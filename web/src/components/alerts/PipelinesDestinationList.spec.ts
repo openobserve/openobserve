@@ -214,10 +214,12 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).confirmDelete.data).toBeNull();
     });
 
-    it("has 7 table columns", async () => {
+    it("has 6 table columns", async () => {
+      // The "#" index column is now OTable's built-in show-index gutter, not a
+      // member of `columns`, so the array holds only the 6 real data columns.
       wrapper = mountComponent();
       await flushPromises();
-      expect((wrapper.vm as any).columns).toHaveLength(7);
+      expect((wrapper.vm as any).columns).toHaveLength(6);
     });
   });
 

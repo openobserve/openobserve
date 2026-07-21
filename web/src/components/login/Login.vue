@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container w-[100vw] h-[100vh]">
+  <div class="bg-card-glass-bg w-[100vw] h-[100vh]">
     <div style="max-width: 400px; padding-top: 100px" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"
@@ -48,15 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <img
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="appLogo"
-          style="height: auto"
+          class="appLogo h-auto"
           :style="
             store.state.zoConfig.custom_logo_text != ''
               ? 'width: 150px;'
               : 'width: 250px;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
@@ -64,15 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex justify-center mb-4" v-else>
         <img
-          class="appLogo"
-          style="height: auto"
+          class="appLogo h-auto"
           :style="
             store.state.zoConfig.custom_logo_text != ''
               ? 'width: 150px;'
               : 'width: 250px;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
@@ -87,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-else>
-        <div style="font-size: 22px" class="w-full text-center pb-3">
+        <div style="font-size: var(--text-xl)" class="w-full text-center pb-3">
           Login
         </div>
 
@@ -114,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <a
-            class="cursor-pointer py-3 hover:text-[#595959]"
+            class="cursor-pointer py-3 hover:text-text-secondary"
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
@@ -126,23 +124,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="login-inputs"
         >
-          <div class="flex flex-col gap-3">
-            <OInput
-              v-model="name"
+          <OForm
+            :schema="loginSchema"
+            :default-values="loginDefaults"
+            @submit="onSignIn"
+            class="flex flex-col gap-3"
+          >
+            <OFormInput
+              name="name"
               data-cy="login-user-id"
               data-test="login-user-id"
-              :label="`${t('login.userEmail')} *`"
-              placeholder="Email"
+              :label="t('login.userEmail')"
+              :placeholder="t('login.email')"
               type="email"
+              required
             />
 
-            <OInput
-              v-model="password"
+            <OFormInput
+              name="password"
               data-cy="login-password"
               data-test="login-password"
-              :label="`${t('login.password')} *`"
-              placeholder="Password"
+              :label="t('login.password')"
+              :placeholder="t('login.password')"
               type="password"
+              required
             />
 
             <OButton
@@ -153,11 +158,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               block
               type="submit"
               :loading="submitting"
-              @click="onSignIn()"
             >
               {{ t('login.login') }}
             </OButton>
-          </div>
+          </OForm>
         </div>
       </div>
     </div>
@@ -165,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -182,34 +186,43 @@ import {
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
+import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from '@/lib/core/Button/OButton.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
+import OForm from '@/lib/forms/Form/OForm.vue';
+import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeLoginSchema, loginDefaults, type LoginForm } from "./Login.schema";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton, OInput },
+  components: { OButton, OForm, OFormInput },
 
   setup() {
     const store = useStore();
     const router = useRouter();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const name = ref("");
     const password = ref("");
     const confirmpassword = ref("");
     const email = ref("");
-    const loginform = ref();
     const selectedOrg = ref({});
     const autoRedirectDexLogin = ref(false);
     let orgOptions = ref([{ label: Number, value: String }]);
-    const { identify } = useReo();
+    useReo();
 
     const submitting = ref(false);
 
     const loginAsInternalUser = ref(false);
+
+    // Zod schema for the internal-user login form (email + required password).
+    // Built via the i18n factory and RETURNED from setup() so `:schema` resolves
+    // in the Options-API template (a module-scope import is out of the template's
+    // scope, which would silently disable validation).
+    const loginSchema = makeLoginSchema(t);
 
     onBeforeMount(() => {
 
@@ -247,8 +260,14 @@ export default defineComponent({
       }
     };
 
-    const onSignIn = () => {
-      if (name.value == "" || password.value == "") {
+    // Called by OForm's @submit with the schema-validated values. Still accepts
+    // no argument (falls back to the name/password refs) so it can be invoked
+    // directly — the empty-field guard below stays as defense in depth even
+    // though the schema now blocks empty/invalid submits before we get here.
+    const onSignIn = (values?: LoginForm) => {
+      const nameValue = values?.name ?? name.value;
+      const passwordValue = values?.password ?? password.value;
+      if (nameValue == "" || passwordValue == "") {
         toast({
           variant: "warning",
           message: "Please input valid username or password.",
@@ -259,8 +278,8 @@ export default defineComponent({
           //authorize user using username and password
           authService
             .sign_in_user({
-              name: name.value,
-              password: password.value,
+              name: nameValue,
+              password: passwordValue,
             })
             .then(async (res: any) => {
               //if user is authorized, get user info
@@ -268,14 +287,14 @@ export default defineComponent({
                 //get user info from backend and extract auth token and set it into localstorage
                 const authToken = getBasicAuth(name.value, password.value);
                 const userInfo = {
-                  given_name: name.value,
+                  given_name: nameValue,
                   auth_time: Math.floor(Date.now() / 1000),
-                  name: name.value,
+                  name: nameValue,
                   exp: Math.floor(
                     (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000,
                   ),
                   family_name: "",
-                  email: name.value,
+                  email: nameValue,
                   role: res.data.role,
                 };
                 const encodedUserInfo: any = b64EncodeStandard(
@@ -346,13 +365,18 @@ export default defineComponent({
                             user_email: store.state.userInfo.email,
                             ingest_threshold: data.ingest_threshold,
                             search_threshold: data.search_threshold,
-                            subscription_type: data.hasOwnProperty(
+                            subscription_type:
+                              Object.prototype.hasOwnProperty.call(
+                                data,
+                                "CustomerBillingObj",
+                              )
+                                ? data.CustomerBillingObj.subscription_type
+                                : "",
+                            status: data.status,
+                            note: Object.prototype.hasOwnProperty.call(
+                              data,
                               "CustomerBillingObj",
                             )
-                              ? data.CustomerBillingObj.subscription_type
-                              : "",
-                            status: data.status,
-                            note: data.hasOwnProperty("CustomerBillingObj")
                               ? data.CustomerBillingObj.note
                               : "",
                           };
@@ -403,7 +427,7 @@ export default defineComponent({
                 });
               }
             })
-            .catch((e: Error) => {
+            .catch(() => {
               //if any error occurs, show error message and reset form.
               submitting.value = false;
               toast({
@@ -429,6 +453,8 @@ export default defineComponent({
       email,
       submitting,
       onSignIn,
+      loginSchema,
+      loginDefaults,
       tab: ref("signin"),
       innerTab: ref("signup"),
       store,
@@ -439,11 +465,12 @@ export default defineComponent({
       loginWithSSo,
       config,
       autoRedirectDexLogin,
+      isDark,
     };
   },
   methods: {
     selected(item: any) {
-      toast(`Selected suggestion "${item.label}"`);
+      toast({ message: `Selected suggestion "${item.label}"` });
     },
   },
 });

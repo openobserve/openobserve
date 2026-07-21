@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        class="flex items-center justify-between w-full pt-2 px-[0.375rem]"
+        class="flex items-center justify-between w-full pt-2 px-1.5"
       >
         <div class="pr-1 w-[60%]">
           <OInput
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="mb-1 px-2 py-2 cursor-pointer rounded hover:bg-[#ededed] hover:text-black"
+            class="mb-1 px-2 py-2 cursor-pointer rounded-default hover:bg-interactive-hover-bg hover:text-text-body"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
@@ -169,7 +169,12 @@ const props = defineProps({
 });
 
 const activeTab = ref<string>("breadcrumbs");
-const tabs = [
+const tabs: Array<{
+  label: string;
+  value: string;
+  icon: string;
+  style: Record<string, string>;
+}> = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
@@ -261,11 +266,3 @@ const handleEventClick = (event: any) => {
   emit("event-emitted", "event-click", event);
 };
 </script>
-
-<style>
-.event-type-selector .q-field__control .q-field__native span {
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-}
-</style>

@@ -206,18 +206,14 @@ const PREVIEW_STATE_LIMIT = 300;
 /**
  * Page one holds this many cards; "Show more" reveals another increment.
  *
- * This IS an upfront query budget, whatever an earlier version of this comment
- * claimed. `hideEmptyPanels` defaults on, and emptiness is only knowable by
- * asking, so `sweepSlice` queries the WHOLE slice on load — not just what is on
- * screen. At 30 that was 30 PromQL range queries before the user had done
- * anything, against a backend that already times out on heavy metrics, and most
- * of the answers were thrown away: a typical org hides two thirds of them as
- * empty and renders ~11.
+ * This is an upfront query budget: `hideEmptyPanels` defaults on and emptiness
+ * is only knowable by asking, so `sweepSlice` queries the WHOLE slice on load —
+ * not just what is on screen. Kept small because the backend already times out
+ * on heavy metrics and most answers are thrown away (a typical org hides two
+ * thirds as empty).
  *
- * 8 is four rows of the 2-up grid — a bit more than a screenful, so page one
- * still fills once the empties are dropped, and a click costs another six.
- * Divides evenly by both column counts the grid uses (2, and 1 when narrow), so
- * no row is ever left half-empty at the fold.
+ * 8 is four rows of the 2-up grid — a bit more than a screenful — and divides
+ * evenly by both column counts the grid uses (2, and 1 when narrow).
  */
 export const INITIAL_PAGE_SIZE = 8;
 
@@ -230,13 +226,8 @@ export const SWEEP_DEBOUNCE_MS = 250;
 /**
  * Cards revealed per "Show more" click — three rows of the 2-up grid.
  *
- * Was 12, from when the grid was 3-up (four rows). At 2 columns that reveals six
- * rows at once: more than a screenful, so the user loses their place and pays for
- * a batch of queries they did not ask to see. Six lands just past the fold, which
- * is what makes the click feel like "a bit more" rather than "a whole new page".
- *
- * The button's label is computed from this constant, so it always tells the truth
- * about what a click will do.
+ * Six lands just past the fold, so the click feels like "a bit more" rather than
+ * "a whole new page". The button's label is computed from this constant.
  */
 export const PAGE_SIZE_INCREMENT = 6;
 
@@ -360,9 +351,9 @@ export function useMetricsExplorerGrid() {
 
   const overrides = ref<Record<string, FnOverride>>({});
 
-  // The SCRATCHPAD's pinned metrics — a first-class, persisted (localStorage,
-  // org-keyed) working set of hand-picked metrics. `toggleFavorite` is its writer.
-  // The Workspace tab shows exactly this set (via showFavoritesOnly).
+  // The scratchpad's pinned metrics — a persisted (localStorage, org-keyed)
+  // working set of hand-picked metrics. `toggleFavorite` is its writer, and the
+  // Workspace tab shows exactly this set (via showFavoritesOnly).
   const favorites = ref<string[]>([]);
 
   const loadLocalState = () => {
@@ -446,10 +437,12 @@ export function useMetricsExplorerGrid() {
     loading.value = true;
     loadError.value = "";
     try {
-      const response = await getStreams("metrics", false, false, force);
+      const response = (await getStreams("metrics", false, false, force)) as {
+        list?: MetricStream[];
+      };
       if (generation !== orgGeneration || requestedOrg !== org.value) return;
 
-      streams.value = (response?.list ?? []) as MetricStream[];
+      streams.value = response?.list ?? [];
       cards.value = buildMetricCards(streams.value);
       loadLocalState();
       pruneLocalState();
@@ -480,11 +473,8 @@ export function useMetricsExplorerGrid() {
 
   /**
    * The load currently in flight, so a second caller AWAITS it instead of
-   * returning early. `ensureSchemas` used to answer `void` while
-   * `schemaLoading` was true — but `loadLabelValues` awaits it precisely to
-   * read `labelsByStream` on the next line, so the early return handed it an
-   * empty map, its fan-out matched no streams, and the resulting `[]` was
-   * cached as this label's answer for the whole session.
+   * returning early — callers like `loadLabelValues` read `labelsByStream`
+   * immediately after awaiting, so an early return would hand them an empty map.
    */
   let schemaInFlight: Promise<void> | null = null;
 
@@ -542,20 +532,14 @@ export function useMetricsExplorerGrid() {
 
   /**
    * Do we KNOW the label membership — not "did we finish trying to find out".
-   *
-   * `schemaLoaded` is set even when the load FAILS (that is what stops it
-   * retrying on every keystroke), so gating eligibility on it meant a failed
-   * load left an empty `labelsByStream` behind a flag that said "loaded". Every
-   * card then failed the membership test and the grid went blank the moment a
-   * chip was added — the exact opposite of the fail-open it documents. Without
-   * membership data we cannot prove a card ineligible, so we do not claim it is.
+   * `schemaLoaded` is set even when the load FAILS, so it cannot answer this:
+   * without membership data we cannot prove a card ineligible, so we do not
+   * claim it is (fail open).
    *
    * A `computed`, NOT an `Object.keys` call inside `isLabelEligible`: that runs
-   * once per card across five separate passes (`filteredCards`,
-   * `emptyHiddenCount` and the three facet counts), so materialising a
-   * 3,000-element key array in it cost ~90ms per keystroke on a large org — the
-   * search box visibly stuttered on every character. `labelsByStream` is a
-   * shallowRef, so this recomputes only when the map is actually replaced.
+   * once per card across five separate passes, so materialising a 3,000-element
+   * key array in it cost ~90ms per keystroke on a large org. `labelsByStream` is
+   * a shallowRef, so this recomputes only when the map is actually replaced.
    */
   const membershipKnown = computed(
     () => Object.keys(labelsByStream.value).length > 0,
@@ -947,13 +931,9 @@ export function useMetricsExplorerGrid() {
    * The org's scrape interval — the SAME field the panel substitution resolves
    * `$__rate_interval` against (usePanelVariableSubstitution).
    *
-   * The rate window is `max(step + scrape, 4 * scrape)`. Assuming a scrape
-   * interval of our own here meant a card charted a metric with different
-   * smoothing from the panel you land on when you click it: `[4m]` on the card
-   * against `[1m]` in the editor, for the same metric at the same range. One
-   * source of truth, so the drill-in is what you actually clicked — and if the
-   * number is wrong, it is wrong in one place for the whole product rather than
-   * in two places that disagree.
+   * The rate window is `max(step + scrape, 4 * scrape)`. One source of truth, so
+   * a card charts a metric with the same smoothing as the panel you land on when
+   * you click it, rather than two places that disagree.
    */
   const scrapeIntervalSeconds = computed(
     () =>
@@ -968,14 +948,11 @@ export function useMetricsExplorerGrid() {
   /**
    * How many points a card's preview asks for. Heatmaps are coarser.
    *
-   * EVERY derivation must go through this, including the default below. The rate
-   * window is computed from the point count, and above ~2h of range the
-   * 4x-scrape floor stops dominating, so 40 points and 50 points produce
-   * genuinely different queries: at 6h, `[10m]` against `[8m12s]`. Callers that
-   * took the old `PREVIEW_POINTS` default therefore disagreed with the ones that
-   * used `pointsFor` — a histogram card CHARTED one query and handed a different
-   * one to the editor on click, and the dialog's default tile could not hit the
-   * cache entry the card had just filled.
+   * EVERY derivation must go through this. The rate window is computed from the
+   * point count, and above ~2h of range the 4x-scrape floor stops dominating, so
+   * 40 points and 50 points produce genuinely different queries (at 6h, `[10m]`
+   * against `[8m12s]`). A caller using a different point count would generate a
+   * query the card, editor and dialog tile could not share via the cache.
    */
   const pointsFor = (card: MetricCard) =>
     card.chartType === "heatmap" ? HEATMAP_POINTS : PREVIEW_POINTS;
@@ -1098,9 +1075,8 @@ export function useMetricsExplorerGrid() {
   /**
    * Drops a card's rendered preview and abandons whatever it still has running.
    *
-   * The queue is keyed on the generated query string, never on the card name —
-   * cancelling `card:<name>` matched nothing and silently left the superseded
-   * query holding a concurrency slot.
+   * The queue is keyed on the generated query string, never on the card name, so
+   * cancellation must go through the card's query keys.
    *
    * @param alsoCancel keys the card occupied under a state it has since left.
    *   `previewKeysOf` can only describe the CURRENT state, so a caller that
@@ -1367,15 +1343,11 @@ export function useMetricsExplorerGrid() {
       nanGuardApplied: !!cached.value.nanGuardApplied,
       /**
        * The window this data was actually FETCHED for — not the one currently
-       * selected. The card pins its x-axis to this.
-       *
-       * Without it the axis was pinned to `timeRange`, which a relative range
-       * re-stamps to `now` on every mount: the axis marched forward with the
-       * wall clock while the cached points underneath stayed put, so a chart
-       * claimed to show 10:15-10:30 while plotting data from 09:40. Dashboards
-       * avoid this by restoring `metadata` from the cache too
-       * (usePanelDataLoader.ts:841) and pinning from the QUERY's window, never
-       * the selected one — this is the same idea, carried on the preview.
+       * selected. The card pins its x-axis to this so a relative range that
+       * re-stamps `timeRange` to `now` on every mount does not march the axis
+       * forward while the cached points underneath stay put. Same idea as the
+       * dashboards restoring `metadata` and pinning from the QUERY's window
+       * (usePanelDataLoader.ts:841), carried on the preview.
        */
       cachedTimeRange:
         range.start_time && range.end_time
@@ -1526,8 +1498,7 @@ export function useMetricsExplorerGrid() {
       cachedDataDiffersFromTimeRange: false,
       // Carried with `results` above: a re-query keeps the OLD chart on screen
       // while it runs, so the axis must keep describing that old data until the
-      // new data lands. Dropping it snapped the axis to the selected window for
-      // the duration of every refresh, then back — a visible twitch.
+      // new data lands.
       cachedTimeRange: existing?.cachedTimeRange ?? null,
       footerLabel: resolved.footerLabel,
     };
@@ -1737,13 +1708,6 @@ export function useMetricsExplorerGrid() {
     queue.clearCache();
   };
 
-  /**
-   * Runs one query for a ⚙-dialog tile.
-   *
-   * Deliberately shares the grid's scheduler and cache: dialog tiles outrank
-   * background grid work while the dialog is open, and a tile whose query the
-   * grid already ran is a cache hit rather than a second request.
-   */
   /** Distinguishes dialog interest from card interest on the same query. */
   const DIALOG_OWNER = "\u0000dialog";
 
@@ -1796,15 +1760,13 @@ export function useMetricsExplorerGrid() {
    *
    * The names are WINDOW-SCOPED: `labels` is asked over `start_time`/`end_time`,
    * so a label that only exists on a job that ran last week is absent from a
-   * 15-minute window and present in a 30-day one. Caching them for the life of
-   * the page, as this did, meant the picker kept offering the first window's
-   * answer forever — widen the range to go looking for a label, and the label
-   * still would not be there.
+   * 15-minute window and present in a 30-day one — the picker must re-ask when
+   * the window changes.
    *
-   * A plain `labelNames.value = []` would not be enough: a request already in
-   * flight for the OLD window would land afterwards and repopulate the list with
-   * exactly the stale answer we were trying to drop. The generation is what lets
-   * that late response identify itself as obsolete and do nothing.
+   * A plain `labelNames.value = []` is not enough: a request already in flight
+   * for the OLD window would land afterwards and repopulate the list with the
+   * stale answer. The generation lets that late response identify itself as
+   * obsolete and do nothing.
    */
   let labelNamesGeneration = 0;
 

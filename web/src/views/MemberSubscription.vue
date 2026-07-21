@@ -15,16 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md">
+  <div class="rounded-default">
     <div
-      style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
+      class="text-center w-full"
+      style="font-size: var(--text-3xl); margin: 40px 0px"
     >
       Member Subscription
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
     <div
       v-else-if="status == 'error' && error == ''"
-      style="text-align: center"
+      class="text-center"
     >
       Error while processing member subscription request.<br /><br />
     </div>
@@ -39,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- <div
       v-if="status == 'error' && error !== ''"
-      class="subscription_message q-btn-primary"
+      class="subscription_message"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
       <OButton variant="primary" class="mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
@@ -85,15 +86,15 @@ export default defineComponent({
       const params = new URLSearchParams(hash);
       const invited_org_id = params.get("org_id");
       await organizationsService
-        .process_subscription(s, action, invited_org_id)
+        .process_subscription(s, action, invited_org_id ?? "")
         .then((res) => {
           this.status = "completed";
-          const dismiss = toast({
+          toast({
             variant: "success",
             message: res.data.message,
           });
 
-          if (res.data.hasOwnProperty("data")) {
+          if (Object.prototype.hasOwnProperty.call(res.data, "data")) {
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 

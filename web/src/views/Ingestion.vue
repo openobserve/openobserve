@@ -17,17 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="ingestionPage h-full flex flex-col" data-test="ingestion-page">
-    <!-- Standard page header: title + icon. Search / token controls live in the
-         toolbar row below. -->
-    <!-- Standard page header: title + icon, with search / token controls and the
-         Manage-Tokens action on the SAME header line. -->
-    <AppPageHeader
-      :title="t('ingestion.header')"
-      icon="data-plus-line"
-      tabs-below
-      class="shrink-0 px-4"
-    >
+  <OPageLayout
+    class="ingestionPage"
+    data-test="ingestion-page"
+    :title="t('ingestion.header')"
+    icon="data-plus-line"
+    tabs-below
+    bleed
+  >
       <template #actions>
         <div class="w-50 flex-none">
           <OSearchInput
@@ -82,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`ingestion.generateRUMTokenLabel`) }}
         </OButton>
       </template>
-      <template #tabs>
+      <template #header-tabs>
         <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
         <div class="-ml-3 w-full">
@@ -145,7 +142,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabs>
         </div>
       </template>
-    </AppPageHeader>
     <ConfirmDialog
       title="Reset RUM Token"
       message="Are you sure you want to update rum token for this organization?"
@@ -160,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
         store.state.organizationData.isDataIngested == false
       "
-      class="text-subtitle bg-amber-500 p-2 font-bold mx-2.5 mt-1 rounded-md"
+      class="text-subtitle bg-warning p-2 font-bold mx-2.5 mt-1 rounded-default"
     >
       {{ t("ingestion.redirectionIngestionMsg") }}
     </div>
@@ -173,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </router-view>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -181,7 +177,7 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 // @ts-ignore
 import {
   defineComponent,
@@ -199,17 +195,18 @@ import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { getImageURL } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageIngestion",
-  components: { AppPageHeader, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
+  components: { OPageLayout, ConfirmDialog, OTabs, ORouteTab, OButton, OSearchInput,
     OSelect,
 },
   setup() {
@@ -242,7 +239,7 @@ export default defineComponent({
     watch(
       tokenOptions,
       (opts) => {
-        if (opts.length > 0 && !opts.find((o) => o.value === selectedTokenName.value)) {
+        if (opts.length > 0 && !opts.find((o: { value: string }) => o.value === selectedTokenName.value)) {
           selectedTokenName.value = opts[0].value;
           const tokens = store.state.organizationData.orgTokens || [];
           const token = tokens.find((t: any) => t.name === opts[0].value);
@@ -253,7 +250,7 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const onTokenSelected = (name: string) => {
+    const onTokenSelected = (name: SelectModelValue) => {
       const tokens = store.state.organizationData.orgTokens || [];
       const token = tokens.find((t: any) => t.name === name);
       if (token?.token) {
@@ -505,7 +502,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           store.state.organizationData.rumToken.id,
         )
-        .then((res) => {
+        .then(() => {
           getRUMToken();
           toast({
             variant: "success",
@@ -546,50 +543,6 @@ export default defineComponent({
       { name: "languages", label: t("ingestion.languagesLabel") },
       { name: "ai-integrations", label: t("ingestion.aiLabel") },
       { name: "others", label: t("ingestion.otherLabel") },
-    ];
-
-    // Recommended sub-tabs
-    const recommendedSubTabs = [
-      {
-        name: "ingestFromKubernetes",
-        label: t("ingestion.kubernetes"),
-        parentTab: "recommended",
-      },
-      {
-        name: "ingestFromWindows",
-        label: t("ingestion.windows"),
-        parentTab: "recommended",
-      },
-      {
-        name: "ingestFromLinux",
-        label: t("ingestion.linux"),
-        parentTab: "recommended",
-      },
-      {
-        name: "AWSConfig",
-        label: t("ingestion.awsconfig"),
-        parentTab: "recommended",
-      },
-      {
-        name: "GCPConfig",
-        label: t("ingestion.gcpconfig"),
-        parentTab: "recommended",
-      },
-      {
-        name: "AzureConfig",
-        label: t("ingestion.azure"),
-        parentTab: "recommended",
-      },
-      {
-        name: "ingestFromTraces",
-        label: t("ingestion.tracesotlp"),
-        parentTab: "recommended",
-      },
-      {
-        name: "frontendMonitoring",
-        label: t("ingestion.rum"),
-        parentTab: "recommended",
-      },
     ];
 
     // Watch for search changes and navigate

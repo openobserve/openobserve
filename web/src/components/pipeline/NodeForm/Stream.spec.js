@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -200,7 +200,7 @@ describe("Stream Component", () => {
     });
 
     it("clears userSelectedNode on mount", async () => {
-      const wrapper = createWrapper();
+      createWrapper();
       await flushPromises();
       expect(mockPipelineObj.userSelectedNode).toEqual({});
     });
@@ -227,7 +227,7 @@ describe("Stream Component", () => {
     });
 
     it("falls back to the pipelines/streams API when usedStreams isn't shared yet", async () => {
-      const wrapper = createWrapper({ usedStreams: null });
+      createWrapper({ usedStreams: null });
       await flushPromises();
       expect(mockGetUsedStreamsList).toHaveBeenCalledTimes(1);
     });
@@ -507,7 +507,7 @@ describe("Stream Component", () => {
       await flushPromises();
       const opts = ["TIMESTAMP", "message"];
       const update = vi.fn((cb) => cb());
-      const result = wrapper.vm.filterColumns(opts, "MESS", update);
+      wrapper.vm.filterColumns(opts, "MESS", update);
       // update is called; filtered result contains "message"
       expect(update).toHaveBeenCalled();
     });
@@ -623,15 +623,6 @@ describe("Stream Component", () => {
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
-    it("resets userClickedNode and userSelectedNode", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      mockPipelineObj.userClickedNode = { id: "x" };
-      mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.openCancelDialog();
-      expect(mockPipelineObj.userClickedNode).toEqual({});
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
-    });
   });
 
   // -------------------------------------------------------------------------

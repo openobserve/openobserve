@@ -1,5 +1,5 @@
 <template>
-  <div style="display: flex; align-items: center; width: 100%">
+  <div class="flex items-center w-full">
     <OSelect
       v-model="backgroundType"
       :options="colorModeOptions"
@@ -11,8 +11,7 @@
     <div v-if="backgroundType === 'single'">
       <div
         data-test="dashboard-config-color-input-wrapper"
-        class="h-6.25 w-6.25 overflow-hidden rounded-full inline-flex items-center relative"
-        style="margin-top: 36px; margin-left: 5px"
+        class="h-6.25 w-6.25 overflow-hidden rounded-full inline-flex items-center relative mt-9 ml-1.25"
       >
         <input
           data-test="dashboard-config-color-input"
@@ -27,7 +26,7 @@
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
+import { computed, defineComponent, inject, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 

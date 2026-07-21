@@ -34,7 +34,7 @@ vi.mock("@/services/alert_destination", () => ({
 let uuidCounter = 0;
 vi.mock("@/utils/zincutils", () => ({
   isValidResourceName: vi.fn((val: string) => {
-    const invalidChars = /[:\/?#\s]/;
+    const invalidChars = /[:/?#\s]/;
     return !invalidChars.test(val);
   }),
   getImageURL: vi.fn((path: string) => `/mock/${path}`),
@@ -78,15 +78,7 @@ describe("CreateDestinationForm", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "q-stepper": false,
-          "q-step": false,
-          "q-input": false,
-          "q-select": false,
-          "q-btn": false,
           "OIcon": false,
-          "q-card": false,
-          "q-card-section": false,
-          "q-toggle": false,
         },
       },
     });

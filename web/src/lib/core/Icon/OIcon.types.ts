@@ -6,8 +6,9 @@ export interface IconProps {
   /**
    * Either an approved icon name from the registry, or an `img:<path>` reference
    * to render an external image. To add a registry icon, update OIcon.icons.ts.
+   * Optional: when omitted the icon is supplied via the default slot.
    */
-  name: IconName | string;
+  name?: IconName | string;
   /**
    * Semantic size. Defaults to "md" (24px).
    * xs=12px  sm=16px  md=24px  lg=32px  xl=40px

@@ -78,9 +78,9 @@ function removeAssertion(index: number) {
 </script>
 
 <template>
-  <div class="rounded-lg border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
-      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+  <div class="rounded-default border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-2.5 px-3">
+      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
       <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.protocolConfig.http.title') }}</h3>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">
@@ -116,7 +116,7 @@ function removeAssertion(index: number) {
               :model-value="h.name"
               :placeholder="t('synthetics.protocolConfig.http.headerName')"
               :data-test="`synthetics-check-http-header-name-${i}`"
-              @update:model-value="(v: string) => patchHeader(i, { name: v })"
+              @update:model-value="(v: string | number) => patchHeader(i, { name: typeof v === 'string' ? v : String(v) })"
             />
           </div>
           <div class="flex-1 min-w-0">
@@ -124,7 +124,7 @@ function removeAssertion(index: number) {
               :model-value="h.value"
               :placeholder="t('synthetics.protocolConfig.http.headerValue')"
               :data-test="`synthetics-check-http-header-value-${i}`"
-              @update:model-value="(v: string) => patchHeader(i, { value: v })"
+              @update:model-value="(v: string | number) => patchHeader(i, { value: typeof v === 'string' ? v : String(v) })"
             />
           </div>
           <OButton
@@ -177,7 +177,7 @@ function removeAssertion(index: number) {
               :model-value="a.value"
               :placeholder="t('synthetics.protocolConfig.http.assertionValue')"
               :data-test="`synthetics-check-http-assertion-value-${i}`"
-              @update:model-value="(v: string) => patchAssertion(i, { value: v })"
+              @update:model-value="(v: string | number) => patchAssertion(i, { value: typeof v === 'string' ? v : String(v) })"
             />
           </div>
           <OButton

@@ -36,9 +36,9 @@ const screenshotDescription = computed(() => {
 </script>
 
 <template>
-  <div class="rounded-lg border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
-      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+  <div class="rounded-default border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-2.5 px-3">
+      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
       <h3 class="text-base font-semibold text-text-heading">{{ t('synthetics.capture.title') }}</h3>
     </div>
     <div class="px-3 py-2 flex flex-col gap-4">

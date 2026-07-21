@@ -186,7 +186,9 @@ export default defineComponent({
 
     // Reactive READ of the form's `series` array (rule ③: form.useStore, NOT a
     // local copy) — drives the draggable + v-for.
-    const editColorBySeries = form.useStore((s: any) => s.values?.series ?? []);
+    const editColorBySeries = form.useStore(
+      (s: any): ColorBySeriesPopUpForm["series"] => s.values?.series ?? [],
+    );
 
     // Re-seed the form on open (the overlay may keep the body mounted).
     watch(
@@ -203,12 +205,17 @@ export default defineComponent({
     });
 
     // Structural mutations go through the form (the single source).
+    // Cast: useOForm erases TFormData to Record<string, unknown>, so array
+    // field keys don't survive DeepKeysOfType and resolve to `never`.
     const addcolorBySeries = () => {
-      form.pushFieldValue("series", {
-        type: "value",
-        value: "",
-        color: null,
-      });
+      (form.pushFieldValue as (field: string, value: unknown) => void)(
+        "series",
+        {
+          type: "value",
+          value: "",
+          color: null,
+        },
+      );
     };
 
     // Use props.options for series dropdown options (not for initialization)
@@ -227,7 +234,10 @@ export default defineComponent({
     };
 
     const removecolorBySeriesByIndex = (index: number) => {
-      form.removeFieldValue("series", index);
+      (form.removeFieldValue as (field: string, index: number) => void)(
+        "series",
+        index,
+      );
     };
 
     // Draggable reorder → write the new order back to the form.
@@ -236,7 +246,10 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      if ((form.getFieldValue("series") ?? []).length === 0) {
+      if (
+        ((form.getFieldValue("series") ??
+          []) as ColorBySeriesPopUpForm["series"]).length === 0
+      ) {
         addcolorBySeries();
       }
     });
@@ -256,9 +269,9 @@ export default defineComponent({
     };
 
     // Method to open color picker directly
-    const openColorPicker = (index: number) => {
+    const openColorPicker = () => {
       // This method is called when the colorize icon is clicked
-      // The color picker should open automatically due to q-popup-proxy
+      // The color picker should open automatically via its popup proxy
     };
 
     return {

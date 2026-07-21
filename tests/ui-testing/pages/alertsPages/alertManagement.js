@@ -517,7 +517,7 @@ export class AlertManagement {
 
     /**
      * Open alert details dialog by clicking alert name in the list (PR #10470)
-     * The new AlertHistoryDrawer is rendered inside a q-dialog
+     * The new AlertHistoryDrawer is rendered inside a dialog
      * @param {string} alertName - Name of the alert
      */
     async openAlertDetailsDialog(alertName) {

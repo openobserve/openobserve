@@ -18,11 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full p-0">
     <template v-if="!showImportRegexPatternDialog">
     <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-    <AppPageHeader
+    <OPageLayout
       :title="t('regex_patterns.title')"
       icon="pattern"
       :subtitle="t('settings.regexPatternList.subtitle')"
-      class="shrink-0 px-4 border-b border-border-default"
+      bleed
     >
       <template #actions>
         <OButton
@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="createRegexPattern"
         >{{ t("regex_patterns.create_pattern") }}</OButton>
       </template>
-    </AppPageHeader>
-    <div class="card-container flex-1 min-h-0 overflow-hidden">
+    <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
     <OTable
       :frame="false"
       data-test="regex-pattern-list-table"
@@ -54,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      show-index
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="settings-regex-patterns"
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template #bottom>
         <div class="flex items-center gap-2">
-          <span class="o2-table-footer-title">
+          <span class="text-xs font-normal">
             {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
           </span>
           <OButton
@@ -148,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     </div>
+    </OPageLayout>
     </template>
     <ImportRegexPattern
       v-else-if="showImportRegexPatternDialog"
@@ -182,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, onMounted, watch, defineComponent, computed } from "vue";
+import { ref, onMounted, defineComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { convertUnixToDateFormat } from "@/utils/zincutils";
@@ -202,15 +203,15 @@ import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "RegexPatternList",
   components: {
-    AppPageHeader,
+    OPageLayout,
     ConfirmDialog,
     AddRegexPattern,
     ImportRegexPattern,
@@ -229,13 +230,6 @@ export default defineComponent({
     const router = useRouter();
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("regex_patterns.name"),
@@ -363,10 +357,8 @@ export default defineComponent({
         const response = await regexPatternsService.list(
           store.state.selectedOrganization.identifier,
         );
-        let counter = 1;
         regexPatterns.value = response.data.patterns.map((pattern: any) => ({
           ...pattern,
-          "#": counter <= 9 ? `0${counter++}` : counter++,
           created_at: convertUnixToDateFormat(pattern.created_at),
           updated_at: convertUnixToDateFormat(pattern.updated_at),
         }));

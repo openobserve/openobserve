@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @variablesManagerReady="onVariablesManagerReady"
       >
         <template v-slot:before_panels>
-          <div class="flex items-center q-pb pt-3 text-base font-medium font-bold">
+          <div class="flex items-center pt-3 text-base font-medium font-bold">
             <div class="text-center w-[25%]">
               {{ t("rum.webVitalsLabel") }}
             </div>
@@ -82,7 +82,6 @@ import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
-import { cloneDeep } from "lodash-es";
 import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
@@ -151,24 +150,6 @@ export default defineComponent({
 
     // variables data
     const variablesData = reactive({});
-    const variablesDataUpdated = (data: any) => {
-      Object.assign(variablesData, data);
-      const variableObj = {};
-      data.values.forEach((v) => {
-        variableObj[`var-${v.name}`] = v.value;
-      });
-      router.replace({
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          dashboard: route.query.dashboard,
-          folder: route.query.folder,
-          refresh: generateDurationLabel(refreshInterval.value),
-          ...getQueryParamsForDuration(selectedDate.value),
-          ...variableObj,
-        },
-      });
-    };
-
     // ======= [START] default variable values
 
     const initialVariableValues = {};

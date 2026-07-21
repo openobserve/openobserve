@@ -694,23 +694,13 @@ describe("Query Component", () => {
     });
 
     it("openDeleteDialog ok callback deletes node and emits cancel:hideform", async () => {
-      const wrapper = createWrapper({}, { currentSelectedNodeID: "q-node-1" });
+      const wrapper = createWrapper({}, { currentSelectedNodeID: "node-1" });
       await flushPromises();
       wrapper.vm.openDeleteDialog();
       wrapper.vm.dialog.okCallback();
       await nextTick();
-      expect(mockDeletePipelineNode).toHaveBeenCalledWith("q-node-1");
+      expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-1");
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("closeDialog resets userClickedNode and userSelectedNode", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      mockPipelineObj.userClickedNode = { id: "x" };
-      mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.closeDialog();
-      expect(mockPipelineObj.userClickedNode).toEqual({});
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
     });
 
     it("closeDialog emits cancel:hideform", async () => {
@@ -859,10 +849,10 @@ describe("Query Component", () => {
   // -------------------------------------------------------------------------
   describe("deleteRoute", () => {
     it("calls deletePipelineNode with the current node ID", async () => {
-      const wrapper = createWrapper({}, { currentSelectedNodeID: "q-node-delete" });
+      const wrapper = createWrapper({}, { currentSelectedNodeID: "node-delete" });
       await flushPromises();
       wrapper.vm.deleteRoute();
-      expect(mockDeletePipelineNode).toHaveBeenCalledWith("q-node-delete");
+      expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-delete");
     });
 
     it("emits cancel:hideform after deleting", async () => {

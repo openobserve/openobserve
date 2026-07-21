@@ -17,21 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar flex flex-row items-center justify-between gap-x-3 h-10"
-      :style="{
-        backgroundColor:
-          store.state.theme === 'dark'
-            ? 'var(--o2-header-menu-bg)'
-            : 'var(--color-primary-100)',
-      }"
+      class="sql-bar flex flex-row items-center justify-between gap-x-3 h-10 bg-section-header-bg"
       @click.stop
     >
       <div
         class="flex flex-row items-center flex-1 min-w-0"
         data-test="dashboard-query-data"
       >
-        <div
-          style="max-width: 600px; overflow: hidden"
+        <div class="max-w-150 overflow-hidden"
         >
           <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
@@ -72,11 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="cursor-pointer select-none whitespace-nowrap"
-                style="font-size: 12px"
+                class="cursor-pointer select-none whitespace-nowrap text-xs"
+               
                 :title="'Double-click to rename'"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
-              >{{ tab.tabName || ('Query ' + (index + 1)) }}</span>
+              >{{ tab.tabName || ('Query ' + (Number(index) + 1)) }}</span>
               <!-- Eye icon + its tooltip wrapped in a span so the tooltip's
                    trigger is scoped to JUST the icon, not the entire OTab. -->
               <span
@@ -89,11 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
+                  class="ml-1 opacity-[0.7] transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full cursor-pointer"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
-                  style="cursor: pointer"
                   size="sm"
                   :data-test="`dashboard-panel-query-tab-visibility-${index}`"
                   :data-test-hidden="
@@ -112,16 +104,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <OIcon
                 v-if="
-                  index > 0 ||
+                  Number(index) > 0 ||
                   (index === 0 && dashboardPanelData.data.queries.length > 1)
                 "
                 name="close"
                 size="sm"
-                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-[var(--o2-hover-gray)] hover:rounded-full"
+                class="opacity-60 transition-all duration-150 hover:opacity-100 hover:bg-hover-gray hover:rounded-full cursor-pointer"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
-                style="cursor: pointer"
                 :data-test="`dashboard-panel-query-tab-remove-${index}`"
               />
             </OTab>
@@ -135,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
         >
         </OButton>
-        <!-- D5: Warning for restricted chart types with multiple queries.
+        <!-- Warning for restricted chart types with multiple queries.
              Outlined soft-background chip (warning-soft variant + ring),
              height-aligned (h-8) with the toolbar's size="sm" buttons. -->
         <OTag
@@ -158,11 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             <img
               :src="getImageURL('images/common/function.svg')"
-              :style="{
-                width: '16px',
-                height: '16px',
-                filter: store.state.theme === 'dark' ? 'invert(1)' : 'none',
-              }"
+              class="w-4 h-4 dark:invert"
             />
           </template>
         </OSwitch>
@@ -171,18 +158,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div
-    class="flex flex-col flex-1"
+    class="flex flex-col flex-1 overflow-hidden"
     :style="
       !dashboardPanelData.layout.showQueryBar ? 'height: 0px; flex: none;' : ''
     "
-    style="overflow: hidden"
     data-test="dashboard-query"
   >
-      <div class="flex flex-col" style="width: 100%; height: 100%">
-      <div class="flex flex-col" style="width: 100%; height: 100%">
-        <div class="flex" style="height: 100%">
-          <OSplitter
-            style="width: 100%; height: 100%"
+      <div class="flex flex-col w-full h-full">
+      <div class="flex flex-col w-full h-full">
+        <div class="flex h-full">
+          <OSplitter class="w-full h-full"
             v-model="splitterModel"
             :disable="
               promqlMode || !dashboardPanelData.layout.vrlFunctionToggle
@@ -195,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ]"
           >
             <template #separator>
-              <div class="w-1 h-full bg-(--o2-border) transition-colors hover:bg-[orange]"></div>
+              <div class="w-1 h-full bg-border-default transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
               <UnifiedQueryEditor
@@ -231,14 +216,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #after>
-              <div style="display: flex; flex-direction: column; height: 100%; width: 100%">
-                <div style="flex: 1; min-height: 0; width: 100%">
-                  <UnifiedQueryEditor
+              <div class="flex flex-col h-full w-full">
+                <div class="flex-1 min-h-0 w-full">
+                  <UnifiedQueryEditor class="w-full h-full"
                     v-if="
                       !promqlMode && dashboardPanelData.layout.vrlFunctionToggle
                     "
                     data-test="dashboard-vrl-function-editor"
-                    style="width: 100%; height: 100%"
                     ref="vrlFnEditorRef"
                     :languages="['vrl']"
                     default-language="vrl"
@@ -264,15 +248,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].vrlFunctionQuery && functionEditorPlaceholderFlag"
                     class="absolute top-0 left-0 right-0 bottom-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                   >
-                    <span class="font-mono text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
+                    <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ vrlPlaceholder }}</span>
                   </div>
                 </div>
-                <div style="flex-shrink: 0; width: 100%">
-                  <div style="display: flex;" class="items-center">
+                <div class="shrink-0 w-full">
+                  <div class="items-center flex">
                     <OSelect
                       v-model="selectedFunction"
                       :label="t('dashboard.useSavedFunction')"
-                      :options="functionOptions"
+                      :options="functionSelectOptions"
                       label-position="inside"
                       data-test="dashboard-use-saved-vrl-function"
                       labelKey="name"
@@ -287,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="dashboard-addpanel-config-drilldown-info"
                     >
                       <template #icon-left
-                        ><OIcon name="info-outline" size="sm"
+><OIcon name="info-outline" size="sm"
                       /></template>
                       <OTooltip
                         :content="t('dashboard.vrlExtractionTooltip')"
@@ -301,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OSplitter>
         </div>
       </div>
-      <div style="color: red; z-index: 100000" class="mx-2 col-auto">
+      <div class="text-status-error-text z-100000 mx-2 col-auto">
         {{ dashboardPanelData.meta.errors.queryErrors.join(", ") }}
       </div>
     </div>
@@ -318,13 +302,11 @@ import {
   watch,
   computed,
   onMounted,
-  defineAsyncComponent,
   nextTick,
   onUnmounted,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import ConfirmDialog from "../../../components/ConfirmDialog.vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
@@ -343,18 +325,36 @@ import { isQueryVrlEnabled } from "@/composables/dashboard/useVrlFunction";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type {
+  SelectModelValue,
+  SelectOptionInput,
+} from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
+// Minimal surface of UnifiedQueryEditor's exposed methods used here.
+interface QueryEditorInstance {
+  getCursorIndex: () => number;
+  triggerAutoComplete: (_val: string) => void;
+  disableSuggestionPopup: (_val: string) => void;
+  getValue?: () => string;
+  setValue: (_value: string) => void;
+  resetEditorLayout: () => void;
+}
+
+interface FunctionListItem {
+  name: string;
+  function: string;
+}
+
 export default defineComponent({
   name: "DashboardQueryEditor",
   components: {
     OTabs,
     OTab,
-    ConfirmDialog,
     QueryTypeSelector,
     UnifiedQueryEditor,
     OButton,
@@ -384,8 +384,13 @@ export default defineComponent({
     );
 
     const { getAllFunctions } = useFunctions();
-    const functionList = ref([]);
-    const functionOptions = ref([]);
+    const functionList = ref<FunctionListItem[]>([]);
+    const functionOptions = ref<FunctionListItem[]>([]);
+    // Options are keyed via labelKey="name"/valueKey="function", so they carry
+    // no `label` field; the cast bridges that to OSelect's option shape.
+    const functionSelectOptions = computed(
+      () => functionOptions.value as unknown as SelectOptionInput[],
+    );
     const selectedFunction = ref<string | undefined>(undefined);
 
     const getFunctions = async () => {
@@ -399,14 +404,6 @@ export default defineComponent({
           for (let i = 0; i < parseInt(data.num_args); i++) {
             args.push("'${1:value}'");
           }
-
-          const itemObj: {
-            name: any;
-            args: string;
-          } = {
-            name: data.name,
-            args: "(" + args.join(",") + ")",
-          };
 
           functionList.value.push({
             name: data.name,
@@ -437,12 +434,13 @@ export default defineComponent({
       });
     };
 
-    const onFunctionSelect = (fnCode: string | null | undefined) => {
-      if (!fnCode) return;
+    const onFunctionSelect = (fnCode: SelectModelValue) => {
+      // valueKey="function" yields string codes; ignore anything else.
+      if (typeof fnCode !== "string" || !fnCode) return;
       // assign selected vrl function
       vrlFnEditorRef.value?.setValue(fnCode);
       // find function name for notification
-      const fn = functionList.value.find((f: any) => f.function === fnCode);
+      const fn = functionList.value.find((f) => f.function === fnCode);
       // clear v-model
       selectedFunction.value = undefined;
 
@@ -490,7 +488,7 @@ export default defineComponent({
       updateStreamKeywords: sqlUpdateStreamKeywords,
     } = useSqlSuggestions();
 
-    const queryEditorRef = ref(null);
+    const queryEditorRef = ref<QueryEditorInstance | null>(null);
 
     // Server-error highlight ranges, provided by AddPanel.vue where the panel
     // search runs. The composable forwards these to the editor.
@@ -527,7 +525,7 @@ export default defineComponent({
     });
 
     const functionEditorPlaceholderFlag = ref(true);
-    const vrlFnEditorRef = ref(null);
+    const vrlFnEditorRef = ref<QueryEditorInstance | null>(null);
     const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 
 
@@ -541,7 +539,7 @@ export default defineComponent({
           0,
     );
 
-    // D5: Warning banner for restricted chart types with multiple queries
+    // Warning banner for restricted chart types with multiple queries
     const multiQueryWarning = computed(() => {
       if (dashboardPanelData.data.queries.length <= 1) return null;
       if (promqlMode.value) return null;
@@ -561,7 +559,7 @@ export default defineComponent({
         dashboardPanelData.data.queries.length - 1;
     };
 
-    const updatePromQLQuery = async (value, event) => {
+    const updatePromQLQuery = async (value: string, _event?: unknown) => {
       promqlAutoCompleteData.value.query = value;
       // promqlAutoCompleteData.value.text = event.changes[0].text;
 
@@ -576,27 +574,29 @@ export default defineComponent({
         };
       }
 
-      promqlAutoCompleteData.value.position.cursorIndex =
-        queryEditorRef.value.getCursorIndex();
-      promqlAutoCompleteData.value.popup.open =
-        queryEditorRef.value.triggerAutoComplete;
-      promqlAutoCompleteData.value.popup.close =
-        queryEditorRef.value.disableSuggestionPopup;
+      const editor = queryEditorRef.value;
+      if (editor) {
+        promqlAutoCompleteData.value.position.cursorIndex =
+          editor.getCursorIndex();
+        promqlAutoCompleteData.value.popup.open = editor.triggerAutoComplete;
+        promqlAutoCompleteData.value.popup.close =
+          editor.disableSuggestionPopup;
+      }
 
       promqlGetSuggestions();
     };
 
-    const updateQuery = (query, event) => {
+    const updateQuery = (query: string, event: unknown) => {
       if (dashboardPanelData.data.queryType === "promql") {
         updatePromQLQuery(query, event);
       } else {
         sqlAutoCompleteData.value.query = query;
-        sqlAutoCompleteData.value.cursorIndex =
-          queryEditorRef.value?.getCursorIndex();
-        sqlAutoCompleteData.value.popup.open =
-          queryEditorRef.value?.triggerAutoComplete;
-        sqlAutoCompleteData.value.popup.close =
-          queryEditorRef.value?.disableSuggestionPopup;
+        const editor = queryEditorRef.value;
+        if (editor) {
+          sqlAutoCompleteData.value.cursorIndex = editor.getCursorIndex();
+          sqlAutoCompleteData.value.popup.open = editor.triggerAutoComplete;
+          sqlAutoCompleteData.value.popup.close = editor.disableSuggestionPopup;
+        }
         sqlGetSuggestions();
       }
     };
@@ -696,7 +696,8 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const removeTab = async (index) => {
+    const removeTab = async (rawIndex: string | number) => {
+      const index = Number(rawIndex);
       if (
         dashboardPanelData.layout.currentQueryIndex >=
         dashboardPanelData.data.queries.length - 1
@@ -705,8 +706,9 @@ export default defineComponent({
       removeQuery(index);
     };
 
-    const toggleQueryVisibility = (index) => {
-      // Lazy-init for layouts loaded from saved dashboards that predate the multi-SQL feature.
+    const toggleQueryVisibility = (rawIndex: string | number) => {
+      const index = Number(rawIndex);
+      // Lazy-init for older saved dashboard layouts that lack this array.
       if (!Array.isArray(dashboardPanelData.layout.hiddenQueries)) {
         dashboardPanelData.layout.hiddenQueries = [];
       }
@@ -782,11 +784,11 @@ export default defineComponent({
       },
     );
 
-    const onUpdateToggle = (value) => {
+    const onUpdateToggle = () => {
       dashboardPanelData.meta.errors.queryErrors = [];
     };
 
-    const onFunctionToggle = (value, event) => {
+    const onFunctionToggle = (value: any, event?: any) => {
       // OSwitch's @update:model-value calls this with only the value (no event),
       // so guard it.
       event?.stopPropagation();
@@ -814,7 +816,7 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle query update
-    const handleQueryUpdate = (newQuery) => {
+    const handleQueryUpdate = (newQuery: string) => {
       _sqlOnQueryChange();
       dashboardPanelData.data.queries[
         dashboardPanelData.layout.currentQueryIndex
@@ -851,7 +853,11 @@ export default defineComponent({
     );
 
     // Unified Query Editor: Handle language change
-    const handleLanguageChange = (newLanguage: "sql" | "promql") => {
+    const handleLanguageChange = (
+      newLanguage: "sql" | "promql" | "vrl" | "javascript",
+    ) => {
+      // Only sql/promql are offered here; ignore any other emitted language.
+      if (newLanguage !== "sql" && newLanguage !== "promql") return;
       dashboardPanelData.data.queryType = newLanguage;
 
       // Explicitly sync the editor with the correct query after language change
@@ -867,10 +873,7 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (
-      naturalLanguage: string,
-      language: "sql" | "promql",
-    ) => {
+    const handleAskAI = async () => {
       // The unified component handles AI generation internally
       // This event is just for parent components that may need to react
     };
@@ -909,10 +912,7 @@ export default defineComponent({
       // Can remove loading indicators here if needed
     };
 
-    const handleVrlGenerationSuccess = (payload: {
-      type: string;
-      message: string;
-    }) => {
+    const handleVrlGenerationSuccess = () => {
       // VRL function code is already updated via @update:query handler
     };
 
@@ -924,7 +924,8 @@ export default defineComponent({
     // underlying <input> via querySelector. Cleaner than a global DOM lookup.
     const renameInputRef = ref<any>(null);
 
-    const startEditQueryName = (index: number, tab: any) => {
+    const startEditQueryName = (rawIndex: string | number, tab: any) => {
+      const index = Number(rawIndex);
       editingQueryIndex.value = index;
       editingQueryName.value = tab.tabName || "Query " + (index + 1);
       // OInput renders on the next tick; focus + select the inner <input>
@@ -974,6 +975,7 @@ export default defineComponent({
       getImageURL,
       onFunctionToggle,
       functionOptions,
+      functionSelectOptions,
       selectedFunction,
       filterFunctionOptions,
       onFunctionSearch,

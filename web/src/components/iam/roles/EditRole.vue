@@ -15,19 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col pb-[0.625rem] h-full" data-test="edit-role-page">
-    <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
-    <AppPageHeader
-      :title="editingRole"
-      :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
-      class="shrink-0 px-4 border-b border-border-default"
-    />
+  <OPageLayout
+    class="pb-2.5"
+    data-test="edit-role-page"
+    :title="editingRole"
+    :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+    bleed
+  >
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
       class="shrink-0"
     >
-    <div class="card-container py-2 flex flex-col">
+    <div class="bg-card-glass-bg py-2 flex flex-col">
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -62,17 +62,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container flex flex-col h-full"
+          class="bg-card-glass-bg flex flex-col h-full"
         >
           <div
-            class="flex justify-between items-center flex-shrink-0"
-            :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+            class="flex justify-between items-center flex-shrink-0 bg-surface-base"
           >
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class="flex items-start px-3 py-2 justify-start gap-3"
-              style="position: sticky; top: 0px; z-index: 2"
+              class="flex items-start px-3 py-2 justify-start gap-3 sticky"
+              style="top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
@@ -80,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span
                   data-test="edit-role-permissions-show-text"
-                  style="font-size: 14px"
+                  style="font-size: var(--text-sm)"
                 >
                   {{ t('iam.editRole.show') }}
                 </span>
@@ -104,8 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="filter.value"
                   :debounce="500"
-                  class="no-border o2-search-input h-[36px] w-[200px]"
-                  :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                  class="no-border o2-search-input h-9 w-50"
                   :placeholder="t('iam.editRole.searchPermissions')"
                   @update:model-value="onResourceChange"
                 >
@@ -130,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <span
                 data-test="edit-role-permissions-count"
-                class="font-bold text-[14px]"
+                class="font-bold text-sm"
               >
                 {{ t('iam.editRole.permissionsCount', { count: selectedPermissionsHash.size }) }}
               </span>
@@ -155,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="el-border-radius flex-1 min-h-0 overflow-y-auto"
+            class="rounded-default flex-1 min-h-0 overflow-y-auto"
           >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
@@ -206,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="p-2">
                   <div class="flex justify-between items-center px-2">
-                    <div style="font-size: 16px">{{ t('iam.editRole.quickReference') }}</div>
+                    <div style="font-size: var(--text-base)">{{ t('iam.editRole.quickReference') }}</div>
                     <OIcon
                       class="cursor-pointer"
                       name="close"
@@ -220,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       {{ t('iam.editRole.jsonConfigHelp') }}
                     </div>
-                    <pre style="font-size: 12px">
+                    <pre style="font-size: var(--text-xs)">
 {
   "object": "MainResource:ChildResource",
   "permission": "AccessType"
@@ -239,10 +237,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end w-full flex-shrink-0 mt-[0.625rem]"
+        class="flex justify-end w-full flex-shrink-0 mt-2.5"
         style="z-index: 2"
       >
-      <div class="card-container w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
+      <div class="bg-card-glass-bg w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"
@@ -262,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       </div>
-  </div>
+  </OPageLayout>
   <ConfirmDialog
     :title="t('iam.editRole.leaveConfirm.title')"
     :message="t('iam.editRole.leaveConfirm.message')"
@@ -295,7 +293,6 @@ import {
   getAllRolePermissions,
   getRoleUsers,
 } from "@/services/iam";
-import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
@@ -311,11 +308,10 @@ import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
-import config from "@/aws-exports";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -597,6 +593,7 @@ const getResourceByName = (
   }
 
   if (!level) return null;
+  return undefined;
 };
 
 const setPermission = (resource: any, visited: Set<string>) => {
@@ -715,8 +712,8 @@ const modifyResourcePermissions = (resource: Resource) => {
 };
 
 const getResourcePermissions = () => {
-  // Single request returns the role's permissions across all resource types,
-  // replacing one request per resource. Backend returns a flat Permission[].
+  // Single request returns the role's permissions across all resource types.
+  // Backend returns a flat Permission[].
   return new Promise((resolve, reject) => {
     getAllRolePermissions({
       role_name: editingRole.value,
@@ -905,14 +902,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
 
       // This is just to handle dashboard permissions, need to fix this
       if (resource === "dashboard") {
-        const [folderId, dashboardId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         const dashResource = resourceMapper["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(dashResource as Entity);
       } else if (resource === "alert") {
-        const [folderId, alertId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         const alertResource = resourceMapper["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
@@ -1197,7 +1194,7 @@ const updateJsonInTable = () => {
       resourceDetails = resourceMapper.value[resource];
 
       if (resource === "dashboard") {
-        const [folderId, dashboardId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
@@ -1242,27 +1239,6 @@ const updateJsonInTable = () => {
         entity,
         permission.permission,
       );
-    }
-  });
-};
-
-const updateExpandedResources = (resources: (Resource | Entity)[]) => {
-  resources.forEach(async (resource) => {
-    // Check if the current item is an object and has the 'expand' key
-    if (
-      typeof resource === "object" &&
-      resource.expand &&
-      resource.has_entities
-    ) {
-      resource.is_loading = true;
-      await getResourceEntities(resource);
-      resource.is_loading;
-      // Perform additional actions as needed
-    }
-
-    // If the item itself contains a nested array, call the function recursively
-    if (Array.isArray(resource.entities)) {
-      updateExpandedResources(resource.entities);
     }
   });
 };
@@ -1434,42 +1410,6 @@ const updatePermissionVisibility = (
 //   });
 // };
 
-const filterRowsByResourceName = (
-  rows: (Resource | Entity)[],
-  resourceName: string,
-) => {
-  return rows.reduce(
-    (filteredRows: (Resource | Entity)[], row: Resource | Entity) => {
-      // Check if the current row matches the filter
-      if (row.resourceName === resourceName) {
-        // If the row has nested rows, filter those as well
-        if (row.entities && row.entities.length) {
-          row.entities = filterRowsByResourceName(
-            row.entities,
-            resourceName,
-          ) as Entity[];
-        }
-        // Add the row to the filtered list
-        filteredRows.push(row);
-      } else if (row.entities && row.entities.length) {
-        // Even if the current row doesn't match, there might be nested rows that do
-        const filteredEntities = filterRowsByResourceName(
-          row.entities,
-          resourceName,
-        );
-        // Only add the row if it has matching nested rows
-        if (filteredEntities.length) {
-          // Optionally, you might want to clone the row here to avoid mutating the original
-          const newRow = { ...row, entities: filteredEntities };
-          filteredRows.push(newRow as Resource);
-        }
-      }
-      return filteredRows;
-    },
-    [],
-  );
-};
-
 const onResourceChange = async () => {
   updatePermissionVisibility(permissionsState.permissions);
   countVisibleResources(permissionsState.permissions);
@@ -1575,30 +1515,32 @@ const getResourceEntities = (resource: Resource | Entity) => {
     logs_cache: getLogsCacheStreams,
   };
 
-  return new Promise(async (resolve, reject) => {
-    try {
-      if (!resource.entities?.length) {
-        resource.is_loading = true;
-        try {
-          const listEntities = resource.childName
-            ? listEntitiesFnMap[resource.childName]
-            : listEntitiesFnMap[resource.resourceName];
+  return new Promise((resolve, reject) => {
+    (async () => {
+      try {
+        if (!resource.entities?.length) {
+          resource.is_loading = true;
+          try {
+            const listEntities = resource.childName
+              ? listEntitiesFnMap[resource.childName]
+              : listEntitiesFnMap[resource.resourceName];
 
-          if (listEntities) {
-            await listEntities(resource);
+            if (listEntities) {
+              await listEntities(resource);
+            }
+          } finally {
+            resource.is_loading = false;
           }
-        } finally {
-          resource.is_loading = false;
+
+          // unncecessaryly we are updating the all resource entities, fix to update the current resource
+          updatePermissionVisibility(permissionsState.permissions);
         }
 
-        // unncecessaryly we are updating the all resource entities, fix to update the current resource
-        updatePermissionVisibility(permissionsState.permissions);
+        resolve(true);
+      } catch (err) {
+        reject(err);
       }
-
-      resolve(true);
-    } catch (err) {
-      reject(err);
-    }
+    })();
   });
 };
 
@@ -1607,7 +1549,7 @@ const getEnrichmentTables = async () => {
 
   updateResourceEntities("enrichment_table", ["name"], data.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1875,12 +1817,12 @@ const getLogs = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], logs.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
 
-const getLogsPatternStreams = async (resource: Resource | Entity) => {
+const getLogsPatternStreams = async () => {
   const logs: any = await getStreams("logs", false);
 
   updateResourceEntities("logs_pattern", ["name"], logs.list);
@@ -1890,7 +1832,7 @@ const getLogsPatternStreams = async (resource: Resource | Entity) => {
   });
 };
 
-const getLogsInsightsStreams = async (resource: Resource | Entity) => {
+const getLogsInsightsStreams = async () => {
   const logs: any = await getStreams("logs", false);
 
   updateResourceEntities("logs_insights", ["name"], logs.list);
@@ -1900,7 +1842,7 @@ const getLogsInsightsStreams = async (resource: Resource | Entity) => {
   });
 };
 
-const getLogsCacheStreams = async (resource: Resource | Entity) => {
+const getLogsCacheStreams = async () => {
   const logs: any = await getStreams("logs", false);
 
   updateResourceEntities("logs_cache", ["name"], logs.list);
@@ -1915,7 +1857,7 @@ const getIndexStreams = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], indices.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1925,7 +1867,7 @@ const getMetrics = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], metrics.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1935,17 +1877,17 @@ const getTraces = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], traces.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
 
-const getMetadataStreams = async (resource: Resource | Entity) => {
+const getMetadataStreams = async () => {
   const metadata: any = await getStreams("metadata", false);
 
   updateResourceEntities("metadata", ["name"], metadata.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1987,7 +1929,7 @@ const getStreamsTypes = async () => {
     );
   });
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -2058,7 +2000,7 @@ const getCipherKeys = async () => {
 
   updateResourceEntities("cipher_keys", ["name"], [...data.data.keys]);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -2076,7 +2018,7 @@ const getRePatterns = async () => {
     "name",
   );
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -2510,7 +2452,7 @@ const saveRole = () => {
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
-    .then(async (res) => {
+    .then(async () => {
       // combine permissionsHash and selectedPermissionsHash
 
       toast({
@@ -2570,31 +2512,6 @@ const saveRole = () => {
       }
       console.log(err);
     });
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.label.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
-const filterResourceOptions = (val: string, update: any) => {
-  filteredResources.value = filterColumns(
-    resourceOptions.value,
-    val,
-    update,
-  ) as any[];
 };
 
 const updateEntityPermission = (

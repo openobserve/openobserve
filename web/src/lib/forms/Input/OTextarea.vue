@@ -21,7 +21,8 @@ const parentDataTest = computed(
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const rest = { ...$attrs };
+  delete rest.tabindex;
   return rest;
 });
 
@@ -77,13 +78,13 @@ watch(
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "w-[var(--spacing-field-width-xs)]";
+      return "w-field-width-xs";
     case "sm":
-      return "w-[var(--spacing-field-width-sm)]";
+      return "w-field-width-sm";
     case "md":
-      return "w-[var(--spacing-field-width-md)]";
+      return "w-field-width-md";
     case "lg":
-      return "w-[var(--spacing-field-width-lg)]";
+      return "w-field-width-lg";
     default:
       return "w-full";
   }
@@ -95,7 +96,7 @@ const charCount = computed(() => {
 });
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   "bg-input-bg",
   /* Keep the red error border on focus (don't let the focus color override it);
@@ -125,8 +126,8 @@ const wrapperClasses = computed(() => [
       v-if="label || $slots.tooltip"
       :for="textareaId"
       :class="[
-        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        props.disabled && 'o-input-label--disabled',
+        'o-input-label text-compact leading-tight flex items-center gap-1',
+        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -161,7 +162,7 @@ const wrapperClasses = computed(() => [
           'text-input-text placeholder:text-input-placeholder',
           'disabled:cursor-not-allowed',
           'py-2 px-3 text-sm',
-          fill ? 'h-full min-h-0 resize-none' : 'min-h-[80px]',
+          fill ? 'h-full min-h-0 resize-none' : 'min-h-20',
           !fill && (autogrow ? 'resize-none' : 'resize-y'),
         ]"
         @input="

@@ -45,6 +45,17 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ resolve: () => ({ href: "" }) }),
 }));
 
+// AlertSettings self-fetches the workflow options on mount (enterprise/cloud
+// only). Stub the service so the mount is deterministic and offline.
+const listWorkflowsMock = vi.fn(async () => ({
+  data: { list: [{ id: "wf-1", name: "Escalate to PagerDuty" }] },
+}));
+vi.mock("@/services/workflows", () => ({
+  default: {
+    listWorkflows: (...args: any[]) => listWorkflowsMock(...args),
+  },
+}));
+
 function makeStore() {
   return createStore({
     state: {
@@ -342,5 +353,192 @@ describe("AlertSettings.schema — period rules unchanged by the silence fix", (
       creates_incident: false,
     });
     expect(result.success).toBe(true);
+  });
+});
+
+
+// ── "destination OR workflow" (enterprise/cloud) ─────────────────────────────
+// Pre-migration this lived in the component's hand-rolled validate(); that method
+// was deleted by the zod migration, so the rule now rides on the schema via the
+// `allowWorkflows` flag. OSS must be untouched: the flag defaults to false and
+// keeps the original "destinations >= 1" rule and message. Enterprise/cloud
+// relaxes it to "at least ONE of destinations | workflows", reported on the
+// `destinations` path so AlertSettings can surface it under the combined
+// AlertTargetsSelect control.
+describe("AlertSettings.schema — destination OR workflow", () => {
+  const DEST_ONLY = t("alerts.validation.destinationRequired");
+  const EITHER = t("alerts.destinationOrWorkflowRequired");
+  const base = {
+    trigger_condition: { silence: 10, period: 10 },
+    creates_incident: false,
+  };
+
+  describe("OSS (allowWorkflows omitted — default false)", () => {
+    const schema = createAlertSettingsSchema(t, false);
+
+    it("REJECTS empty destinations with the ORIGINAL message", () => {
+      const r = schema.safeParse({ ...base, destinations: [] });
+      expect(r.success).toBe(false);
+      expect(
+        r.success ? [] : r.error.issues.map((i: any) => i.message),
+      ).toContain(DEST_ONLY);
+    });
+
+    it("does NOT accept a workflow as a substitute for a destination", () => {
+      // OSS has no workflows feature; a stray value must not satisfy the rule.
+      const r = schema.safeParse({
+        ...base,
+        destinations: [],
+        workflows: ["wf-1"],
+      });
+      expect(r.success).toBe(false);
+    });
+
+    it("ACCEPTS a destination", () => {
+      expect(
+        schema.safeParse({ ...base, destinations: ["email"] }).success,
+      ).toBe(true);
+    });
+  });
+
+  describe("enterprise/cloud (allowWorkflows = true)", () => {
+    const schema = createAlertSettingsSchema(t, false, true);
+
+    it("ACCEPTS a destination and no workflow", () => {
+      const r = schema.safeParse({
+        ...base,
+        destinations: ["email"],
+        workflows: [],
+      });
+      expect(r.success).toBe(true);
+    });
+
+    it("ACCEPTS a workflow and NO destination (the new capability)", () => {
+      const r = schema.safeParse({
+        ...base,
+        destinations: [],
+        workflows: ["wf-1"],
+      });
+      expect(r.success).toBe(true);
+    });
+
+    it("ACCEPTS both", () => {
+      const r = schema.safeParse({
+        ...base,
+        destinations: ["email"],
+        workflows: ["wf-1"],
+      });
+      expect(r.success).toBe(true);
+    });
+
+    it("REJECTS neither, with the combined message on the destinations path", () => {
+      const r = schema.safeParse({ ...base, destinations: [], workflows: [] });
+      expect(r.success).toBe(false);
+      const issues = r.success ? [] : r.error.issues;
+      expect(issues.map((i: any) => i.message)).toContain(EITHER);
+      // Path matters: AlertSettings reads fieldError("destinations") to render it.
+      expect(
+        issues.some((i: any) => i.path.join(".") === "destinations"),
+      ).toBe(true);
+    });
+
+    it("REJECTS when both keys are absent entirely", () => {
+      expect(schema.safeParse({ ...base }).success).toBe(false);
+    });
+  });
+});
+
+
+// ── Workflows target wiring (enterprise/cloud) ───────────────────────────────
+// The zod migration replaced the destinations control with a name=-bound
+// OFormSelect; this branch replaces it again with AlertTargetsSelect, ONE control
+// covering destinations + workflows. Because one control writes TWO form fields
+// it cannot be name=-bound, so it is props-in / events-out and the ancestor
+// AddAlert does the setFieldValue. These pin that wiring — it is exactly what the
+// merge had to reconstruct on top of main's rewrite.
+describe("AlertSettings — combined destinations + workflows target control", () => {
+  const findTargets = (host: any) =>
+    host.findComponent({ name: "AlertTargetsSelect" });
+
+  it("renders AlertTargetsSelect instead of a name=-bound destinations select", () => {
+    const host = mountDescendant();
+    expect(findTargets(host).exists()).toBe(true);
+    // The old control is gone — if it came back, both would write `destinations`.
+    expect(
+      host.findAll('[data-test="alert-destinations-select"]').length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("keeps the original data-test hooks (e2e contract)", () => {
+    const host = mountDescendant();
+    expect(host.find('[data-test="alert-destinations-select"]').exists()).toBe(
+      true,
+    );
+    expect(
+      host
+        .find('[data-test="alert-settings-refresh-destinations-btn"]')
+        .exists(),
+    ).toBe(true);
+    expect(host.find('[data-test="create-destination-btn"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("forwards the destinations + workflows props down to the control", () => {
+    const host = mountDescendant();
+    const targets = findTargets(host);
+    expect(targets.props("destinations")).toEqual([]);
+    expect(targets.props("workflows")).toEqual([]);
+    expect(targets.props("destinationOptions")).toEqual(["dest-a", "dest-b"]);
+  });
+
+  it("re-emits the child's update:workflows so the ancestor can setFieldValue", async () => {
+    const host = mountDescendant();
+    const step = host.findComponent(AlertSettings);
+
+    await findTargets(host).vm.$emit("update:workflows", ["wf-1"]);
+    await nextTick();
+
+    // The step does NOT write the form itself — it bubbles, matching how
+    // destinations already worked (AddAlert owns the single write).
+    expect(step.emitted("update:workflows")).toBeTruthy();
+    expect(step.emitted("update:workflows")![0]).toEqual([["wf-1"]]);
+  });
+
+  it("re-emits update:destinations from the same control", async () => {
+    const host = mountDescendant();
+    const step = host.findComponent(AlertSettings);
+
+    await findTargets(host).vm.$emit("update:destinations", ["dest-a"]);
+    await nextTick();
+
+    expect(step.emitted("update:destinations")![0]).toEqual([["dest-a"]]);
+  });
+
+  it("refresh reloads BOTH lists — bubbles refresh:destinations and refetches workflows", async () => {
+    const host = mountDescendant();
+    const step = host.findComponent(AlertSettings);
+    listWorkflowsMock.mockClear();
+
+    await findTargets(host).vm.$emit("refresh");
+    await flushPromises();
+
+    expect(step.emitted("refresh:destinations")).toBeTruthy();
+    if ((findTargets(host).props("workflowsEnabled") as boolean)) {
+      expect(listWorkflowsMock).toHaveBeenCalled();
+    }
+  });
+
+  it("still renders the destinations validation error under the control", async () => {
+    // The control is no longer an OForm* wrapper, so the schema error has no
+    // renderer of its own — the step surfaces it via fieldError("destinations").
+    const host = mountDescendant("true");
+    const parentForm = hostForm(host);
+
+    await parentForm.handleSubmit();
+    await flushPromises();
+    await nextTick();
+
+    expect(host.text()).toContain(DESTINATIONS_REQUIRED_MESSAGE);
   });
 });

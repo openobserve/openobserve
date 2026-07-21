@@ -3,7 +3,7 @@
 
 import { provide, inject, watch } from "vue";
 import { FORM_CONTEXT_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
-import { useOForm, type OFormInstance } from "./useOForm";
+import { useOForm } from "./useOForm";
 
 const props = defineProps<{
   /**
@@ -14,7 +14,7 @@ const props = defineProps<{
   defaultValues?: T;
   /**
    * Validate every field before stopping on the first error.
-   * Mirrors q-form's `greedy` prop. Without this, validation short-circuits
+   * Enables greedy validation (validate all fields, not just stop at the first). Without this, validation short-circuits
    * on the first failed field.
    */
   greedy?: boolean;
@@ -44,10 +44,9 @@ const props = defineProps<{
    * and does NOT create its own — this lets the component that OWNS <OForm>
    * read the form reactively (form.useStore) to drive parent-side conditional
    * rendering. When absent, OForm creates its own form from
-   * `defaultValues`/`schema`/`onSubmit` (the ~60 existing simple forms are
-   * untouched). See START-HERE.md (Rule ③).
+   * `defaultValues`/`schema`/`onSubmit`.
    */
-  form?: OFormInstance;
+  form?: ReturnType<typeof useOForm<T>>;
 }>();
 
 const emit = defineEmits<{
@@ -60,12 +59,10 @@ const emit = defineEmits<{
 // onSubmit), so handleSubmit() below runs whichever form's onSubmit.
 const form =
   props.form ??
-  useOForm<Record<string, unknown>>({
-    defaultValues: (props.defaultValues ?? {}) as Record<string, unknown>,
+  useOForm<T>({
+    defaultValues: (props.defaultValues ?? {}) as T,
     schema: props.schema,
-    onSubmit: props.onSubmit as
-      | ((values: Record<string, unknown>) => unknown | Promise<unknown>)
-      | undefined,
+    onSubmit: props.onSubmit,
   });
 
 provide(FORM_CONTEXT_KEY, form);
@@ -100,10 +97,9 @@ async function handleSubmit(e: Event) {
   }
 }
 
-// ── q-form compatibility surface ──────────────────────────────────────────
-// q-form exposes these methods on its ref. The 50 existing q-form refs in
-// the codebase rely on them — keep names identical to avoid touching every
-// call site during migration.
+// ── Form compatibility surface ──────────────────────────────────────────
+// These methods mirror the legacy form ref API — keep the names identical so existing
+// call sites keep working.
 
 /**
  * All registered fields by dot-notation path.
@@ -126,7 +122,7 @@ function registeredFieldPaths(): string[] {
 async function validate(): Promise<boolean> {
   // TanStack form's validateAllFields runs every field's validators
   // concurrently. Without `greedy`, run them sequentially and stop at the
-  // first failure to match q-form semantics.
+  // first failure to match the legacy form semantics.
   if (props.greedy) {
     await form.validateAllFields("submit");
   } else {
@@ -142,7 +138,7 @@ async function validate(): Promise<boolean> {
 
 /**
  * Clear validation errors on every field without resetting their values.
- * Mirrors q-form's `resetValidation()`.
+ * Mirrors the legacy form's `resetValidation()`.
  */
 function resetValidation() {
   // Clear each field's errorMap so no stale message lingers (errors[] is a
@@ -156,7 +152,7 @@ function resetValidation() {
 
 /**
  * Programmatically trigger submission (runs validators → onSubmit).
- * Mirrors q-form's `submit()`.
+ * Mirrors the legacy form's `submit()`.
  */
 function submit() {
   if (isSubmitting.value) return; // guard double-submit

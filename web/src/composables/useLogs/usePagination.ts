@@ -98,7 +98,6 @@ export const usePagination = () => {
 
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
-        // issue #5432
         //here BE return all the records if we set the size to -1 and we are doing it as we dont support pagination for aggregation and groupby
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
           queryReq.query.size = -1;
@@ -153,17 +152,17 @@ export const usePagination = () => {
       )
         .then(async (res: any) => {
           if (
-            res.data.hasOwnProperty("function_error") &&
+            Object.prototype.hasOwnProperty.call(res.data, "function_error") &&
             res.data.function_error != ""
           ) {
             searchObj.data.functionError = res.data.function_error;
           }
 
           if (
-            res.data.hasOwnProperty("function_error") &&
+            Object.prototype.hasOwnProperty.call(res.data, "function_error") &&
             res.data.function_error != "" &&
-            res.data.hasOwnProperty("new_start_time") &&
-            res.data.hasOwnProperty("new_end_time")
+            Object.prototype.hasOwnProperty.call(res.data, "new_start_time") &&
+            Object.prototype.hasOwnProperty.call(res.data, "new_end_time")
           ) {
             res.data.function_error = getFunctionErrorMessage(
               res.data.function_error,
@@ -321,24 +320,19 @@ export const usePagination = () => {
             if (
               searchObj.meta.refreshInterval > 0 &&
               router.currentRoute.value.name == "logs" &&
-              searchObj.data.queryResults.hasOwnProperty("hits") &&
+              Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "hits") &&
               searchObj.data.queryResults.hits.length > 0
             ) {
               searchObj.data.queryResults.from = res.data.from;
               searchObj.data.queryResults.scan_size = res.data.scan_size;
               searchObj.data.queryResults.took = res.data.took;
               searchObj.data.queryResults.aggs = res.data.aggs;
-              const lastRecordTimeStamp = parseInt(
-                searchObj.data.queryResults.hits[0][
-                  store.state.zoConfig.timestamp_column
-                ],
-              );
               searchObj.data.queryResults.hits = res.data.hits;
             } else {
               if (searchObj.meta.jobId != "") {
                 searchObj.data.queryResults.total = res.data.total;
               }
-              if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+              if (!Object.prototype.hasOwnProperty.call(queryReq.query, "track_total_hits")) {
                 delete res.data.total;
               }
               searchObj.data.queryResults = {
@@ -352,7 +346,7 @@ export const usePagination = () => {
           if (
             searchObj.data.queryResults.hits.length > 0 &&
             store.state.zoConfig.timestamp_column != "" &&
-            res.data.hasOwnProperty("order_by_metadata") &&
+            Object.prototype.hasOwnProperty.call(res.data, "order_by_metadata") &&
             res.data.order_by_metadata.length > 0
           ) {
             sortResponse(
@@ -448,16 +442,16 @@ export const usePagination = () => {
           if (err.response != undefined) {
             searchObj.data.errorMsg =
               err.response?.data?.error || err.response?.data?.message || "";
-            if (err.response.data.hasOwnProperty("error_detail")) {
+            if (Object.prototype.hasOwnProperty.call(err.response.data, "error_detail")) {
               searchObj.data.errorDetail =
                 err.response?.data?.error_detail || "";
             }
-            if (err.response.data.hasOwnProperty("trace_id")) {
+            if (Object.prototype.hasOwnProperty.call(err.response.data, "trace_id")) {
               trace_id = err.response.data?.trace_id;
             }
           } else {
             searchObj.data.errorMsg = err?.message || "";
-            if (err.hasOwnProperty("trace_id")) {
+            if (Object.prototype.hasOwnProperty.call(err, "trace_id")) {
               trace_id = err?.trace_id;
             }
           }
@@ -521,7 +515,6 @@ export const usePagination = () => {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
       const partitionDetail = searchObj.data.queryResults.partitionDetail;
-      let remainingRecords = rowsPerPage;
       let lastPartitionSize = 0;
       //we generally get the pagination upto 3 pages ahead of the current page
       if (
@@ -558,9 +551,10 @@ export const usePagination = () => {
             searchObj.data.resultGrid.currentPage == 1)
         ) {
           if (
-            searchObj.data.queryResults.hasOwnProperty("aggs") &&
+            Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "aggs") &&
             searchObj.data.queryResults.aggs != null
           ) {
+            /* no-op: aggs present */
           }
         } else {
           // if streaming output is enabled, then we need to update the total as the last partition total, as the last partition total is the total of all the records in case of streaming output
@@ -597,7 +591,6 @@ export const usePagination = () => {
           if (totalPages > 0) {
             partitionFrom = 0;
             for (let i = 0; i < totalPages; i++) {
-              remainingRecords = rowsPerPage;
               recordSize =
                 i === totalPages - 1
                   ? total - partitionFrom || rowsPerPage
@@ -692,10 +685,6 @@ export const usePagination = () => {
 
             if (partitionDetail.paginations[pageNumber].size > 0) {
               pageNumber++;
-              remainingRecords =
-                rowsPerPage - partitionDetail.paginations[pageNumber].size;
-            } else {
-              remainingRecords = rowsPerPage;
             }
           }
 
@@ -714,6 +703,7 @@ export const usePagination = () => {
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }
+    return;
   };
 
   /**
@@ -784,31 +774,33 @@ export const usePagination = () => {
   }
 
   const fetchAllParitions = async (queryReq: any) => {
-    return new Promise(async (resolve) => {
-      if (
-        searchObj.data.queryResults.partitionDetail.partitions[
-          searchObj.data.queryResults.subpage
-        ]?.length
-      ) {
-        queryReq.query.start_time =
+    return new Promise((resolve) => {
+      (async () => {
+        if (
           searchObj.data.queryResults.partitionDetail.partitions[
             searchObj.data.queryResults.subpage
-          ][0];
-        queryReq.query.end_time =
-          searchObj.data.queryResults.partitionDetail.partitions[
-            searchObj.data.queryResults.subpage
-          ][1];
-        queryReq.query.from = 0;
-        queryReq.query.size = -1;
-        searchObj.data.queryResults.subpage++;
-        await getPaginatedData(queryReq, true, false);
+          ]?.length
+        ) {
+          queryReq.query.start_time =
+            searchObj.data.queryResults.partitionDetail.partitions[
+              searchObj.data.queryResults.subpage
+            ][0];
+          queryReq.query.end_time =
+            searchObj.data.queryResults.partitionDetail.partitions[
+              searchObj.data.queryResults.subpage
+            ][1];
+          queryReq.query.from = 0;
+          queryReq.query.size = -1;
+          searchObj.data.queryResults.subpage++;
+          await getPaginatedData(queryReq, true, false);
+          resolve(true);
+        }
         resolve(true);
-      }
-      resolve(true);
+      })();
     });
   };
 
-  const refreshJobPagination = (regenrateFlag: boolean = false) => {
+  const refreshJobPagination = (_regenrateFlag: boolean = false) => {
     try {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
@@ -838,6 +830,7 @@ export const usePagination = () => {
       notificationMsg.value = "Error while refreshing pagination.";
       return false;
     }
+    return;
   };
 
   // Convert timestamp to microseconds

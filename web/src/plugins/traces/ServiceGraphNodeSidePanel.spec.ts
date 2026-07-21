@@ -116,7 +116,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
-import useStreams from "@/composables/useStreams";
 import { correlate as correlateStreams } from "@/services/service_streams";
 
 
@@ -937,26 +936,43 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel();
     });
 
-    it("should set sortBy to the provided field when called with asc order", () => {
-      wrapper.vm.handleSortChange("p99", "asc");
+    it("should set sortBy to the field and sortOrder to asc on first click", () => {
+      wrapper.vm.handleSortChange("p99");
       expect(wrapper.vm.sortBy).toBe("p99");
       expect(wrapper.vm.sortOrder).toBe("asc");
     });
 
-    it("should set sortOrder to desc when provided", () => {
-      wrapper.vm.handleSortChange("requests", "desc");
+    it("should toggle sortOrder to desc when the same field is clicked twice", () => {
+      wrapper.vm.handleSortChange("requests");
+      expect(wrapper.vm.sortBy).toBe("requests");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+
+      wrapper.vm.handleSortChange("requests");
       expect(wrapper.vm.sortBy).toBe("requests");
       expect(wrapper.vm.sortOrder).toBe("desc");
     });
 
-    it("should update both sortBy and sortOrder when called multiple times", () => {
-      wrapper.vm.handleSortChange("operation", "asc");
-      expect(wrapper.vm.sortBy).toBe("operation");
+    it("should clear sorting on the third click of the same field", () => {
+      wrapper.vm.handleSortChange("operation");
       expect(wrapper.vm.sortOrder).toBe("asc");
 
-      wrapper.vm.handleSortChange("p95", "desc");
-      expect(wrapper.vm.sortBy).toBe("p95");
+      wrapper.vm.handleSortChange("operation");
       expect(wrapper.vm.sortOrder).toBe("desc");
+
+      wrapper.vm.handleSortChange("operation");
+      expect(wrapper.vm.sortBy).toBe("");
+      expect(wrapper.vm.sortOrder).toBe("");
+    });
+
+    it("should reset sortOrder to asc when switching to a different field", () => {
+      wrapper.vm.handleSortChange("operation");
+      wrapper.vm.handleSortChange("operation");
+      expect(wrapper.vm.sortBy).toBe("operation");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+
+      wrapper.vm.handleSortChange("p95");
+      expect(wrapper.vm.sortBy).toBe("p95");
+      expect(wrapper.vm.sortOrder).toBe("asc");
     });
   });
 
@@ -1013,7 +1029,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by p99 ascending when sortBy is p99 and sortOrder is asc", () => {
-        wrapper.vm.handleSortChange("p99", "asc");
+        wrapper.vm.handleSortChange("p99");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].p99).toBe(80000);
         expect(rows[1].p99).toBe(120000);
@@ -1021,7 +1037,8 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by p99 descending when sortBy is p99 and sortOrder is desc", () => {
-        wrapper.vm.handleSortChange("p99", "desc");
+        wrapper.vm.handleSortChange("p99"); // asc
+        wrapper.vm.handleSortChange("p99"); // toggle to desc
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].p99).toBe(150000);
         expect(rows[1].p99).toBe(120000);
@@ -1029,7 +1046,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by operation alphabetically ascending", () => {
-        wrapper.vm.handleSortChange("operation", "asc");
+        wrapper.vm.handleSortChange("operation");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].operation).toBe("GET /api/products");
         expect(rows[1].operation).toBe("GET /api/users");
@@ -1037,7 +1054,8 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by requests numerically descending", () => {
-        wrapper.vm.handleSortChange("requests", "desc");
+        wrapper.vm.handleSortChange("requests"); // asc
+        wrapper.vm.handleSortChange("requests"); // toggle to desc
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].requests).toBe(200);
         expect(rows[1].requests).toBe(100);
@@ -1045,7 +1063,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by errors numerically ascending", () => {
-        wrapper.vm.handleSortChange("errors", "asc");
+        wrapper.vm.handleSortChange("errors");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].errors).toBe(0);
         expect(rows[1].errors).toBe(5);
@@ -1063,7 +1081,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should return an empty array without error when sortBy is set", () => {
-        wrapper.vm.handleSortChange("p99", "asc");
+        wrapper.vm.handleSortChange("p99");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows).toHaveLength(0);
       });

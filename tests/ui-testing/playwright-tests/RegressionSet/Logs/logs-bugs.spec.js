@@ -1439,7 +1439,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    const errorVisible = await page.locator('[class*="error"], [class*="negative"], .q-banner, .q-notification')
+    const errorVisible = await page.locator('[class*="error"], [class*="negative"], [role="alert"]')
       .filter({ hasText: /error|failed|invalid/i })
       .first().isVisible({ timeout: 2000 }).catch(() => false);
 

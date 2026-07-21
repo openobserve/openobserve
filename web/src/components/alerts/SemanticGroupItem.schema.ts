@@ -24,10 +24,6 @@ import { z } from "zod";
 // The generated `id` and the parent-supplied `group` (category) are NOT form
 // fields — `id` is a slugify side-effect of `display` and `group` comes from the
 // prop; both are merged back into the emitted group object, never validated.
-//
-// Message parity: the live message was `t('common.name') + ' is required'`, which
-// resolves to "Name is required" — the same English as the shared
-// `common.nameRequired` i18n key used here (factory takes the component's `t`).
 export const makeSemanticGroupItemSchema = (t: (_key: string) => string) =>
   z.object({
     display: z.string().min(1, t("common.nameRequired")),
@@ -41,8 +37,7 @@ export type SemanticGroupItemForm = z.infer<
 
 /**
  * Typed default values for the form, projected from the (optional) group record
- * the row is editing. This is an edit-prefill form (values come from a prop), so
- * the defaults are derived from that record rather than a create-only blank.
+ * the row is editing.
  */
 export const semanticGroupItemDefaults = (
   group?: Partial<Pick<SemanticGroupItemForm, "display" | "is_workload_type" | "fields">>,

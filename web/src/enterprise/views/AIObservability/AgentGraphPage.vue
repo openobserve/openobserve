@@ -15,16 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OPageLayout
     data-test="ai-agent-graph-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="t('aiObservability.nav.agentGraph')"
+    :subtitle="t('aiObservability.subtitle.agentGraph')"
+    icon="hub"
+    bleed
+    :scroll="false"
   >
-    <AppPageHeader
-      :title="t('aiObservability.nav.agentGraph')"
-      :subtitle="t('aiObservability.subtitle.agentGraph')"
-      icon="hub"
-      class="px-4 border-b border-border-default"
-    >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -39,36 +37,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.datetime.relativeTimePeriod ?? '15m'
           "
           data-test="ai-agent-graph-date-time"
-          class="h-[2rem]"
+          class="h-8"
           @on:date-change="onDateChange"
         />
+        <!-- Last-refresh + refresh control, consistent with LLM Insights /
+             Sessions / Agent Behavior page headers. -->
+        <div
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+        >
+          <ORefreshButton
+            :last-run-at="graphLastRunAt"
+            :loading="isGraphLoading"
+            :disabled="isGraphLoading"
+            data-test="ai-agent-graph-refresh-btn"
+            @click="refresh"
+          />
+        </div>
       </template>
-    </AppPageHeader>
 
     <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
          AI pages read as one product. Stream tab picks a trace stream; Agent
-         tab picks a discovered agent and the graph follows its source_stream. -->
-    <div
-      class="flex items-center gap-3 px-4 py-2 border-b border-border-default"
-    >
+         tab picks a discovered agent and the graph follows its source_stream.
+         Lives in OPageLayout's #subnav (which draws the full-bleed divider). -->
+    <template #subnav>
+    <div class="flex items-center gap-3 px-page-edge py-2">
       <OToggleGroup
         :model-value="filterMode"
         type="single"
         data-test="agent-graph-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">{{
-          t("aiObservability.agentGraph.stream")
-        }}</OToggleGroupItem>
         <OToggleGroupItem value="agent" size="sm">{{
           t("aiObservability.agentGraph.agent")
+        }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{
+          t("aiObservability.agentGraph.stream")
         }}</OToggleGroupItem>
       </OToggleGroup>
 
       <div
         v-if="filterMode === 'stream'"
         data-test="agent-graph-stream-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 shrink-0"
       >
         <OSelect
           v-model="activeStream"
@@ -77,19 +87,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-default"
         />
       </div>
       <div
         v-else
         data-test="agent-graph-agent-selector"
-        class="w-[14rem] flex-shrink-0"
+        class="w-56 shrink-0"
       >
         <SkeletonBox
           v-if="!agentsLoaded"
           width="100%"
           height="2.125rem"
-          rounded
+          :rounded="true"
         />
         <OSelect
           v-else
@@ -99,31 +109,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="agentSelectOptions"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-default"
         />
       </div>
     </div>
+    </template>
 
-    <div class="flex-1 min-h-0 overflow-hidden">
-      <ServiceGraph
-        :stream-filter="effectiveStream"
-        hide-stream-selector
-        agent-highlight
-        class="h-full"
-      />
-    </div>
-  </div>
+    <ServiceGraph
+      ref="graphRef"
+      :stream-filter="effectiveStream"
+      hide-stream-selector
+      agent-highlight
+      class="flex-1 min-h-0"
+    />
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
@@ -145,9 +157,44 @@ const ServiceGraph = defineAsyncComponent(
 
 const DEFAULT_RELATIVE = "15m";
 
-const filterMode = ref<"stream" | "agent">("stream");
+// Default scope is "agent" — the AI module is agent-centric (agents load on
+// mount, so the default is ready on first paint).
+const filterMode = ref<"stream" | "agent">("agent");
 const availableStreams = ref<string[]>([]);
 const activeStream = ref<string>("default");
+
+// Graph child ref + header refresh state. ServiceGraph exposes
+// { refresh, loading, lastRunAt }.
+const graphRef = ref<any>(null);
+const isRefreshing = ref(false);
+const graphLastRunAt = computed<number | null>(
+  () => graphRef.value?.lastRunAt ?? null,
+);
+const isGraphLoading = computed(
+  () => isRefreshing.value || graphRef.value?.loading || false,
+);
+
+async function refresh() {
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    // Re-anchor a relative window first so "last 15m" refreshes to now.
+    const dt = searchObj.data.datetime;
+    if (dt.type === "relative" && dt.relativeTimePeriod) {
+      const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+      if (r) {
+        searchObj.data.datetime = {
+          ...dt,
+          startTime: r.startTime,
+          endTime: r.endTime,
+        };
+      }
+    }
+    await graphRef.value?.refresh?.();
+  } finally {
+    isRefreshing.value = false;
+  }
+}
 
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentsLoaded = ref(false);
@@ -177,7 +224,9 @@ const effectiveStream = computed(() =>
     : activeStream.value,
 );
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(
+  mode: boolean | AcceptableValue | AcceptableValue[],
+) {
   if (mode === "stream" || mode === "agent") filterMode.value = mode;
 }
 
@@ -192,8 +241,10 @@ function effectiveWindow() {
 
 async function loadStreams() {
   try {
-    const res = await getStreams("traces", false, false);
-    availableStreams.value = (res?.list ?? []).map((s: any) => s.name);
+    const res = (await getStreams("traces", false, false)) as {
+      list?: { name: string }[];
+    };
+    availableStreams.value = (res?.list ?? []).map((s) => s.name);
     if (
       availableStreams.value.length &&
       !availableStreams.value.includes(activeStream.value)

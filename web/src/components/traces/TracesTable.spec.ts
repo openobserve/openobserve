@@ -29,7 +29,7 @@
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { mount, VueWrapper } from "@vue/test-utils";
 import { h } from "vue";
 
 // ---------------------------------------------------------------------------
@@ -275,13 +275,13 @@ describe("TenstackTable — generic features", () => {
             accessorKey: "svc",
             header: "SVC",
             size: 150,
-            meta: { cellClass: "text-[var(--o2-text-1)]" },
+            meta: { cellClass: "text-[var(--color-text-secondary)]" },
           },
         ],
         rows: [{ svc: "auth" }],
       });
       const tds = wrapper.findAll("td[data-test]");
-      expect(tds[0].classes()).toContain("text-[var(--o2-text-1)]");
+      expect(tds[0].classes()).toContain("text-[var(--color-text-secondary)]");
     });
   });
 

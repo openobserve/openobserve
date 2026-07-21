@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <pre
         data-test="error-event-description-navigation"
-        class="bg-[#ececec] rounded p-2"
+        class="bg-surface-subtle rounded-default p-2"
       >
 {
   <span class="text-primary">from</span> : {{ column.view_referrer }},
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template
       v-else-if="column.type === 'resource' && column.resource_type === 'xhr'"
     >
-      <span class="font-bold pr-2 text-[0.75rem]">{{
+      <span class="font-bold pr-2 text-xs">{{
         column.resource_method
       }}</span>
       <a
@@ -48,14 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <span
         data-test="error-event-description-default"
-        class="text-[0.875rem]"
+        class="text-sm"
       >{{ getDescription }}</span>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineProps } from "vue";
+import { computed } from "vue";
 
 const props = defineProps({
   column: {

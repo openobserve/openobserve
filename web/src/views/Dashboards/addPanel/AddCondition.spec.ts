@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { shallowMount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
@@ -47,7 +47,6 @@ Object.defineProperty(Element.prototype, "removeAttribute", {
 
 describe("AddCondition.vue", () => {
   let wrapper: any;
-  let mockLoadFilterItem: any;
 
   const defaultProps = {
     condition: {
@@ -109,18 +108,6 @@ describe("AddCondition.vue", () => {
       global: {
         plugins: [i18n],
         stubs: [
-          "q-select",
-          "q-btn",
-          "q-btn-group",
-          "q-menu",
-          "q-tabs",
-          "q-tab",
-          "q-tab-panels",
-          "q-tab-panel",
-          "q-separator",
-          "q-item",
-          "q-item-section",
-          "q-checkbox",
           "CommonAutoComplete",
           "SanitizedHtmlRenderer",
         ],
@@ -130,7 +117,6 @@ describe("AddCondition.vue", () => {
   };
 
   beforeEach(() => {
-    mockLoadFilterItem = vi.fn();
     vi.clearAllMocks();
   });
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { mount, VueWrapper } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import CustomDateTimePicker from '@/components/CustomDateTimePicker.vue';
@@ -6,18 +6,6 @@ import CustomDateTimePicker from '@/components/CustomDateTimePicker.vue';
 
 describe('CustomDateTimePicker.vue', () => {
   let wrapper: VueWrapper;
-  let store: any;
-
-  beforeEach(() => {
-    // Create mock store
-    store = createStore({
-      state: {
-        theme: 'light'
-      },
-      mutations: {},
-      actions: {}
-    });
-  });
 
   afterEach(() => {
     if (wrapper) {
@@ -39,14 +27,7 @@ describe('CustomDateTimePicker.vue', () => {
       props,
       global: {
         plugins: [currentStore],
-        stubs: {
-          'q-btn': true,
-          'q-menu': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-input': true,
-          'q-select': true
-        }
+        stubs: {}
       }
     });
   };
@@ -188,12 +169,13 @@ describe('CustomDateTimePicker.vue', () => {
       expect(vm.isSelected(5, 'h')).toBe(false);
     });
 
-    it('isSelected handles different types correctly', () => {
+    it('isSelected compares value strictly by type', () => {
       wrapper = createWrapper({ modelValue: '15s' });
       const vm = wrapper.vm as any;
-      
+
+      // picker value is stored as a number, so only a numeric argument matches.
       expect(vm.isSelected(15, 's')).toBe(true);
-      expect(vm.isSelected('15', 's')).toBe(true); // Should handle string comparison
+      expect(vm.isSelected('15', 's')).toBe(false); // strict equality: string !== number
     });
   });
 
@@ -231,24 +213,24 @@ describe('CustomDateTimePicker.vue', () => {
   });
 
   describe('Theme and Styling', () => {
-    it('computedClass returns dark mode class for dark theme', () => {
+    it('computedClass returns semantic surface class for dark theme', () => {
       wrapper = createWrapper(
-        { changeStyle: true }, 
+        { changeStyle: true },
         { theme: 'dark' }
       );
       const vm = wrapper.vm as any;
-      
-      expect(vm.computedClass).toBe('bg-[#2a2828]! text-white!');
+
+      expect(vm.computedClass).toBe('bg-surface-base!');
     });
 
-    it('computedClass returns light mode class for light theme', () => {
+    it('computedClass returns semantic surface class for light theme', () => {
       wrapper = createWrapper(
-        { changeStyle: true }, 
+        { changeStyle: true },
         { theme: 'light' }
       );
       const vm = wrapper.vm as any;
-      
-      expect(vm.computedClass).toBe('bg-white!');
+
+      expect(vm.computedClass).toBe('bg-surface-base!');
     });
 
     it('computedClass returns empty string when changeStyle is false', () => {
@@ -318,10 +300,15 @@ describe('CustomDateTimePicker.vue', () => {
     });
 
     it('handles malformed modelValue', () => {
-      // Component will attempt to parse but should not crash entirely
+      // Parsing is null-guarded, so a value with no digits must not crash.
       expect(() => {
         wrapper = createWrapper({ modelValue: 'invalid' });
-      }).toThrow(); // This test expects the error from malformed parsing
+      }).not.toThrow();
+
+      const vm = wrapper.vm as any;
+      // No numeric part -> NaN; the alphabetic part is captured as the period.
+      expect(Number.isNaN(vm.picker.data.selectedDate.relative.value)).toBe(true);
+      expect(vm.picker.data.selectedDate.relative.period).toBe('invalid');
     });
 
     it('setRelativeDate with zero value', () => {

@@ -38,7 +38,12 @@ const props = defineProps<{
   /** Unique row identifier field (used as VueDraggableNext item-key). */
   rowKey?: string;
   /** Virtual scroll: virtual items from useTableVirtualization */
-  virtualRows?: { index: number; start: number; size: number; key: number }[];
+  virtualRows?: {
+    index: number;
+    start: number;
+    size: number;
+    key: number | string | bigint;
+  }[];
   /** Virtual scroll: total height of the virtual container */
   totalSize?: number;
   /** Virtual scroll: base offset for Firefox compatibility */
@@ -266,7 +271,7 @@ function getRowForItem(item: any): Row<any> {
 
     <OTableBodyRow
       v-for="virtualRow in virtualRows"
-      :key="virtualRow.key"
+      :key="(virtualRow.key as string | number)"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
       :table="table"
@@ -324,16 +329,18 @@ function getRowForItem(item: any): Row<any> {
   </tbody>
 </template>
 
-<style>
-/* Row drag reorder — ghost & dragging classes for VueDraggableNext */
+<style scoped>
+/* keep(third-party): VueDraggableNext applies these classes to row clones at
+   RUNTIME (ghost / dragging); no template ever writes them, so they cannot be
+   utilities. Scoped still matches — the clones keep the row's data-v attr. */
 .o2-table-drag-ghost {
   opacity: 0.3;
-  background: var(--o2-primary-50);
-  border: 1px dashed var(--o2-primary-color);
+  background: var(--color-primary-50);
+  border: 1px dashed var(--color-accent);
   border-radius: 0.375rem;
 }
 .o2-table-drag-dragging {
   opacity: 0.5;
-  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  box-shadow: var(--shadow-lg);
 }
 </style>

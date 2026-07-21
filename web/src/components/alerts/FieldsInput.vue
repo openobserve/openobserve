@@ -79,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div
-            class="ml-0 alerts-condition-action"
-            style="margin-bottom: 12px"
+            class="ml-0 alerts-condition-action mb-3"
           >
             <OButton
               data-test="alert-conditions-delete-condition-btn"
@@ -128,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in fields as any"
+        v-for="(field, index) in fields"
         :key="field.uuid"
         class="flex justify-start items-end gap-2 pb-2"
         :data-test="`alert-conditions-${index + 1}`"
@@ -137,12 +136,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="field.column"
             :options="props.streamFields"
-            class="py-2"
+            class="py-2 min-w-55"
             :placeholder="t('alerts.column')"
             :creatable="props.enableNewValueMode"
             :error="!!fieldErrors[`${field.uuid}-column`]"
             :error-message="fieldErrors[`${field.uuid}-column`] || ''"
-            style="min-width: 220px"
             data-test="alert-conditions-select-column"
             @create="(val: string) => { field.column = val; emits('input:update', 'conditions', field); }"
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-column`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
@@ -152,10 +150,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             v-model="field.operator"
             :options="triggerOperators"
-            class="py-2"
+            class="py-2 min-w-30"
             :error="!!fieldErrors[`${field.uuid}-operator`]"
             :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
-            style="min-width: 120px"
             data-test="alert-conditions-operator-select"
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-operator`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
           />
@@ -164,17 +161,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             v-model="field.value"
             :placeholder="t('common.value')"
-            class="py-2"
+            class="py-2 min-w-37.5"
             :error="!!fieldErrors[`${field.uuid}-value`]"
             :error-message="fieldErrors[`${field.uuid}-value`] || ''"
-            style="min-width: 150px"
             data-test="alert-conditions-value-input"
             @update:model-value="(v: any) => { fieldErrors[`${field.uuid}-value`] = v ? '' : t('alerts.validation.fieldRequired'); emits('input:update', 'conditions', field); }"
           />
         </div>
         <div
-          class="ml-0 alerts-condition-action"
-          style="margin-bottom: 12px"
+          class="ml-0 alerts-condition-action mb-3"
         >
           <OButton
             data-test="alert-conditions-delete-condition-btn"
@@ -206,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, reactive, inject } from "vue";
+import type { PropType, Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -214,16 +210,17 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import { useStore } from "vuex";
 
 const props = defineProps({
   fields: {
-    type: Array,
+    type: Array as PropType<ConditionField[]>,
     default: () => [],
     required: false,
   },
   streamFields: {
-    type: Array,
+    type: Array as PropType<SelectOptionInput[]>,
     default: () => [],
     required: true,
   },
@@ -245,6 +242,16 @@ const props = defineProps({
     required: false,
   },
 });
+interface ConditionRow {
+  column: string;
+  operator: string;
+  value: string;
+}
+
+interface ConditionField extends ConditionRow {
+  uuid: string;
+}
+
 const fieldErrors = reactive<Record<string, string>>({});
 
 var triggerOperators: any = ref([
@@ -280,13 +287,13 @@ const resolvePath = (obj: any, path: string): any =>
 
 // ⚠️ MUST be form.useStore (reactive) — NOT form.state.values (a snapshot a
 // computed won't track; playbook §2).
-const formRows = injectedForm
+const formRows: Ref<ConditionRow[]> = injectedForm
   ? injectedForm.useStore((s: any) =>
       props.namePrefix ? (resolvePath(s.values, props.namePrefix) ?? []) : [],
     )
-  : ref<any[]>([]);
+  : ref<ConditionRow[]>([]);
 
-const makeConditionRow = () => ({ column: "", operator: "=", value: "" });
+const makeConditionRow = (): ConditionRow => ({ column: "", operator: "=", value: "" });
 
 const addFormRow = () =>
   injectedForm?.pushFieldValue(props.namePrefix, makeConditionRow());

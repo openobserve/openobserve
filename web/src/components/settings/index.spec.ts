@@ -17,7 +17,6 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import SettingsIndex from "./index.vue";
 import i18n from "@/locales";
-import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 // Mock external dependencies
@@ -87,7 +86,7 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        PageLayout: {
+        OPageLayout: {
           template: `<div data-test-stub="page-layout">
             <slot name="sidebar"></slot>
             <slot></slot>
@@ -98,7 +97,7 @@ const createWrapper = (props = {}, options = {}) => {
           template: `<div data-test-stub="section-rail"></div>`,
           props: ["groups", "activeKey", "title"],
         },
-        AppPageHeader: {
+        OPageHeader: {
           template: `<div data-test-stub="app-page-header">
             <slot name="title"></slot>
           </div>`,

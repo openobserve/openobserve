@@ -26,12 +26,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- x axis container -->
     <div
-      style="display: flex; flex-direction: row; width: 100%"
-      class="pl-3"
+      class="pl-3 flex flex-row w-full"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
-      <div style="flex: 1">
-        <div style="display: flex; flex-direction: row">
+      <div class="flex-1">
+        <div class="flex flex-row">
           <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
             {{ currentXLabel }}
             <OIcon name="info-outline" size="sm" class="ml-1" />
@@ -42,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
             :class="{
               'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+              'transition-all duration-200 bg-field-list-row-hover-bg':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x',
             }"
@@ -73,17 +72,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index &&
                   dashboardPanelData.meta.dragAndDrop.currentDragArea == 'x'
                 "
-                class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
+                class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+                class="axis-field overflow-hidden"
                 radius="sm"
                 :draggable="true"
-                @dragstart="onFieldDragStart($event, itemX, 'x', index)"
-                @drop="onDrop($event, 'x', index)"
+                @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
+                @drop="onDrop($event, 'x', Number(index))"
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
@@ -105,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ xLabel[index] }}
                       <template #icon-right
-                        ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                       /></template>
                     </OButton>
                   </template>
@@ -144,24 +143,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
-                  @click="removeXAxisItemByIndex(index)"
+                  @click="removeXAxisItemByIndex(Number(index))"
                   icon-left="close"
                 >
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="text-xs text-weight-bold text-center py-1"
+              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
               v-if="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.x?.length < 1
-              "
-              style="
-                width: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
               "
             >
               <div class="mt-1">{{ xAxisHint }}</div>
@@ -170,8 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- b axis container -->
-      <div
-        style="flex: 1"
+      <div class="flex-1"
         v-if="
           dashboardPanelData.data.type == 'table' ||
           dashboardPanelData.data.type == 'area' ||
@@ -184,10 +176,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           dashboardPanelData.data.type == 'stacked'
         "
       >
-        <div style="display: flex; flex-direction: row" class="pl-3 h-full">
+        <div class="pl-3 h-full flex flex-row">
           <!-- Separator between X and Breakdown/Pivot -->
           <OSeparator vertical class="mr-4" />
-          <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center" style="min-width: 0 !important">
+          <div class="layout-name whitespace-nowrap min-w-0 flex items-center">
             {{
               dashboardPanelData.data.type == "table"
                 ? t("panel.pivotField")
@@ -204,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       dashboardPanelData.data.type == 'h-bar' ||
                       dashboardPanelData.data.type == 'h-stacked'
                     "
-                    >{{ t("panel.breakdownTooltipHBar") }}</span
+                  >{{ t("panel.breakdownTooltipHBar") }}</span
                   >
                   <span v-else>{{ t("panel.breakdownTooltipDefault") }}</span>
                 </template>
@@ -215,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
             :class="{
               'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-              'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+              'transition-all duration-200 bg-field-list-row-hover-bg':
                 dashboardPanelData.meta.dragAndDrop.dragging &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea ==
                   'breakdown',
@@ -248,17 +240,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   dashboardPanelData.meta.dragAndDrop.currentDragArea ==
                     'breakdown'
                 "
-                class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
+                class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
                 data-test="dashboard-query-builder-drag-item"
               >
                 &nbsp;
               </div>
               <OButtonGroup
-                class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+                class="axis-field overflow-hidden"
                 radius="sm"
                 :draggable="true"
-                @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
-                @drop="onDrop($event, 'breakdown', index)"
+                @dragstart="
+                  onFieldDragStart($event, itemB, 'breakdown', Number(index))
+                "
+                @drop="onDrop($event, 'breakdown', Number(index))"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
@@ -280,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ bLabel[index] }}
                       <template #icon-right
-                        ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                       /></template>
                     </OButton>
                   </template>
@@ -319,24 +313,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
-                  @click="removeBreakdownItemByIndex(index)"
+                  @click="removeBreakdownItemByIndex(Number(index))"
                   icon-left="close"
                 >
                 </OButton>
               </OButtonGroup>
             </div>
             <div
-              class="text-xs text-weight-bold text-center py-1"
+              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
               v-if="
                 !dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.breakdown?.length
-              "
-              style="
-                width: 100%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
               "
             >
               <div class="mt-1">{{ bAxisHint }}</div>
@@ -345,9 +333,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <OSeparator />
+    <OSeparator v-if="dashboardPanelData.data.type != 'metric'" />
     <!-- y axis container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
+    <div class="pl-3 flex flex-row">
       <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ currentYLabel }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
@@ -358,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
         :class="{
           'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+          'transition-all duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y',
         }"
@@ -388,17 +376,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'y'
             "
-            class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
+            class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
             data-test="dashboard-query-builder-drag-item"
           >
             &nbsp;
           </div>
           <OButtonGroup
-            class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+            class="axis-field overflow-hidden"
             radius="sm"
             :draggable="true"
-            @dragstart="onFieldDragStart($event, itemY, 'y', index)"
-            @drop="onDrop($event, 'y', index)"
+            @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
+            @drop="onDrop($event, 'y', Number(index))"
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
@@ -420,7 +408,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ yLabel[index] }}
                   <template #icon-right
-                    ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                   /></template>
                 </OButton>
               </template>
@@ -463,35 +451,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-chip"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
-              @click="removeYAxisItemByIndex(index)"
+              @click="removeYAxisItemByIndex(Number(index))"
               icon-left="close"
             >
             </OButton>
           </OButtonGroup>
         </div>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.y?.length < 1
-          "
-          style="
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
           "
         >
           <div class="mt-1">{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
-    <OSeparator />
-
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
-      <div style="display: flex; flex-direction: row" class="pl-3">
+      <OSeparator />
+      <div class="pl-3 flex flex-row">
         <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
           {{
             dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : ""
@@ -504,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap border-2 border-dashed border-transparent"
           :class="{
             'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
-            'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+            'transition-all duration-200 bg-field-list-row-hover-bg':
               dashboardPanelData.meta.dragAndDrop.dragging &&
               dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z',
           }"
@@ -534,17 +515,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 dashboardPanelData.meta.dragAndDrop.targetDragIndex == index &&
                 dashboardPanelData.meta.dragAndDrop.currentDragArea == 'z'
               "
-              class="dragItem bg-(--o2-theme-color) w-5 h-full rounded-md opacity-70"
+              class="dragItem bg-theme-accent w-5 h-full rounded-default opacity-70"
               data-test="dashboard-query-builder-drag-item"
             >
               &nbsp;
             </div>
             <OButtonGroup
-              class="axis-field overflow-hidden [--tw-divide-color:rgba(255,255,255,0.25)]"
+              class="axis-field overflow-hidden"
               radius="sm"
               :draggable="true"
-              @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
-              @drop="onDrop($event, 'z', index)"
+              @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
+              @drop="onDrop($event, 'z', Number(index))"
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
@@ -566,7 +547,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     {{ zLabel[index] }}
                     <template #icon-right
-                      ><OIcon name="arrow-drop-down" size="sm"
+><OIcon name="arrow-drop-down" size="sm"
                     /></template>
                   </OButton>
                 </template>
@@ -605,24 +586,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-chip"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
-                @click="removeZAxisItemByIndex(index)"
+                @click="removeZAxisItemByIndex(Number(index))"
                 icon-left="close"
               >
               </OButton>
             </OButtonGroup>
           </div>
           <div
-            class="text-xs text-weight-bold text-center py-1"
+            class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.z?.length < 1
-            "
-            style="
-              width: 100%;
-              display: flex;
-              justify-content: center;
-              align-items: center;
             "
           >
             <div class="mt-1">{{ zAxisHint }}</div>
@@ -630,13 +605,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </span>
-    <OSeparator />
-    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <OSeparator />
-    <!-- filters container -->
-    <DashboardFiltersOption
-      :dashboardData="dashboardData"
-    ></DashboardFiltersOption>
+    <template v-if="showJoinsAndFilters">
+      <OSeparator />
+      <DashboardJoinsOption
+        :dashboardData="dashboardData"
+      ></DashboardJoinsOption>
+      <OSeparator />
+      <!-- filters container -->
+      <DashboardFiltersOption
+        :dashboardData="dashboardData"
+      ></DashboardFiltersOption>
+    </template>
   </div>
 
   <!-- PromQL Builder Mode -->
@@ -677,8 +656,6 @@ import { getImageURL } from "../../../utils/zincutils";
 import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
-import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
@@ -700,7 +677,7 @@ import {
   promqlSeedFor,
 } from "@/utils/dashboard/promqlSeed";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
-import type { PromqlBuilderQuery } from "@/components/promql/types";
+import type { PromqlBuilderQuery, PromqlStep } from "@/components/promql/types";
 import { normalizeSteps } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -709,6 +686,14 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+// Minimal shape of a dashboard panel query slot as read by the PromQL builder.
+interface DashboardQuerySlot {
+  fields?: {
+    promql_operations?: PromqlStep[];
+    promql_labels?: string[];
+  };
+}
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -719,7 +704,6 @@ export default defineComponent({
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DashboardJoinsOption,
     DynamicFunctionPopUp,
@@ -732,7 +716,7 @@ export default defineComponent({
   },
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],
-  setup(props) {
+  setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
@@ -746,7 +730,7 @@ export default defineComponent({
       config: true,
       filter: false,
     });
-    const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey = inject<string>(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
@@ -769,8 +753,6 @@ export default defineComponent({
       isAddZAxisNotAllowed,
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
-      fetchPromQLLabels,
       isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
@@ -797,6 +779,19 @@ export default defineComponent({
       return dashboardPanelData.data.type == "h-bar"
         ? t("panel.xAxisShort")
         : t("panel.yAxisShort");
+    });
+
+    // Joins and Filters hide themselves in custom-SQL mode; the separators
+    // around them must follow the same condition or they stack into a
+    // double border after the Y-axis row.
+    const showJoinsAndFilters = computed(() => {
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      return !(
+        currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql"
+      );
     });
 
     // Initialize treatAsNonTimestamp for existing fields (only for table charts)
@@ -999,7 +994,7 @@ export default defineComponent({
             streamAlias: firstFieldTypeArg.streamAlias,
           };
 
-          const axisArray = getAxisArray(targetAxis);
+          getAxisArray(targetAxis);
 
           if (targetAxis !== "f") {
             if (
@@ -1146,11 +1141,11 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
 
@@ -1170,7 +1165,7 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const xAxisHint = computed((e: any) => {
+    const xAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
@@ -1197,7 +1192,7 @@ export default defineComponent({
       }
     });
 
-    const bAxisHint = computed((e: any) => {
+    const bAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "stacked":
         case "area-stacked":
@@ -1208,7 +1203,7 @@ export default defineComponent({
       }
     });
 
-    const yAxisHint = computed((e: any) => {
+    const yAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
@@ -1223,7 +1218,7 @@ export default defineComponent({
       }
     });
 
-    const zAxisHint = computed((e: any) => {
+    const zAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "heatmap":
           return t("dashboard.dashboardQueryBuilder.addOneField");
@@ -1286,8 +1281,6 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
-
     // PromQL Builder Mode (queryType = "promql" with customQuery = false)
     const promqlBuilderMode = computed(
       () =>
@@ -1308,19 +1301,18 @@ export default defineComponent({
      * under, and writes the upgrade back into the panel.
      *
      * The write-back has to happen HERE rather than being left to the deep
-     * watcher that copies builder state into the schema. That watcher is
-     * registered after this one runs `immediate`, so on the very load that
-     * matters it has not been set up yet and never fires — the builder would
-     * hold the new ids while the panel kept the old ones forever, and the
-     * compatibility table could never be retired.
+     * watcher that copies builder state into the schema: that watcher is
+     * registered after this one runs `immediate`, so on the load that matters it
+     * has not been set up yet and never fires.
      *
      * `normalizeSteps` hands back the array it was given when nothing needed
-     * upgrading, so a changed reference is exactly the signal that this panel
-     * was saved under old ids. A modern panel is not touched, and does not look
-     * dirty for having been opened.
+     * upgrading, so a changed reference is the signal that this panel was saved
+     * under old ids. A modern panel is not touched.
      */
-    const loadSavedSteps = (currentQuery: any) => {
-      const stored = currentQuery?.fields?.promql_operations || [];
+    const loadSavedSteps = (
+      currentQuery: DashboardQuerySlot | undefined,
+    ): PromqlStep[] => {
+      const stored: PromqlStep[] = currentQuery?.fields?.promql_operations || [];
       const upgraded = normalizeSteps(stored);
 
       if (upgraded !== stored && currentQuery?.fields) {
@@ -1335,9 +1327,7 @@ export default defineComponent({
      *
      * A panel can hold several queries behind tabs, and the builder only ever
      * loads the tab you are looking at. Migrating just that one would leave a
-     * two-tab panel half-upgraded — saved with tab 2 still on the old ids — and
-     * the compatibility table could never actually be retired, because whether a
-     * panel migrated would depend on which tabs its author happened to click.
+     * two-tab panel half-upgraded — saved with tab 2 still on the old ids.
      */
     const migrateAllSavedSteps = () => {
       for (const slot of dashboardPanelData.data.queries ?? []) {
@@ -1445,11 +1435,11 @@ export default defineComponent({
      * written from OUTSIDE — which is what `applyDefaultPanelFields` does when it
      * seeds the metrics rule set's default on a query-type toggle.
      *
-     * Ordering made this necessary: the builder-mode watcher above reads the
-     * schema when the mode flips, but the seed lands a microtask later. The
-     * result was a panel whose QUERY was `sum(rate(x{}[4m]))` while the builder
-     * showed no operations at all — and since the builder is the sole writer of
-     * the query string, the user's very first click rewrote it to a bare `x{}`.
+     * The builder-mode watcher above reads the schema when the mode flips, but
+     * the seed lands a microtask later, so without this the builder would show no
+     * operations while the query already held the seeded value — and since the
+     * builder is the sole writer of the query string, the user's first click
+     * would rewrite it to a bare `x{}`.
      *
      * The equality guards matter: the deep watcher below writes these same
      * references straight back, so without them the two watchers would ping-pong.
@@ -1525,7 +1515,9 @@ export default defineComponent({
         try {
           const query = promqlRenderer.renderQuery(promqlBuilderQuery);
           currentQuery.query = query;
-        } catch (error) {}
+        } catch {
+          /* ignore: keep last valid query on render failure */
+        }
       },
       { deep: true },
     );
@@ -1545,9 +1537,8 @@ export default defineComponent({
      * rather than seeding the local state and trusting the deep watcher above to
      * render it into the schema. That indirection does not survive here: this fires
      * `immediate`, i.e. during setup, and a mutation made then never reaches the deep
-     * watcher. The symptom was precise and baffling: the builder's chips were right
-     * while the query stayed empty. Writing both ends is idempotent anyway, since the
-     * deep watcher renders the same query back out of the same state.
+     * watcher. Writing both ends is idempotent anyway, since the deep watcher
+     * renders the same query back out of the same state.
      *
      * Deliberately only seeds an EMPTY slot: switching between existing tabs must
      * never rewrite a query that is already there.
@@ -1642,6 +1633,7 @@ export default defineComponent({
       currentYLabel,
       isPivotMode,
       reorderItems,
+      showJoinsAndFilters,
     };
   },
 });

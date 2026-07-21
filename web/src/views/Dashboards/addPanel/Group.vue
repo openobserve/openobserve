@@ -1,8 +1,9 @@
 <template>
   <div
     data-test="dashboard-group"
-    :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}; background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));`"
-    class="flex p-0 rounded-[5px]"
+    :style="`--group-index: ${groupNestedIndex};`"
+    class="flex p-0 rounded-default bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(12%*var(--group-index)),transparent)]"
+    :class="groupNestedIndex > 0 ? 'pl-1.25' : 'pl-0'"
   >
     <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
@@ -15,14 +16,14 @@
           v-if="condition.filterType === 'group'"
           :group="condition"
           :group-nested-index="groupNestedIndex + 1"
-          :group-index="index"
+          :group-index="Number(index)"
           :dashboard-variables-filter-items="dashboardVariablesFilterItems"
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
           @add-condition="addConditionToGroup"
           @add-group="addGroupToGroup"
-          @remove-group="removeGroupFromNested(index)"
+          @remove-group="removeGroupFromNested(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
         />
         <AddCondition
@@ -32,7 +33,7 @@
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
-          @remove-condition="removeConditionFromGroup(index)"
+          @remove-condition="removeConditionFromGroup(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
           :condition-index="index"
         />
@@ -60,7 +61,7 @@
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="border-l border-[#f5f5f5] flex justify-between items-center">
+    <div v-if="groupNestedIndex !== 0" class="border-l border-border-default flex justify-between items-center">
       <OButton
         variant="ghost"
         size="icon"
@@ -74,7 +75,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -125,6 +126,9 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const showAddMenu = ref(false);
+
+    // Same reference as props.group; mutation targets its nested fields only.
+    const groupModel = computed(() => props.group);
     const filterOptions = ["AND", "OR"];
 
     const emitAddCondition = () => {
@@ -138,7 +142,7 @@ export default defineComponent({
     };
 
     const removeConditionFromGroup = (index: number) => {
-      props.group.conditions.splice(index, 1);
+      groupModel.value.conditions.splice(index, 1);
     };
 
     const removeGroupFromNested = (groupIndex: number) => {

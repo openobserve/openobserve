@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   picks the route the rail/breadcrumb highlight.
 -->
 <template>
-  <PageLayout :sidebar-width="232">
+  <OPageLayout bleed :sidebar-width="230">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"
@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <section class="h-full min-w-0 min-h-0 overflow-y-auto">
       <router-view />
     </section>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -41,7 +41,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import type {
   SectionHubGroup,
@@ -70,6 +70,8 @@ function evalLink(tab: EvalTab) {
 const activeSection = computed<string>(() => {
   if (route.name === "aiLLMInsights") return "llmInsights";
   if (route.name === "aiSessions") return "sessions";
+  if (route.name === "aiAgentGraph") return "agentGraph";
+  if (route.name === "aiAgentBehavior") return "agentBehavior";
   if (route.name === "aiEvaluations") {
     const tab = (route.query.tab as string) || "quality";
     return tab;
@@ -102,6 +104,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     icon: "hub",
     to: { name: "aiAgentGraph", query: orgQuery.value },
     dataTest: "ai-secondary-nav-agent-graph",
+    group: "Monitor",
+  },
+  {
+    key: "agentBehavior",
+    label: t("aiObservability.nav.agentBehavior"),
+    icon: "troubleshoot",
+    to: { name: "aiAgentBehavior", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-agent-behavior",
     group: "Monitor",
   },
   {
@@ -168,5 +178,5 @@ const sectionGroups = computed<SectionHubGroup[]>(() => {
 
 // Reserved for future per-section header chrome wiring (mirrors Settings'
 // activeSectionItem use). Keeping the reference live for clarity.
-void activeSectionItem;
+void activeSectionItem.value;
 </script>

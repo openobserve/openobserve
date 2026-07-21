@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import VisualizeLogsQuery from "@/plugins/logs/VisualizeLogsQuery.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { ref } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 
@@ -252,13 +251,6 @@ describe("VisualizeLogsQuery Component", () => {
           CustomMarkdownEditor: true,
           AddToDashboard: true,
           CustomChartEditor: true,
-          "q-splitter": {
-            template:
-              '<div><slot name="before"></slot><slot name="after"></slot></div>',
-          },
-          "q-splitter-panel": {
-            template: "<div><slot></slot></div>",
-          },
         },
       },
     });
@@ -538,7 +530,7 @@ describe("VisualizeLogsQuery Component", () => {
 
   describe("addToDashboard Function", () => {
     it("should show dialog when no errors", () => {
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors added to array
       });
 
@@ -592,7 +584,7 @@ describe("VisualizeLogsQuery Component", () => {
         { converted_histogram_query: "SELECT histogram(...)" },
       ]);
 
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors
       });
 
@@ -612,7 +604,7 @@ describe("VisualizeLogsQuery Component", () => {
 
       const originalQuery = wrapper.vm.dashboardPanelData.data.queries[0].query;
 
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors
       });
 
@@ -634,7 +626,7 @@ describe("VisualizeLogsQuery Component", () => {
     });
   });
 
-  // Migration coverage: q-dialog wrapper removed; AddToDashboard now uses
+  // Migration coverage: dialog wrapper removed; AddToDashboard now uses
   // v-model:open and emits update:open / save directly (ODialog/ODrawer contract).
   describe("AddToDashboard integration (ODialog/ODrawer migration)", () => {
     it("should render AddToDashboard stub bound to showAddToDashboardDialog", async () => {
@@ -672,12 +664,6 @@ describe("VisualizeLogsQuery Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showAddToDashboardDialog).toBe(false);
-    });
-
-    it("should not render any legacy q-dialog wrapper around AddToDashboard", () => {
-      // After migration, AddToDashboard is no longer wrapped in q-dialog;
-      // it controls its own ODialog/ODrawer via v-model:open.
-      expect(wrapper.find(".q-dialog").exists()).toBe(false);
     });
   });
 
@@ -930,7 +916,7 @@ describe("VisualizeLogsQuery Component", () => {
     it("should handle missing resultMetaData gracefully in addToDashboard", () => {
       wrapper.vm.resultMetaData = null;
 
-      mockValidatePanel.mockImplementation((errors) => {
+      mockValidatePanel.mockImplementation(() => {
         // No errors
       });
 

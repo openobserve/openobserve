@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="variablesData.values?.length > 0"
-    class="flex flex-wrap mt-1 ml-1"
+    class="flex flex-wrap mt-1"
   >
     <div
       v-for="(item, index) in variablesData.values"
@@ -29,36 +29,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
-          @search="onVariableSearch(index, $event)"
+          @search="onVariableSearch(Number(index), $event)"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mr-4 mt-1"
-          style="max-width: 150px !important"
+          class="mr-4 mt-1 max-w-37.5!"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
           readonly
           :data-test="`variable-selector-${item.name}`"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
       <div v-else-if="item.type == 'textbox'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mr-4 mt-1"
-          style="max-width: 150px !important"
+          class="mr-4 mt-1 max-w-37.5!"
           :debounce="1000"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
           :data-test="`variable-selector-${item.name}`"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
       <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
@@ -67,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mr-4 mt-1"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
@@ -76,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mr-4 mt-1"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
@@ -98,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import {
-  getCurrentInstance,
   onMounted,
   onUnmounted,
   ref,
@@ -152,7 +149,7 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // New props for scoped variables
+    // Props for scoped variables
     scope: {
       type: String as PropType<"global" | "tabs" | "panels">,
       default: "global",
@@ -190,8 +187,8 @@ export default defineComponent({
   setup(props: any, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    // Try to inject variablesManager from parent (for backward compatibility)
-
+    // Alias preserves the same prop reference for in-place mutation.
+    const initialVariableValuesModel = computed(() => props.initialVariableValues);
     // Try to inject variablesManager from parent (for backward compatibility)
     const injectedManager = inject<any>("variablesManager", undefined);
     const manager = props.variablesManager || injectedManager;
@@ -629,13 +626,6 @@ export default defineComponent({
                   ? JSON.stringify(originalValue) !==
                     JSON.stringify(variableObject.value)
                   : originalValue !== variableObject.value;
-
-              // Check if variable now has a valid value (not null/undefined/empty)
-              const hasValidValue =
-                variableObject.value !== null &&
-                variableObject.value !== undefined &&
-                (!Array.isArray(variableObject.value) ||
-                  variableObject.value.length > 0);
 
               // Mark as partially loaded
               variableObject.isVariablePartialLoaded = true;
@@ -1266,7 +1256,6 @@ export default defineComponent({
     };
 
     // it is used to change/update initial variables values from outside the component
-    // NOTE: right now, it is not used after variables in variables feature
     const changeInitialVariableValues = async (
       newInitialVariableValues: any,
     ) => {
@@ -1277,7 +1266,7 @@ export default defineComponent({
       resetVariablesData();
 
       // set initial variables values
-      props.initialVariableValues.value = newInitialVariableValues;
+      initialVariableValuesModel.value.value = newInitialVariableValues;
 
       // make list of variables using variables config list
       initializeVariablesData();
@@ -1426,10 +1415,6 @@ export default defineComponent({
         currentVariable.isVariableLoadingPending = true;
         return;
       }
-
-      // Pre-calculate the options values array
-      const optionsValues =
-        currentVariable.options.map((option: any) => option.value) ?? [];
 
       // For single select, handle old value selection
       if (!currentVariable.multiSelect) {
@@ -1609,7 +1594,9 @@ export default defineComponent({
       isInitialLoad: boolean = false,
       searchText?: string,
     ) => {
-      return new Promise(async (resolve, reject) => {
+      return new Promise((resolve, reject) => {
+        // Async body hoisted into an IIFE so the executor stays synchronous
+        void (async () => {
         const { name } = variableObject;
 
         if (!name || !variableObject) {
@@ -1787,6 +1774,7 @@ export default defineComponent({
           await finalizeVariableLoading(variableObject, false);
           resolve(false);
         }
+        })();
       });
     };
 
@@ -2256,10 +2244,11 @@ export default defineComponent({
 
       try {
         await loadSingleVariableDataByName(variableObject);
-      } catch (error) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
         variableLog(
           variableObject.name,
-          `Error loading variable options for ${variableObject.name}: ${error.message}`,
+          `Error loading variable options for ${variableObject.name}: ${message}`,
         );
       }
     };
@@ -2406,7 +2395,7 @@ export default defineComponent({
 
         const merged = [
           ...filtered,
-          ...customTypedValues.filter((v) => !filtered.includes(v)),
+          ...customTypedValues.filter((v: unknown) => !filtered.includes(v)),
         ];
 
         if (merged.length !== currentVariable.value.length) {

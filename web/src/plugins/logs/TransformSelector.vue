@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OButtonGroup
-    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="p-0 float-left mr-1 transform-selector element-box-shadow border border-button-outline-border"
   >
     <!-- Wrap toggle + dropdown together so divide-x only creates one separator (before save) -->
@@ -52,8 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Search Input -->
           <div
             data-test="logs-search-bar-transform-type-select"
-            class="logs-transform-type o2-input mx-2"
-            style="padding-top: 0"
+            class="logs-transform-type o2-input mx-2 pt-0"
           >
             <OSelect
               v-if="isActionsEnabled"
@@ -78,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="filteredTransformOptions.length" class="max-h-72 overflow-y-auto">
             <ul class="flex flex-col m-0 p-0 list-none">
               <li
-                v-for="(item, i) in filteredTransformOptions"
+                v-for="item in filteredTransformOptions"
                 :key="'transform-' + item?.name"
                 :data-test="`logs-search-saved-transform-item-${item?.name}`"
                 class="border-b saved-view-item flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
@@ -127,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -141,6 +139,7 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const props = withDefaults(defineProps<{
@@ -159,6 +158,7 @@ const { searchObj } = searchState();
 const { isActionsEnabled } = logsUtils();
 
 const store = useStore();
+  const { isDark } = useTheme();
 
 const functionModel = ref(false);
 
@@ -215,7 +215,7 @@ const iconRight = computed(() => {
   return (
     "img:" +
     getImageURL(
-      store.state.theme === "dark"
+      isDark.value
         ? "images/common/function_dark.svg"
         : "images/common/function.svg",
     )
@@ -240,12 +240,12 @@ const transformsLabel = computed(() => {
 });
 
 const transformIcon = computed(() => {
-  const isDark = store.state.theme === "dark";
+  
   if (!isActionsEnabled.value)
     return (
       "img:" +
       getImageURL(
-        isDark
+        isDark.value
           ? "images/common/function_dark.svg"
           : "images/common/function.svg",
       )
@@ -255,7 +255,7 @@ const transformIcon = computed(() => {
     return (
       "img:" +
       getImageURL(
-        isDark
+        isDark.value
           ? "images/common/function_dark.svg"
           : "images/common/function.svg",
       )
@@ -267,11 +267,13 @@ const transformIcon = computed(() => {
     return (
       "img:" +
       getImageURL(
-        isDark
+        isDark.value
           ? "images/common/transform_dark.svg"
           : "images/common/transform.svg",
       )
     );
+
+  return undefined;
 });
 
 const updateTransforms = () => {
@@ -334,4 +336,13 @@ const getTransformLabelTooltip = computed(() => {
     : `${t("search.show")} ${editorType} ${t("search.editor")}`;
 });
 </script>
+
+<style scoped>
+/* keep(lib-override:obuttongroup): rounds OButtonGroup's own root, which this
+   component only receives as a class — not settable from the template without
+   losing to the group's internal radius. */
+.transform-selector {
+  border-radius: 0.375rem;
+}
+</style>
 

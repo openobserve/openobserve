@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import type { BrowserCheck } from '@/types/synthetics'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
+import type { SelectModelValue } from '@/lib/forms/Select/OSelect.types'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 
@@ -55,7 +56,10 @@ const localDestinations = computed({
 
 const destinationError = ref(false)
 
-function onDestinationsChange(v: string[]) {
+function onDestinationsChange(value: SelectModelValue) {
+  const v = (Array.isArray(value) ? value : []).filter(
+    (d): d is string => typeof d === 'string',
+  )
   destinationError.value = v.length === 0
   emit('update:check', { ...props.check, notifications: { destinations: v } })
 }
@@ -80,9 +84,9 @@ const silenceMinutes = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
-      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+  <div class="rounded-default border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-2.5 px-3">
+      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
       <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.scheduleAlert.alerts') }}
       </h3>
@@ -139,7 +143,7 @@ const silenceMinutes = computed({
             :options="destinations"
             multiple
             :error="destinationError"
-            class="min-w-[180px] max-w-[300px]"
+            class="min-w-45 max-w-75"
             data-test="synthetics-check-alerts-destinations-select"
             @update:model-value="onDestinationsChange"
           >
@@ -174,7 +178,7 @@ const silenceMinutes = computed({
           {{ t('synthetics.scheduleAlert.cooldownPeriod') }} *
         </label>
         <div class="flex items-center">
-          <div class="w-[87px]">
+          <div class="w-21.75">
             <OInput
               v-model="silenceMinutes"
               type="number"

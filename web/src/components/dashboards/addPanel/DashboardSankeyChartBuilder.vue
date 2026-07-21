@@ -17,18 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'sankey'">
     <!-- source container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="layout-name whitespace-nowrap min-w-[130px] flex items-center">
+    <div class="pl-3 flex flex-row">
+      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.source") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+          'transition-all duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'source',
         }"
@@ -75,17 +75,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-source-item-${sourceLabel}`"
               >
                 {{ sourceLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
               :data-test="`dashboard-source-item-${sourceLabel}-menu`"
             >
-              <div
-                style="padding: 3px 16px 16px 16px"
+              <div class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[
@@ -129,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           data-test="dashboard-sankey-source-empty-hint"
           v-if="
             dashboardPanelData.data.queries[
@@ -143,18 +141,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- target container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="layout-name whitespace-nowrap min-w-[130px] flex items-center">
+    <div class="pl-3 flex flex-row">
+      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.target") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+          'transition-all duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'target',
         }"
@@ -201,17 +199,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-target-item-${targetLabel}`"
               >
                 {{ targetLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
               :data-test="`dashboard-target-item-${targetLabel}-menu`"
             >
-              <div
-                style="padding: 3px 16px 16px 16px"
+              <div class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[
@@ -255,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -268,18 +264,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- value container -->
-    <div style="display: flex; flex-direction: row" class="pl-3">
-      <div class="layout-name whitespace-nowrap min-w-[130px] flex items-center">
+    <div class="pl-3 flex flex-row">
+      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
         {{ t("panel.value") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator flex items-center ml-[2px] mr-[2px]">:</span>
+      <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
         class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
-          'transition-all duration-200 bg-[var(--color-field-list-row-hover-bg)]':
+          'transition-all duration-200 bg-field-list-row-hover-bg':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'value',
         }"
@@ -326,17 +322,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`dashboard-value-item-${valueLabel}`"
               >
                 {{ valueLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[771px]! h-[323px] shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+              class="field-function-menu-popup dashboard-sankey-chart-builder-dropdown w-[48.1875rem]! h-[20.1875rem] shadow-md p-4 translate-y-2 rounded-none"
               :data-test="`dashboard-value-item-${valueLabel}-menu`"
             >
-              <div
-                style="padding: 3px 16px 16px 16px"
+              <div class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[
@@ -380,7 +374,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs text-weight-bold text-center py-1"
+          class="text-xs font-bold text-center py-1"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -391,13 +385,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <OSeparator />
-    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <OSeparator />
-    <!-- filters container -->
-    <DashboardFiltersOption
-      :dashboardData="dashboardData"
-    ></DashboardFiltersOption>
+    <template v-if="showJoinsAndFilters">
+      <OSeparator />
+      <DashboardJoinsOption
+        :dashboardData="dashboardData"
+      ></DashboardJoinsOption>
+      <OSeparator />
+      <!-- filters container -->
+      <DashboardFiltersOption
+        :dashboardData="dashboardData"
+      ></DashboardFiltersOption>
+    </template>
   </div>
 </template>
 
@@ -409,13 +407,10 @@ import {
   watch,
   computed,
   inject,
-  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
-import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
@@ -436,7 +431,6 @@ export default defineComponent({
     OButtonGroup,
     OButton,
     ODropdown,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
@@ -444,7 +438,7 @@ export default defineComponent({
     OTooltip,
   },
   props: ["dashboardData"],
-  setup(props) {
+  setup() {
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
@@ -470,7 +464,6 @@ export default defineComponent({
       addFilteredItem,
       promqlMode,
       cleanupDraggingFields,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -608,11 +601,11 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
     const onDragEnter = (e: any, area: string, index: any) => {
@@ -640,7 +633,7 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-    const Hint = computed((e: any) => {
+    const Hint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "sankey":
           return t("dashboard.oneFieldMessage");
@@ -697,9 +690,23 @@ export default defineComponent({
       return commonBtnLabel(valueField);
     });
 
+    // Joins and Filters hide themselves in custom-SQL mode; the separators
+    // around them must follow the same condition or they stack into a
+    // double border.
+    const showJoinsAndFilters = computed(() => {
+      const currentQuery =
+        dashboardPanelData.data.queries[
+          dashboardPanelData.layout.currentQueryIndex
+        ];
+      return !(
+        currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql"
+      );
+    });
+
     return {
       t,
       dashboardPanelData,
+      showJoinsAndFilters,
       removeSource,
       removeTarget,
       removeValue,

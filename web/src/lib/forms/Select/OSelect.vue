@@ -67,21 +67,12 @@ type NormalizedOption = {
   colorPalette?: string[];
   /** Optional badge/chip text rendered inline next to the label (e.g. "recommended"). */
   badge?: string;
-  /**
-   * Tooltip for the badge. Use when the badge is abbreviated — a one-letter chip
-   * is compact but not self-explanatory, and this is what tells you `C` is
-   * "Counter" without costing a row of width.
-   */
+  /** Tooltip for the badge. Use when the badge is abbreviated (e.g. `C` → "Counter"). */
   badgeTitle?: string;
   /**
-   * Per-option badge colours, e.g. `{ color, background }`. Without it the badge
-   * is a green outline — fine for a one-off "recommended" tag, wrong for a badge
-   * that CLASSIFIES (every option green says nothing). Supplying a style turns it
-   * into a filled pill in that option's own colour, right-aligned so the chips
-   * form a single scannable column instead of ragging along the label ends.
-   *
-   * The right-align applies only to STYLED badges: a bare "recommended" tag reads
-   * as part of the label and belongs next to it, so those are left where they are.
+   * Per-option badge colours, e.g. `{ color, background }`. A styled badge renders
+   * as a filled pill in that option's own colour, right-aligned into a single
+   * column; a bare (unstyled) badge stays inline next to the label.
    */
   badgeStyle?: Record<string, string>;
 };
@@ -99,6 +90,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchable: true,
   searchDebounce: 0,
   hideSelected: false,
+  collapsibleGroups: false,
   creatable: false,
   searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
@@ -124,6 +116,7 @@ const parentDataTest = computed(
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
   const { tabindex, ...rest } = $attrs;
+  void tabindex;
   return rest;
 });
 
@@ -261,7 +254,7 @@ const pinnedSelected = ref<Set<string>>(new Set());
 
 const inputEnabled = computed(() => props.searchable);
 
-const filteredOptions = computed(() => {
+const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
   const term = searchTerm.value.trim().toLowerCase();
   let options = normalizedOptions.value;
@@ -319,6 +312,56 @@ const filteredOptions = computed(() => {
   return result;
 });
 
+// ── Collapsible groups (opt-in via `collapsibleGroups`) ──────────────────────
+// Group headers become accordion toggles: collapsing a group hides its items
+// (the header stays, so it can be re-expanded). Keyed by header label — group
+// labels are unique in practice. Ignored while searching so matches always show.
+const collapsedGroups = ref<Set<string>>(new Set());
+const isGroupCollapsed = (label: string) => collapsedGroups.value.has(label);
+const toggleGroup = (label: string) => {
+  const next = new Set(collapsedGroups.value);
+  next.has(label) ? next.delete(label) : next.add(label);
+  collapsedGroups.value = next;
+};
+
+// The final option list the dropdown renders — the single source of truth that
+// feeds the virtualizer, keyboard navigation, and the empty-state check. It
+// layers the accordion collapse on top of `baseFilteredOptions` (which has
+// already applied the search + hide-selected filters), one step before render.
+//
+// `baseFilteredOptions` is a FLAT array where each group header
+// (`{ header: true, label }`) is followed by that group's items, e.g.
+//   [Destinations(header), dest1, dest2, Workflows(header), wf1, wf2]
+// Collapsing a group must hide its items but KEEP the header (so the bar stays
+// visible and clickable to re-expand).
+//
+// Two early exits leave `base` untouched:
+//   1. Not in collapsible mode, or nothing collapsed — every other select in the
+//      app hits this, so the feature is invisible unless opted in.
+//   2. An active search term — collapse is bypassed so a match inside a collapsed
+//      group still shows (otherwise search would look broken).
+//
+// Otherwise walk the flat list: on a header, remember whether ITS group is
+// collapsed (and always keep the header); on an item, keep it only while the
+// current group isn't collapsed. `hidden` carries forward until the next header
+// resets it.
+const filteredOptions = computed(() => {
+  const base = baseFilteredOptions.value;
+  if (!props.collapsibleGroups || collapsedGroups.value.size === 0) return base;
+  if (searchTerm.value.trim()) return base; // search spans every group
+  const out: NormalizedOption[] = [];
+  let hidden = false;
+  for (const opt of base) {
+    if (opt.header) {
+      hidden = collapsedGroups.value.has(opt.label);
+      out.push(opt);
+    } else if (!hidden) {
+      out.push(opt);
+    }
+  }
+  return out;
+});
+
 const listboxModeEnabled = computed(
   () =>
     !slots.default &&
@@ -360,7 +403,7 @@ const selectedLabels = computed(() => {
       if (selectedValue === null) return null;
       return String(selectedValue);
     })
-    .filter(Boolean);
+    .filter((label): label is string => Boolean(label));
 });
 
 const triggerDisplayLabel = computed(() => {
@@ -397,12 +440,9 @@ watch(popoverOpen, (open) => {
 });
 
 // ── Error state ────────────────────────────────────────────────────────────
-// The error message is only shown when `props.error` is true. Previously this
-// computed returned `props.errorMessage || (props.error ? " " : null)`, which
-// meant a static (non-conditional) error-message prop would render the error
-// permanently regardless of `props.error` — so a select with valid defaults
-// still showed "X is required". Now `error` is the single source of truth
-// for whether the error is visible; `errorMessage` only controls the text.
+// The error message is only shown when `props.error` is true. `error` is the
+// single source of truth for whether the error is visible; `errorMessage` only
+// controls the text.
 const effectiveError = computed(() => {
   if (!props.error) return null;
   return props.errorMessage || " ";
@@ -415,7 +455,12 @@ const stringValue = computed(() =>
     : undefined,
 );
 
-function handleUpdate(value: string) {
+function handleUpdate(value: string | null) {
+  // Reka's SelectRoot types the value as nullable; null means no selection here.
+  if (value === null) {
+    emit("update:modelValue", undefined);
+    return;
+  }
   // Recover the original type: prefer props.options, then the slot-item registry
   const opt = normalizedOptions.value.find((o) => String(o.value) === value);
   let resolved: SelectPrimitiveValue;
@@ -990,13 +1035,13 @@ const triggerEndPadding = computed(() =>
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "w-[var(--spacing-field-width-xs)]";
+      return "w-field-width-xs";
     case "sm":
-      return "w-[var(--spacing-field-width-sm)]";
+      return "w-field-width-sm";
     case "md":
-      return "w-[var(--spacing-field-width-md)]";
+      return "w-field-width-md";
     case "lg":
-      return "w-[var(--spacing-field-width-lg)]";
+      return "w-field-width-lg";
     default:
       return "w-full";
   }
@@ -1017,8 +1062,8 @@ const fieldWidthClass = computed(() => {
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        disabled ? 'o-input-label--disabled' : 'cursor-pointer',
+        'o-input-label text-compact leading-tight flex items-center gap-1',
+        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text cursor-pointer',
       ]"
       @click.prevent="handleLabelClick"
     >
@@ -1036,7 +1081,7 @@ const fieldWidthClass = computed(() => {
     <template v-if="listboxModeEnabled">
       <PopoverRoot
         v-model:open="popoverOpen"
-        @update:open="(v) => emit(v ? 'open' : 'close')"
+        @update:open="(v) => (v ? emit('open') : emit('close'))"
       >
         <div
           ref="triggerWrapperRef"
@@ -1050,6 +1095,7 @@ const fieldWidthClass = computed(() => {
             :tabindex="inputTabindex"
             role="combobox"
             :aria-expanded="popoverOpen"
+            :aria-invalid="hasError || undefined"
             @keydown="handleTriggerKeydown"
             :data-test="
               parentDataTest ? `${parentDataTest}-trigger` : undefined
@@ -1063,7 +1109,7 @@ const fieldWidthClass = computed(() => {
             "
             :data-test-selected-label="triggerDisplayLabel"
             :class="[
-              'relative flex w-full rounded-md border',
+              'relative flex w-full rounded-default border',
               // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
               labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'ps-2' : 'ps-3'),
               'bg-select-bg',
@@ -1085,7 +1131,7 @@ const fieldWidthClass = computed(() => {
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="text-[0.625rem] leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
+              class="text-3xs leading-none whitespace-nowrap text-start text-text-secondary select-none pointer-events-none ps-3 pe-7"
               >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
@@ -1116,14 +1162,14 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="inline-flex items-center rounded px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
+                        class="inline-flex items-center rounded-default px-2 py-0.5 text-xs leading-none bg-select-item-selected-bg text-select-item-selected-text max-w-40 truncate shrink-0"
                       >
                         {{ labelText }}
                       </span>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
-                      class="inline-flex items-center rounded px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
+                      class="inline-flex items-center rounded-default px-2 py-0.5 text-xs bg-select-item-hover-bg text-select-text shrink-0"
                       data-test="o-select-overflow-chip"
                     >
                       +{{ overflowSelectedCount }} more
@@ -1227,7 +1273,7 @@ const fieldWidthClass = computed(() => {
             :class="[
               'z-[10001] min-w-(--reka-popover-trigger-width)',
               'overflow-hidden flex flex-col',
-              'rounded-md shadow-lg',
+              'rounded-default shadow-lg',
               'bg-select-content-bg',
             ]"
             :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
@@ -1243,7 +1289,7 @@ const fieldWidthClass = computed(() => {
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
-                  'rounded-md border border-input-border overflow-hidden',
+                  'rounded-default border border-input-border overflow-hidden',
                   'bg-select-content-bg flex flex-col flex-1 min-h-0',
                 ]"
               >
@@ -1282,7 +1328,7 @@ const fieldWidthClass = computed(() => {
                   :class="[
                     'relative flex items-center w-full gap-2 shrink-0',
                     'ps-3 pe-3 py-1.5 text-sm',
-                    'text-select-item-text rounded-sm',
+                    'text-select-item-text rounded-default',
                     'cursor-pointer select-none outline-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
@@ -1297,7 +1343,7 @@ const fieldWidthClass = computed(() => {
                   <span
                     :class="[
                       'flex items-center justify-center shrink-0',
-                      'size-3.5 rounded-sm border transition-colors',
+                      'size-3.5 rounded-default border transition-colors',
                       allSelected
                         ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
                         : 'bg-checkbox-bg border-checkbox-border',
@@ -1326,7 +1372,7 @@ const fieldWidthClass = computed(() => {
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
                    on the ListboxFilter input above. Items are index-highlighted reactively. -->
-                <div ref="listboxScrollEl" :class="['overflow-auto', multiple && rowClickSingleSelect ? 'flex-1 min-h-[6rem]' : 'max-h-60']">
+                <div ref="listboxScrollEl" :class="['overflow-auto', multiple && rowClickSingleSelect ? 'flex-1 min-h-24' : 'max-h-60']">
                   <div
                     v-if="filteredOptions.length === 0"
                     class="px-3 py-2 text-sm text-select-placeholder"
@@ -1362,11 +1408,27 @@ const fieldWidthClass = computed(() => {
                       <div
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
-                          'flex w-full h-full px-3 py-1 text-xs font-bold',
-                          'text-select-item-text bg-select-content-bg',
-                          'select-none pointer-events-none',
+                          'flex w-full h-full px-3 py-1 text-xs font-bold select-none text-select-item-text',
+                          collapsibleGroups
+                            ? 'items-center gap-1 cursor-pointer bg-surface-subtle'
+                            : 'pointer-events-none bg-select-content-bg',
                         ]"
+                        @click.stop="
+                          collapsibleGroups &&
+                            toggleGroup(filteredOptions[vRow.index].label)
+                        "
                       >
+                        <OIcon
+                          v-if="collapsibleGroups"
+                          name="keyboard-arrow-up"
+                          size="sm"
+                          :class="[
+                            'shrink-0 transition-transform duration-150',
+                            !isGroupCollapsed(filteredOptions[vRow.index].label)
+                              ? 'rotate-180'
+                              : '',
+                          ]"
+                        />
                         {{ filteredOptions[vRow.index].label }}
                       </div>
 
@@ -1397,7 +1459,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'relative flex w-full h-full gap-2',
                           'ps-3 pe-3 text-sm',
-                          'text-select-item-text rounded-sm',
+                          'text-select-item-text rounded-default',
                           'cursor-pointer select-none outline-none',
                           'transition-colors duration-100',
                           // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
@@ -1421,7 +1483,7 @@ const fieldWidthClass = computed(() => {
                           <span
                             :class="[
                               'flex items-center justify-center shrink-0',
-                              'size-3.5 rounded-sm border transition-colors',
+                              'size-3.5 rounded-default border transition-colors',
                               selectedValues.includes(
                                 filteredOptions[vRow.index].value,
                               )
@@ -1453,8 +1515,7 @@ const fieldWidthClass = computed(() => {
                           <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
                           <span
                             v-if="rowClickSingleSelect"
-                            class="w-px shrink-0 bg-[var(--o2-border-color)] mx-1 my-1"
-                            style="align-self: stretch"
+                            class="w-px shrink-0 bg-card-glass-border mx-1 my-1 self-stretch"
                             aria-hidden="true"
                             data-select-separator
                           />
@@ -1480,18 +1541,18 @@ const fieldWidthClass = computed(() => {
                               <span class="truncate font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
                               <span
                                 v-if="filteredOptions[vRow.index].badge"
-                                class="shrink-0 rounded border border-solid"
+                                class="shrink-0 rounded-default border border-solid"
                                 :class="[
                                   filteredOptions[vRow.index].badgeTitle ? 'cursor-help' : undefined,
                                   filteredOptions[vRow.index].badgeStyle
                                     ? 'inline-flex items-center justify-center leading-none ml-auto min-w-[1.125rem] h-[1.125rem] px-1 text-xs font-semibold border-current'
-                                    : 'text-[10px] font-medium px-1 py-px leading-tight',
+                                    : 'text-3xs font-medium px-1 py-px leading-tight',
                                 ]"
                                 :title="filteredOptions[vRow.index].badgeTitle"
                                 :style="
                                   filteredOptions[vRow.index].badgeStyle ?? {
-                                    color: 'var(--o2-positive)',
-                                    borderColor: 'var(--o2-positive)',
+                                    color: 'var(--color-status-positive)',
+                                    borderColor: 'var(--color-status-positive)',
                                   }
                                 "
                               >{{ filteredOptions[vRow.index].badge }}</span>
@@ -1502,7 +1563,7 @@ const fieldWidthClass = computed(() => {
                             >{{ filteredOptions[vRow.index].subLabel }}</span>
                             <div
                               v-if="filteredOptions[vRow.index].colorPalette?.length"
-                              class="h-1.5 w-full rounded-sm"
+                              class="h-1.5 w-full rounded-default"
                               :style="{
                                 background: getPaletteGradient(
                                   filteredOptions[vRow.index].colorPalette!,
@@ -1551,9 +1612,9 @@ const fieldWidthClass = computed(() => {
                 class="flex items-center gap-2 px-3 py-2 select-none pointer-events-none shrink-0"
               >
                 <!-- Checkbox zone hint -->
-                <span class="flex items-center gap-1.5 text-[0.6875rem] text-select-placeholder shrink-0">
+                <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
                   <span
-                    class="inline-flex items-center justify-center size-3.5 rounded-sm border border-select-placeholder shrink-0"
+                    class="inline-flex items-center justify-center size-3.5 rounded-default border border-select-placeholder shrink-0"
                     aria-hidden="true"
                   >
                     <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-2.5 p-px">
@@ -1566,7 +1627,7 @@ const fieldWidthClass = computed(() => {
                 <span class="w-px h-3.5 bg-input-border shrink-0" aria-hidden="true" />
 
                 <!-- Name zone hint -->
-                <span class="flex items-center gap-1.5 text-[0.6875rem] text-select-placeholder shrink-0">
+                <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
                   <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="size-3 shrink-0" aria-hidden="true">
                     <path d="M4 2h6M4 5h6M4 8h3" />
                   </svg>
@@ -1592,7 +1653,8 @@ const fieldWidthClass = computed(() => {
       @update:open="
         (v) => {
           selectOpen = v;
-          emit(v ? 'open' : 'close');
+          if (v) emit('open');
+          else emit('close');
         }
       "
     >
@@ -1607,7 +1669,7 @@ const fieldWidthClass = computed(() => {
             parentDataTest ? `${parentDataTest}-trigger` : undefined
           "
           :class="[
-            'relative flex w-full rounded-md border',
+            'relative flex w-full rounded-default border',
             // In inside-label mode padding is handled per-row
             labelPosition === 'inside' && label ? '' : 'ps-3',
             'bg-select-bg',
@@ -1629,7 +1691,7 @@ const fieldWidthClass = computed(() => {
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="text-[0.625rem] leading-none whitespace-nowrap text-start text-select-placeholder select-none pointer-events-none ps-3 pe-7"
+            class="text-3xs leading-none whitespace-nowrap text-start text-text-secondary select-none pointer-events-none ps-3 pe-7"
             >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
@@ -1724,7 +1786,7 @@ const fieldWidthClass = computed(() => {
           :class="[
             'z-[10001] min-w-(--reka-select-trigger-width)',
             'overflow-hidden',
-            'rounded-md border shadow-md',
+            'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft

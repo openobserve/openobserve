@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
        always present; the chosen section renders to the right. -->
-  <PageLayout :sidebar-width="232">
+  <OPageLayout bleed :sidebar-width="230">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"
@@ -32,12 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="isConstrainedSection"
       class="h-full min-h-0 flex flex-col"
     >
-      <AppPageHeader
+      <OPageHeader
         :title="activeSectionItem?.label || ''"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
         :subtitle="activeSectionItem?.description || ''"
         :icon="(activeSectionItem?.icon as any)"
-        class="shrink-0 px-4 border-b border-border-subtle"
+        class="shrink-0 border-b border-border-default"
       />
       <ConstrainedPage
         size="lg"
@@ -48,17 +48,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <router-view title="" />
       </ConstrainedPage>
     </div>
-    <!-- Table/list sections render their own AppPageHeader inside. -->
+    <!-- Table/list sections render their own header (OPageLayout) inside. Do NOT
+         pass a `title` attr here: these children are OPageLayout-rooted, so a
+         fallthrough `title` would clobber their own `:title` prop and blank the
+         header (regression seen on Query Management / Nodes). -->
     <section v-else class="h-full min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
-      <router-view title="" />
+      <router-view />
     </section>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import {
   type SectionHubGroup,
@@ -69,14 +72,12 @@ import {
   ref,
   onBeforeMount,
   onActivated,
-  onDeactivated,
-  onUnmounted,
   onUpdated,
   computed,
-  watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
@@ -85,14 +86,15 @@ import { getImageURL } from "@/utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   components: {
-    AppPageHeader,
+    OPageHeader,
     ConstrainedPage,
-    PageLayout,
+    OPageLayout,
     SectionRail,
   },
   setup() {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
     const route = useRoute();
 
@@ -184,7 +186,7 @@ export default defineComponent({
 
     const regexIcon = computed(() =>
       getImageURL(
-        store.state.theme === "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       ),

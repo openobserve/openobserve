@@ -16,19 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="report-list-page" class="h-full">
-    <PageLayout
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    <OPageLayout bleed
+      :title="t('reports.header')"
+      title-data-test="report-list-title"
+      icon="description"
+      :subtitle="t('reports.subtitle')"
     >
-      <!-- Row 1: standard header — title + actions only. Tabs / search / folder
-           scope moved into the table's own toolbar below. -->
-      <template #header>
-        <AppPageHeader
-          :title="t('reports.header')"
-          title-data-test="report-list-title"
-          icon="description"
-          :subtitle="t('reports.subtitle')"
-        >
           <template #actions>
             <OButton
               data-test="report-list-add-report-btn"
@@ -39,8 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t(`reports.add`) }}
             </OButton>
           </template>
-        </AppPageHeader>
-      </template>
 
     <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
     <div
@@ -48,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="report-list-table flex-1 flex min-h-0"
     >
       <!-- Left: folder list -->
-      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+      <div class="shrink-0 h-full w-rail">
         <div class="h-full">
           <FolderList
             type="reports"
@@ -59,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Right: report table -->
       <div class="flex-1 min-w-0 h-full">
-        <div class="h-full card-container">
+        <div class="h-full bg-card-glass-bg">
               <OTable
                 data-test="report-list-table"
                 :data="visibleRows"
@@ -70,11 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 pagination="client"
                 selection="multiple"
                 v-model:selected-ids="selectedReportIds"
-                style="width: 100%; height: 100%"
+                class="w-full h-full"
                 :show-global-filter="false"
                 :enable-column-resize="true"
                 :persist-columns="true"
                 :default-columns="false"
+                show-index
                 table-id="reports-report-list"
               >
                 <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
@@ -197,8 +189,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="reportsStateLoadingMap[row.report_id]"
                     data-test="report-list-toggle-report-state-loader"
-                    style="display: inline-block; width: 33.14px; height: auto"
-                    class="flex justify-center items-center"
+                    style="display: inline-block; width: 33.14px"
+                    class="flex justify-center items-center h-auto"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -247,11 +239,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Table footer: pagination + bulk actions -->
-                <template #bottom="scope">
-                  <div class="flex items-center justify-between w-full h-[48px]">
+                <template #bottom>
+                  <div class="flex items-center justify-between w-full h-12">
                     <!-- Left: count + action buttons grouped together -->
                     <div class="flex items-center gap-2">
-                      <div class="o2-table-footer-title flex items-center whitespace-nowrap">
+                      <div class="text-xs font-normal flex items-center whitespace-nowrap">
                         {{ resultTotal }} {{ t("reports.header") }}
                       </div>
                       <OButton
@@ -281,7 +273,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    </PageLayout>
+    </OPageLayout>
 
     <!-- Single delete confirm -->
     <ConfirmDialog
@@ -319,8 +311,7 @@ import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } f
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
@@ -331,7 +322,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
-import { cloneDeep, debounce } from "lodash-es";
+import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
@@ -341,11 +332,10 @@ import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from '@/lib/core/Icon/OIcon.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -360,7 +350,6 @@ const store = useStore();
 
 
 // ── Folder state ──────────────────────────────────────────────────────────────
-const splitterModel = ref(200);
 const activeFolderId = ref<string>(
   (router.currentRoute.value.query.folder as string) ?? "default",
 );
@@ -402,8 +391,6 @@ const tabs = reactive([
 ]);
 
 const resultTotal = ref<number>(0);
-const pageSize = ref(20);
-const pageSizeOptions = [20, 50, 100, 250, 500];
 
 const deleteDialog = ref({
   show:    false,
@@ -415,7 +402,6 @@ const confirmBulkDelete = ref<boolean>(false);
 
 const columns = computed<OTableColumnDef[]>(() => {
   const base: OTableColumnDef[] = [
-    { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "center" } },
     { id: "name", header: t("alerts.name"), accessorKey: "name", cell: " ", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
     { id: "owner", header: t("alerts.owner"), accessorKey: "owner", sortable: true, resizable: true, hideable: true, size: COL.owner },
     { id: "description", header: t("alerts.description"), accessorKey: "description", sortable: false, resizable: true, hideable: true, size: COL.description, meta: { align: "left" } },
@@ -472,8 +458,7 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
       nameQuery || undefined,
     );
 
-    const mapped = (res.data ?? []).map((report: any, index: number) => ({
-      "#": index + 1,
+    const mapped = (res.data ?? []).map((report: any) => ({
       ...report,
       last_triggered_at_raw: report.last_triggered_at || null,
       last_triggered_at: report.last_triggered_at
@@ -519,10 +504,7 @@ const invalidateFolderCache = (folderId: string) => {
 };
 
 const filterReports = () => {
-  reportsTableRows.value = (staticReportsList.value as any[]).map((r: any, i: number) => ({
-    ...r,
-    "#": i + 1,
-  }));
+  reportsTableRows.value = [...(staticReportsList.value as any[])];
   resultTotal.value = reportsTableRows.value.length;
 };
 
@@ -626,8 +608,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value || searchAcrossFolders.value) return reportsTableRows.value ?? [];
   return filterData(reportsTableRows.value ?? [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
 watch(visibleRows, (rows) => { resultTotal.value = rows.length; }, { immediate: true });
 
 // ── Actions ───────────────────────────────────────────────────────────────────

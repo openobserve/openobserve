@@ -1,25 +1,28 @@
 ﻿<template>
-  <div class="w-full h-full flex flex-col min-h-0">
-    <AppPageHeader
-      :title="t('search_history.title')"
-      icon="history"
-      :back="{ onClick: closeSearchHistory }"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    :title="t('search_history.title')"
+    icon="history"
+    :back="{ onClick: closeSearchHistory }"
+    bleed
+  >
       <template #actions>
           <OButton
             data-test="search-history-wrap-content-btn"
             variant="ghost"
             size="icon"
-            class="wrap-content-btn"
-            :class="{ 'wrap-content-btn--active': wrapText }"
+            class="h-6! min-h-6! w-[1.45rem]! p-0! m-0 border-[0.0626rem]! border-solid! border-card-glass-border! rounded-default! [transition:all_0.2s_ease] backdrop-blur-[0.625rem]! flex! items-center! justify-center!"
+            :class="
+              wrapText
+                ? 'bg-theme-accent! text-white hover:opacity-85'
+                : 'bg-white/10! hover:bg-white/15!'
+            "
             @click="wrapText = !wrapText"
           >
             <OIcon name="wrap-text" size="sm" />
             <OTooltip :content="t('search.messageWrapContent')" />
           </OButton>
           <div
-            class="text-[#f5a623] border border-[#f5a623] flex items-center px-2 h-[36px] rounded-md"
+            class="text-status-warning-text border border-status-warning-text flex items-center px-2 h-9 rounded-default"
           >
             <OIcon name="info" class="mr-1" size="sm" />
             <div>
@@ -51,8 +54,7 @@
             </OButton>
           </div>
       </template>
-    </AppPageHeader>
-    <div class="card-container flex-1 min-h-0 overflow-hidden">
+    <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
             :data="dataToBeLoaded"
@@ -83,11 +85,14 @@
             </template>
 
             <template #cell-sql="{ row }">
-              <span class="text-text-primary">{{ row.sql }}</span>
+              <span class="text-text-body">{{ row.sql }}</span>
             </template>
 
             <template #expansion="{ row }">
-              <div class="app-tabs-container w-fit my-1">
+              <!-- px-4 matches the SQL/Function/More-Details blocks below so the
+                   tabs line up with the query content instead of sitting flush
+                   to the cell edge (same inset the scheduler list uses). -->
+              <div class="app-tabs-container w-fit my-1 px-4">
                 <app-tabs
                   data-test="expanded-list-tabs"
                   class="tabs-selection-container"
@@ -96,29 +101,37 @@
                 />
               </div>
               <div v-show="activeTab === 'query'">
-                <div class="text-left px-2 mb-2 expanded-content">
+                <div class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden">
                   <div class="flex items-center py-2 gap-2">
                     <strong
                       >{{ t('logs.searchHistory.sqlQueryLabel') }}
                       <span>
+                        <!-- Copy is a neutral action in both sections; the SQL/VRL
+                             accent lives on the block's left border, which marks
+                             which language you're looking at. -->
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="copy-btn-sql ml-2"
+                          data-test="search-history-copy-sql-btn"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           @click.stop="
                             copyToClipboard(row.sql, { successMessage: t('logs.searchHistory.sqlQueryCopied'), timeout: 5000 })
                           "
                         >
-                          <OIcon name="content-copy" size="sm" /> </OButton></span
+                          <OIcon name="content-copy" size="xs" /> </OButton></span
                     ></strong>
+                    <!-- Logs and Inspect are both navigations, so they share one
+                         variant and size. -->
+                    <!-- No mx-2: the row is already `gap-2`, so a margin here
+                         stacked on top of it and doubled the spacing to 16px. -->
                     <OButton
-                      variant="outline-destructive"
+                      data-test="search-history-go-to-logs-btn"
+                      variant="outline"
                       size="chip"
-                      class="copy-btn mx-2"
                       @click.stop="goToLogs(row)"
                     >
                       <template #icon-left
-                        ><OIcon name="search" size="sm"
+                        ><OIcon name="search" size="xs"
                       /></template>
                       {{ t('logs.searchHistory.logs') }}
                     </OButton>
@@ -128,35 +141,49 @@
                         config.isCloud == 'false' &&
                         store.state.zoConfig.search_inspector_enabled
                       "
-                      variant="ghost"
-                      size="sm"
-                      class="copy-btn"
+                      data-test="search-history-inspect-btn"
+                      variant="outline"
+                      size="chip"
                       @click.stop="goToInspector(row)"
                     >
                       <template #icon-left
-                        ><OIcon name="analytics" size="sm"
+                        ><OIcon name="analytics" size="xs"
                       /></template>
                       {{ t('logs.searchHistory.inspect') }}
                     </OButton>
                   </div>
                   <div class="flex items-start justify-center">
-                    <div class="scrollable-content expanded-sql">
-                      <pre style="text-wrap: wrap">{{ row?.sql }}</pre>
+                    <div
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query"
+                    >
+                      <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
+                           as the dashboard Query Inspector. Falls back to plain
+                           text for the frame before colorize resolves, and if
+                           Monaco throws (colorizeQuery escapes on failure). -->
+                      <pre
+                        v-if="colorizedSql[row.uuid]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-history-sql-colorized"
+                        v-html="colorizedSql[row.uuid]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.sql }}</pre>
                     </div>
                   </div>
                 </div>
                 <div
                   v-if="row?.function"
-                  class="text-left mb-2 px-2 expanded-content"
+                  class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
                 >
                   <div class="flex items-center py-2">
                     <strong
                       >{{ t('logs.searchHistory.functionDefinitionLabel') }}
                       <span>
+                        <!-- Same neutral copy affordance as the SQL block above. -->
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="copy-btn-function ml-2"
+                          data-test="search-history-copy-function-btn"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           @click.stop="
                             copyToClipboard(
                               row.function,
@@ -164,27 +191,38 @@
                             )
                           "
                         >
-                          <OIcon name="content-copy" size="sm" /> </OButton></span
+                          <OIcon name="content-copy" size="xs" /> </OButton></span
                     ></strong>
                   </div>
 
                   <div class="flex items-start justify-center">
-                    <div class="scrollable-content expanded-function">
-                      <pre style="text-wrap: wrap">{{ row?.function }}</pre>
+                    <div
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query"
+                    >
+                      <pre
+                        v-if="colorizedFunction[row.uuid]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-history-function-colorized"
+                        v-html="colorizedFunction[row.uuid]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.function }}</pre>
                     </div>
                   </div>
                 </div>
               </div>
-              <query-editor
-                v-show="activeTab === 'more_details'"
-                style="height: 200px"
-                :ref="`QueryEditorRef${row.trace_id + row.sql}`"
-                :editor-id="`search-query-editor${row.trace_id + row.sql}`"
-                :debounceTime="600"
-                v-model:query="moreDetailsToDisplay"
-                language="json"
-                read-only
-              />
+              <!-- px-4 keeps the More Details editor aligned with the tabs and
+                   the query blocks above. -->
+              <div v-show="activeTab === 'more_details'" class="px-4">
+                <query-editor
+                  style="height: 200px"
+                  :ref="`QueryEditorRef${row.trace_id + row.sql}`"
+                  :editor-id="`search-query-editor${row.trace_id + row.sql}`"
+                  :debounceTime="600"
+                  v-model:query="moreDetailsToDisplay"
+                  language="json"
+                  read-only
+                />
+              </div>
             </template>
 
             <template #empty>
@@ -195,10 +233,10 @@
 
             <template #bottom>
               <div
-                class="flex items-center justify-between w-full h-[48px]"
+                class="flex items-center justify-between w-full h-12"
               >
                 <div
-                  class="o2-table-footer-title flex items-center w-[100px] mr-md"
+                  class="text-xs font-normal flex items-center w-25 mr-md"
                 >
                   {{ resultTotal }} {{ t("search_history.results") }}
                 </div>
@@ -207,25 +245,25 @@
             </template>
           </OTable>
     </div>
-  </div>
+  </OPageLayout>
 
   <!-- Show NoData component if there's no data to display -->
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, watch, onMounted, nextTick, computed, onUnmounted } from "vue";
+import { ref, watch, onMounted, computed, onUnmounted } from "vue";
 import {
   timestampToTimezoneDate,
   b64EncodeUnicode,
-  convertDateToTimestamp,
   getUUID,
 } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
-import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
+import DOMPurify from "dompurify";
+import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import DateTime from "@/components/DateTime.vue";
@@ -238,14 +276,13 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts, getManager } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -258,16 +295,14 @@ export default defineComponent({
   components: {
     OEmptyState,
     DateTime,
-    NoData,
     AppTabs,
     QueryEditor,
     OButton,
-    OSpinner,
     OIcon,
     OTooltip,
     OTable,
     OTimeCell,
-    AppPageHeader,
+    OPageLayout,
 },
   props: {
     isClicked: {
@@ -281,7 +316,7 @@ export default defineComponent({
       this.$emit("closeSearchHistory");
     },
   },
-  setup(props, { emit }) {
+  setup(props) {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
@@ -299,7 +334,6 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
@@ -424,13 +458,9 @@ export default defineComponent({
           hit.rawTook = hit.took;
           hit.took = formatTime(hit.took);
           hit.rawScanRecords = hit.scan_records;
-          hit.scan_records = hit.scan_records;
           hit.rawScanSize = hit.scan_size;
           hit.scan_size = hit.scan_size + hit.unit;
-          hit.cached_ratio = hit.cached_ratio;
           hit.rawCachedRatio = hit.cached_ratio;
-          hit.sql = hit.sql;
-          hit.function = hit.function;
           hit.rawExecutedTime = hit._timestamp;
           hit.executed_time = timestampToTimezoneDate(
             hit._timestamp / 1000,
@@ -463,7 +493,6 @@ export default defineComponent({
     });
 
     const updateDateTime = async (value: any) => {
-      const { startTime, endTime } = value;
       dateTimeToBeSent.value = value;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
     };
@@ -521,6 +550,27 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
+    /* Monaco-colorized SQL / VRL for the expanded row, keyed by row uuid — the
+       same treatment the dashboard Query Inspector gives its queries. Colorizing
+       is async and only the expanded row is ever visible, so it runs on expand
+       rather than up-front for every row. */
+    const colorizedSql = ref<Record<string, string>>({});
+    const colorizedFunction = ref<Record<string, string>>({});
+
+    const colorizeRow = async (row: any) => {
+      if (!row?.uuid) return;
+      if (row.sql && colorizedSql.value[row.uuid] === undefined) {
+        colorizedSql.value[row.uuid] = DOMPurify.sanitize(
+          await colorizeQuery(row.sql, "sql"),
+        );
+      }
+      if (row.function && colorizedFunction.value[row.uuid] === undefined) {
+        colorizedFunction.value[row.uuid] = DOMPurify.sanitize(
+          await colorizeQuery(row.function, "vrl"),
+        );
+      }
+    };
+
     const onExpandedIdsChange = (ids: string[]) => {
       expandedIds.value = ids;
       const expandedId = ids[0];
@@ -531,14 +581,12 @@ export default defineComponent({
       const row = dataToBeLoaded.value.find((r: any) => r.uuid === expandedId);
       if (row) {
         moreDetailsToDisplay.value = JSON.stringify(filterRow(row), null, 2);
+        colorizeRow(row);
       }
     };
     const goToLogs = (row) => {
-      const duration_suffix = row.duration.split(" ")[1];
       // emit('closeSearchHistory');
       const stream: string = row.stream_name;
-      const from = row.toBeStoredStartTime;
-      const to = row.toBeStoredEndTime;
       const refresh = 0;
 
       const query = b64EncodeUnicode(row.sql);
@@ -558,7 +606,10 @@ export default defineComponent({
       };
       //here if we have function then we are adding fn_editor flag as true because it will open the function editor by default
       //else we are adding fn_editor flag as false because it will close the function editor by default
-      if (row.hasOwnProperty("function") && row.function) {
+      if (
+        Object.prototype.hasOwnProperty.call(row, "function") &&
+        row.function
+      ) {
         const functionContent = b64EncodeUnicode(row.function);
         queryObject["functionContent"] = functionContent;
         queryObject["fn_editor"] = "true";
@@ -641,6 +692,8 @@ export default defineComponent({
       goToLogs,
       goToInspector,
       onExpandedIdsChange,
+      colorizedSql,
+      colorizedFunction,
       copyToClipboard,
       formatTime,
       delayMessage,
@@ -657,3 +710,14 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
+   v-html, so these can't be template utilities. Every colour but .mtk1 comes
+   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
+   we point back at the block's own colour so the query inherits our theme
+   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
+.o2-colorized-query :deep(.mtk1) {
+  color: inherit;
+}
+</style>

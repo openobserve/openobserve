@@ -1,8 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
-    <!-- <div class="mb-2 title" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
     <div
-      class="flex flex-nowrap items-center mb-1 gap-x-1"
+      class="flex flex-nowrap items-center mb-2 mr-4 gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -14,17 +13,15 @@
         @update:model-value="updateModelValueOfSelect(index, $event)"
         class="flex-1"
       />
-      <OSelect
+      <OSelect class="w-auto"
         v-model="adhocVariables[index].operator"
         :options="operatorOptions"
-        style="width: auto"
         data-test="dashboard-variable-adhoc-operator-selector"
       />
-      <OInput
+      <OInput class="w-31.25"
         v-model="adhocVariables[index].value"
         :placeholder="t('dashboard.variableAdHocValueSelector.enterValue')"
         :debounce="1000"
-        style="width: 125px"
         data-test="dashboard-variable-adhoc-value-selector"
         @update:model-value="emitValue()"
       />
@@ -37,7 +34,7 @@
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" :class="store.state.theme === 'dark' ? 'bg-gray-600' : 'bg-gray-300'">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
     </div>
     <OButton
       variant="ghost"
@@ -63,6 +60,13 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
+interface AdHocVariable {
+  name: string;
+  operator: string;
+  value: string;
+  streams: string[];
+}
+
 export default defineComponent({
   name: "VariableAdHocValueSelector",
   props: ["modelValue", "variableItem"],
@@ -77,7 +81,9 @@ export default defineComponent({
       { label: "!=", value: "!=" },
     ];
     const options = toRef(props.variableItem, "options");
-    const { modelValue: adhocVariables } = toRefs(props);
+    const { modelValue: adhocVariables } = toRefs(props) as {
+      modelValue: Ref<AdHocVariable[]>;
+    };
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSelectAutoComplete(options, "name");
 
@@ -123,6 +129,7 @@ export default defineComponent({
       adhocVariables,
       removeField,
       updateModelValueOfSelect,
+      emitValue,
       store,
       t,
     };
@@ -130,8 +137,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.printMode .hideOnPrintMode {
-  display: none;
-}
-</style>

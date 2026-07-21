@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="invoice-history-container" class="rounded-md flex flex-col h-full">
+  <div data-test="invoice-history-container" class="rounded-default flex flex-col h-full">
     <div class="flex-1 min-h-0">
       <div class="w-full h-full">
         <invoice-table></invoice-table>
@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "@vue/runtime-core";
+import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import InvoiceTable from "./invoiceTable.vue";
 

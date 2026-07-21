@@ -35,16 +35,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :drawer-mode="drawerMode"
     @update-status="emit('update-status', $event)"
   />
-  <div
+  <OPageLayout
     v-else
-    class="run-detail flex flex-col h-full min-h-0"
+    class="run-detail"
     data-test="synthetics-run-detail"
+    bleed
   >
     <!-- ════════ HEADER ════════ -->
-    <!-- ── Route mode header ── -->
-    <AppPageHeader
-      v-if="!drawerMode"
-      class="px-2!"
+    <template #header v-if="!drawerMode">
+    <OPageHeader
+      class=""
       :subtitle="currentRun.timestamp"
       :back="{
         label: t('synthetics.results.monitors'),
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="default"
           size="sm"
           icon="link"
-          class="truncate max-w-[200px]"
+          class="truncate max-w-50"
           data-test="synthetics-run-detail-url-badge"
         >
           {{ currentRun.url }}
@@ -78,14 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-xs"
-            icon-left="chevron_left"
+            icon-left="chevron-left"
             :disabled="true"
             data-test="synthetics-run-detail-prev-btn"
           />
           <OButton
             variant="ghost"
             size="icon-xs"
-            icon-left="chevron_right"
+            icon-left="chevron-right"
             :disabled="true"
             data-test="synthetics-run-detail-next-btn"
           />
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
-          icon-left="open_in_new"
+          icon-left="open-in-new"
           data-test="synthetics-run-detail-trace-btn"
         >
           {{ t('synthetics.runDetail.openTrace') }}
@@ -109,12 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('synthetics.journey.reRun') }}
         </OButton>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
+    </template>
 
     <!-- ════════ SUB TABS ════════ -->
     <OTabs
       v-model="activeTab"
-      class="shrink-0 px-2 border-b border-border-default"
+      class="shrink-0 px-page-edge border-b border-border-default"
     >
       <OTab name="summary" data-test="synthetics-run-detail-tab-summary">
         <span class="flex items-center gap-1.5">
@@ -147,18 +148,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ════════════ SUMMARY ════════════ -->
         <OTabPanel name="summary" data-test="synthetics-run-detail-summary-tab">
           <div
-            class="py-[0.875rem] pb-[1.75rem] flex flex-col"
+            class="py-3.5 pb-7 flex flex-col"
           >
             <!-- Info chips skeleton -->
             <template v-if="loading">
               <div
-                class="grid grid-cols-5 gap-[0.625rem] px-2"
+                class="grid grid-cols-5 gap-2.5 px-2"
                 data-test="synthetics-run-detail-info-skeleton"
               >
                 <div
                   v-for="i in 5"
                   :key="i"
-                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default flex flex-row items-center px-3.5 py-2.5 gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OSkeleton type="circle" class="h-4 w-4 shrink-0" />
                   <OSkeleton type="text" class="h-4 w-20" />
@@ -168,13 +169,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Info chips -->
             <template v-else>
               <div
-                class="grid grid-cols-5 gap-[0.625rem] px-2"
+                class="grid grid-cols-5 gap-2.5 px-2"
                 data-test="synthetics-run-detail-info-bar"
               >
                 <div
                   v-for="chip in infoChips"
                   :key="chip.label"
-                  class="card-container rounded-lg flex flex-row items-center px-[0.875rem] py-[0.625rem] gap-1.5 bg-surface-base border border-border-default"
+                  class="card-container rounded-default flex flex-row items-center px-3.5 py-2.5 gap-1.5 bg-surface-base border border-border-default"
                 >
                   <OIcon
                     v-if="chip.icon"
@@ -204,9 +205,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="i in 4"
                     :key="i"
-                    class="flex items-center gap-2 rounded border border-border-default p-2"
+                    class="flex items-center gap-2 rounded-default border border-border-default p-2"
                   >
-                    <OSkeleton type="rect" class="h-12 w-18 shrink-0 rounded" />
+                    <OSkeleton type="rect" class="h-12 w-18 shrink-0 rounded-default" />
                     <OSkeleton type="circle" class="h-6 w-6 shrink-0" />
                     <OSkeleton type="text" class="h-4 flex-1" />
                     <OSkeleton type="text" class="h-4 w-16 shrink-0" />
@@ -217,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Lambda execution error (no steps) -->
             <div
               v-else-if="isErrorRun"
-              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-lg overflow-hidden m-2"
+              class="bg-[var(--color-badge-error-soft-bg)] border border-badge-error-ol-border/30 rounded-default overflow-hidden m-2"
               role="alert"
               data-test="synthetics-run-detail-steps-error-banner"
             >
@@ -229,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <span class="text-[13.5px] font-bold text-status-error-text">
+                    <span class="text-sm font-bold text-status-error-text">
                       {{ currentRun.errorType }}
                     </span>
                   </div>
@@ -249,13 +250,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :class="{ 'rotate-180': stackOpen }"
                       />
                     </template>
-                    <span class="text-[11.5px] font-semibold text-status-error-text">
+                    <span class="text-2xs font-semibold text-status-error-text">
                       {{ t('synthetics.runDetail.viewFullError') }}
                     </span>
                   </OButton>
                   <pre
                     v-if="stackOpen && currentRun.errorStack"
-                    class="mt-2 text-[11px] leading-[1.6] text-text-body bg-code-bg rounded-md p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
+                    class="mt-2 text-2xs leading-[1.6] text-text-body bg-code-bg rounded-default p-[10px_12px] overflow-auto whitespace-pre-wrap font-mono"
                     data-test="synthetics-run-detail-error-stack"
                   >{{ currentRun.errorStack }}</pre>
                 </div>
@@ -279,13 +280,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ t('synthetics.runDetail.sessionReplay') }}</span
                   >
                   <span class="flex-1" />
-                  <span class="font-mono text-[11px] text-text-secondary">
-                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep.id, total: steps.length }) }}
+                  <span class="font-mono text-2xs text-text-secondary">
+                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep?.id, total: steps.length }) }}
                   </span>
                 </OCardSection>
                 <OSeparator />
 
-                <div class="h-[380px] flex flex-col">
+                <div class="h-95 flex flex-col">
                   <div class="flex-1 min-h-0">
                     <VideoPlayer
                       :events="[]"
@@ -329,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-else
                         name="image"
                         size="xs"
-                        class="text-text-caption"
+                        class="text-text-secondary"
                       />
                     </template>
 
@@ -337,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template #expansion="{ row }">
                       <div class="flex gap-4 p-3">
                         <div class="w-[40%] shrink-0">
-                          <div class="rounded border border-border-default overflow-hidden">
+                          <div class="rounded-default border border-border-default overflow-hidden">
                             <div
                               class="aspect-[16/10] flex items-center justify-center overflow-hidden"
                               :class="row.status === 'fail' ? 'bg-status-error-bg' : 'bg-surface-subtle'"
@@ -360,15 +361,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   />
                                 </OButton>
                                 <div
-                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-md bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none"
+                                  class="absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded-default bg-surface-base/80 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
                                   aria-hidden="true"
                                 >
-                                  <OIcon name="fullscreen" size="sm" class="text-text-heading" />
+                                  <OIcon name="fullscreen" size="sm" class="text-text-body" />
                                 </div>
                               </div>
                               <template v-else>
-                                <OIcon name="image" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'" size="lg" />
-                                <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-caption'">
+                                <OIcon name="image" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-secondary'" size="lg" />
+                                <span class="text-xs font-semibold" :class="row.status === 'fail' ? 'text-status-error-text' : 'text-text-secondary'">
                                   {{ row.status === 'fail' ? t('synthetics.runDetail.failureScreenshot') : t('synthetics.runDetail.screenshotPlaceholder') }}
                                 </span>
                               </template>
@@ -390,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                           <div
                             v-if="row.status === 'fail' && row.error"
-                            class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden"
+                            class="rounded-default border border-badge-error-ol-border/30 overflow-hidden"
                             :data-test="`synthetics-run-detail-step-error-card-${row.id}`"
                           >
                             <div class="flex items-center gap-2 px-3 py-2 bg-[var(--color-badge-error-soft-bg)]">
@@ -399,8 +400,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </div>
                             <div class="px-3 py-3">
                               <pre
-                                class="text-[12.5px] text-text-body m-0 whitespace-pre-wrap font-mono leading-relaxed"
-                                :class="{ 'max-h-[96px] overflow-hidden': !expandedStepErrors.has(row.id) && (row.error?.length ?? 0) > 200 }"
+                                class="text-xs text-text-body m-0 whitespace-pre-wrap font-mono leading-relaxed"
+                                :class="{ 'max-h-24 overflow-hidden': !expandedStepErrors.has(row.id) && (row.error?.length ?? 0) > 200 }"
                               >{{ row.error }}</pre>
                               <div class="flex items-center gap-2 mt-1.5">
                                 <OButton
@@ -438,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="logs">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-logs-empty"
             >
@@ -456,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="traces">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-traces-empty"
             >
@@ -474,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="rum">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-rum-empty"
             >
@@ -489,7 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
     </div>
-  </div>
+  </OPageLayout>
 
   <!-- ════════════ Screenshot Lightbox ════════════ -->
   <ODialog
@@ -527,7 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="errorStep"
       class="flex flex-col h-full overflow-y-auto p-6"
     >
-      <div class="rounded-lg border border-badge-error-ol-border/30 overflow-hidden">
+      <div class="rounded-default border border-badge-error-ol-border/30 overflow-hidden">
         <div
           class="flex items-center gap-2 px-4 py-2.5 bg-[var(--color-badge-error-soft-bg)]"
         >
@@ -553,6 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -574,7 +576,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import VideoPlayer from "@/components/rum/VideoPlayer.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import JourneySteps from "@/components/synthetics/journey/JourneySteps.vue";
 import type { StepDotState } from "@/components/synthetics/journey/JourneySteps.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
@@ -595,7 +598,7 @@ const emit = defineEmits<{
   (
     e: "update-status",
     status: {
-      variant: string;
+      variant: BadgeVariant;
       icon: string;
       label: string;
       url: string;
@@ -908,6 +911,9 @@ const stepsWithTotal = computed(() => {
   return steps.value.map((s) => ({ ...s, _totalDuration: total }));
 });
 
+/** Current step shown in the session-replay panel (first step for now). */
+const selectedStep = computed<StepRow | null>(() => steps.value[0] ?? null);
+
 // ── Screenshot lightbox ──────────────────────────────────────────────────────
 const lightboxStepId = ref<number | null>(null);
 
@@ -1068,7 +1074,14 @@ const statusChip = computed(() => {
   };
 });
 
-const infoChips = computed(() => [
+interface InfoChip {
+  label: string;
+  value: string;
+  icon: string;
+  colorClass?: string;
+}
+
+const infoChips = computed<InfoChip[]>(() => [
   statusChip.value,
   { label: t('synthetics.results.duration'), value: fmtDur(currentRun.value.duration), icon: "schedule" },
   {

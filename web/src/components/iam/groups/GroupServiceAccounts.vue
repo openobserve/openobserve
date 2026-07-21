@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col h-full">
       <div
         data-test="iam-service-accounts-selection-filters"
-       class="flex justify-start px-3 py-2 card-container shrink-0"
+       class="flex justify-start px-3 py-2 bg-card-glass-bg shrink-0"
       >
         <div data-test="iam-service-accounts-selection-show-toggle" class="mr-3">
           <div class="flex items-center">
             <span
               data-test="iam-service-accounts-selection-show-text"
-              style="font-size: 14px"
+              style="font-size: var(--text-sm)"
             >
               {{ t('iam.groupServiceAccounts.show') }}
             </span>
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-table" class="flex-1 min-h-0 card-container">
+      <div data-test="iam-service-accounts-selection-table" class="flex-1 min-h-0 bg-card-glass-bg">
         <OTable
           :data="rows"
           :columns="columns"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { ref, onBeforeMount } from "vue";
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
-  import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+  import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
   
   // show selected users in the table
   // Add is_selected to the user object
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       header: "",
       accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+    size: TABLE_CHECKBOX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },
@@ -225,34 +225,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   const fetchOrgServiceAccounts = async () => {
     // fetch group users
     hasFetchedOrgServiceAccounts.value = true;
-    return new Promise(async (resolve) => {
-      const data: any = await serviceAccountsState.getServiceAccounts(
-        store.state.selectedOrganization.identifier
-      );
-  
-      serviceAccountsState.service_accounts_users = cloneDeep(
-        data
-          .filter((user: any) => user.is_system !== true) // Filter out system accounts
-          .map((user: any, index: number) => {
-            return {
-              email: user.email,
-              "#": index + 1,
-              isInGroup: groupUsersMap.value.has(user.email),
-            };
-          })
-      );
-  
-      users.value = cloneDeep(serviceAccountsState.service_accounts_users).map(
-        (user: any, index: number) => {
+    const data: any = await serviceAccountsState.getServiceAccounts(
+      store.state.selectedOrganization.identifier
+    );
+
+    serviceAccountsState.service_accounts_users = cloneDeep(
+      data
+        .filter((user: any) => user.is_system !== true) // Filter out system accounts
+        .map((user: any) => {
           return {
-            "#": index + 1,
             email: user.email,
             isInGroup: groupUsersMap.value.has(user.email),
           };
-        }
-      );
-      resolve(true);
-    });
+        })
+    );
+
+    users.value = cloneDeep(serviceAccountsState.service_accounts_users).map(
+      (user: any, index: number) => {
+        return {
+          "#": index + 1,
+          email: user.email,
+          isInGroup: groupUsersMap.value.has(user.email),
+        };
+      }
+    );
+    return true;
   };
   
   const toggleUserSelection = (user: any) => {

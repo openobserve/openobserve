@@ -17,12 +17,11 @@ import { useStore } from "vuex";
 
 import { searchState } from "@/composables/useLogs/searchState";
 
-import { INTERVAL_MAP } from "@/utils/logs/constants";
+import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
 
 // Severity-aware sort order for stacked histogram breakdown categories.
 // Lower index = bottom of stack (least severe), higher = top (most severe).
 // Categories not in this map fall back to alphabetical order at rank 100.
-// Defined at module scope so it is allocated once, not on every generateHistogramData call.
 const SEVERITY_ORDER: Record<string, number> = {
   trace: 0, debug: 1, info: 2, success: 3,
   pending: 4, cancelled: 5,
@@ -153,23 +152,26 @@ export const useHistogram = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
-      // hasAggregationFlag is set here but consumed by commented-out code below;
-      // kept in place so it's ready if that code is re-enabled.
-       
       let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
-      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-        hasAggregationFlag = hasAggregation(parsedSQL.columns);
+      if (
+        searchObj.meta.sqlMode &&
+        Object.prototype.hasOwnProperty.call(parsedSQL, "columns")
+      ) {
+        hasAggregation(parsedSQL.columns);
       }
 
       if (
-        searchObj.data.queryResults.hasOwnProperty("aggs") &&
+        Object.prototype.hasOwnProperty.call(
+          searchObj.data.queryResults,
+          "aggs",
+        ) &&
         searchObj.data.queryResults.aggs
       ) {
-        // NEW: read the breakdown field returned by the backend.
+        // Read the breakdown field returned by the backend.
         // When present, the histogram is rendered as a stacked bar chart grouped
         // by this field (e.g. "severity"). When absent, falls through to the
-        // original flat single-series path below.
+        // flat single-series path below.
         const breakdownField: string | null =
           searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
@@ -182,7 +184,7 @@ export const useHistogram = () => {
           );
 
         if (hasBreakdown) {
-          // --- NEW: Stacked breakdown path ---
+          // --- Stacked breakdown path ---
           // Uses a composite key "timestamp|||category" so that the same
           // (timestamp, category) pair from different pages is merged correctly.
           const breakdownMap = new Map<
@@ -192,9 +194,8 @@ export const useHistogram = () => {
 
           // Collect every timestamp we know about — including zero-filled
           // skeleton entries that have no breakdown — so the x-axis matches
-          // the full query range from the first render (same behaviour as
-          // the flat path). Without this the chart would appear to grow
-          // outward from the center as partitions stream in.
+          // the full query range from the first render. Without this the chart
+          // would appear to grow outward from the center as partitions stream in.
           const timestampSet = new Set<string>();
 
           // Seed from previously accumulated pages
@@ -282,8 +283,8 @@ export const useHistogram = () => {
           searchObj.data.histogram = {
             xData,
             yData,
-            breakdownField,       // NEW: field name used for grouping
-            breakdownSeries: seriesMap, // NEW: Map<category, counts[]> for stacked chart
+            breakdownField,       // field name used for grouping
+            breakdownSeries: seriesMap, // Map<category, counts[]> for stacked chart
             chartParams: {
               title: getHistogramTitle(),
               unparsed_x_data,
@@ -294,10 +295,7 @@ export const useHistogram = () => {
             errorDetail: "",
           };
         } else {
-          // --- EXISTING: Single-series (flat) path ---
-          // Original logic moved here unchanged; previously this was the only path.
-          // num_records was originally declared at the top of the function but is
-          // only used here, so it is now scoped to this block.
+          // --- Single-series (flat) path ---
           histogramMappedData = new Map(
             histogramResults.value.map((item: any) => [
               item.zo_sql_key,
@@ -314,7 +312,7 @@ export const useHistogram = () => {
             }
           });
 
-          let num_records = 0; // moved from top of function — only needed in this path
+          let num_records = 0;
           const mergedData: any = Array.from(histogramMappedData.values());
           mergedData.forEach(
             (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {
@@ -370,13 +368,18 @@ export const useHistogram = () => {
 
   const generateHistogramSkeleton = () => {
     if (
-      searchObj.data.queryResults.hasOwnProperty("aggs") &&
+      Object.prototype.hasOwnProperty.call(
+        searchObj.data.queryResults,
+        "aggs",
+      ) &&
       searchObj.data.queryResults.aggs
     ) {
       histogramResults.value = [];
       histogramMappedData = [];
-      const intervalMs: any =
-        INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
+      const intervalMs: number =
+        INTERVAL_MAP[
+          searchObj.meta.resultGrid.chartInterval as IntervalMapKey
+        ];
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
@@ -384,7 +387,6 @@ export const useHistogram = () => {
         .histogram_interval
         ? searchObj.data.queryResults.histogram_interval * 1000000
         : intervalMs;
-      const date = new Date();
       const startTimeDate = new Date(
         searchObj.data.customDownloadQueryObj.query.start_time / 1000,
       ); // Convert microseconds to milliseconds
@@ -410,11 +412,10 @@ export const useHistogram = () => {
         startTimeDate.setDate(startTimeDate.getDate() + 1);
       }
 
-      const startTime = startTimeDate.getTime() * 1000;
     }
   };
 
-  const setMultiStreamHistogramQuery = (queryReq: any) => {
+  const setMultiStreamHistogramQuery = (_queryReq?: unknown) => {
     let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
     let multiSql = [];
 

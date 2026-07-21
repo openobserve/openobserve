@@ -16,28 +16,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="flex flex-col h-full overflow-hidden">
-    <!-- Standard page header on top (full-width). The filter panel (left) + table
-         (right) sit below in the splitter — the standard header + left + right model. -->
-    <AppPageHeader
-      :title="t('nodes.header')"
-      icon="hub"
-      :subtitle="t('settings.nodesPage.subtitle')"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
-    </AppPageHeader>
+  <OPageLayout
+    :title="t('nodes.header')"
+    icon="hub"
+    :subtitle="t('settings.nodesPage.subtitle')"
+    bleed
+  >
     <OSplitter
       :model-value="splitterModel"
       @update:model-value="(v: number) => splitterModel = v"
       :limits="[0, 250]"
       unit="px"
-      class="flex-1 min-h-0"
-      style="overflow: hidden"
+      class="flex-1 min-h-0 overflow-hidden"
     >
       <template #before>
-        <div class="flex flex-col border-r4 border-r border-border-default " style="height: 100%">
+        <div class="flex flex-col border-r4 border-r border-border-default h-full">
           <div class="sticky top-0 px-2 shrink-0">
-            <div class="flex items-center justify-between p-2 " style="font-size: 18px">
+            <div class="flex items-center justify-between p-2 " style="font-size: var(--text-lg)">
               <span class="flex items-center gap-1">
                 {{ t("nodes.filter_header") }}
                 <OIcon name="filter-list" size="sm" />
@@ -517,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -525,9 +520,6 @@ import {
   defineComponent,
   reactive,
   ref,
-  onMounted,
-  watch,
-  Ref,
   computed,
 } from "vue";
 import { useStore } from "vuex";
@@ -552,14 +544,14 @@ import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     OButton,
     OProgressBar,
@@ -1103,36 +1095,38 @@ export default defineComponent({
 });
 </script>
 
-<style>
-tr.status-row > td:first-child {
+<style scoped>
+/* keep(generated-content): status stripe on OTable rows (row-class-driven ::before,
+   rendered inside the child OTable DOM — needs :deep) */
+:deep(tr.status-row) > td:first-child {
   position: relative;
 }
-tr.status-row > td:first-child::before {
+:deep(tr.status-row) > td:first-child::before {
   content: "";
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 5px;
+  width: 0.3125rem;
 }
-tr.status-online > td:first-child::before {
-  background: #00a76f;
+:deep(tr.status-online) > td:first-child::before {
+  background: var(--color-status-positive);
 }
-tr.status-offline > td:first-child::before {
-  background: #ce2528;
+:deep(tr.status-offline) > td:first-child::before {
+  background: var(--color-status-negative);
 }
-tr.status-prepare > td:first-child::before {
-  background: #ffab00;
+:deep(tr.status-prepare) > td:first-child::before {
+  background: var(--color-status-warning-text);
 }
 
-/* Legacy span-based status indicator (still used by status filter list) */
+/* Legacy span-based status indicator (slotted status filter list — parent-scoped) */
 span.status-online {
-  border-left: #00a76f 5px solid !important;
+  border-left: var(--color-status-positive) 0.3125rem solid !important;
 }
 span.status-offline {
-  border-left: 5px solid #ce2528 !important;
+  border-left: 0.3125rem solid var(--color-status-negative) !important;
 }
 span.status-prepare {
-  border-left: 5px solid #ffab00 !important;
+  border-left: 0.3125rem solid var(--color-status-warning-text) !important;
 }
 </style>

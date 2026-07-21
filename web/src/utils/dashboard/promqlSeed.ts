@@ -76,9 +76,7 @@ export function promqlSeedFor(
     // We may set the chart type only when the panel has not been shaped by the
     // user: either it is still on the new-panel default, or the query AND the
     // type still agree with what we would produce at that type — meaning we
-    // authored both. Asking the panel beats remembering what we did to it: the
-    // previous memo was keyed on an object `useDashboardPanel` reuses across
-    // every panel, so it leaked between them.
+    // authored both.
     allowChartTypeChange:
       isUntouchedPanelType(type) ||
       seedOwnsChartType(slot?.query, previousMetric, streams, {
@@ -169,16 +167,14 @@ export function applyPromqlSeed(
  * Write the PANEL-level part of a seed: the chart type, the unit, and the
  * chart-type contracts.
  *
- * Only from the FIRST query slot. `data.type` and `data.config` describe the
- * whole panel, not one query, but the metrics page seeds every empty slot in a
- * loop — so a second slot on a different metric was overwriting the panel shape
- * the first had established (a counter slot flipping a histogram panel to
- * `line`).
+ * Only from the FIRST query slot: `data.type` and `data.config` describe the
+ * whole panel, not one query, and the metrics page seeds every empty slot in a
+ * loop — a later slot on a different metric must not overwrite the panel shape
+ * the first established.
  *
- * And when we do change the type, the contracts belonging to the type we are
- * LEAVING are retracted. Merging alone only ever added keys, so a panel that
- * went heatmap -> line kept `heatmap_mode: prometheus_histogram` and
- * `bucket_unit` in its config forever.
+ * When the type changes, the contracts belonging to the type being LEFT are
+ * retracted (merging alone only adds keys, so a heatmap -> line panel would
+ * otherwise keep `heatmap_mode` / `bucket_unit` forever).
  */
 export function applySeedPanelShape(
   dashboardPanelData: any,

@@ -10,7 +10,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "update:modelValue", value: string): void;
 }>();
 </script>

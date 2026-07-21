@@ -36,8 +36,8 @@ export type EmptyStateVariant =
 
 /** A rich action card (icon + title + description) shown in an empty state. */
 export interface EmptyStateAction {
-  /** Icon shown in the card. */
-  icon: IconName;
+  /** Icon shown in the card. `(string & {})` admits dynamic names while keeping autocomplete. */
+  icon: IconName | (string & {});
   /** i18n key for the card title. */
   titleKey: string;
   /** i18n key for the card description (optional). */
@@ -172,6 +172,20 @@ export const emptyStatePresets = {
         icon: "add",
         titleKey: "emptyState.noFunctions.action",
         descriptionKey: "emptyState.noFunctions.actionDesc",
+      },
+    ],
+  },
+  "no-workflows": {
+    illustration: "pipeline",
+    variant: "create",
+    titleKey: "emptyState.noWorkflows.title",
+    descriptionKey: "emptyState.noWorkflows.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noWorkflows.action",
+        descriptionKey: "emptyState.noWorkflows.actionDesc",
       },
     ],
   },
@@ -756,6 +770,7 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-patterns": "emptyState.nouns.patterns",
   "no-dashboards": "emptyState.nouns.dashboards",
   "no-pipelines": "emptyState.nouns.pipelines",
+  "no-workflows": "emptyState.nouns.workflows",
   "no-functions": "emptyState.nouns.functions",
   "no-streams": "emptyState.nouns.streams",
   "no-alerts": "emptyState.nouns.alerts",

@@ -4,13 +4,13 @@
     class="h-[100vh] flex flex-col items-center justify-center"
   >
     <OSpinner size="lg" data-test="spinner" />
-    <div data-test="message" class="text-base text-[#666]">Redirecting...</div>
+    <div data-test="message" class="text-base text-text-secondary">Redirecting...</div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
 import { useStore } from "vuex";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -24,8 +24,7 @@ export default defineComponent({
       required: true,
     },
   },
-  setup(props, { emit }) {
-    const route = useRoute();
+  setup(props) {
     const router = useRouter();
     const store = useStore();
 

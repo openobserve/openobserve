@@ -21,16 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="function-list-page"
     class="flex flex-col h-full min-h-0"
   >
-    <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-      <AppPageHeader
-        :title="t('function.header')"
-        icon="function"
-        :subtitle="t('function.subtitle')"
-        tabs-below
-        class="shrink-0 px-4"
-      >
-        <template #tabs>
+    <OPageLayout
+      v-if="!showAddJSTransformDialog"
+      :title="t('function.header')"
+      icon="function"
+      :subtitle="t('function.subtitle')"
+      tabs-below
+      bleed
+    >
+        <template #header-tabs>
           <PipelineSectionTabs />
         </template>
         <template #actions>
@@ -43,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(`function.add`) }}
           </OButton>
         </template>
-      </AppPageHeader>
       <div class="w-full flex-1 min-h-0 overflow-hidden">
         <div class="h-full">
           <OTable
@@ -57,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size-options="pageSizeOptions"
             selection="multiple"
             v-model:selected-ids="selectedFunctionIds"
+            show-index
             :show-global-filter="false"
             :default-columns="false"
             width="100%"
@@ -94,7 +93,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
 
               <template #cell-name="{ row, value }">
-                <span class="text-text-primary" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
+                <span class="text-text-body" :data-test="`function-list-name-cell-${row?.name ?? value}`">{{ value }}</span>
+              </template>
+
+              <!-- Language of the transform. Its own column (sortable + hideable)
+                   rather than a glyph on the name, so JS vs VRL reads at a glance. -->
+              <template #cell-transType="{ row }">
+                <OBadge
+                  size="xs"
+                  :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
+                  :data-test="`function-list-type-badge-${
+                    row?.transType === '1' ? 'js' : 'vrl'
+                  }`"
+                >
+                  {{
+                    row?.transType === "1"
+                      ? t("function.javascript")
+                      : t("function.vrl")
+                  }}
+                </OBadge>
               </template>
 
               <template #cell-actions="{ row }">
@@ -128,9 +145,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
 
-              <template #bottom="scope">
+              <template #bottom>
                 <div class="flex items-center justify-between w-full py-2">
-                  <div class="flex items-center o2-table-footer-title mr-4">
+                  <div class="flex items-center text-xs font-normal mr-4">
                     {{ resultTotal }} {{ t('function.header') }}
                   </div>
                   <OButton
@@ -148,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-    </div>
+    </OPageLayout>
     <div v-else class="flex-1 min-h-0">
       <AddFunction
         v-model="formData"
@@ -211,7 +228,6 @@ import {
   ref,
   computed,
   watch,
-  onMounted,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -219,9 +235,7 @@ import { useI18n } from "vue-i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
-import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
@@ -229,12 +243,12 @@ import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import { useReo } from "@/services/reodotdev_analytics";
 import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -243,17 +257,16 @@ export default defineComponent({
   name: "functionList",
   components: {
     OEmptyState,
-    AppPageHeader,
+    OPageLayout,
     PipelineSectionTabs,
     OTable,
     AddFunction: defineAsyncComponent(() => import("./AddFunction.vue")),
-    NoData,
     ConfirmDialog,
     OButton,
+    OBadge,
     ODialog,
     OSearchInput,
     OTooltip,
-    OCheckbox,
     },
   emits: [
     "updated:fields",
@@ -280,19 +293,19 @@ export default defineComponent({
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
       {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        sortable: false,
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
-      {
         id: "name",
         accessorKey: "name",
         header: t("common.name"),
         sortable: true,
         meta: { align: "left", autoWidth: true },
+      },
+      {
+        id: "transType",
+        accessorKey: "transType",
+        header: t("common.type"),
+        sortable: true,
+        size: 120,
+        meta: { align: "left" },
       },
       {
         id: "actions",
@@ -336,7 +349,6 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
         )
         .then((res) => {
-          var counter = 1;
           resultTotal.value = res.data.list.length;
           if (router.currentRoute.value.query.action == "add") {
             showAddUpdateFn({ row: undefined });
@@ -349,7 +361,6 @@ export default defineComponent({
             }
 
             return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
               name: data.name,
               function: data.function,
               params: data.params,
@@ -770,21 +781,22 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(scrollbar): custom webkit scrollbar for the function list */
 .scrollable-list::-webkit-scrollbar {
-  width: 8px;
+  width: 0.5rem;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb {
-  background-color: #888;
-  border-radius: 4px;
+  background-color: var(--color-border-strong);
+  border-radius: 0.25rem;
 }
 
 .scrollable-list::-webkit-scrollbar-thumb:hover {
-  background-color: blue;
+  background-color: var(--color-text-muted);
 }
 
 .scrollable-list::-webkit-scrollbar-track {
-  background-color: blue;
+  background-color: transparent;
 }
 </style>

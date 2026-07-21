@@ -15,15 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0"
+  <OPageLayout
+    :back="{
+      label: t('pipeline_destinations.header'),
+      onClick: () => emit('cancel'),
+    }"
+    bleed
   >
-    <AppPageHeader
-      :back="{
-        label: t('pipeline_destinations.header'),
-        onClick: () => emit('cancel'),
-      }"
-      class="px-3 border-b border-border-default"
-    >
       <template #title>
         <span data-test="pipeline-destination-editor-title">
           <template v-if="destination"
@@ -33,9 +31,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-else>{{ t("alert_destinations.addTitle") }}</template>
         </span>
       </template>
-    </AppPageHeader>
 
-    <div class="rounded-lg py-2 px-3 overflow-auto">
+    <div class="rounded-default py-2 px-3 overflow-auto">
       <div class="w-full">
         <CreateDestinationForm
           :destination="destination"
@@ -45,19 +42,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts" setup>
-import { defineProps, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 const { t } = useI18n();
 
 // Props
-const props = defineProps<{
+defineProps<{
   destination?: any;
 }>();
 

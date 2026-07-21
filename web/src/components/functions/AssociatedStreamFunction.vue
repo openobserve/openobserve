@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="rounded-md p-0" style="min-height: inherit">
+  <div class="rounded-default p-0" style="min-height: inherit">
     <OTable
       data-test="log-stream-table"
       :data="filteredStreamData"
@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="pageSizeOptions"
       expansion="single"
       v-model:expanded-ids="expandedIds"
+      show-index
       :show-global-filter="false"
       :default-columns="false"
       width="100%"
@@ -40,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #top>
-        <div class="flex items-center w-full border-b border-[var(--o2-border)] pb-2 mb-1">
-          <div class="text-[15px] font-[600]" data-test="log-stream-title-text">
+        <div class="flex items-center w-full border-b border-border-default pb-2 mb-1">
+          <div class="text-sm font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
           <div class="ml-auto" data-test="stream-association-search-input">
@@ -64,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template #expansion="{ row }">
+      <template #expansion>
         <div
           v-show="loadingFunctions"
           class="pl-3 py-1"
@@ -89,15 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #top>
               <div
-                style="
-                  display: flex;
-                  flex-direction: row;
-                  width: 100%;
-                  justify-content: space-between;
-                "
+                class="flex flex-row w-full justify-between"
               >
                 <div
-                  class="text-[15px] font-[600] flex items-center"
+                  class="text-sm font-[600] flex items-center"
                   data-test="log-stream-title-text"
                 >
                   {{ t("function.associatedFunctionHeader") }}
@@ -114,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <template #cell-#="{ row, index }">
+            <template #[`cell-#`]="{ row, index }">
               <span v-if="!row._isAddRow">{{ index + 1 }}</span>
             </template>
 
@@ -163,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #empty>
               <div
                 v-if="!addFunctionInProgress"
-                style="width: 100%; text-align: center"
+                class="w-full text-center"
               >
                 No functions found
               </div>
@@ -173,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     <ODrawer data-test="associated-stream-function-index-schema-drawer"
+      bleed
       v-model:open="showIndexSchemaDialog"
       size="lg"
     >
@@ -204,7 +201,6 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -212,15 +208,15 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageLogStream",
   components: { SchemaIndex, NoData, OButton, ODrawer, OInnerLoading, OSwitch, OSelect, OSearchInput,
-    OIcon, OTable,
+    OTable,
 },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
@@ -233,13 +229,6 @@ export default defineComponent({
     const previousOrgIdentifier = ref("");
     const functionsList = ref<any>([]);
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         accessorKey: "name",
@@ -378,7 +367,7 @@ export default defineComponent({
           header: t("user.actions"),
           isAction: true,
           size: 80,
-          meta: { align: "left", actionCount: 1 },
+          meta: { align: "center", actionCount: 1 },
         },
       ];
       if (expandedRow.value.stream_type !== "logs") {
@@ -399,7 +388,6 @@ export default defineComponent({
 
         getStreams("", false)
           .then((res: any) => {
-            let counter = 1;
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
@@ -417,7 +405,6 @@ export default defineComponent({
                   compressed_size = data.stats.compressed_size + " MB";
                 }
                 return {
-                  "#": counter <= 9 ? `0${counter++}` : counter++,
                   name: data.name,
                   doc_num: doc_num,
                   storage_size: storage_size,
@@ -435,7 +422,7 @@ export default defineComponent({
 
             dismiss();
           })
-          .catch((err) => {
+          .catch(() => {
             dismiss();
             toast({
               variant: "error",
@@ -610,7 +597,7 @@ export default defineComponent({
             getLogStream();
           }
         })
-        .catch((err: any) => {
+        .catch(() => {
           toast({
             message: "Error while deleting stream.",
             variant: "error",
@@ -640,7 +627,7 @@ export default defineComponent({
           _function.name,
           _function
         )
-        .then((res) => {
+        .then(() => {
           getStreamFunctions(
             expandedRow.value.name,
             expandedRow.value.stream_type

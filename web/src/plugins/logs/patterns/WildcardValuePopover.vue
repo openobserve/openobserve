@@ -18,8 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-show="visible && !!anchorEl"
     ref="popoverRef"
-    class="wcp w-72 bg-(--o2-card-bg-solid) border border-(--o2-border) rounded-[0.625rem] overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)] [animation:wcpIn_0.15s_ease-out]"
-    :class="{ '[animation-name:wcpInUp]': flipUpward }"
+    class="wcp w-72 bg-card-glass-solid border border-border-default rounded-default overflow-hidden shadow-[0_0.5rem_1.5rem_rgba(0,0,0,0.14),0_0.125rem_0.375rem_rgba(0,0,0,0.06)]"
+    :class="{ 'wcp--flip-up': flipUpward }"
     :style="popoverStyle"
     data-test="wildcard-value-popover"
     @mouseenter="$emit('popoverEnter')"
@@ -27,10 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- ── Header ── -->
     <div
-      class="wcp__header flex items-center justify-between gap-2 pt-[0.625rem] px-3 pb-[0.375rem]"
+      class="wcp__header flex items-center justify-between gap-2 pt-2.5 px-3 pb-1.5"
     >
       <div
-        class="wcp__header-left flex items-center gap-[0.375rem] min-w-0"
+        class="wcp__header-left flex items-center gap-1.5 min-w-0"
       >
         <OTag
           type="fieldType"
@@ -39,17 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="wcp__type-badge shrink-0 font-mono font-bold"
         />
         <span
-          class="wcp__title text-[0.8125rem] font-semibold text-(--o2-text-heading) truncate"
+          class="wcp__title text-compact font-semibold text-text-heading truncate"
         >{{ t('logs.wildcardValuePopover.variableSlot', { type: tokenType }) }}</span>
       </div>
       <div
         class="wcp__header-right flex items-baseline gap-1 shrink-0"
       >
         <span
-          class="wcp__unique-count text-sm font-bold text-(--o2-text-heading) [font-variant-numeric:tabular-nums]"
+          class="wcp__unique-count text-sm font-bold text-text-body [font-variant-numeric:tabular-nums]"
         >{{ displayValues.length }}</span>
         <span
-          class="wcp__unique-label text-[0.6875rem] text-(--o2-text-caption)"
+          class="wcp__unique-label text-2xs text-text-secondary"
         >{{ t('logs.wildcardValuePopover.unique') }}</span>
       </div>
     </div>
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
-        class="wcp__row px-3 pt-[0.375rem] pb-1"
+        class="wcp__row px-3 pt-1.5 pb-1 not-first:pt-2"
         :data-test="`wildcard-value-row-${i}`"
       >
         <!-- Value name + count -->
@@ -70,15 +70,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="wcp__row-top flex items-baseline justify-between gap-2 mb-1"
         >
           <span
-            class="wcp__row-value text-xs font-semibold font-mono text-(--o2-text-body) truncate flex-1 min-w-0"
+            class="wcp__row-value text-xs font-semibold font-mono text-text-body truncate flex-1 min-w-0"
           >{{ item.value || t('logs.wildcardValuePopover.empty') }}</span>
           <span
-            class="wcp__row-count text-[0.8125rem] font-bold text-(--o2-text-heading) [font-variant-numeric:tabular-nums] shrink-0"
+            class="wcp__row-count text-compact font-bold text-text-body [font-variant-numeric:tabular-nums] shrink-0"
           >{{ item.count.toLocaleString() }}</span>
         </div>
         <!-- Full-width progress bar -->
         <div
-          class="wcp__bar-track w-full h-1 bg-(--o2-border-color) rounded-full overflow-hidden mb-[0.1875rem]"
+          class="wcp__bar-track w-full h-1 bg-card-glass-border rounded-full overflow-hidden mb-[0.1875rem]"
         >
           <div
             class="wcp__bar-fill h-full rounded-full transition-[width] duration-200"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Percentage -->
         <div
-          class="wcp__row-pct text-[0.625rem] text-(--o2-text-caption) [font-variant-numeric:tabular-nums]"
+          class="wcp__row-pct text-3xs text-text-secondary [font-variant-numeric:tabular-nums]"
         >
           {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + '%' : '' }}
         </div>
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div
         v-if="displayValues.length === 0"
-        class="wcp__empty py-6 px-3 text-center text-[0.6875rem] text-(--o2-text-muted)"
+        class="wcp__empty py-6 px-3 text-center text-2xs text-text-muted"
       >
         {{ t("search.patternNoValuesAvailable") }}
       </div>
@@ -105,10 +105,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Footer ── -->
     <div
       v-if="displayValues.length > 0 && totalOccurrences > 0"
-      class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-(--o2-border-color)"
+      class="wcp__footer flex items-center justify-end py-[0.4375rem] px-3 border-t border-card-glass-border"
     >
       <span
-        class="wcp__occurrences text-[0.6875rem] font-semibold text-(--o2-text-caption) [font-variant-numeric:tabular-nums]"
+        class="wcp__occurrences text-2xs font-semibold text-text-secondary [font-variant-numeric:tabular-nums]"
       >{{ t('logs.wildcardValuePopover.occurrences', { count: totalOccurrences.toLocaleString() }) }}</span>
     </div>
   </div>
@@ -128,7 +128,7 @@ const props = defineProps<{
   anchorEl: HTMLElement | null;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "popoverEnter"): void;
   (e: "popoverLeave"): void;
   (e: "filter-value", value: string, action: "include" | "exclude"): void;
@@ -155,11 +155,11 @@ const barWidth = (count: number): string => {
 
 const barColorClass = computed(() => {
   const cls = wildcardChipColor(props.token, props.displayValues);
-  if (cls.includes("blue"))   return "bg-(--o2-wildcard-bar-blue)";
-  if (cls.includes("green"))  return "bg-(--o2-wildcard-bar-green)";
-  if (cls.includes("orange")) return "bg-(--o2-wildcard-bar-orange)";
-  if (cls.includes("purple")) return "bg-(--o2-wildcard-bar-purple)";
-  return "bg-(--o2-primary-color)";
+  if (cls.includes("blue"))   return "bg-wildcard-bar-blue";
+  if (cls.includes("green"))  return "bg-wildcard-bar-green";
+  if (cls.includes("orange")) return "bg-wildcard-bar-orange";
+  if (cls.includes("purple")) return "bg-wildcard-bar-purple";
+  return "bg-accent";
 });
 
 // ── Positioning ──────────────────────────────────────────────────────────────
@@ -211,13 +211,40 @@ watch(
 );
 </script>
 
-<style>
-/* ── Animation ── */
-@keyframes wcpIn    { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-@keyframes wcpInUp  { from { opacity: 0; transform: translateY(4px);  } to { opacity: 1; transform: none; } }
+<style scoped>
+/* keep(keyframes): the popover entrance is used only here. Both the `animation`
+   and the flipped variant's `animation-name` are declared in this block rather
+   than as template `[animation:…]` / `[animation-name:…]` utilities, so Vue's
+   scoped compiler renames the keyframes and both references together.
+   `.wcp--flip-up` follows `.wcp`, so the flipped name wins on source order. */
+.wcp {
+  animation: pop-in 0.15s ease-out;
+}
 
-/* ── Sibling spacing ── */
-.wcp__row + .wcp__row {
-  padding-top: 0.5rem;
+.wcp--flip-up {
+  animation-name: pop-in-up;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 </style>
+

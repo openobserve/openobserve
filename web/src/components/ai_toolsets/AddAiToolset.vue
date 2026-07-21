@@ -14,17 +14,16 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0" style="min-height: inherit">
-    <!-- Header -->
-    <AppPageHeader
-      :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
-      :back="{
-        label: t('aiToolset.header'),
-        onClick: () => $emit('cancel:hideform'),
-        dataTest: 'ai-toolset-back-btn',
-      }"
-      class="shrink-0 px-4 border-b border-border-default"
-    />
+  <OPageLayout
+    class="min-h-[inherit]"
+    :title="isEditing ? t('aiToolset.update') : t('aiToolset.add')"
+    :back="{
+      label: t('aiToolset.header'),
+      onClick: () => $emit('cancel:hideform'),
+      dataTest: 'ai-toolset-back-btn',
+    }"
+    bleed
+  >
 
     <!-- Inline page form. The form is created in setup() via useOForm (headless)
          so this owner can read `kind`/arrays/skill content reactively to drive
@@ -36,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :form="form"
       v-slot="{ isSubmitting }"
     >
-      <div style="height: calc(100vh - 120px); overflow: auto">
+      <div style="height: calc(100vh - 120px)" class="overflow-auto">
         <div class="max-w-2xl mx-4 mt-4">
           <!-- Name -->
           <div class="o2-input mb-4">
@@ -147,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("aiToolset.cliConfig") }}
               </div>
               <div class="flex items-center gap-1">
-                <span class="text-xs text-gray-400"
+                <span class="text-xs text-text-muted"
                   >{{ t("aiToolset.presets") }}:</span
                 >
                 <OTag
@@ -274,12 +273,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon name="delete" size="xs" />
                 </OButton>
               </div>
-              <div class="text-xs text-gray-500 mb-1">
+              <div class="text-xs text-text-secondary mb-1">
                 {{ t("aiToolset.credContentHint") }}
               </div>
               <query-editor
                 :editor-id="`cred-file-editor-${idx}`"
-                class="w-full min-h-50! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto"
+                class="w-full min-h-50! rounded-default border border-card-glass-border resize-y overflow-auto"
                 language="yaml"
                 :query="cred.value"
                 @update:query="(v: string) => setCredValue(idx, v)"
@@ -303,20 +302,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-base font-medium font-semibold mb-2">
               {{ t("aiToolset.skillConfig") }}
             </div>
-            <div class="mb-1 text-xs text-gray-400">
+            <div class="mb-1 text-xs text-text-muted">
               {{ t("aiToolset.skillContent") }} *
             </div>
             <query-editor
               data-test="ai-toolset-skill-content"
               editor-id="skill-content-editor"
-              class="w-full min-h-100! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"
+              class="w-full min-h-100! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"
               language="markdown"
               :query="skillContent"
               @update:query="(v: string) => setSkillContent(v)"
             />
             <div
               v-if="skillContentError"
-              class="text-red-500 text-xs mt-[-12px] mb-4"
+              class="text-error-500 text-xs -mt-3 mb-4"
             >
               {{ t("aiToolset.skillContentRequired") }}
             </div>
@@ -326,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Footer -->
         <div
           class="flex items-center gap-2 px-4 py-3 border-t border-border-default sticky bottom-0"
-          :class="store.state.theme === 'dark' ? 'bg-(--o2-primary-background)' : 'bg-white'"
+          :class="'bg-surface-base'"
         >
           <OButton
             data-test="ai-toolset-save-btn"
@@ -349,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OForm>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -372,7 +371,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -389,7 +388,7 @@ const QueryEditor = defineAsyncComponent(
 export default defineComponent({
   name: "AddAiToolset",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OTag,
     OButton,
     OIcon,
@@ -526,9 +525,16 @@ export default defineComponent({
     // form change — used for the section toggle, the array v-for rows, the
     // Monaco editor value, and the submit-attempt-driven skill error.
     const selectedKind = form.useStore((s: any) => s.values.kind);
-    const mcpHeaders = form.useStore((s: any) => s.values.mcp?.headers ?? []);
-    const cliEnvVars = form.useStore((s: any) => s.values.cli?.env ?? []);
-    const cliCredFiles = form.useStore((s: any) => s.values.cli?.credFiles ?? []);
+    // Selector returns are annotated as arrays so the template v-for index is `number`.
+    const mcpHeaders = form.useStore(
+      (s: any): AddAiToolsetForm["mcp"]["headers"] => s.values.mcp?.headers ?? [],
+    );
+    const cliEnvVars = form.useStore(
+      (s: any): AddAiToolsetForm["cli"]["env"] => s.values.cli?.env ?? [],
+    );
+    const cliCredFiles = form.useStore(
+      (s: any): AddAiToolsetForm["cli"]["credFiles"] => s.values.cli?.credFiles ?? [],
+    );
     const skillContent = form.useStore((s: any) => s.values.skill?.content ?? "");
     const submitted = form.useStore((s: any) => (s.submissionAttempts ?? 0) > 0);
 
@@ -586,7 +592,8 @@ export default defineComponent({
     // the form API directly, and the `form.useStore` reads above re-render the
     // v-for rows (playbook §2).
     // -----------------------------------------------------------------------
-    // MCP headers
+    // MCP headers. (useOForm erases the form generic to Record<string, unknown>,
+    // so TanStack's array-field paths collapse to `never` — hence the casts.)
     const addHeader = () =>
       form.pushFieldValue("mcp.headers", { key: "", value: "", visible: false });
     const removeHeader = (i: number) => form.removeFieldValue("mcp.headers", i);

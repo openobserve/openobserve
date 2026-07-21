@@ -27,9 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     selection="multiple"
     v-model:selected-ids="selectedIds"
     @row-click="getAllUserQueries"
-    style="width: 100%"
+    class="w-full"
     :show-global-filter="false"
     :default-columns="false"
+    show-index
     :enable-column-resize="true"
     :persist-columns="true"
     table-id="settings-query-management-summary"
@@ -100,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { ref, type Ref, defineComponent, computed } from "vue";
+import { ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -111,11 +112,11 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { durationFormatter } from "@/utils/zincutils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { OEmptyState, OTable, OUserCell, OButton, OTooltip, OSpinner, OCheckbox },
+  components: { OEmptyState, OTable, OUserCell, OButton, OTooltip },
   props: {
     rows: {
       type: Array,
@@ -144,8 +145,6 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { isMetaOrg } = useIsMetaOrg();
-    const resultTotal = ref<number>(0);
-
     const loadingState = ref(false);
 
     const deleteDialog = ref({
@@ -162,7 +161,6 @@ export default defineComponent({
     const pageSizeOptions = [5, 10, 20, 50, 100];
 
     const columns = ref<OTableColumnDef[]>([
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "user_id", header: t("user.email"), accessorKey: "user_id", size: COL.email, sortable: true, hideable: true, meta: { align: "left" , autoWidth: true } },
       { id: "search_type_label", header: t("queries.searchType"), accessorKey: "search_type_label", size: 130, sortable: true, hideable: true, meta: { align: "left"  } },
       { id: "numOfQueries", header: t("queries.numOfQueries"), accessorKey: "numOfQueries", size: 170, sortable: true, hideable: true, meta: { align: "right" } },
@@ -214,8 +212,8 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Deep override for empty-state image spacing */
+<style scoped>
+/* keep(complex-state): :deep override of a child empty-state image's spacing */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
 }

@@ -168,14 +168,12 @@ import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
 import MenuBook from "~icons/material-symbols/menu-book-outline";
 
-// Batch 3: Synthetics / browser-check icons (2026-06-22)
 import OpenInBrowser from "~icons/material-symbols/open-in-browser";
 import StackedLineChart from "~icons/material-symbols/stacked-line-chart";
 import Keyboard from "~icons/material-symbols/keyboard";
 import Checklist from "~icons/material-symbols/checklist";
 import PhotoCamera from "~icons/material-symbols/photo-camera-outline";
 
-// Batch 2: Additional icons from full codebase audit (2026-05-16)
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
 import AnalyticsIcon from "~icons/material-symbols/analytics-outline";
@@ -187,9 +185,8 @@ import AssessmentIcon from "~icons/material-symbols/analytics-outline";
 import AssignmentIcon from "~icons/material-symbols/assignment-outline";
 import AttachFileIcon from "~icons/material-symbols/attach-file";
 import AttachMoneyIcon from "~icons/material-symbols/attach-money";
-// Material Symbols replacements for the old `material-symbols-outlined` icon set
-// (these specific icons don't ship an `-outline` variant in @iconify/material-symbols;
-// the base names render the outlined glyph by default)
+// These icons don't ship an `-outline` variant in @iconify/material-symbols;
+// the base names render the outlined glyph by default.
 import SoundSampler from "~icons/material-symbols/sound-sampler";
 import ClockLoader20 from "~icons/material-symbols/clock-loader-20";
 import DataInfoAlert from "~icons/material-symbols/data-info-alert";
@@ -308,7 +305,6 @@ import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
 import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
 import TrendingUpFilled from "~icons/material-symbols/trending-up";
-import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
 import ViewInAr from "~icons/material-symbols/view-in-ar-outline";
 import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";

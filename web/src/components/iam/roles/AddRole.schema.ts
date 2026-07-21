@@ -2,11 +2,6 @@
 //
 // Validation schema for AddRole.vue. Built via a factory so the required message
 // stays i18n-driven (pass useI18n's `t`).
-//
-// Restores the full pre-migration validation rule for `name`
-// (`!!v ? isValidRoleName : nameRequired`) per the truthy→Zod inversion: it is
-// BOTH required (min(1)) AND the alphanumeric/underscore regex — not regex-only —
-// plus the maxlength(100) the current code carried.
 
 import { z } from "zod";
 
@@ -22,8 +17,8 @@ export const makeAddRoleSchema = (
       .min(1, t("iam.role.name.required"))
       .regex(roleNameRegex, t("iam.role.name.invalidChars"))
       .max(100, t("common.nameMaxLength", { max: 100 })),
-    // "Start from" preset (from #12460): "custom" = empty role; "readonly" =
-    // seed read-only perms once on EditRole. Form-owned, defaults to "custom".
+    // "Start from" preset: "custom" = empty role; "readonly" = seed read-only
+    // perms once on EditRole. Defaults to "custom".
     startFrom: z.enum(["custom", "readonly"]).default("custom"),
   });
 

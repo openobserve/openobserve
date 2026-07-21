@@ -15,19 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll flex flex-col h-full" data-test="metrics-page">
-    <!-- Standard page header: title + icon + all query controls on ONE line
-         (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
-    <AppPageHeader
-      :title="t('search.metrics')"
-      icon="bar-chart"
-      :back="{
-        label: t('search.metrics'),
-        onClick: goBackToExplorer,
-        dataTest: 'metrics-editor-back-btn',
-      }"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    data-test="metrics-page"
+    :title="t('search.metrics')"
+    icon="bar-chart"
+    :back="{
+      label: t('search.metrics'),
+      onClick: goBackToExplorer,
+      dataTest: 'metrics-editor-back-btn',
+    }"
+    bleed
+  >
       <template #actions>
         <syntax-guide-metrics />
         <MetricLegends />
@@ -93,15 +91,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </template>
       </template>
-    </AppPageHeader>
-
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
       pageType="metrics"
       :editMode="false"
       :dashboardData="currentDashboardData.data"
-      :variablesData="{}"
+      :variablesData="({} as unknown as PanelEditorVariablesData)"
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
@@ -114,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboardPanelData="dashboardPanelData"
       @save="addPanelToDashboard"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -125,7 +121,6 @@ import {
   nextTick,
   watch,
   reactive,
-  onUnmounted,
   onMounted,
   onBeforeMount,
   defineAsyncComponent,
@@ -136,7 +131,7 @@ import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -144,7 +139,10 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import {
+  PanelEditor,
+  type PanelEditorVariablesData,
+} from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import { useRoute, useRouter } from "vue-router";
@@ -176,7 +174,7 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
-    AppPageHeader,
+    OPageLayout,
     DateTimePickerDashboard,
     SyntaxGuideMetrics,
     MetricLegends,
@@ -186,7 +184,7 @@ export default defineComponent({
     OButton,
     ShareButton,
   },
-  setup(props) {
+  setup() {
     provide("dashboardPanelDataPageKey", "metrics");
 
     // PanelEditor ref for accessing exposed methods/properties
@@ -344,7 +342,7 @@ export default defineComponent({
 
     onMounted(async () => {
       // DateTimePicker is now mounted; safe to read its value
-      updateDateTime(selectedDate.value);
+      updateDateTime();
 
       // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
@@ -355,7 +353,7 @@ export default defineComponent({
       // auto-run a restored blob / inbound deep-link, then normalize the URL
       if (pendingAutoRun) {
         pendingAutoRun = false;
-        updateDateTime(selectedDate.value);
+        updateDateTime();
         runQuery();
       }
     });
@@ -374,7 +372,7 @@ export default defineComponent({
     );
 
     watch(selectedDate, () => {
-      updateDateTime(selectedDate.value);
+      updateDateTime();
     });
 
     // resize the chart when config panel is opened and closed
@@ -430,7 +428,7 @@ export default defineComponent({
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      updateDateTime(selectedDate.value);
+      updateDateTime();
 
       // Call PanelEditor's runQuery if available
       if (panelEditorRef.value) {
@@ -441,7 +439,7 @@ export default defineComponent({
       syncStateToUrl();
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = () => {
       if (selectedDate.value && dateTimePickerRef?.value) {
         const date = dateTimePickerRef.value?.getConsumableDateTime();
 
@@ -464,7 +462,7 @@ export default defineComponent({
     );
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
-    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+    const debouncedUpdateChartConfig = debounce((newVal) => {
       if (!isEqual(chartData.value, newVal)) {
         const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
           chartData.value,

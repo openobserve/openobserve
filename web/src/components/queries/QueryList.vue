@@ -36,7 +36,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -172,9 +172,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Hides OTable's thead — deep structural override, must stay in CSS */
-.o2-table-hide-header thead {
-  display: none;
-}
-</style>

@@ -145,7 +145,7 @@ function buildSQLJoinsFromInput(joins: any[], defaultStream: any): string {
     let joinConditionStrings: string[] = [];
 
     for (const condition of conditions) {
-      const { leftField, rightField, operation, logicalOperator } = condition;
+      const { leftField, rightField, operation } = condition;
 
       if (!leftField?.field || !rightField?.field || !operation) {
         // Invalid condition, skip it and continue to the next one
@@ -629,7 +629,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
 
   if (condition.filterType === "group") {
     const groupConditions = condition.conditions
-      .map((condition) => buildCondition(condition, dashboardPanelData))
+      .map((condition: any) => buildCondition(condition, dashboardPanelData))
       .filter(Boolean);
     const logicalOperators = condition.conditions
       .map((c: any) => c.logicalOperator)
@@ -716,21 +716,6 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
         dashboardPanelData,
       )})`;
     } else if (condition.value != null && condition.value !== "") {
-      // streamAlias can be undefined or null, also, groupedfield will have one entry with streamAlias as null
-      // so we need to handle both cases
-      const streamFields = condition.column.streamAlias
-        ? dashboardPanelData?.meta?.streamFields?.groupedFields.find(
-            (it: any) => it.stream_alias === condition.column.streamAlias,
-          )
-        : dashboardPanelData?.meta?.streamFields?.groupedFields.find(
-            (it: any) =>
-              it.stream_alias === null || it.stream_alias === undefined,
-          );
-
-      const columnType = streamFields?.schema?.find(
-        (it: any) => it.name == condition.column.field,
-      )?.type;
-
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -779,7 +764,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
   const whereConditions = filterData
-    ?.map((condition) => buildCondition(condition, dashboardPanelData))
+    ?.map((condition: any) => buildCondition(condition, dashboardPanelData))
     ?.filter(Boolean);
 
   const logicalOperators = filterData.map((it: any) => it.logicalOperator);

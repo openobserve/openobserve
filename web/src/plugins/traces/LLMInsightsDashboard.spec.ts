@@ -145,14 +145,6 @@ function mountDashboard(
           template: "<button @click=\"$emit('click')\"><slot /></button>",
           emits: ["click"],
         },
-        // Primitives the dashboard renders.
-        QSelect: {
-          template: "<div data-test=\"q-select\" />",
-          props: ["modelValue", "options", "disable"],
-          emits: ["update:model-value"],
-        },
-        QTooltip: { template: "<div />" },
-        QIcon: { template: "<i />" },
       },
     },
   });
@@ -186,6 +178,10 @@ beforeEach(() => {
   // Reset localStorage between tests so the dashboard's stream
   // initialisation doesn't bleed across cases.
   localStorage.clear();
+  // The dashboard defaults to Agent scope now ("the AI module is
+  // agent-centric"); this suite exercises the stream-mode paths, so opt into
+  // stream mode the way a returning user would — the persisted preference.
+  localStorage.setItem("llmInsights_filterMode", "stream");
   // Default streams response.
   mockGetStreams.mockResolvedValue({
     list: [
@@ -333,7 +329,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
 });
 
 // ===========================================================================
-// onStreamChange — the q-select v-model handler
+// onStreamChange — the OSelect v-model handler
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onStreamChange", () => {

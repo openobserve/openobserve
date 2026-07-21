@@ -6,11 +6,6 @@
 // to an OFormToggleGroup so the superRefine can branch on it):
 //   • create → savedFunctionName required + identifier regex;
 //   • update → savedFunctionSelectedName required.
-//
-// Restored from the current SearchBar code (preserve the regex in use TODAY):
-//   savedFunctionName — `!!v.trim() || 'This field is required'`
-//                    ;  `/^[a-zA-Z][a-zA-Z0-9_]*$/.test(v) || 'Input must be alphanumeric'`
-//   savedFunctionSelectedName — `!!v || 'Field is required!'` (update mode).
 
 import { z } from "zod";
 

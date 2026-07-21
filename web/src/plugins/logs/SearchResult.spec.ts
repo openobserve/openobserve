@@ -507,7 +507,7 @@ describe("SearchResult Component", () => {
 
     it("should handle column sizes update with empty previous sizes", async () => {
       wrapper.vm.searchObj.data.resultGrid.colSizes = {};
-      wrapper.vm.searchObj.data.stream.selectedStream = "new-stream";
+      wrapper.vm.searchObj.data.stream.selectedStream = ["new-stream"];
 
       const newSizes = { col1: 100 };
       await wrapper.vm.handleColumnSizesUpdate(newSizes);
@@ -833,7 +833,7 @@ describe("SearchResult Component", () => {
   // ───────────────────────────────────────────────────────────────────────────
   // ODrawer migration coverage
   //
-  // The Detail Tab was migrated from <q-dialog> to <ODrawer>. These tests
+  // The Detail Tab was migrated to <ODrawer>. These tests
   // pin the v-model:open binding to searchObj.meta.showDetailTab and the
   // close behaviour (which must trigger reDrawChart).
   // ───────────────────────────────────────────────────────────────────────────

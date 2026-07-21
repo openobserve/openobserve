@@ -40,6 +40,13 @@ export interface SelectOption {
   [key: string]: unknown;
 }
 
+/**
+ * Anything accepted by the `options` prop. Primitive entries (strings,
+ * numbers, …) are normalized at runtime into `{ label, value }` pairs by
+ * OSelect's normalizeOption().
+ */
+export type SelectOptionInput = SelectOption | SelectValue;
+
 // ── Root ──────────────────────────────────────────────────────────────────
 
 export interface SelectProps {
@@ -50,7 +57,7 @@ export interface SelectProps {
    * automatically. For grouped or custom-rendered options, use the `default`
    * slot instead.
    */
-  options?: SelectOption[];
+  options?: readonly SelectOptionInput[];
   /** Allows selecting multiple options */
   multiple?: boolean;
   /**
@@ -65,6 +72,13 @@ export interface SelectProps {
   searchDebounce?: number;
   /** Hides already selected options in multiple mode */
   hideSelected?: boolean;
+  /**
+   * Makes group headers (options with `header: true`) clickable to collapse /
+   * expand their items — an accordion inside the dropdown. Default off, so
+   * existing selects are unaffected. Ignored while a search term is active
+   * (search always spans every group).
+   */
+  collapsibleGroups?: boolean;
   /**
    * Renders a "Select All" master row at the top of the dropdown (multi-select
    * listbox mode only). Shows an indeterminate dash when only some options are
@@ -158,11 +172,13 @@ export interface SelectSlots {
   empty?: () => unknown;
   /** Content before the options list */
   "before-options"?: () => unknown;
+  /** Content after the options list */
+  "after-options"?: () => unknown;
   /** Icon content inside the trigger on the left — matches OButton's `#icon-left` pattern */
   "icon-left"?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
-   * Provide a `<q-tooltip>` element as the slot content.
+   * Provide a tooltip element as the slot content.
    */
   tooltip?: () => unknown;
 }

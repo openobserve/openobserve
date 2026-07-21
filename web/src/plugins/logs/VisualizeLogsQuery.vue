@@ -16,14 +16,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: 100%; width: 100%">
+  <div class="h-full w-full">
     <!-- PanelEditor Content Area (no header for logs visualization) -->
     <PanelEditor
       ref="panelEditorRef"
       pageType="logs"
       :editMode="true"
       :dashboardData="{}"
-      :variablesData="{}"
+      :variablesData="emptyVariablesData"
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       :externalChartData="chartData"
       :searchResponse="searchResponse"
@@ -62,6 +62,7 @@ import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { searchState } from "@/composables/useLogs/searchState";
 import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import type { PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
@@ -119,6 +120,12 @@ export default defineComponent({
     const { searchObj } = searchState();
     const { buildSearch } = useSearchStream();
 
+    // Logs visualization has no dashboard variables; keep the runtime `{}` value.
+    const emptyVariablesData = {} as PanelEditorVariablesData;
+
+    // Same reference as props.errorData; mutation targets its nested fields only.
+    const errorDataModel = computed(() => props.errorData);
+
     const regionClusterParams = computed(() => {
       if (store.state.zoConfig?.super_cluster_enabled) {
         return {
@@ -132,7 +139,6 @@ export default defineComponent({
     const {
       visualizeChartData,
       is_ui_histogram,
-      shouldRefreshWithoutCache,
     }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
 
@@ -200,7 +206,7 @@ export default defineComponent({
         const errorList = props.errorData.errors ?? [];
         errorList.splice(0);
         errorList.push(errorMsg.message);
-        props.errorData.value = errorMsg?.message ?? "";
+        errorDataModel.value.value = errorMsg?.message ?? "";
       }
 
       emit("handleChartApiError", errorMsg);
@@ -273,7 +279,7 @@ export default defineComponent({
 
       if (errors.length) {
         // set errors into errorData
-        props.errorData.errors = errors;
+        errorDataModel.value.errors = errors;
         showErrorNotification(
           t("logs.visualizeLogsQuery.fixErrorsAndRetry"),
         );
@@ -306,8 +312,6 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
-      is_ui_histogram,
-      shouldRefreshWithoutCache,
       hoveredSeriesState,
       resultMetaData,
       isSimpleSelectAllQuery,
@@ -315,6 +319,7 @@ export default defineComponent({
       panelEditorRef,
       allowedChartTypes,
       regionClusterParams,
+      emptyVariablesData,
     };
   },
 });

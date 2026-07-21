@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 //
-// ODataBarCell — the headline "bars like Datadog" cell (audit §2.2). Renders
+// ODataBarCell — the headline "bars like Datadog" cell. Renders
 // a (right-aligned) formatted value with a subtle horizontal bar behind it,
 // width proportional to value / columnMax. The caller computes the column max
 // over the visible page and passes it in, plus the already-formatted display
@@ -65,7 +65,7 @@ const barClass = computed(
   <div class="flex flex-col items-end justify-center gap-0.75 w-full min-w-0">
     <span
       class="tabular-nums whitespace-nowrap leading-none"
-      :class="num === null ? 'text-text-primary text-xs' : ''"
+      :class="num === null ? 'text-text-body text-xs' : ''"
     >{{ text }}</span>
     <div
       v-if="widthPct > 0"

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import ValueMappingPopUp from "@/components/dashboards/addPanel/ValueMappingPopUp.vue";
 import i18n from "@/locales";
@@ -265,7 +265,7 @@ describe("ValueMappingPopUp", () => {
 
     it('should render "cancel" icon in the page', () => {
       wrapper = createWrapper();
-      // After q-icon → OIcon migration, "cancel" is the OIcon name prop, not a vm property
+      // After the icon → OIcon migration, "cancel" is the OIcon name prop, not a vm property
       const cancelIcons = wrapper
         .findAllComponents({ name: "OIcon" })
         .filter((i: any) => i.props("name") === "cancel");

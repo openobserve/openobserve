@@ -1,21 +1,24 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { Component } from "vue";
-import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
+import type { Row, Table } from "@tanstack/vue-table";
 
 // ─── Shared column size constants ────────────────────────────────
 /**
- * Fixed width (px) of the auto-rendered selection-checkbox column. Includes the
- * left padding (TABLE_CHECKBOX_COL_PAD_LEFT) that insets the box from the table
- * edge. Imported by OTableHeader/OTableBodyRow so the three stay in sync.
+ * Fixed width (px) of the auto-rendered selection-checkbox column. Imported by
+ * OTableHeader/OTableBodyRow/OTableLoading so the three stay in sync. The box's
+ * left inset is the shared `--spacing-table-edge` token (applied in inline
+ * style), the same edge line the first data column and toolbar search bar use.
  */
-export const TABLE_CHECKBOX_COL_PAD_LEFT = 18;
 export const TABLE_CHECKBOX_COL_SIZE = 44;
 /**
- * Fixed width (px) of the row-index ("#") column. Wide enough to fit a
- * zero-padded 3-digit number at text-xs plus the cell's horizontal padding.
+ * Fixed width (px) of the row-index ("#") column. Fits a 4-digit number at
+ * text-xs after the `--spacing-table-edge` left inset (14px) + right padding.
+ * Paired with `tabular-nums` on the cell so every digit is the same advance
+ * width — otherwise a proportional font makes wide-glyph values (209, 200) clip
+ * to "2…" while narrow ones (215) fit, at the same column width.
  */
-export const TABLE_INDEX_COL_SIZE = 44;
+export const TABLE_INDEX_COL_SIZE = 56;
 
 export const COL = {
   name:         200,
@@ -63,17 +66,21 @@ export const COL = {
 // ── Column Definition ────────────────────────────────────────────
 
 export interface OTableColumnMeta {
-  /** Text alignment for header and body cells */
-  align?: "left" | "center" | "right";
+  /**
+   * Text alignment for header and body cells. The documented values are
+   * "left" | "center" | "right"; `(string & {})` keeps their autocomplete while
+   * accepting the widened `string` that TS infers from untyped column literals.
+   */
+  align?: "left" | "center" | "right" | (string & {});
   /** Additional class applied to the <th> */
   headerClass?: string;
   /** Additional class applied to the <td> */
   cellClass?: string;
   /**
-   * Mark this as the primary "name" column. Per the design system (HANDOFF §8.2)
-   * the record-name column renders at weight 500 — enough to separate it from
-   * metadata columns (which stay 400 / --text-3) without the "wall of bold".
-   * Only affects default-rendered cells; custom `cell` renderers style their own.
+   * Mark this as the primary "name" column. The record-name column renders at
+   * weight 500 — enough to separate it from metadata columns (which stay 400 /
+   * --text-3) without the "wall of bold". Only affects default-rendered cells;
+   * custom `cell` renderers style their own.
    */
   isName?: boolean;
   /** Format function applied to cell value before rendering */
@@ -414,6 +421,15 @@ export interface OTableSlots<TData = any> {
     value: any;
     table: Table<TData>;
   }) => any;
+  /** Per-column cell slot (`#cell-<columnId>`) — scoped to the plain row data (`row.original`) + row index */
+  [key: `cell-${string}`]:
+    | ((props: {
+        row: TData;
+        column: OTableColumnDef<TData>;
+        value: any;
+        index: number;
+      }) => any)
+    | undefined;
   /** Custom header content */
   "header-actions"?: () => any;
   /** Content above the table */
@@ -445,8 +461,8 @@ export interface OTableSlots<TData = any> {
   empty?: () => any;
   /** Custom error state */
   error?: (props: { message: string }) => any;
-  /** Expanded row content — scoped to { row } */
-  expansion?: (props: { row: Row<TData> }) => any;
+  /** Expanded row content — scoped to the plain row data (`row.original`) */
+  expansion?: (props: { row: TData }) => any;
   /** Tree-mode warning row — rendered between an expanded parent and its children when `getRowWarning(row)` is true. */
   "tree-warning"?: (props: { row: TData }) => any;
 }

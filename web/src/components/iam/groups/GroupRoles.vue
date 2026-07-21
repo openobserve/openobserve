@@ -17,8 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="iam-roles-selection-section" class="flex flex-col h-full p-0" >
     <div
-      class="flex justify-start px-3 py-2 card-container shrink-0"
-      :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
+      class="flex justify-start px-3 py-2 bg-card-glass-bg shrink-0"
     >
       <div class="mr-3">
         <div
@@ -27,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span
             data-test="iam-roles-selection-show-text"
-            style="font-size: 14px"
+            style="font-size: var(--text-sm)"
           >
             {{ t('iam.groupRoles.show') }}
           </span>
@@ -60,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" class="flex-1 min-h-0 card-container">
+    <div data-test="iam-roles-selection-table" class="flex-1 min-h-0 bg-card-glass-bg">
       <OTable
         :data="rows"
         :columns="columns"
@@ -99,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { watch, onBeforeMount, computed } from "vue";
+import { watch, onBeforeMount } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -114,7 +113,7 @@ import { ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -142,11 +141,11 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["add", "remove"]);
+defineEmits(["add", "remove"]);
 
 const users = ref([]);
 
-const { rolesState, groupsState } = usePermissions();
+usePermissions();
 
 const rows: Ref<any[]> = ref([]);
 
@@ -179,7 +178,7 @@ const columns: OTableColumnDef[] = [
     header: "",
     accessorKey: "isInGroup",
     cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+    size: TABLE_CHECKBOX_COL_SIZE,
     minSize: 32,
     maxSize: 40,
     meta: { align: "center", compactPadding: true },
@@ -230,20 +229,17 @@ const updateUserTable = async (value: string) => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise(async (resolve) => {
-    const data: any = await getRoles(
-      store.state.selectedOrganization.identifier
-    );
+  const data: any = await getRoles(
+    store.state.selectedOrganization.identifier
+  );
 
-    users.value = cloneDeep(data.data).map((role: any, index: number) => {
-      return {
-        role_name: role,
-        "#": index + 1,
-        isInGroup: groupUsersMap.value.has(role),
-      };
-    });
-    resolve(true);
+  users.value = cloneDeep(data.data).map((role: any) => {
+    return {
+      role_name: role,
+      isInGroup: groupUsersMap.value.has(role),
+    };
   });
+  return true;
 };
 
 const toggleUserSelection = (user: any) => {

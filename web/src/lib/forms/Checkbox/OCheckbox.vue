@@ -132,11 +132,6 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
   md: "size-4",
 };
 
-const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
-  xs: "text-xs",
-  sm: "text-xs",
-  md: "text-sm",
-};
 </script>
 
 <template>
@@ -157,7 +152,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        'shrink-0 rounded-sm border cursor-[inherit]',
+        'shrink-0 rounded-checkbox border cursor-[inherit]',
         boxSizeClasses[size ?? 'md'],
         // Base / unchecked
         'bg-checkbox-bg border-checkbox-border',
@@ -225,8 +220,8 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label text-sm font-semibold select-none leading-tight',
-        isDisabled && 'o-input-label--disabled',
+        'o-input-label text-compact select-none leading-tight',
+        isDisabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>

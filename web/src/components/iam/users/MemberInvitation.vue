@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-md p-0" style="min-height: inherit">
+  <div class="rounded-default p-0" style="min-height: inherit">
     <div v-if="currentUserRole == 'admin' || currentUserRole == 'root'">
       <!-- Inline form (no dialog): the Save button lives inside <OForm>, so it is
            type="submit" — Enter submits natively, no form-id needed. -->
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @submit="onSubmit"
         v-slot="{ isSubmitting }"
       >
-        <div style="position: relative">
+        <div class="relative">
           <OFormInput
             name="email"
             :placeholder="t('user.inviteByEmail')"
@@ -68,7 +68,6 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {

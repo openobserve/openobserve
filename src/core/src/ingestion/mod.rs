@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     io::Write,
     sync::{
         Arc,
@@ -29,11 +29,9 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
-        function::VRLResultResolver,
         self_reporting::usage::{RequestStats, TriggerData, TriggerDataStatus, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
-    metrics,
     utils::{flatten, json::*, schema::format_partition_key},
 };
 use infra::{
@@ -41,7 +39,7 @@ use infra::{
     schema::STREAM_RECORD_ID_GENERATOR,
 };
 use proto::cluster_rpc::IngestionType;
-use vrl::compiler::{TargetValueRef, runtime::Runtime};
+use transform::vrl::compiler::runtime::Runtime;
 
 use super::{
     db::{alerts::alert, pipeline},
@@ -52,21 +50,17 @@ use crate::{
     common::{
         infra::config::{REALTIME_ALERT_TRIGGERS, STREAM_ALERTS},
         meta::{ingestion::IngestionRequest, stream::SchemaRecords},
-        utils::js::{
-            JSRuntimeConfig, apply_js_fn as apply_js, compile_js_function as compile_js_func,
-        },
     },
     service::{
         alerts::alert::AlertExt,
         db::{self, alerts::alert::scheduler_key},
-        logs::bulk::TRANSFORM_FAILED,
     },
 };
 
 pub mod grpc;
 pub mod ingestion_service;
 
-pub use openobserve_vrl::compile_vrl_function;
+pub use transform::compile_vrl_function;
 
 pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 
@@ -86,92 +80,10 @@ pub fn get_thread_id() -> usize {
     REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed) % cfg.limit.http_worker_num
 }
 
-/// Compile a JS function and return configuration
-/// This wraps the common::utils::js::compile_js_function
-pub fn compile_js_function(func: &str, org_id: &str) -> Result<JSRuntimeConfig, std::io::Error> {
-    compile_js_func(func, org_id)
-}
-
-/// Apply a JS function to transform data
-/// This wraps the common::utils::js::apply_js_fn
-pub fn apply_js_fn(
-    js_config: &JSRuntimeConfig,
-    row: Value,
-    org_id: &str,
-    stream_name: &[String],
-) -> (Value, Option<String>) {
-    apply_js(js_config, row, org_id, stream_name)
-}
-
-pub fn apply_vrl_fn(
-    runtime: &mut Runtime,
-    vrl_runtime: &VRLResultResolver,
-    row: Value,
-    org_id: &str,
-    stream_name: &[String],
-) -> (Value, Option<String>) {
-    let mut metadata = vrl::value::Value::from(BTreeMap::new());
-    metadata.insert("org_id", vrl::value::Value::from(org_id.to_string()));
-    metadata.insert(
-        "stream_name",
-        vrl::value::Value::from(stream_name[0].clone()),
-    );
-    let mut target = TargetValueRef {
-        value: &mut vrl::value::Value::from(&row),
-        metadata: &mut metadata,
-        secrets: &mut vrl::value::Secrets::new(),
-    };
-
-    target
-        .secrets
-        .insert(stream_name[0].clone(), stream_name[0].clone());
-
-    let timezone = vrl::compiler::TimeZone::Local;
-    let result = match vrl::compiler::VrlRuntime::default() {
-        vrl::compiler::VrlRuntime::Ast => {
-            runtime.resolve(&mut target, &vrl_runtime.program, &timezone)
-        }
-    };
-    match result {
-        Ok(res) => match res.try_into() {
-            Ok(val) => (val, None),
-            Err(err) => {
-                metrics::INGEST_ERRORS
-                    .with_label_values(&[
-                        org_id,
-                        StreamType::Logs.as_str(),
-                        &format!("{stream_name:?}"),
-                        TRANSFORM_FAILED,
-                    ])
-                    .inc();
-                // Log full error with record for debugging
-                log::debug!(
-                    "{org_id}/{stream_name:?} vrl failed at processing result {err:?} on record {row:?}. Returning original row."
-                );
-                // Return only error message without sensitive record data
-                let clean_err = format!("{org_id}/{stream_name:?} vrl failed: {err:?}");
-                (row, Some(clean_err))
-            }
-        },
-        Err(err) => {
-            metrics::INGEST_ERRORS
-                .with_label_values(&[
-                    org_id,
-                    StreamType::Logs.as_str(),
-                    &format!("{stream_name:?}"),
-                    TRANSFORM_FAILED,
-                ])
-                .inc();
-            // Log full error with record for debugging
-            log::debug!(
-                "{org_id}/{stream_name:?} vrl runtime failed at getting result {err:?} on record {row:?}. Returning original row."
-            );
-            // Return only error message without sensitive record data
-            let clean_err = format!("{org_id}/{stream_name:?} vrl runtime error: {err:?}");
-            (row, Some(clean_err))
-        }
-    }
-}
+pub use transform::{
+    apply_vrl_fn,
+    js::{apply_js_fn, compile_js_function},
+};
 
 pub async fn get_stream_partition_keys(
     org_id: &str,
@@ -261,12 +173,17 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             time_in_queue_ms: None,
             ..Default::default()
         };
+        let trace_id = config::ider::generate_trace_id();
+        let trace_id = format!("eval_trigg_{trace_id}");
         log::info!(
-            "Evaluating trigger for alert: {}/{}",
+            "Evaluating trigger for alert: {}/{} with trace id {trace_id}",
             alert.org_id,
             alert.name
         );
-        match alert.send_notification(val, now, None, now).await {
+        match alert
+            .send_notification(&trace_id, val, now, None, now)
+            .await
+        {
             Err(e) => {
                 log::error!("Failed to send notification: {e}");
                 trigger_data_stream.status = TriggerDataStatus::Failed;

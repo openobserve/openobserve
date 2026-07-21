@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex items-center gap-2">
-    <img v-if="showIcon" style="width: 24px; height: 24px;" :src="icon" alt="icon" />
+    <img class="size-6" v-if="showIcon" :src="icon" alt="icon" />
     <span data-test="common-group-header-title" class="text-base font-bold leading-6">
       {{ title }}
     </span>
@@ -48,7 +48,7 @@ export default defineComponent({
       default: true,
     }
   },
-  setup(props, { emit }) {
+  setup(props) {
     const icon = computed(() => {
       return getImageURL(props.iconPath)
     })

@@ -32,6 +32,7 @@ import {
   calculateChartDimensions,
   calculatePieChartRadius,
 } from "../../legendConfiguration";
+import { chartColor } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
 import { processData } from "../../sqlProcessData";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
@@ -53,11 +54,9 @@ export const largestLabel = (data: any) => {
 };
 
 /**
- * Builds the complete SQLContext for a given set of raw inputs.
- *
- * This function replicates all the work that `convertSQLData` used to do
- * *before* the chart-type switch statement ΓÇö axis-key extraction, data
- * processing, base-options construction, and helper-function creation.
+ * Builds the complete SQLContext for a given set of raw inputs — axis-key
+ * extraction, data processing, base-options construction, and helper-function
+ * creation.
  *
  * @returns The fully populated SQLContext, or `null` if the input is invalid.
  */
@@ -480,14 +479,12 @@ export function buildSQLContext(
       appendToBody: true,
       className: "o2-echarts-tooltip",
       textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+        color: chartColor("--color-tooltip-text"),
         fontSize: 12,
       },
       enterable: true,
-      backgroundColor:
-        store.state.theme === "dark" ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)",
-      borderColor:
-        store.state.theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+      backgroundColor: chartColor("--color-tooltip-bg"),
+      borderColor: chartColor("--color-tooltip-border"),
       borderWidth: 1,
       padding: [8, 12],
       extraCssText:
@@ -666,7 +663,6 @@ export function buildSQLContext(
         hasTimestampField || isHorizontalChart
           ? 120
           : panelSchema.config?.axis_label_truncate_width || 120;
-      const labelFontSize = 12;
       const labelMargin = 10;
 
       return {
@@ -793,9 +789,14 @@ export function buildSQLContext(
       bottom: "100%",
       feature: {
         dataZoom: {
-          yAxisIndex: panelSchema.config?.dataZoom?.hasOwnProperty("yAxisIndex")
-            ? panelSchema.config?.dataZoom.yAxisIndex
-            : "none",
+          yAxisIndex:
+            panelSchema.config?.dataZoom &&
+            Object.prototype.hasOwnProperty.call(
+              panelSchema.config.dataZoom,
+              "yAxisIndex",
+            )
+              ? panelSchema.config?.dataZoom.yAxisIndex
+              : "none",
         },
       },
     },
@@ -805,7 +806,7 @@ export function buildSQLContext(
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
       },
@@ -813,7 +814,7 @@ export function buildSQLContext(
   }
   if (options.yAxis) {
     (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;

@@ -28,8 +28,6 @@
 /**
  * Read the LLM operation kind from a span.
  * Uses the OTEL gen_ai.operation.name value directly.
- * @example getOp({ gen_ai_operation_name: "chat" })             // "chat"
- * @example getOp({})                                            // ""
  */
 export function getOp(span: any): string {
   return String(
@@ -40,8 +38,6 @@ export function getOp(span: any): string {
 /**
  * Read the model name. Prefers the response model (what actually served
  * the call) over the request model (what was asked for).
- * @example getModel({ gen_ai_response_model: "claude-sonnet-4-6" })
- *          // "claude-sonnet-4-6"
  */
 export function getModel(span: any): string {
   return String(
@@ -100,10 +96,6 @@ export type SpanKind = "llm_turn" | "tool_call" | "agent" | "root" | "other";
  * (Vertex/ADK tag `generate_content` with `gen_ai.operation.name=GENERATION`
  * even though it carries no `messages` array — the actual model call
  * is the inner span).
- *
- * @example hasLLMPayload({ gen_ai_input_messages: '[{"role":"user"}]' }) // true
- * @example hasLLMPayload({ gen_ai_input_messages: '{}' })                // false
- * @example hasLLMPayload({})                                             // false
  */
 export function hasLLMPayload(span: any): boolean {
   const inp = getInputRaw(span);
@@ -121,11 +113,6 @@ export function hasLLMPayload(span: any): boolean {
  *   - {invoke_agent, create_agent}              → agent
  *   - server span with no parent                → root
  *   - everything else                           → other
- *
- * @example classify({ gen_ai_operation_name: "chat",
- *                     gen_ai_input_messages: "[{...}]" })     // "llm_turn"
- * @example classify({ gen_ai_operation_name: "execute_tool" }) // "tool_call"
- * @example classify({ span_kind: "2" })                       // "root"
  */
 export function classify(span: any): SpanKind {
   const obs = getOp(span);
@@ -159,11 +146,6 @@ export interface Message {
 /**
  * Try to parse a value as JSON; return it untouched if it's already an
  * object/array, or `null` for non-strings / parse failures.
- *
- * @example safeParseJSON('{"a":1}')   // { a: 1 }
- * @example safeParseJSON({ a: 1 })    // { a: 1 } (passthrough)
- * @example safeParseJSON("not json")  // null
- * @example safeParseJSON(null)        // null
  */
 export function safeParseJSON<T = any>(value: unknown): T | null {
   if (value == null) return null;
@@ -344,9 +326,9 @@ export function looksLikeAgentInjection(text: string): boolean {
     return true;
   }
 
-  if (/^for context\s*[:\-]/i.test(head)) return true;
+  if (/^for context\s*[:-]/i.test(head)) return true;
 
-  if (/^\[?[\w._-]+\]?\s+said[:\-]/i.test(head)) return true;
+  if (/^\[?[\w._-]+\]?\s+said[:-]/i.test(head)) return true;
 
   return false;
 }

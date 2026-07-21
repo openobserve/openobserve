@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           t(`pipeline.searchHistory`) || 'Select or search pipeline...'
         "
         data-test="pipeline-history-search-select"
-        class="min-w-[250px]"
+        class="min-w-62.5"
         clearable
       >
         <template #empty>
@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 min-h-0 overflow-hidden">
       <div
         data-test="pipeline-history-table"
-        class="pipeline-history-table card-container h-full"
+        class="pipeline-history-table bg-card-glass-bg h-full"
       >
         <OTable
           :frame="false"
@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           :column-visibility="columnVisibility"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="pipelines-pipeline-history-list"
@@ -146,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_realtime ? 'Real-time' : 'Scheduled'">
               <OIcon
                 :name="row.is_realtime ? 'check-circle' : 'schedule'"
-                :class="row.is_realtime ? 'text-[var(--o2-positive)]' : 'text-gray-500'"
+                :class="row.is_realtime ? 'text-status-positive' : 'text-text-muted'"
                 size="md"
               />
             </OTooltip>
@@ -156,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip :content="row.is_silenced ? 'Silenced' : 'Not Silenced'">
               <OIcon
                 :name="row.is_silenced ? 'volume-off' : 'volume-up'"
-                :class="row.is_silenced ? 'text-gray-500' : 'text-[var(--o2-positive)]'"
+                :class="row.is_silenced ? 'text-text-muted' : 'text-status-positive'"
                 size="md"
               />
             </OTooltip>
@@ -176,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 row.is_partial !== undefined
               "
               :name="row.is_partial ? 'warning' : 'check-circle'"
-              :class="row.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-positive)]'"
+              :class="row.is_partial ? 'text-warning' : 'text-status-positive'"
               size="xs"
             >
               <OTooltip
@@ -229,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="{ totalRows }">
             <div
-              class="flex items-center o2-table-footer-title mr-4 py-2"
+              class="flex items-center text-xs font-normal mr-4 py-2"
             >
               {{ totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -253,15 +254,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">
+                <div class="text-xs text-text-label mb-1">
                   Pipeline Name
                 </div>
-                <div class="text-sm text-weight-medium">
+                <div class="text-sm font-medium">
                   {{ selectedRow.pipeline_name }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Status</div>
+                <div class="text-xs text-text-label mb-1">Status</div>
                 <OTag type="queryStatus" :value="selectedRow.status" />
               </div>
             </div>
@@ -273,13 +274,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Timestamp</div>
+                <div class="text-xs text-text-label mb-1">Timestamp</div>
                 <div class="text-sm">
                   {{ formatDate(selectedRow.timestamp) }}
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Duration</div>
+                <div class="text-xs text-text-label mb-1">Duration</div>
                 <div class="text-sm">
                   {{
                     formatDuration(
@@ -297,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="py-1">
             <div class="flex gap-3">
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Type</div>
+                <div class="text-xs text-text-label mb-1">Type</div>
                 <div class="text-sm">
                   <OIcon
                     :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
@@ -308,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div class="w-1/2">
-                <div class="text-xs text-gray-400 mb-1">Silenced</div>
+                <div class="text-xs text-text-label mb-1">Silenced</div>
                 <div class="text-sm">
                   <OIcon
                     v-if="selectedRow.is_silenced"
@@ -338,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="py-1">
               <div class="flex gap-3">
                 <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">
+                  <div class="text-xs text-text-label mb-1">
                     Evaluation Time
                   </div>
                   <div class="text-sm">
@@ -346,17 +347,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div v-if="selectedRow.query_took" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">Query Time</div>
+                  <div class="text-xs text-text-label mb-1">Query Time</div>
                   <div class="text-sm">
                     {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
                   </div>
                 </div>
                 <div v-if="selectedRow.retries > 0" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">Retries</div>
+                  <div class="text-xs text-text-label mb-1">Retries</div>
                   <div class="text-sm">{{ selectedRow.retries }}</div>
                 </div>
                 <div v-if="selectedRow.delay_in_secs" class="w-1/3">
-                  <div class="text-xs text-gray-400 mb-1">Delay</div>
+                  <div class="text-xs text-text-label mb-1">Delay</div>
                   <div class="text-sm">{{ selectedRow.delay_in_secs }}s</div>
                 </div>
                 <div
@@ -366,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   class="w-1/3"
                 >
-                  <div class="text-xs text-gray-400 mb-1">
+                  <div class="text-xs text-text-label mb-1">
                     Result Status
                   </div>
                   <div class="text-sm">
@@ -374,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :name="
                         selectedRow.is_partial ? 'warning' : 'check-circle'
                       "
-                      :class="['mr-1', selectedRow.is_partial ? 'text-[var(--o2-warning)]' : 'text-[var(--o2-positive)]']"
+                      :class="['mr-1', selectedRow.is_partial ? 'text-warning' : 'text-status-positive']"
                       size="xs"
                     />
                     {{ selectedRow.is_partial ? "Partial" : "Complete" }}
@@ -388,8 +389,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.source_node">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-xs text-gray-400 mb-1">Source Node</div>
-              <div class="text-sm font-mono text-[13px]">
+              <div class="text-xs text-text-label mb-1">Source Node</div>
+              <div class="text-sm font-mono text-compact">
                 {{ selectedRow.source_node }}
               </div>
             </div>
@@ -399,21 +400,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.error">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-xs text-gray-400 mb-1">
+              <div class="text-xs text-text-label mb-1">
                 <OIcon name="error" size="xs" class="mr-1" />
                 Error Details
               </div>
               <div
-                class="rounded border border-solid border-negative/30 p-2 mt-2 bg-red-500/5"
+                class="rounded-default border border-solid border-status-negative/30 p-2 mt-2 bg-status-error-bg"
               >
                 <pre
-                  class="text-sm"
+                  class="text-sm whitespace-pre-wrap m-0"
                   style="
-                    white-space: pre-wrap;
                     word-break: break-word;
-                    margin: 0;
-                    font-family: &quot;Courier New&quot;, monospace;
-                    font-size: 12px;
+                    font-family: var(--font-mono);
+                    font-size: var(--text-xs);
                   "
                   >{{ selectedRow.error }}</pre
                 >
@@ -425,21 +424,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-if="selectedRow.success_response">
             <OSeparator class="my-2" />
             <div class="py-1">
-              <div class="text-xs text-gray-400 mb-1">
+              <div class="text-xs text-text-label mb-1">
                 <OIcon name="check-circle" size="xs" class="mr-1" />
                 Response
               </div>
               <div
-                class="rounded border border-solid border-positive/30 p-2 mt-2 bg-green-500/5"
+                class="rounded-default border border-solid border-status-positive/30 p-2 mt-2 bg-status-success-bg"
               >
                 <pre
-                  class="text-sm"
+                  class="text-sm whitespace-pre-wrap m-0"
                   style="
-                    white-space: pre-wrap;
                     word-break: break-word;
-                    margin: 0;
-                    font-family: &quot;Courier New&quot;, monospace;
-                    font-size: 12px;
+                    font-family: var(--font-mono);
+                    font-size: var(--text-xs);
                   "
                   >{{ selectedRow.success_response }}</pre
                 >
@@ -466,11 +463,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="md" class="text-[#ef4444]" />
+        <OIcon name="error" size="md" class="text-status-error-text" />
       </template>
       <div class="mb-4">
-        <div class="text-[13px] font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
-        <div class="p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#dc2626]">
+        <div class="text-compact font-semibold tracking-[0.02em] opacity-80 mb-2">Error Summary</div>
+        <div class="p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
           {{ errorMessage?.error }}
         </div>
       </div>
@@ -500,7 +497,8 @@ import pipelinesService from "@/services/pipelines";
 import http from "@/services/http";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -552,14 +550,7 @@ const selectedRow = ref<any>(null);
 const errorMessage = ref<any>(null);
 
 // Table columns
-const columns = ref([
-  {
-    id: "row_number",
-    header: "#",
-    accessorKey: "#",
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" as const },
-  },
+const columns = ref<OTableColumnDef[]>([
   {
     id: "pipeline_name",
     header: "Pipeline Name",
@@ -702,22 +693,15 @@ const fetchPipelinesList = async () => {
           label: pipeline.name,
           value: pipeline.pipeline_id,
         }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        .sort((a: { label: string; value: string }, b: { label: string; value: string }) =>
+          a.label.localeCompare(b.label),
+        );
       filteredPipelineOptions.value = [...allPipelines.value];
     }
   } catch (error: any) {
     console.error("Error fetching pipelines list:", error);
     // Silently fail - user can still type pipeline names manually
   }
-};
-
-const filterPipelineOptions = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredPipelineOptions.value = allPipelines.value.filter((v) =>
-      v.label.toLowerCase().includes(needle),
-    );
-  });
 };
 
 const onPipelineSelected = (val: any) => {
@@ -775,10 +759,6 @@ const fetchPipelineHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#":
-          index +
-          1 +
-          (pagination.value.page - 1) * pagination.value.rowsPerPage,
       }));
 
       // Update pagination total
@@ -867,16 +847,6 @@ const formatDuration = (microseconds: number) => {
     return `${minutes}m ${seconds % 60}s`;
   }
   return `${seconds}s`;
-};
-
-const showDetailsDialog = (row: any) => {
-  selectedRow.value = row;
-  detailsDialog.value = true;
-};
-
-const showErrorDialog = (error: any) => {
-  errorMessage.value = error;
-  errorDialog.value = true;
 };
 
 const closeErrorDialog = () => {

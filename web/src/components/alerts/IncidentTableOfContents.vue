@@ -18,20 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="toc-container" class="px-2 pt-4 pb-2 flex flex-col h-full overflow-hidden">
     <div
       data-test="toc-section-container"
-      class="overflow-hidden flex flex-col flex-1 border border-[var(--o2-border-color)] rounded-md"
+      class="overflow-hidden flex flex-col flex-1 border border-card-glass-border rounded-default"
     >
       <!-- Header -->
       <div
         data-test="toc-header"
-        :class="[
-          'px-3 py-2 flex items-center gap-2 border-b flex-shrink-0 !bg-[var(--o2-table-header-bg)]',
-          isDarkMode
-            ? 'border-gray-700'
-            : 'border-gray-200'
-        ]"
+        class="px-3 py-2 flex items-center gap-2 border-b flex-shrink-0 border-border-default !bg-[var(--color-theme-table-header-bg)]"
       >
         <OIcon data-test="toc-header-icon" name="format-list-bulleted" size="sm" class="opacity-80" />
-        <span data-test="toc-header-title" :class="isDarkMode ? 'text-gray-300' : 'text-gray-700'" class="text-xs font-semibold">
+        <span data-test="toc-header-title" class="text-xs font-semibold text-text-body">
           Table of Contents
         </span>
       </div>
@@ -39,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Content -->
       <div data-test="toc-content" class="p-3 flex-1 overflow-auto">
         <!-- Table of Contents -->
-        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" :class="isDarkMode ? 'text-gray-500' : 'text-gray-400'" class="text-xs italic">
+        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" class="text-xs italic text-text-secondary">
           No sections available
         </div>
         <div v-else class="space-y-1">
@@ -49,12 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Level 1 Item -->
               <div
                 :data-test="`toc-level1-content-${item.id}`"
-                :class="[
-                  'flex items-center gap-2 px-2 py-1.5 rounded transition-colors',
-                  isDarkMode
-                    ? 'text-gray-200'
-                    : 'text-gray-900'
-                ]"
+                class="flex items-center gap-2 px-2 py-1.5 rounded-default transition-colors text-text-heading"
               >
                 <!-- Icon on the left -->
                 <OIcon
@@ -67,12 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span
                   :data-test="`toc-level1-text-${item.id}`"
                   @click="$emit('scroll-to-section', item.id)"
-                  :class="[
-                    'text-xs font-medium truncate flex-1 cursor-pointer',
-                    isDarkMode
-                      ? 'hover:text-blue-400'
-                      : 'hover:text-blue-600'
-                  ]"
+                  class="text-xs font-medium truncate flex-1 cursor-pointer hover:text-text-link-hover"
                 >{{ item.text }}</span>
                 <!-- Expand button on the right (only for items with children) -->
                 <OButton
@@ -95,12 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Level 2 Item -->
                     <div
                       :data-test="`toc-level2-content-${child.id}`"
-                      :class="[
-                        'flex items-center gap-2 px-2 py-1 rounded transition-colors',
-                        isDarkMode
-                          ? 'text-gray-300'
-                          : 'text-gray-700'
-                      ]"
+                      class="flex items-center gap-2 px-2 py-1 rounded-default transition-colors text-text-body"
                     >
                       <!-- Icon on the left -->
                       <OIcon
@@ -113,12 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         :data-test="`toc-level2-text-${child.id}`"
                         @click="$emit('scroll-to-section', child.id)"
-                        :class="[
-                          'text-xs truncate flex-1 cursor-pointer',
-                          isDarkMode
-                            ? 'hover:text-blue-400'
-                            : 'hover:text-blue-600'
-                        ]"
+                        class="text-xs truncate flex-1 cursor-pointer hover:text-text-link-hover"
                       >{{ child.text }}</span>
                       <!-- Expand button on the right (only for items with children) -->
                       <OButton
@@ -141,15 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :key="grandchild.id"
                         :data-test="`toc-level3-item-${grandchild.id}`"
                         @click="$emit('scroll-to-section', grandchild.id)"
-                        :class="[
-                          'flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-colors',
-                          isDarkMode
-                            ? 'hover:bg-gray-700 text-gray-400'
-                            : 'hover:bg-blue-50 text-gray-600'
-                        ]"
+                        class="flex items-center gap-2 px-2 py-1 rounded-default cursor-pointer transition-colors text-text-secondary hover:bg-surface-subtle-hover"
                       >
                         <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="xs" class="opacity-60" />
-                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="text-[11px] truncate">{{ grandchild.text }}</span>
+                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="text-2xs truncate">{{ grandchild.text }}</span>
                       </div>
                     </div>
                   </div>
@@ -166,7 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface TocItem {

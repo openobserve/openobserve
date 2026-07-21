@@ -66,8 +66,9 @@ export const usePanelDataLoader = (
   regionClusterParams?: any,
   allowAnnotationsAPI?: any,
 ) => {
+  const PANEL_DATA_LOADER_DEBUG = false;
   const log = (...args: any[]) => {
-    if (false) {
+    if (PANEL_DATA_LOADER_DEBUG) {
       console.log(panelSchema?.value?.title + ": ", ...args);
     }
   };
@@ -140,7 +141,7 @@ export const usePanelDataLoader = (
     loading: false,
     errorDetail: {
       message: "",
-      code: "",
+      code: "" as string | number,
     },
     metadata: {
       queries: [] as any,
@@ -463,10 +464,9 @@ export const usePanelDataLoader = (
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [selectedTimeObj?.value, forceLoad?.value],
-    async (newVal, oldVal) => {
+    async () => {
       log("PanelSchema/Time Wather: called");
 
-      // CRITICAL FIX: Check if this specific panel should refresh
       // If panelIdToBeRefreshed is set and doesn't match this panel, skip loading
       // This prevents all panels from refreshing when only one panel's time changes
       if (
@@ -515,23 +515,13 @@ export const usePanelDataLoader = (
       case "promql": {
         // A PromQL failure comes back as the backend's internal envelope
         // ("Error during planning: ErrorCode# {...}") rather than a sentence.
-        // Shown raw, that is what a user reads on a broken panel; the sentence
-        // they need is buried in the middle of it. parseSearchError digs it out
-        // and truncates, so this branch no longer has to.
-        // No `""` fallback. `parseSearchError` guarantees a non-empty message —
-        // "a card or panel that failed has to say *something*" — and passing ""
-        // is precisely what defeats it: an error whose body carries no `error`,
-        // no `message` and no `error.message` (a bare network failure, a 502 with
-        // an empty body) fell through to the fallback and rendered as a BLANK
-        // error, which reads as a second bug on top of the first.
+        // parseSearchError digs the readable message out and truncates it, and
+        // guarantees a non-empty message.
         const parsed = parseSearchError(error);
 
         state.errorDetail = {
           message: parsed.message,
-          // No `?? error.response.status` fallback: `parseSearchError` already folds
-          // the HTTP status into `code` (searchError.ts), so the fallbacks were
-          // unreachable — and code that cannot run is code that lies about what the
-          // function above it does.
+          // `parseSearchError` already folds the HTTP status into `code`.
           code: parsed.code ?? "",
         };
         break;
@@ -697,9 +687,9 @@ export const usePanelDataLoader = (
       threshold: 0, // Adjust as needed
     });
 
-    // Keep the working solution - setTimeout ensures the element is fully rendered
-    // This is necessary because IntersectionObserver checks immediately after observe()
-    // but the element might not be fully laid out yet (especially in popups/drawers)
+    // setTimeout ensures the element is fully rendered: IntersectionObserver
+    // checks immediately after observe(), but the element might not be fully
+    // laid out yet (especially in popups/drawers).
     setTimeout(() => {
       if (chartPanelRef?.value) {
         observer.observe(chartPanelRef?.value);
@@ -814,7 +804,12 @@ export const usePanelDataLoader = (
     };
 
     const currentCacheKey = omit(getCacheKey(), keysToIgnore);
-    const savedCacheKey = omit(tempPanelCacheKey, keysToIgnore);
+    // tempPanelCacheKey is untyped (from the panel cache), so mirror the
+    // typed key shape rather than lodash's Omit<any, string> inference.
+    const savedCacheKey: typeof currentCacheKey = omit(
+      tempPanelCacheKey,
+      keysToIgnore,
+    );
 
     // Normalize variables in both keys before comparison
     const normalizedCurrentKey = {

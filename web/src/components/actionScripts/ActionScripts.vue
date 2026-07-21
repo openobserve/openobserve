@@ -19,13 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="action-scripts-list-page" class="h-full">
     <div v-if="!showAddActionScriptDialog" class="h-full">
-      <PageLayout
-        :header-class="'shrink-0 px-4 border-b border-border-default'"
+      <OPageLayout
+        bleed
+        :title="t('actions.header')"
+        icon="code"
+        :subtitle="'Custom automation and scripting'"
       >
         <!-- Row 1: standard header — title + actions only. Search moved into the
              table's own toolbar below. -->
-        <template #header>
-          <AppPageHeader :title="t('actions.header')" icon="code" :subtitle="'Custom automation and scripting'">
             <template #actions>
               <OButton
                 data-test="action-list-add-btn"
@@ -35,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("actions.add") }}</OButton
               >
             </template>
-          </AppPageHeader>
-        </template>
         <OTable
           data-test="action-scripts-table"
           :data="visibleRows"
@@ -52,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :show-global-filter="false"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 data-test="action-scripts-loading"
                 v-if="alertStateLoadingMap[row.uuid]"
-                style="display: inline-block; width: 33.14px; height: auto"
-                class="flex justify-center items-center ml-1"
+                style="display: inline-block; width: 33.14px"
+                class="flex justify-center items-center ml-1 h-auto"
                 :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
               >
                 <OSpinner size="xs" />
@@ -147,11 +147,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div
-                class="flex items-center justify-between w-full h-[48px]"
+                class="flex items-center justify-between w-full h-12"
               >
                 <div class="flex items-center gap-2">
                   <div
-                    class="o2-table-footer-title flex items-center w-[80px] mr-md"
+                    class="text-xs font-normal flex items-center w-20 mr-md"
                   >
                     {{ resultTotal }} {{ t("actions.header") }}
                   </div>
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
           </OTable>
-      </PageLayout>
+      </OPageLayout>
     </div>
     <template v-else>
       <div class="w-full">
@@ -250,22 +250,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  onBeforeMount,
   watch,
   defineAsyncComponent,
   computed,
 } from "vue";
 import type { Ref } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { useI18n } from "vue-i18n";
-import alertsService from "@/services/alerts";
-import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -276,7 +271,7 @@ import {
   verifyOrganizationStatus,
   convertUnixToDateFormat,
 } from "@/utils/zincutils";
-import type { Alert, AlertListItem } from "@/ts/interfaces/index";
+import type { Alert } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
@@ -286,7 +281,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -296,12 +290,11 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 interface ActionScriptList {
-  "#": string | number;
   id: any;
   name: any;
   uuid: any;
@@ -315,8 +308,7 @@ interface ActionScriptList {
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     OIcon,
     EditScript: defineAsyncComponent(
       () => import("@/components/actionScripts/EditScript.vue"),
@@ -328,7 +320,6 @@ export default defineComponent({
     OSpinner,
     OInput,
     OSearchInput,
-    OCheckbox,
     OTooltip,
     OSelect,
     OForm,
@@ -349,7 +340,6 @@ export default defineComponent({
     const alerts: Ref<Alert[]> = ref([]);
     const actionsScriptRows: Ref<ActionScriptList[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
-    const toBeClonedAlert: Ref<Alert | {}> = ref({});
     const showAddActionScriptDialog: any = ref(false);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
@@ -370,6 +360,9 @@ export default defineComponent({
 
     const { getStreams } = useStreams();
 
+    // Clone-dialog bindings referenced by the template; nothing opens the dialog yet.
+    const showForm = ref(false);
+    const submitForm = () => {};
     const toBeCloneAlertName = ref("");
     const toBeCloneUUID = ref("");
     const toBeClonestreamType = ref("");
@@ -387,13 +380,6 @@ export default defineComponent({
     ]);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "center" },
-      },
       {
         id: "name",
         header: t("alerts.name"),
@@ -494,7 +480,6 @@ export default defineComponent({
       loading.value = true;
       getAllActions()
         .then(() => {
-          var counter = 1;
           resultTotal.value = store.state.organizationData.actions.length;
           alerts.value = store.state.organizationData.actions.map(
             (alert: any) => {
@@ -512,7 +497,6 @@ export default defineComponent({
             if (data.execution_details_type === "once")
               data.execution_details_type = "Once";
             return {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
               id: data.id,
               name: data.name,
               uuid: data.uuid,
@@ -743,22 +727,6 @@ export default defineComponent({
       }
     };
 
-    const filterColumns = (options: any[], val: String, update: Function) => {
-      let filteredOptions: any[] = [];
-      if (val === "") {
-        update(() => {
-          filteredOptions = [...options];
-        });
-        return filteredOptions;
-      }
-      update(() => {
-        const value = val.toLowerCase();
-        filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1,
-        );
-      });
-      return filteredOptions;
-    };
     const updateStreamName = (selectedOption: any) => {
       toBeClonestreamName.value = selectedOption;
     };
@@ -792,20 +760,6 @@ export default defineComponent({
         .catch(() => Promise.reject())
         .finally(() => (isFetchingStreams.value = false));
     };
-    const filterStreams = (val: string, update: any) => {
-      streamNames.value = filterColumns(indexOptions.value, val, update);
-    };
-
-    const routeTo = (name: string) => {
-      router.push({
-        name: name,
-        query: {
-          action: "add",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
       terms = terms.toLowerCase();
@@ -863,6 +817,10 @@ export default defineComponent({
       showDeleteDialogFn,
       maxRecordToReturn,
       showAddActionScriptDialog,
+      showForm,
+      submitForm,
+      updateStreams,
+      updateStreamName,
       toBeCloneAlertName,
       toBeCloneUUID,
       toBeClonestreamType,

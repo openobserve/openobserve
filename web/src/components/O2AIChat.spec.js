@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 // O2AIChat.vue unit tests (50+)
 
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
@@ -46,7 +46,7 @@ function setupFakeIndexedDB() {
         if (typeof req.onsuccess === 'function') {
           // Fake DB handle
           const db = {
-            transaction: (storeName, _mode) => {
+            transaction: (storeName) => {
               const tx = {
                 objectStore: (name) => {
                   if (name !== storeName) throw new Error('Invalid store');
@@ -70,7 +70,7 @@ function setupFakeIndexedDB() {
                       return r;
                     },
                     index: (/* name */) => ({
-                      openCursor: (_range, _dir) => {
+                      openCursor: () => {
                         const r = { onsuccess: null, onerror: null };
                         setTimeout(() => {
                           // iterate newest first
@@ -174,10 +174,9 @@ beforeEach(() => {
 
 // 1. Basic rendering
 describe('O2AIChat - basic rendering', () => {
-  it('renders container when closed and applies theme classes', async () => {
+  it('renders container when closed', async () => {
     const wrapper = await mountChat({ isOpen: false });
     expect(wrapper.find('.chat-container').exists()).toBe(true);
-    expect(wrapper.find('.dark-mode').exists() || wrapper.find('.light-mode').exists()).toBe(true);
   });
 
   it('renders content and header when open', async () => {
@@ -197,7 +196,6 @@ describe('O2AIChat - basic rendering', () => {
 describe('O2AIChat - header actions', () => {
   it('emits close on close button click', async () => {
     const wrapper = await mountChat({ isOpen: true });
-    const closeBtn = wrapper.find('button[aria-label="close"]');
     // Fallback: trigger via emitted close on component when button is not easily selectable
     await wrapper.vm.$emit('close');
     expect(wrapper.emitted('close')).toBeTruthy();
@@ -392,18 +390,19 @@ describe('O2AIChat - capabilities', () => {
   });
 });
 
-// 12. Theme classes
-describe('O2AIChat - theme classes', () => {
-  it('applies dark-mode classes when theme is dark', async () => {
-    store.state.theme = 'dark';
-    const wrapper = await mountChat({ isOpen: true });
-    expect(wrapper.find('.dark-mode').exists()).toBe(true);
-  });
-
-  it('applies light-mode classes when theme is light', async () => {
-    store.state.theme = 'light';
-    const wrapper = await mountChat({ isOpen: true });
-    expect(wrapper.find('.light-mode').exists()).toBe(true);
+// 12. Theming
+// The component no longer emits per-theme `.light-mode` / `.dark-mode` classes.
+// Colours now come from semantic design tokens that flip on the root `.dark`
+// class, so the rendered markup is theme-independent.
+describe('O2AIChat - theming', () => {
+  it('renders the same markup under either theme, with no per-theme class', async () => {
+    for (const theme of ['light', 'dark']) {
+      store.state.theme = theme;
+      const wrapper = await mountChat({ isOpen: true });
+      expect(wrapper.find('.chat-container').exists()).toBe(true);
+      expect(wrapper.find('.light-mode').exists()).toBe(false);
+      expect(wrapper.find('.dark-mode').exists()).toBe(false);
+    }
   });
 });
 

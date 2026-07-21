@@ -32,6 +32,7 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { chartColor } from "@/utils/chartTheme";
 import {
   calculateBottomLegendHeight,
   calculateRightLegendWidth,
@@ -138,10 +139,9 @@ export const convertPromQLData = async (
 
       // Apply annotations if present (only for ECharts-based charts)
       if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
-        const annotationResults = await getAnnotationsData(
+        const annotationResults = getAnnotationsData(
           annotations,
-          store,
-          panelSchema,
+          store.state.timezone,
         );
         if (annotationResults && result.options) {
           result.options.annotations = annotationResults;
@@ -183,7 +183,6 @@ export const convertPromQLData = async (
     if (!queryData || !queryData.result) {
       return queryData;
     }
-    const originalCount = queryData.result.length;
     const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
@@ -400,14 +399,12 @@ export const convertPromQLData = async (
       appendToBody: true,
       className: "o2-echarts-tooltip",
       textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+        color: chartColor("--color-tooltip-text"),
         fontSize: 12,
       },
       enterable: true,
-      backgroundColor:
-        store.state.theme === "dark" ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)",
-      borderColor:
-        store.state.theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+      backgroundColor: chartColor("--color-tooltip-bg"),
+      borderColor: chartColor("--color-tooltip-border"),
       borderWidth: 1,
       padding: [8, 12],
       extraCssText:
@@ -620,7 +617,7 @@ export const convertPromQLData = async (
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
@@ -629,7 +626,7 @@ export const convertPromQLData = async (
   }
   if (options.yAxis) {
     (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
@@ -854,6 +851,7 @@ export const convertPromQLData = async (
           }
         }
       }
+      // falls through — unknown resultType has no series to build
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
@@ -941,7 +939,7 @@ export const convertPromQLData = async (
           show: true,
           trigger: "item",
           textStyle: {
-            color: store.state.theme === "dark" ? "#fff" : "#000",
+            color: chartColor("--color-tooltip-text"),
             fontSize: 12,
           },
           valueFormatter: (value: any) => {
@@ -955,14 +953,8 @@ export const convertPromQLData = async (
             );
           },
           enterable: true,
-          backgroundColor:
-            store.state.theme === "dark"
-              ? "rgba(22,23,25,0.97)"
-              : "rgba(255,255,255,0.97)",
-          borderColor:
-            store.state.theme === "dark"
-              ? "rgba(255,255,255,0.1)"
-              : "rgba(0,0,0,0.08)",
+          backgroundColor: chartColor("--color-tooltip-bg"),
+          borderColor: chartColor("--color-tooltip-border"),
           borderWidth: 1,
           padding: [8, 12],
           extraCssText:
@@ -1067,7 +1059,6 @@ export const convertPromQLData = async (
 
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
-              const values = [metric.value];
               return {
                 name: JSON.stringify(metric.metric),
                 value: metric?.value?.length > 1 ? metric.value[1] : "",

@@ -199,7 +199,7 @@ limitations under the License.
           data-test="opsgenie-eu-region-toggle"
           :label="t('alerts.prebuiltDestinations.opsgenieEuRegion')"
         />
-        <span class="text-xs text-gray-400">
+        <span class="text-xs text-text-secondary">
           {{ t('alerts.prebuiltDestinations.opsgenieEuRegionHelp') }}
         </span>
       </div>

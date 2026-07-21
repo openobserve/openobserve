@@ -5,8 +5,6 @@ import { createI18n } from "vue-i18n";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import AppPerformance from "./AppPerformance.vue";
-import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 
 // Mock the composables
 const mockPerformanceState = {
@@ -154,9 +152,6 @@ describe("AppPerformance.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-                    QSeparator: {
-            template: '<hr class="q-separator" />',
-          },
           OButton: {
             template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
             props: ["variant", "size", "disabled"],
@@ -573,7 +568,7 @@ describe("AppPerformance.vue", () => {
     });
 
     it("should dispatch resize event on activation", async () => {
-      const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+      vi.spyOn(window, "dispatchEvent");
       
       // Simulate the activation process
       await nextTick();

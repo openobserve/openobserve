@@ -21,7 +21,7 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.legendLabel") }}</span>
             <div
               data-test="promql-builder-options-field-input-wrapper"
@@ -29,8 +29,8 @@
             >
               <OCombobox
                 v-model="
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
+                  dashboardPanelDataModel.data.queries[
+                    dashboardPanelDataModel.layout.currentQueryIndex
                   ].config.promql_legend
                 "
                 :items="dashboardSelectfieldPromQlList"
@@ -64,12 +64,12 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("dashboard.stepValue") }}</span>
             <OInput
               v-model="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
                 ].config.step_value
               "
               type="text"
@@ -101,12 +101,12 @@
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="text-[11px] font-medium whitespace-nowrap opacity-85"
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
             >{{ t("common.type") }}</span>
             <OSelect
               v-model="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
                 ].config.query_type
               "
               :options="queryTypeOptions"
@@ -165,6 +165,9 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18n();
 
+    // Alias for the prop; same reference, mutation stays identical.
+    const dashboardPanelDataModel = computed(() => props.dashboardPanelData);
+
     // Initialize query_type if not set (default to "range")
     const currentQuery =
       props.dashboardPanelData.data.queries[
@@ -174,7 +177,7 @@ export default defineComponent({
       currentQuery.config.query_type = "range";
     }
 
-    // Query type options for q-select
+    // Query type options for the select
     const queryTypeOptions = [
       {
         label: t("metrics.promQLBuilderOptions.range"),
@@ -239,6 +242,7 @@ export default defineComponent({
 
     return {
       t,
+      dashboardPanelDataModel,
       queryTypeOptions,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,

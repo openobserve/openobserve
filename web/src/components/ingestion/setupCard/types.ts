@@ -20,6 +20,9 @@
 // via markdown frontmatter (ai/content/richCard/buildFromMarkdown), and in-repo
 // data sources via typed builders (setupCard/content/*, setupCard/registry).
 
+import type { FieldWidth } from "@/lib/forms/Input/OInput.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
 /**
  * Per-org values substituted into a card's code blocks. `token` is the
  * OpenObserve ingestion token: base64 of `email:<org ingestion passcode>`,
@@ -35,8 +38,13 @@ export interface CardSubstitutions {
 /** Context of a step → drives both the title chip and the code-block chrome. */
 export type StepChipKind = "terminal" | "editor" | "run" | "traces";
 
-/** How a step is marked complete: the user copies its code, or a span lands. */
-export type StepCompleteOn = "copy" | "detect";
+/**
+ * How a step is marked complete: the user copies its code, a span lands, or the
+ * user triggers the step's action button (see RichCardStepAction — used by the
+ * cloud-provider cards, whose steps launch a console wizard rather than
+ * producing a command to copy).
+ */
+export type StepCompleteOn = "copy" | "detect" | "action";
 
 export interface RichCardChip {
   kind: StepChipKind;
@@ -78,6 +86,24 @@ export interface RichCardStepVariant {
   note?: string;
 }
 
+/**
+ * A button that performs the step instead of handing over a command — e.g.
+ * "Launch CloudFormation Stack", which opens the AWS console. The renderer is
+ * presentational, so it only emits `step-action` with this id; the hosting page
+ * owns the behaviour.
+ */
+export interface RichCardStepAction {
+  /** Emitted with the `step-action` event so the page can dispatch. */
+  id: string;
+  label: string;
+  /** OIcon registry name rendered before the label. */
+  icon?: IconName;
+  /** Renders as a secondary button (default is primary). */
+  variant?: "primary" | "secondary";
+  /** Greys the button out — e.g. nothing selected yet. */
+  disabled?: boolean;
+}
+
 export interface RichCardStep {
   /** Stable id (also used as the scroll target for the next-step auto-advance). */
   id: string;
@@ -113,6 +139,11 @@ export interface RichCardStep {
   note?: string;
   /** Monospace pills rendered after the description (e.g. captured attributes). */
   pills?: string[];
+  /**
+   * Button that performs this step (cloud-console flows). Rendered after the
+   * step's own content and any `#step-<id>` slot.
+   */
+  action?: RichCardStepAction;
   completeOn: StepCompleteOn;
   /** Marks the step as required (renders a "Required" emphasis on its chip). */
   required?: boolean;
@@ -157,6 +188,19 @@ export interface RichCardExtras {
   fixBody?: string;
   /** Highlight language for the fix snippet (e.g. "bash"). Default "python". */
   fixLang?: string;
+  /**
+   * An alternative, manual path to the same result — e.g. the raw Helm sequence
+   * behind Kubernetes' one-line installer. Rendered as a collapsed section below
+   * the steps, so the primary path stays the obvious default. Its code goes
+   * through the same live substitution as the steps ({stream} and step inputs).
+   */
+  advanced?: {
+    /** Accordion label, e.g. "Advanced Installation (Manual Steps)". */
+    label: string;
+    /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
+    description?: string;
+    code: RichCardCode;
+  };
   troubleshooting?: { q: string; a: string }[];
 }
 
@@ -214,7 +258,7 @@ export interface RichCardInput {
   /** Helper text under the field. */
   help?: string;
   /** Width hint passed to OInput (e.g. "sm" | "md"). Defaults to "md". */
-  width?: string;
+  width?: FieldWidth;
 }
 
 export interface RichCardContent {
@@ -224,7 +268,15 @@ export interface RichCardContent {
   /** When set, the card shows a stream-name input (see RichCardStreamInput). */
   streamInput?: RichCardStreamInput;
   extras?: RichCardExtras;
+  /** Primary "Full integration docs" link in the footer. */
   docUrl?: string;
+  /**
+   * Additional reference links rendered as real anchors beside `docUrl` — for
+   * sources that legitimately have more than one guide (e.g. GCP's Pub/Sub and
+   * Google Workspace pages). Without this they end up as unclickable text
+   * inside a collapsed accordion, which is how they get lost.
+   */
+  docLinks?: { label: string; url: string }[];
   slackUrl?: string;
 }
 

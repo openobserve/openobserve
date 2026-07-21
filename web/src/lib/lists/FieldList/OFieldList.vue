@@ -7,8 +7,12 @@
       <slot name="before-list" />
     </div>
 
-    <!-- Search input -->
-    <div v-if="showSearch" class="shrink-0 py-1.5">
+    <!-- Search input. The horizontal inset is the page-edge grid line, baked in
+         here so every field list (logs, traces, RUM, dashboards) lines up with
+         the page header instead of each panel supplying its own gutter — that's
+         how this drifted to four different values. `searchClass` remains as an
+         escape hatch for a panel that genuinely needs to differ. -->
+    <div v-if="showSearch" class="shrink-0 py-1.5 px-page-edge" :class="searchClass">
       <OInput
         :model-value="searchModel"
         data-test="o-field-list-search"
@@ -49,7 +53,7 @@
         <!-- Group header -->
         <div
           v-if="row.isGroup"
-          class="o-field-list__group-header h-7 flex items-center justify-between text-[0.6875rem] font-semibold text-(--color-field-list-group-text) cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-transparent"
+          class="o-field-list__group-header h-7 px-page-edge flex items-center justify-between text-2xs font-semibold text-field-list-group-text cursor-default select-none tracking-[0.01em] sticky top-0 z-[2] bg-surface-panel"
           :data-test="`o-field-list-group-${row.groupName}`"
         >
           <slot name="group-header" :row="row" :group-name="row.groupName">
@@ -62,7 +66,7 @@
         <!-- Field row -->
         <div
           v-else
-          class="o-field-list__row mt-[0.25rem] flex items-center w-full min-h-[24px] p-0 relative cursor-pointer rounded-[0.1875rem] text-xs leading-[0.8rem]"
+          class="o-field-list__row group mt-1 flex items-center w-full min-h-6 px-page-edge relative cursor-pointer rounded-default text-xs leading-[0.8rem]"
           :class="{ 'o-field-list__row--draggable': draggable }"
           :data-test="`o-field-list-row-${row.name}`"
           :draggable="draggable && isDragEnabled(row, row._index ?? 0)"
@@ -86,7 +90,7 @@
                   name="drag-indicator"
                   size="sm"
                   :class="[
-                    'shrink-0 inline-flex items-center justify-center w-4 text-[var(--color-field-list-drag-icon)]',
+                    'shrink-0 inline-flex items-center justify-center w-4 text-field-list-drag-icon',
                     isDragEnabled(row, row._index ?? 0)
                       ? 'cursor-grab'
                       : 'cursor-not-allowed opacity-40',
@@ -97,7 +101,7 @@
               </OFieldRow>
             </slot>
           </div>
-          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-(--color-field-list-actions-border) rounded-[0.1875rem] overflow-hidden bg-(--color-field-list-actions-bg)">
+          <div v-if="$slots['field-actions']" class="o-field-list__actions flex items-stretch shrink-0 invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-[opacity,visibility] duration-[120ms] ease-[ease] absolute right-1 top-1/2 -translate-y-1/2 border border-field-list-actions-border rounded-default overflow-hidden bg-field-list-actions-bg">
             <slot name="field-actions" :row="row" :index="row._index" />
           </div>
         </div>
@@ -105,7 +109,7 @@
         <!-- Expanded content -->
         <div
           v-if="isExpanded(row) && $slots.expansion"
-          class="w-full pt-1 pb-[0.375rem] border border-[var(--color-field-list-expansion-border)] border-t-0 rounded-b-[0.1875rem] mb-[0.375rem] relative z-[1] box-border"
+          class="w-full pt-1 pb-1.5 border border-field-list-expansion-border border-t-0 rounded-b-default mb-1.5 relative z-[1] box-border"
         >
           <slot name="expansion" :row="row" />
         </div>
@@ -133,6 +137,8 @@ const props = withDefaults(
     fields: FieldItem[];
     search?: string;
     searchPlaceholder?: string;
+    /** Extra classes for the search block — see the template note on gutters. */
+    searchClass?: string;
     loading?: boolean;
     currentPage?: number;
     pageSize?: number;
@@ -148,6 +154,7 @@ const props = withDefaults(
   {
     search: "",
     searchPlaceholder: "Search fields",
+    searchClass: "",
     loading: false,
     currentPage: 1,
     pageSize: 50,
@@ -195,12 +202,13 @@ watch(
 
 // ── Search ──────────────────────────────────────────────────────────
 
-function onSearchChange(value: string) {
-  searchModel.value = value;
+function onSearchChange(value: string | number) {
+  const search = String(value);
+  searchModel.value = search;
   // Reset to first page when search changes
   internalCurrentPage.value = 1;
   emit("update:currentPage", 1);
-  emit("update:search", value);
+  emit("update:search", search);
 }
 
 // ── Filtering ───────────────────────────────────────────────────────
@@ -258,7 +266,7 @@ const isLastPage = computed(
   () => internalCurrentPage.value >= totalPages.value,
 );
 
-function setPageSize(size: number) {
+function setPageSize() {
   internalCurrentPage.value = 1;
   emit("update:currentPage", 1);
 }
@@ -376,11 +384,15 @@ function scrollToTop() {
 defineExpose({ scrollToTop });
 </script>
 
-<style>
-/* =============================================================
-   OFieldList — compact data-panel variant
-   Tokens mapped to O2 design system, small fonts for dense UI
-   ============================================================= */
+<style scoped>
+/* keep(lib-override:OButton): the __actions rules flatten SLOT content (OButton
+   roots rendered by consumers) — they need `!important` to beat the button's own
+   utilities. Slotted nodes carry the CONSUMER's scope id, not ours, so the child
+   selectors go through `:deep()`; the block itself is scoped (the wrapper is our
+   own element, so it still gets our scope id). The group-header sibling-combinator
+   spacing is co-located here (adjacent/`:not(:first-child)` selectors aren't
+   expressible per-element as utilities). Row-hover reveal of __actions is handled
+   by `group`/`group-hover` utilities in the template. */
 
 /* Defensive: two adjacent group headers shouldn't double their separator. */
 .o-field-list__group-header + .o-field-list__group-header {
@@ -390,32 +402,19 @@ defineExpose({ scrollToTop });
 /* Add a section break above every group header except the first one,
    so consecutive streams render as visually distinct sections.
    Pure margin — no border-top, because in dark mode the border-color token
-   resolves to `rgba(255, 255, 255, 0.40)` and renders as a glaring white
-   line above the header band. */
+   resolves to a translucent white that renders as a glaring line above the band. */
 .o-field-list__group-header:not(:first-child) {
   margin-top: 0.5rem;
 }
 
-/* No background-color here — each slot consumer owns its own hover highlight.
-   __row:hover is kept solely to reveal __actions (PanelFieldList +X/+Y buttons).
-   Hovering any child (including expanded slot content) propagates :hover up to
-   __row, so __actions appear correctly without the background bleeding into
-   expansion panels or value rows. */
-.o-field-list__row:hover .o-field-list__actions {
-  visibility: visible;
-  opacity: 1;
-}
-
-/* Make each chip flush (no individual border, no rounded corners),
-   and put a vertical separator between adjacent chips.
-   `!important` overrides Tailwind utility classes on the OButton root
-   (`border-0`, `rounded`, etc.) which otherwise win on specificity. */
-.o-field-list__actions > * {
+/* Make each chip flush (no individual border, no rounded-default corners),
+   and put a vertical separator between adjacent chips. */
+.o-field-list__actions > :deep(*) {
   border: 0 !important;
   border-radius: 0 !important;
   background-color: transparent !important;
 }
-.o-field-list__actions > *:not(:first-child) {
+.o-field-list__actions > :deep(*:not(:first-child)) {
   border-left: 1px solid var(--color-field-list-actions-border) !important;
 }
 </style>

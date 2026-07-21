@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="scheduled-dashboards-drawer"
+    bleed
     :open="open"
     :width="60"
     :title="t('dashboard.scheduledDashboards')"
@@ -23,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #header-right>
       <div class="flex items-center justify-end gap-2">
-        <div class="app-tabs-container h-[36px]">
+        <div class="app-tabs-container h-9">
           <AppTabs
             class="tabs-selection-container"
             :tabs="scheduledReportTypeTabs"
@@ -42,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="alert-list-add-alert-btn"
           @click="createScheduledReport"
-          >{{ t("dashboard.newReport") }}</OButton
+        >{{ t("dashboard.newReport") }}</OButton
         >
       </div>
     </template>
@@ -50,9 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="scheduled-dashboards-container"
       class="scheduled-dashboards h-fit"
-      :class="store.state.theme === 'dark' ? 'dark-mode bg-[var(--color-surface-panel)]' : 'bg-white'"
     >
-    <OTable
+    <OTable class="w-full"
       data-test="scheduled-dashboard-table"
       :data="displayReports"
       :columns="columns"
@@ -62,8 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="perPageOptionsList"
       :show-global-filter="false"
       :default-columns="false"
+      show-index
       :loading="loading"
-      style="width: 100%"
     >
       <template #cell-name="{ row }">
         <span class="cursor-pointer" @click="openReport(row)">{{ row.name }}</span>
@@ -122,16 +122,14 @@ import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToDateFormat } from "@/utils/date";
 import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const props = defineProps({
   open: {
@@ -191,11 +189,18 @@ const createScheduledReport = () => {
   });
 };
 
-const scheduledReports = ref<ScheduledDashboardReport[]>(
-  props.reports as ScheduledDashboardReport[],
+// Row shape for the list: adds the raw sort keys not on the shared interface.
+// "#" is provided by OTable's show-index, so rows built here omit it.
+type ScheduledReportRow = Omit<ScheduledDashboardReport, "#"> & {
+  last_triggered_at_raw: number | null;
+  created_at_raw: number | null;
+};
+
+const scheduledReports = ref<ScheduledReportRow[]>(
+  props.reports as ScheduledReportRow[],
 );
 
-const formattedReports = ref<ScheduledDashboardReport[]>([]);
+const formattedReports = ref<ScheduledReportRow[]>([]);
 
 const store = useStore();
 
@@ -223,9 +228,8 @@ onMounted(() => {
 
 const formatReports = () => {
   props.reports.length > 0 &&
-    props.reports.forEach((report: any, index) => {
+    props.reports.forEach((report: any) => {
       scheduledReports.value.push({
-        "#": index + 1,
         name: report.name,
         tab: getTabName(report.dashboards?.[0]?.tabs?.[0]),
         time_range: getTimeRangeValue(report.dashboards?.[0]?.timerange),
@@ -253,33 +257,17 @@ const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
   if (scheduledActiveTab.value === "cached") {
-    formattedReports.value = (
-      scheduledReports.value as ScheduledDashboardReport[]
-    ).filter((report) => report.isCached);
+    formattedReports.value = scheduledReports.value.filter(
+      (report) => report.isCached,
+    );
   } else {
-    formattedReports.value = (
-      scheduledReports.value as ScheduledDashboardReport[]
-    ).filter((report) => !report.isCached);
+    formattedReports.value = scheduledReports.value.filter(
+      (report) => !report.isCached,
+    );
   }
-
-  formattedReports.value = formattedReports.value.map(
-    (report: any, index: number) => {
-      return {
-        ...report,
-        "#": index + 1,
-      };
-    },
-  );
 };
 
 const columns: OTableColumnDef[] = [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    meta: { align: "left" },
-    size: TABLE_INDEX_COL_SIZE,
-  },
   {
     id: "name",
     header: t("reports.name"),
@@ -334,8 +322,6 @@ const selectedPerPage = ref(20);
 
 const perPageOptionsList = [5, 10, 20, 50, 100];
 
-const resultTotal = ref(0);
-
 const displayReports = computed(() => {
   let reports = formattedReports.value;
   if (scheduledFilterQuery.value) {
@@ -346,7 +332,6 @@ const displayReports = computed(() => {
       ),
     );
   }
-  resultTotal.value = reports.length;
   return reports;
 });
 
@@ -410,43 +395,32 @@ const getTimeRangeValue = (dateTime: any) => {
 };
 </script>
 
-<style>
-.dark-mode.scheduled-dashboards .rum-tabs {
-  border: 1px solid #464646;
-}
-
-.dark-mode.scheduled-dashboards .rum-tab:hover {
-  background: #464646;
-}
-
-.dark-mode.scheduled-dashboards .rum-tab.active {
-  background: #5960b2;
-  color: #ffffff !important;
-}
-
-.scheduled-dashboards thead tr {
+<style scoped>
+/* keep(lib-override:o2-table.rum-tabs): table header-row background and the pill-style
+   time-range tabs — target OTable / tab child DOM reached via :deep(). */
+.scheduled-dashboards :deep(thead tr) {
   background-color: var(--color-table-header-bg);
 }
 
-.scheduled-dashboards .rum-tabs {
-  border: 1px solid #eaeaea;
+.scheduled-dashboards :deep(.rum-tabs) {
+  border: 1px solid var(--color-border-default);
   height: fit-content;
-  border-radius: 4px;
+  border-radius: 0.25rem;
   overflow: hidden;
 }
 
-.scheduled-dashboards .rum-tab {
+.scheduled-dashboards :deep(.rum-tab) {
   width: fit-content !important;
-  padding: 4px 12px !important;
+  padding: 0.25rem 0.75rem !important;
   border: none !important;
 }
 
-.scheduled-dashboards .rum-tab:hover {
-  background: #eaeaea;
+.scheduled-dashboards :deep(.rum-tab:hover) {
+  background: var(--color-surface-subtle-hover);
 }
 
-.scheduled-dashboards .rum-tab.active {
-  background: #5960b2;
-  color: #ffffff !important;
+.scheduled-dashboards :deep(.rum-tab.active) {
+  background: var(--color-brand-indigo);
+  color: var(--color-white) !important;
 }
 </style>

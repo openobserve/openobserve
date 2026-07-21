@@ -15,24 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col w-full index-menu p-1.5! bg-surface-panel!">
-    <OSelect
-      data-test="log-search-index-list-select-stream"
-      :model-value="searchObj.data.stream.selectedStream?.value ?? null"
-      :label="
-        searchObj.data.stream.selectedStream?.label
-          ? ''
-          : t('search.selectIndex')
-      "
-      :options="streamOptions"
-      data-cy="index-dropdown"
-      @search="onStreamSearch"
-      @update:model-value="onStreamChange"
-    >
+  <div class="flex flex-col w-full index-menu py-1.5! bg-surface-panel!">
+    <!-- Stream selector sits on the same page-edge rail inset as the field list below it. -->
+    <div class="px-page-edge">
+      <OSelect
+        data-test="log-search-index-list-select-stream"
+        :model-value="searchObj.data.stream.selectedStream?.value ?? null"
+        :label="
+          searchObj.data.stream.selectedStream?.label
+            ? ''
+            : t('search.selectIndex')
+        "
+        :options="streamOptions"
+        data-cy="index-dropdown"
+        @search="onStreamSearch"
+        @update:model-value="onStreamChange"
+      >
         <template #empty>
           <div class="p-2">{{ t("search.noResult") }}</div>
         </template>
-    </OSelect>
+      </OSelect>
+    </div>
     <div
       class="index-table h-[calc(100%-2rem)]! w-full"
       data-test="log-search-index-list-fields-table"
@@ -87,7 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="field.name === 'duration'" #body>
                   <div
                     v-if="durationPercentilesLoading"
-                    class="flex justify-center py-[0.5rem]"
+                    class="flex justify-center py-2"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -95,31 +98,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="p in PERCENTILE_LABELS"
                       :key="p.key"
-                      class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
+                      class="flex items-center justify-between py-[0.15rem] pl-2"
                     >
-                      <span class="text-[0.75rem] w-[2rem] shrink-0">{{ p.label }}</span>
-                      <span class="text-[0.75rem] flex-1 text-right pr-[0.25rem]">
-                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                      <span class="text-xs w-8 shrink-0">{{ p.label }}</span>
+                      <span class="text-xs flex-1 text-right pr-1">
+                        {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
-                      <div class="flex w-[3rem]">
+                      <div class="flex w-12">
                         <OButton
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover ml-[0.25rem]! border! border-[var(--o2-border-color)]!"
+                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                          @click.stop="addSearchTerm(`duration>='${formatPercentile(durationPercentiles[p.key])}'`)"
+                          class="o2-custom-button-hover ml-1! border! border-card-glass-border!"
                         >
-                          <OIcon name="arrow-forward-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
+                          <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
-                          class="o2-custom-button-hover mr-[0.625rem]! border! border-[var(--o2-border-color)]! ml-auto!"
+                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                          @click.stop="addSearchTerm(`duration<='${formatPercentile(durationPercentiles[p.key])}'`)"
+                          class="o2-custom-button-hover mr-2.5! border! border-card-glass-border! ml-auto!"
                         >
-                          <OIcon name="arrow-back-ios" size="sm" class="h-[0.5rem]! w-[0.5rem]!" />
+                          <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                       </div>
                     </div>
@@ -150,10 +153,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #loading>
           <div
-            class="flex items-center justify-center w-full pt-[2rem]"
+            class="flex items-center justify-center w-full pt-8"
           >
             <div
-              class="text-sm font-medium text-weight-bold w-fit mx-auto my-0 flex-col justify-items-center"
+              class="text-sm font-medium w-fit mx-auto my-0 flex items-center gap-1.5"
             >
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}
@@ -176,12 +179,12 @@ import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles, { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
-import { removeFieldFromWhereAST, logsUtils } from "@/composables/useLogs/logsUtils";
+import { logsUtils } from "@/composables/useLogs/logsUtils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -189,14 +192,10 @@ export default defineComponent({
     FieldRow,
     OButton,
     OSelect,
-    OInput,
     OSpinner,
     OIcon,
     GroupedFieldList: defineAsyncComponent(
       () => import("@/components/common/GroupedFieldList.vue"),
-    ),
-    FieldListPagination: defineAsyncComponent(
-      () => import("@/components/common/FieldListPagination.vue"),
     ),
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
@@ -292,11 +291,19 @@ export default defineComponent({
       );
     };
 
-    const onStreamChange = (selectedValue: string | null) => {
-      const stream = selectedValue
-        ? searchObj.data.stream.streamLists.find((s: any) => s.value === selectedValue) ?? null
-        : null;
-      searchObj.data.stream.selectedStream = stream;
+    const onStreamChange = (selectedValue: SelectModelValue) => {
+      const streamValue = typeof selectedValue === "string" ? selectedValue : null;
+      const matched = streamValue
+        ? searchObj.data.stream.streamLists.find(
+            (s: any) => s.value === streamValue,
+          )
+        : undefined;
+      // No match clears to the empty-stream sentinel (the codebase's "cleared"
+      // convention everywhere else — resetSearchObj, SearchBar, Index).
+      searchObj.data.stream.selectedStream = matched ?? {
+        label: "",
+        value: "",
+      };
       searchObj.data.query = "";
       searchObj.data.editorValue = "";
       searchObj.data.resultGrid.currentPage = 0;
@@ -378,11 +385,14 @@ export default defineComponent({
       PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
     );
 
+    const formatPercentile = (value: number | null) =>
+      value === null ? "" : formatTimeWithSuffix(value);
+
     const expandedFields = ref<Record<string, boolean>>({});
     const fieldValuesCurrentFrom = ref<Record<string, number>>({});
     const fieldValuesCurrentKeyword = ref<Record<string, string>>({});
 
-    const { fnParsedSQL, fnUnparsedSQL } = logsUtils();
+    logsUtils();
 
     const removeFieldFromWhereStr = (
       whereClause: string,
@@ -471,7 +481,8 @@ export default defineComponent({
       expandedFields.value[field.name] = true;
 
       if (field.name === "duration") {
-        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(field.name));
+        // buildFieldValuesSql emits valid base64, so the decode never hits its catch (undefined) path.
+        const decodedSql = b64DecodeUnicode(buildFieldValuesSql(field.name))!;
         const whereMatch = decodedSql.match(/\bWHERE\b\s+([\s\S]+)$/i);
         fetchPercentiles({
           streamName: searchObj.data.stream.selectedStream.value,
@@ -592,6 +603,7 @@ export default defineComponent({
       resetSelectedFields,
       // Field value fetching
       fieldValues,
+      defaultValuesCount,
       expandedFields,
       openFilterCreator,
       handleSearchFieldValues,
@@ -606,101 +618,99 @@ export default defineComponent({
       hasDurationPercentiles,
       PERCENTILE_LABELS,
       formatTimeWithSuffix,
+      formatPercentile,
       getValueMapper,
     };
   },
 });
 </script>
 
-<style>
-
-.index-menu .index-table table {
+<style scoped>
+/* keep(lib-override:GroupedFieldList): fixed table-layout + block rows on the child
+   OTable's <table>, and field-row label/overlay/container overrides on the child
+   FieldRow DOM — reached through child components, so not expressible as utilities. */
+.index-menu .index-table :deep(table) {
   display: table;
   table-layout: fixed !important;
 }
 
-.index-menu .index-table thead {
+.index-menu .index-table :deep(thead) {
   display: none;
 }
 
-.index-menu .index-table tr {
+.index-menu .index-table :deep(tr) {
   margin-bottom: 1px;
 }
 
-.index-menu .index-table tbody,
-.index-menu .index-table tr,
-.index-menu .index-table td {
+.index-menu .index-table :deep(tbody),
+.index-menu .index-table :deep(tr),
+.index-menu .index-table :deep(td) {
   width: 100%;
   display: block;
   height: fit-content;
   overflow: hidden;
 }
 
-
-.index-menu .index-table thead tr,
-.index-menu .index-table tbody td {
+.index-menu .index-table :deep(thead tr),
+.index-menu .index-table :deep(tbody td) {
   height: auto;
 }
 
-.index-menu .field_list {
-  padding: 0px;
+.index-menu :deep(.field_list) {
+  padding: 0;
   margin-bottom: 0.125rem;
   position: relative;
   overflow: visible;
   cursor: default;
 }
 
-.index-menu .field_list.field-group-header {
+/* Vertical padding only — the horizontal inset comes from OFieldList's group
+   header (--spacing-page-edge) so this list lines up with the page header. */
+.index-menu :deep(.field_list.field-group-header) {
   font-weight: 600;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.325rem;
+  font-size: var(--text-xs);
+  padding-block: 0.25rem;
 }
 
-.index-menu .field_list .field_label {
+.index-menu :deep(.field_list .field_label) {
   pointer-events: none;
-  font-size: 0.825rem;
+  font-size: var(--text-compact);
   position: relative;
   display: inline;
   z-index: 2;
   left: 0;
 }
 
-.index-menu .field_list .field-container {
-  height: 25px;
+.index-menu :deep(.field_list .field-container) {
+  height: 1.5625rem;
 }
 
-.index-menu .field_list .field_overlay {
+.index-menu :deep(.field_list .field_overlay) {
   position: absolute;
   height: 100%;
   right: 0;
   top: 0;
   z-index: 5;
-  padding: 0 6px;
+  padding: 0 0.375rem;
   visibility: hidden;
   display: flex;
   align-items: center;
 }
 
-.index-menu .field_list.selected .field_overlay {
+.index-menu :deep(.field_list.selected .field_overlay) {
   background-color: var(--color-interactive-hover-bg);
 }
 
-.index-menu .field_list.selected .field_overlay .field_icons {
-  opacity: 0;
-}
-
-
-.index-table table {
+.index-table :deep(table) {
   width: 100%;
   table-layout: fixed;
 }
 
-
-.index-table table .field-container:hover .field_overlay {
+.index-table :deep(table .field-container:hover .field_overlay) {
   visibility: visible;
 }
 
-.index-table table .field_list.selected {
+.index-table :deep(table .field_list.selected) {
   background-color: var(--color-interactive-hover-bg);
 }
 </style>

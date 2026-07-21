@@ -24,7 +24,7 @@ import http from "./http";
 // PUT /{org_id}/reports/{name}/trigger -- trigger report immediately
 
 const reports = {
-  // v1 — kept for backward compat (create/edit form still uses these)
+  // v1 API — used by the create/edit form
   list: (
     org_identifier: string = "",
     folder_id: string = "",

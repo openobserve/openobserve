@@ -693,7 +693,7 @@ describe("TenstackTable", () => {
       // column separator): a child element painted with the border token.
       const line = resizer.find("div");
       expect(line.exists()).toBe(true);
-      expect(line.classes()).toContain("bg-[var(--color-border-default)]");
+      expect(line.classes()).toContain("bg-border-default");
     });
 
     it("should not carry a transparent background class on the resizer", () => {
@@ -707,7 +707,7 @@ describe("TenstackTable", () => {
       wrapper = mountTable();
       const resizer = wrapper.find(".resizer");
       expect(resizer.exists()).toBe(true);
-      expect(resizer.classes()).not.toContain("hover:bg-[var(--o2-border-color)]");
+      expect(resizer.classes()).not.toContain("hover:bg-card-glass-border");
     });
   });
 
@@ -1216,13 +1216,6 @@ describe("TenstackTable", () => {
         { id: "spans", accessorKey: "spans", header: "SPANS", size: 100, meta: { sortable: true } },
       ];
 
-      // Original rows in default order
-      const originalRows = [
-        { _timestamp: 1000, name: "alpha", spans: 10 },
-        { _timestamp: 2000, name: "beta", spans: 5 },
-        { _timestamp: 3000, name: "gamma", spans: 20 },
-      ];
-
       // When sorted by spans desc, the order should be: gamma(20), alpha(10), beta(5)
       const sortedRows = [
         { _timestamp: 3000, name: "gamma", spans: 20 },  // First after sorting
@@ -1638,7 +1631,6 @@ describe("TenstackTable", () => {
       });
       await flushPromises();
 
-      const copyBtns = wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"]');
       await wrapper.findAll('[data-test="dashboard-table-cell-copy-btn"] button')[1].trigger("click");
       await flushPromises();
 

@@ -118,7 +118,7 @@ const stubs = {
   QueryEditor: true,
   JsonEditor: true,
   InlineSelectFolderDropdown: true,
-  AppPageHeader: true,
+  OPageHeader: true,
 };
 
 const mountAlert = (
@@ -505,6 +505,60 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
+  // ── Workflows link (enterprise/cloud) ──────────────────────────────────────
+  // REGRESSION GUARD. The zod migration made `formData` a READ-ONLY view of the
+  // form (form.useStore), so the pre-migration `formData.value.workflows = x`
+  // became a silent no-op — the write vanished and the link never reached the
+  // payload. Every other setter goes through setF(); updateWorkflows must too.
+  // This merged CLEANLY (the two sides never touched the same lines), so nothing
+  // but a test can catch it.
+  describe("workflows link survives to the payload (read-view write guard)", () => {
+    it("updateWorkflows WRITES THROUGH to the form (not to the read-view)", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+
+      wrapper.vm.updateWorkflows(["wf-1", "wf-2"]);
+      await flushPromises();
+
+      // Read back off the FORM, which is the single source of truth. A write to
+      // the read-view would leave this at [].
+      expect(form.state.values.workflows).toEqual(["wf-1", "wf-2"]);
+    });
+
+    it("ships the linked workflows in the create payload", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+
+      wrapper.vm.updateWorkflows(["wf-1"]);
+      await flushPromises();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(alertsService.create_by_alert_id).toHaveBeenCalledTimes(1);
+      const [, payload] = (alertsService.create_by_alert_id as any).mock
+        .calls[0];
+      expect(payload.workflows).toEqual(["wf-1"]);
+    });
+
+    it("defaults to [] so OSS alerts ship the field empty, never undefined", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+      seedValidScheduled(form);
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      const [, payload] = (alertsService.create_by_alert_id as any).mock
+        .calls[0];
+      expect(payload.workflows).toEqual([]);
+    });
+  });
+
   describe("create save path (payload parity — Rule ④)", () => {
     it("creates an alert with the EXACT payload (keys + types + conditions {version:2})", async () => {
       wrapper = mountAlert();
@@ -534,6 +588,12 @@ describe("AddAlert (OForm owner)", () => {
       // already exist (folder_id/createdAt/owner/lastTriggeredAt/lastEditedBy).
       // If this fails, do NOT just add the key — check whether it BELONGS on the
       // wire or needs stripping in getAlertPayload.
+      //
+      // `workflows` was checked against that rule and BELONGS: the alerts table
+      // has a `workflows` column (infra/src/table/entity/alerts.rs:52), it is
+      // written on save and read back on load (table/alerts/mod.rs:678/732), so
+      // it is a real backend field, not a form-only leak. Enterprise/cloud link
+      // alerts to workflows through it; in OSS it ships as [].
       expect(Object.keys(payload).sort()).toEqual(
         [
           "context_attributes",
@@ -556,6 +616,7 @@ describe("AddAlert (OForm owner)", () => {
           "template",
           "trigger_condition",
           "updatedAt",
+          "workflows",
         ].sort(),
       );
 

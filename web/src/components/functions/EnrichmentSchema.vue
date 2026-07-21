@@ -20,6 +20,7 @@
 
     <template>
         <ODrawer data-test="enrichment-schema-drawer"
+        bleed
         :open="open"
         size="lg"
         :title="t('logStream.schemaHeader')"
@@ -32,9 +33,9 @@
         >
           <OSpinner size="md" data-test="enrichment-schema-loading-indicator" />
         </div>
-        <div v-else class="indexDetailsContainer p-5 w-full" style="height: 100vh">
+        <div v-else class="indexDetailsContainer p-5 w-full h-screen">
           <div
-            class="titleContainer flex flex-col items-flex-start gap-5 bg-[#00000005] border border-[var(--o2-border-input)] rounded-[5px] p-4"
+            class="titleContainer flex flex-col items-flex-start gap-5 bg-surface-subtle border border-input-border rounded-default p-4"
           >
             <div
               data-test="stream-details-container"
@@ -75,7 +76,7 @@
           <div class="flex items-center justify-between gap-4 mt-4">
             <div
               data-test="enrichment-schema-total-fields"
-              class="text-sm w-28.75 h-7.5 rounded-sm flex items-center justify-center bg-(--o2-theme-color) text-white"
+              class="text-sm w-28.75 h-7.5 rounded-default flex items-center justify-center bg-theme-accent text-text-inverse"
             >
                 All Fields ({{ schemaData.schema.length }})
             </div>
@@ -90,11 +91,6 @@
           <div>
 
             <div
-              :class="
-                store.state.theme === 'dark'
-                  ? 'dark-theme-table'
-                  : 'light-theme-table'
-              "
               style="margin-bottom: 30px"
               class="mt-4"
             >
@@ -126,24 +122,14 @@
     } from "vue";
     import { useI18n } from "vue-i18n";
     import { useStore } from "vuex";
-    import streamService from "../../services/stream";
-    import segment from "../../services/segment_analytics";
     import {
     formatSizeFromMB,
-    getImageURL,
-    timestampToTimezoneDate,
-    convertDateToTimestamp,
     } from "@/utils/zincutils";
     import config from "@/aws-exports";
-    import ConfirmDialog from "@/components/ConfirmDialog.vue";
     import useStreams from "@/composables/useStreams";
-    import { useRouter } from "vue-router";
-    import AppTabs from "@/components/common/AppTabs.vue";
 
     import OTable from "@/lib/core/Table/OTable.vue";
     import { COL } from "@/lib/core/Table/OTable.types";
-        import DateTime from "@/components/DateTime.vue";
-    import OButton from "@/lib/core/Button/OButton.vue";
     import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
     import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
         import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -172,11 +158,8 @@
         },
     },
     components: {
-        ConfirmDialog,
-        AppTabs,
         OTable,
         ODrawer,
-        OButton,
         OSearchInput,
         OSpinner,
 },
@@ -237,7 +220,6 @@
         columns,
         loadingState,
         schemaData,
-        selectedEnrichmentTable: props.selectedEnrichmentTable,
         getStream,
         formatSizeFromMB,
         isCloud,
@@ -246,3 +228,20 @@
     },
     });
     </script>
+
+<style scoped>
+/* keep(lib-override:otable): reaches into the OTable-rendered th/td DOM to pin
+   the first column's inset and the fifth column's width — not expressible as
+   utilities on this template. */
+.indexDetailsContainer :deep(th:first-child),
+.indexDetailsContainer :deep(td:first-child) {
+  padding-left: 0.5rem !important;
+}
+
+.indexDetailsContainer :deep(th:nth-child(5)),
+.indexDetailsContainer :deep(td:nth-child(5)) {
+  min-width: 15rem;
+  width: 15rem;
+  max-width: 15rem;
+}
+</style>

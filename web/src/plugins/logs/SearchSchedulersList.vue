@@ -1,12 +1,12 @@
 <template>
   <div class="w-full h-full flex flex-col min-h-0">
-    <div v-if="!showSearchResults" class="h-full flex flex-col min-h-0">
-      <AppPageHeader
-        :title="t('search_scheduler_job.title')"
-        icon="schedule"
-        :back="{ onClick: closeSearchHistory }"
-        class="shrink-0 px-4 border-b border-border-default"
-      >
+    <OPageLayout
+      v-if="!showSearchResults"
+      :title="t('search_scheduler_job.title')"
+      icon="schedule"
+      :back="{ onClick: closeSearchHistory }"
+      bleed
+    >
         <template #actions>
           <div class="flex items-center gap-1">
             <OTableColumnToggle
@@ -27,8 +27,7 @@
             </OButton>
           </div>
         </template>
-      </AppPageHeader>
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
           <OTable
             :frame="false"
             data-test="search-scheduler-table"
@@ -116,7 +115,7 @@
               />
             </template>
             <template #expansion="{ row }">
-              <div class="app-tabs-schedule-list report-list-tabs">
+              <div class="app-tabs-schedule-list px-4 py-0 h-fit w-fit">
                 <app-tabs
                   data-test="expanded-list-tabs"
                   class="mr-3"
@@ -125,25 +124,24 @@
                 />
               </div>
               <div v-if="activeTab == 'query'">
-                <div class="text-left px-2 mb-2 expanded-content">
-                  <div class="flex items-center py-2">
+                <div class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden">
+                  <div class="flex items-center py-2 gap-2">
                     <strong
                       >{{ t('search_scheduler_job.sql_query') }} :
                       <span>
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="copy-btn-sql ml-2"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           data-test="search-scheduler-copy-sql-btn"
                           @click.stop="copyToClipboard(row.sql, { successMessage: `${t('logs.searchSchedulersList.sqlQuery')} ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
-                          <OIcon name="content-copy" size="sm" />
+                          <OIcon name="content-copy" size="xs" />
                         </OButton></span
                     ></strong>
                     <OButton
-                      variant="ghost-destructive"
-                      size="sm"
-                      class="copy-btn mx-2"
+                      variant="outline"
+                      size="chip"
                       data-test="search-scheduler-go-to-logs-btn"
                       :disabled="
                         row.status_code == 0 ||
@@ -156,40 +154,59 @@
                     </OButton>
                   </div>
                   <div class="flex items-start justify-center">
-                    <div class="scrollable-content expanded-sql">
-                      <pre style="text-wrap: wrap">{{ row?.sql }}</pre>
+                    <div
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query"
+                    >
+                      <!-- Monaco-colorized SQL (sanitized in colorizeRow). Falls
+                           back to plain text before colorize resolves / if it throws. -->
+                      <pre
+                        v-if="colorizedSql[row.trace_id]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-scheduler-sql-colorized"
+                        v-html="colorizedSql[row.trace_id]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.sql }}</pre>
                     </div>
                   </div>
                 </div>
                 <div
                   v-if="row?.function"
-                  class="text-left mb-2 px-2 expanded-content"
+                  class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden"
                 >
-                  <div class="flex items-center py-2">
+                  <div class="flex items-center py-2 gap-2">
                     <strong
                       >{{ t('search_scheduler_job.function_definition') }} :
                       <span>
                         <OButton
-                          variant="ghost"
-                          size="icon"
-                          class="copy-btn-function ml-2"
+                          data-test="search-scheduler-copy-function-btn"
+                          variant="outline"
+                          size="icon-chip"
+                          class="ml-2"
                           @click.stop="copyToClipboard(row.function, { successMessage: `${t('logs.searchSchedulersList.functionDefinationCopy')} ${t('search_scheduler_job.copy_success')}`, timeout: 5000 })"
                         >
-                          <OIcon name="content-copy" size="sm" />
+                          <OIcon name="content-copy" size="xs" />
                         </OButton></span
                     ></strong>
                   </div>
 
                   <div class="flex items-start justify-center">
-                    <div class="scrollable-content expanded-function">
-                      <pre style="text-wrap: wrap">{{ row?.function }}</pre>
+                    <div
+                      class="w-full overflow-y-auto p-2.5 h-full max-h-50 border border-border-default border-l-3 border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query"
+                    >
+                      <pre
+                        v-if="colorizedFunction[row.trace_id]"
+                        class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
+                        data-test="search-scheduler-function-colorized"
+                        v-html="colorizedFunction[row.trace_id]"
+                      ></pre>
+                      <pre v-else class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words">{{ row?.function }}</pre>
                     </div>
                   </div>
                 </div>
               </div>
               <div class="py-3" v-else>
                 <div
-                  class="text-left px-2 mb-2 expanded-content flex flex-col"
+                  class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden flex flex-col"
                 >
                   <query-editor
                     style="height: 130px"
@@ -205,8 +222,8 @@
               </div>
             </template>
             <template #bottom>
-              <div class="flex items-center justify-between w-full h-[48px]">
-                <div class="o2-table-footer-title flex items-center w-[100px] mr-md">
+              <div class="flex items-center justify-between w-full h-12">
+                <div class="text-xs font-normal flex items-center w-25 mr-md">
                   {{ resultTotal }} {{ t('search_scheduler_job.results') }}
                 </div>
                 <div class="ml-auto mr-2">{{ t('search_scheduler_job.max_limit') }} : <b>1000</b></div>
@@ -233,7 +250,7 @@
           v-model="confirmCancel"
         />
       </div>
-    </div>
+    </OPageLayout>
   </div>
 
   <!-- Empty state is rendered via OEmptyState in the table #empty slot -->
@@ -245,28 +262,22 @@ import {
   ref,
   watch,
   onMounted,
-  nextTick,
   computed,
-  onBeforeMount,
-  onActivated,
 } from "vue";
 import {
-  timestampToTimezoneDate,
   b64EncodeUnicode,
   b64DecodeUnicode,
-  convertDateToTimestamp,
 } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
-import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
+import DOMPurify from "dompurify";
+import { colorizeQuery } from "@/utils/query/colorizeQuery";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import DateTime from "@/components/DateTime.vue";
 import { useI18n } from "vue-i18n";
 import { convertUnixToDateFormat } from "@/utils/date";
-import type { Ref } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -278,12 +289,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-import JsonPreview from "./JsonPreview.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -293,25 +303,21 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "SearchSchedulersList",
   components: {
-    DateTime,
     OEmptyState,
     OTable,
     OTableColumnToggle,
     OTimeCell,
     OUserCell,
     OTag,
-    TenstackTable,
     ConfirmDialog,
     AppTabs,
-    JsonPreview,
     OButton,
     OTooltip,
-    OSpinner,
     QueryEditor: defineAsyncComponent(
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     OIcon,
-    AppPageHeader,
+    OPageLayout,
 },
   props: {
     isClicked: {
@@ -325,7 +331,7 @@ export default defineComponent({
       this.$emit("closeSearchHistory");
     },
   },
-  setup(props, { emit }) {
+  setup(props) {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
@@ -412,7 +418,6 @@ export default defineComponent({
       }
 
       try {
-        const { org_identifier } = router.currentRoute.value.query;
         // columnsToBeRendered.value = [];
         // dataToBeLoaded.value = [];
         expandedIds.value = [];
@@ -495,7 +500,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           jobId: toBeCancelled.value.id,
         })
-        .then((res) => {
+        .then(() => {
           toast({
             variant: "success",
             message: t('search_scheduler_job.job_cancelled_success'),
@@ -520,7 +525,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           jobId: row.id,
         })
-        .then((res) => {
+        .then(() => {
           toast({
             variant: "success",
             message: t('search_scheduler_job.job_restarted_success'),
@@ -553,7 +558,7 @@ export default defineComponent({
           org_identifier: store.state.selectedOrganization.identifier,
           jobId: toBeDeletedJob.value.id,
         })
-        .then((res) => {
+        .then(() => {
           fetchSearchHistory();
           toast({
             variant: "success",
@@ -584,7 +589,6 @@ export default defineComponent({
     });
 
     const updateDateTime = async (value: any) => {
-      const { startTime, endTime } = value;
       dateTimeToBeSent.value = value;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
     };
@@ -642,6 +646,27 @@ export default defineComponent({
       return { formatted: result, raw: rawDuration };
     };
 
+    /* Monaco-colorized SQL / VRL for the expanded row, keyed by trace_id — the
+       same treatment the dashboard Query Inspector and Search History give their
+       queries. Runs on expand: colorizing is async and only the expanded row is
+       ever on screen. */
+    const colorizedSql = ref<Record<string, string>>({});
+    const colorizedFunction = ref<Record<string, string>>({});
+
+    const colorizeRow = async (row: any) => {
+      if (!row?.trace_id) return;
+      if (row.sql && colorizedSql.value[row.trace_id] === undefined) {
+        colorizedSql.value[row.trace_id] = DOMPurify.sanitize(
+          await colorizeQuery(row.sql, "sql"),
+        );
+      }
+      if (row.function && colorizedFunction.value[row.trace_id] === undefined) {
+        colorizedFunction.value[row.trace_id] = DOMPurify.sanitize(
+          await colorizeQuery(row.function, "vrl"),
+        );
+      }
+    };
+
     const onExpandedIdsChange = (ids: string[]) => {
       expandedIds.value = ids;
       const expandedId = ids[0];
@@ -652,10 +677,10 @@ export default defineComponent({
       const row = dataToBeLoaded.value.find((r: any) => r.trace_id === expandedId);
       if (row) {
         query.value = JSON.stringify(filterRow(row), null, 2);
+        colorizeRow(row);
       }
     };
     const goToLogs = (row) => {
-      const duration_suffix = row.duration.split(" ")[1];
       const from = row.toBeStoredStartTime;
       const to = row.toBeStoredEndTime;
       const refresh = 0;
@@ -682,7 +707,7 @@ export default defineComponent({
       };
       //here if we have function then we are adding fn_editor flag as true because it will open the function editor by default
       //else we are adding fn_editor flag as false because it will close the function editor by default
-      if (row.hasOwnProperty("function") && row.function) {
+      if (Object.prototype.hasOwnProperty.call(row, "function") && row.function) {
         const functionContent = b64EncodeUnicode(row.function);
         queryObject["functionContent"] = functionContent;
         queryObject["fn_editor"] = "true";
@@ -745,15 +770,15 @@ export default defineComponent({
     const getStatusColorClass = (status) => {
       switch (status) {
         case 0:
-          return "text-orange-500"; // Pending
+          return "text-status-warning-text"; // Pending
         case 1:
-          return "text-blue-500"; // Running
+          return "text-status-info-text"; // Running
         case 2:
-          return "text-green-500"; // Finished
+          return "text-status-positive"; // Finished
         case 3:
-          return "text-red-500"; // Cancelled
+          return "text-status-error-text"; // Cancelled
         default:
-          return "text-gray-500"; // Unknown
+          return "text-text-muted"; // Unknown
       }
     };
     const getStatusColor = (status) => {
@@ -803,6 +828,8 @@ export default defineComponent({
       expandedIds,
       goToLogs,
       onExpandedIdsChange,
+      colorizedSql,
+      colorizedFunction,
       copyToClipboard,
       formatTime,
       delayMessage,
@@ -836,3 +863,14 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(generated-content): Monaco's colorize() injects .mtkN token spans via
+   v-html, so these can't be template utilities. Every colour but .mtk1 comes
+   from Monaco's own global stylesheet; .mtk1 is its default-text token, which
+   we point back at the block's own colour so the query inherits our theme
+   instead of Monaco's. Mirrors dashboards/QueryInspector.vue. */
+.o2-colorized-query :deep(.mtk1) {
+  color: inherit;
+}
+</style>

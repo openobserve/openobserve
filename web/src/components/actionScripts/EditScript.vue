@@ -15,21 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="add-action-script-section" class="w-full h-full flex flex-col">
-    <AppPageHeader
-      :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
-      :back="{
-        onClick: () => router.back(),
-        dataTest: 'add-action-script-back-btn',
-      }"
-      class="px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    data-test="add-action-script-section"
+    :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
+    :back="{
+      label: t('actions.header'),
+      onClick: () => router.back(),
+      dataTest: 'add-action-script-back-btn',
+    }"
+    bleed
+  >
       <template #title>
         <span data-test="add-action-script-title">{{
           isEditingActionScript ? t("actions.update") : t("actions.add")
         }}</span>
       </template>
-    </AppPageHeader>
 
     <!-- Inline (full-page) form. The footer Save lives INSIDE the <OForm>, so it
          is `type="submit"` and Enter submits natively — no `form-id` needed. -->
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="w-full flex-1 min-h-0 px-2.5 pb-2.5 pt-1">
         <div
-          class="card-container overflow-auto"
+          class="bg-card-glass-bg overflow-auto"
           style="max-height: calc(100vh - var(--navbar-height) - 157px)"
         >
           <div
@@ -53,8 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 data-test="add-action-script-name-input-wrapper"
-                class="report-name-input"
-                style="padding-top: 12px"
+                class="report-name-input pt-3"
               >
                 <OFormInput
                   data-test="add-action-script-name-input"
@@ -86,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="actionTypes"
                   labelKey="label"
                   valueKey="value"
-                  class="showLabelOnTop no-case w-[400px]"
+                  class="showLabelOnTop no-case w-100"
                   :disabled="isEditingActionScript"
                 />
               </div>
@@ -178,13 +177,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="my-2 px-2">
                     <div
-                      style="font-size: 14px"
-                      class="font-bold text-gray-500 mb-2"
+                      style="font-size: var(--text-sm)"
+                      class="font-bold text-text-secondary mb-2"
                       data-test="add-action-script-frequency-title"
                     >
                       {{ t("actions.frequency") }} *
                     </div>
-                    <div class="p-1 el-border-radius el-border w-fit">
+                    <div class="p-1 rounded-default border border-card-glass-border w-fit">
                       <template
                         v-for="visual in frequencyTabs"
                         :key="visual.value"
@@ -207,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="add-action-script-frequency-info"
                     >
                       <OIcon name="event" size="sm" class="mr-2" />
-                      <div style="font-size: 14px">
+                      <div style="font-size: var(--text-sm)">
                         The script will be triggered immediately after it is saved
                       </div>
                     </div>
@@ -216,11 +215,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="flex">
                         <div
                           data-test="add-action-script-cron-input"
-                          class="mr-2"
-                          style="padding-top: 8px; width: 320px"
+                          class="mr-2 pt-2"
+                          style="width: 320px"
                         >
                           <div
-                            class="mb-1 font-bold text-gray-500"
+                            class="mb-1 font-bold text-text-secondary"
                             data-test="add-action-script-cron-expression-title"
                           >
                             {{ t("reports.cronExpression") + " *" }}
@@ -228,11 +227,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               data-test="add-action-script-cron-info"
                               name="info"
                               size="sm"
-                              class="ml-1 cursor-pointer text-gray-400"
+                              class="ml-1 cursor-pointer text-text-muted"
                             >
                               <OTooltip side="right" align="center">
                                 <template #content>
-                                  <span style="font-size: 14px">
+                                  <span style="font-size: var(--text-sm)">
                                     Pattern: * * * * * means every minute .
                                     <br />
                                     Format: [Minute 0-59] [Hour 0-23] [Day of Month
@@ -252,10 +251,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                           <OFormInput
                             name="cron"
-                            class="showLabelOnTop"
+                            class="showLabelOnTop w-full"
                             type="text"
-                            debounce="300"
-                            style="width: 100%"
+                            :debounce="300"
                             :disabled="isEditingActionScript"
                             :readonly="isEditingActionScript"
                           />
@@ -306,17 +304,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       <div
                         data-test="add-action-script-service-account-title"
-                        class="mb-1 font-bold text-gray-500"
+                        class="mb-1 font-bold text-text-secondary"
                       >
                         {{ t("actions.serviceAccount") + " *" }}
                         <OIcon
                           name="info"
                           size="sm"
-                          class="ml-1 cursor-pointer text-gray-400"
+                          class="ml-1 cursor-pointer text-text-muted"
                         >
                           <OTooltip side="right" align="center">
                             <template #content>
-                              <span style="font-size: 14px">
+                              <span style="font-size: var(--text-sm)">
                                 Make sure service account has permissions to access
                                 Actions.
                               </span>
@@ -362,11 +360,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :done="step > 4"
                   class="mt-3"
                 >
-                  <!-- Env vars are a dynamic key/value array (DEFERRED per the
-                       migration brief): they carry no validation today and the
-                       form-array pattern is not yet live, so these stay bare
-                       OInput bound to the component-owned `environmentalVariables`
-                       and are NOT part of the form schema. -->
+                  <!-- Env vars are a dynamic key/value array bound to the
+                       component-owned `environmentalVariables`, not part of the
+                       form schema (no validation today). -->
                   <div
                     v-for="(header, index) in environmentalVariables"
                     :key="header.uuid"
@@ -427,8 +423,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="mx-2">
         <div
-          class="flex justify-end gap-2 px-3 w-full py-[0.625rem] card-container"
-          style="position: sticky; bottom: 0px; z-index: 2"
+          class="flex justify-end gap-2 px-3 w-full py-2.5 bg-card-glass-bg sticky"
+          style="bottom: 0px; z-index: 2"
         >
           <OButton
             data-test="add-action-script-cancel-btn"
@@ -449,7 +445,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OForm>
-  </div>
+  </OPageLayout>
 
   <ConfirmDialog
     v-model="dialog.show"
@@ -465,31 +461,24 @@ import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import DateTime from "@/components/DateTime.vue";
 import {
   getUUID,
-  useLocalTimezone,
-  isValidResourceName,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
-import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
-import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import CronExpressionParser from "cron-parser";
-import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormFile from "@/lib/forms/File/OFormFile.vue";
@@ -565,17 +554,6 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const timeTabs = [
-  {
-    label: "Schedule now",
-    value: "scheduleNow",
-  },
-  {
-    label: "Schedule later",
-    value: "scheduleLater",
-  },
-];
-
 const frequencyTabs = [
   {
     label: "Cron Job",
@@ -587,23 +565,7 @@ const frequencyTabs = [
   },
 ];
 
-const selectedTimeTab = ref("scheduleNow");
-
 const store = useStore();
-
-const filteredTimezone: any = ref([]);
-
-const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
-
-const dashboardOptions: Ref<
-  { label: string; value: string; tabs: any[]; version: number }[]
-> = ref([]);
-
-const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
-
-const options: Ref<{ [key: string]: any[] }> = ref({});
-
-const emails = ref("");
 
 const isEditingActionScript = ref(false);
 
@@ -637,9 +599,9 @@ const getCronError = (cron: string): string => {
   const value = String(cron ?? "").trim();
   if (!value) return "Invalid cron expression!";
   try {
+    // cron-parser v5 dropped the `utc` option; parse validity is tz-independent here.
     CronExpressionParser.parse(value, {
       currentDate: new Date(),
-      utc: true,
     });
   } catch {
     return "Invalid cron expression!";
@@ -741,7 +703,8 @@ watch(formType, (t) => {
 // whether to advance.
 const validateStepFields = async (fields: string[]): Promise<boolean> => {
   let valid = true;
-  for (const name of fields) {
+  // Field names are validated dynamically; cast to the form's DeepKeys union.
+  for (const name of fields as FormFieldPath<EditScriptForm>[]) {
     await form.validateField(name, "submit");
     const errors = form.getFieldMeta(name)?.errors ?? [];
     if (errors.length > 0) valid = false;
@@ -757,13 +720,13 @@ const goToStep = async (fields: string[], next: number) => {
 // Map a Zod issue path to its OForm field name so we can match issues to the
 // field that owns them: ["cron"] → "cron". Actions only has flat scalar fields,
 // but keep the same helper reports uses (handles nested array paths too) for parity.
-const issuePathToName = (path: readonly (string | number)[]): string =>
+const issuePathToName = (path: readonly PropertyKey[]): string =>
   path.reduce<string>(
     (acc, seg) =>
       typeof seg === "number"
         ? `${acc}[${seg}]`
         : acc
-          ? `${acc}.${seg}`
+          ? `${acc}.${String(seg)}`
           : String(seg),
     "",
   );
@@ -784,7 +747,9 @@ watch(
     const invalidNames = new Set(
       res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
     );
-    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+    for (const name of Object.keys(
+      form.state.fieldMeta ?? {},
+    ) as FormFieldPath<EditScriptForm>[]) {
       const meta = form.getFieldMeta(name);
       if (!meta) continue;
       const hasError = (meta.errors?.length ?? 0) > 0;
@@ -829,7 +794,7 @@ watch(
 
 watch(
   () => router.currentRoute.value.query?.id,
-  async (action_id) => {
+  async () => {
     await handleActionScript();
   },
 );
@@ -837,37 +802,6 @@ watch(
 onBeforeMount(async () => {
   await handleActionScript();
 });
-
-const scheduling = ref({
-  date: "",
-  time: "",
-  timezone: "",
-});
-
-const currentTimezone =
-  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-const timezone = ref(currentTimezone);
-
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -1092,14 +1026,6 @@ const deleteApiHeader = (header: any) => {
 
   if (!environmentalVariables.value.length) addApiHeader();
 };
-const isRequiredKey = (value: any) => {
-  return value && value.trim() !== "" ? true : "Key is required";
-};
-
-const isRequiredValue = (value: any) => {
-  return value && value.trim() !== "" ? true : "Value is required";
-};
-
 const handleActionScript = async () => {
   isEditingActionScript.value = !!router.currentRoute.value.query?.id;
   // Fresh load starts with an unedited cron field (edit-load re-seeds via
@@ -1145,14 +1071,6 @@ const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref(
   [],
 );
 const isFetchingServiceAccounts = ref(false);
-
-const filterServiceAccounts = (val: string, update: Function) => {
-  filteredServiceAccounts.value = filterColumns(
-    serviceAccountsOptions,
-    val,
-    update,
-  );
-};
 
 const serviceAccountsOptions: any[] = [];
 

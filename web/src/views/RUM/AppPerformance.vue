@@ -17,17 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
+  <OPageLayout
     :key="store.state.selectedOrganization.identifier"
     data-test="rum-performance-page"
-    class="w-full h-full flex flex-col min-h-0"
+    :title="t('rum.performanceSummaryLabel')"
+    :subtitle="t('rum.performanceSummarySubtitle')"
+    title-data-test="rum-performance-title"
+    icon="speed"
+    bleed
   >
-    <AppPageHeader
-      :title="t('rum.performanceSummaryLabel')"
-      title-data-test="rum-performance-title"
-      icon="speed"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
       <template #actions>
         <DateTimePickerDashboard
           class="rum-date-time-picker"
@@ -54,10 +52,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="isVariablesChanged ? t('dashboard.refreshToApplyVariableChanges') : t('dashboard.refresh')" />
         </OButton>
       </template>
-    </AppPageHeader>
-
     <OTabs
-      class="shrink-0 px-3 border-b border-border-default"
+      class="shrink-0 px-page-edge border-b border-border-default"
       v-model="activePerformanceTab"
       align="left"
       dense
@@ -74,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <keep-alive>
         <div class="flex-1 min-h-0">
           <div
-            class="card-container h-full overflow-hidden"
+            class="bg-card-glass-bg h-full overflow-hidden"
           >
             <component
               :is="Component"
@@ -88,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </keep-alive>
     </router-view>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -105,7 +101,7 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
+import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -118,7 +114,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "AppPerformance",
@@ -129,7 +125,7 @@ export default defineComponent({
     DateTimePickerDashboard,
     OButton,
     OTooltip,
-    AppPageHeader,
+    OPageLayout,
   },
   setup() {
     const { t } = useI18n();
@@ -137,7 +133,7 @@ export default defineComponent({
     const activePerformanceTab = ref("overview");
     const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
-    const { rumState } = useRum();
+    useRum();
 
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);

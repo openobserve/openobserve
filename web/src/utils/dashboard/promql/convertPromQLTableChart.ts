@@ -39,8 +39,6 @@ export class TableConverter implements PromQLChartConverter {
     processedData: ProcessedPromQLData[],
     panelSchema: any,
     store: any,
-    extras: any,
-    chartPanelRef?: any,
   ) {
     // Build columns from metric labels + value
     const columns = this.buildColumns(processedData, panelSchema);
@@ -49,7 +47,7 @@ export class TableConverter implements PromQLChartConverter {
     const rows = this.buildRows(processedData, panelSchema, store);
 
     // Return the same structure as SQL tables (convertTableData)
-    // TableRenderer component (q-table) handles pagination, sorting, filtering automatically
+    // TableRenderer component (table) handles pagination, sorting, filtering automatically
     const result = {
       rows,
       columns,
@@ -69,7 +67,7 @@ export class TableConverter implements PromQLChartConverter {
     labelKeys: string[],
     config: any,
   ): string[] {
-    const columnOrder = config.column_order || [];
+    const columnOrder: string[] = config.column_order || [];
 
     // Apply custom ordering if specified
     if (columnOrder.length > 0) {
@@ -237,8 +235,6 @@ export class TableConverter implements PromQLChartConverter {
       columns.push(makeValueColumn(columnName, columnLabel));
     });
 
-    // Timestamp column removed as per user request
-
     return columns;
   }
 
@@ -264,8 +260,8 @@ export class TableConverter implements PromQLChartConverter {
     if (tableMode === "single") {
       const timezone = store.state.timezone;
 
-      processedData.forEach((queryData, qIndex) => {
-        queryData.series.forEach((seriesData, sIndex) => {
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
           // Create a row for each data point
           seriesData.values.forEach(([timestamp, value]) => {
             rows.push({
@@ -289,8 +285,8 @@ export class TableConverter implements PromQLChartConverter {
     if (tableMode === "expanded_timeseries") {
       const timezone = store.state.timezone;
 
-      processedData.forEach((queryData, qIndex) => {
-        queryData.series.forEach((seriesData, sIndex) => {
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
           // Create a row for each data point with all metadata
           seriesData.values.forEach(([timestamp, value]) => {
             const row: any = {
@@ -313,8 +309,8 @@ export class TableConverter implements PromQLChartConverter {
     }
 
     // In "all" (Aggregate) mode, create rows with metric labels and aggregated values
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         // Create row with metric labels
         const row: any = {
           ...seriesData.metric,

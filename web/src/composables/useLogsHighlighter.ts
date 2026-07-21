@@ -17,22 +17,23 @@
  * Logs Highlighting Composable
  * ============================
  *
- * Extracted from LogsHighlighting.vue for reusability and performance optimization.
  * Provides the core highlighting logic that can be used with caching.
  */
 
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
 import { escapeHtml } from "@/utils/html";
-import { computed, ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
+import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { searchState } from "@/composables/useLogs/searchState";
 
 export function useLogsHighlighter() {
-  const processedResults = ref({});
+  const processedResults = ref<Record<string, string>>({});
 
   const store = useStore();
-  const currentColors = ref(getThemeColors(store.state.theme === "dark"));
+  const { isDark } = useTheme();
+  const currentColors = ref(getThemeColors(isDark.value));
   const { searchObj } = searchState();
 
   // Track active processing to prevent memory leaks
@@ -60,9 +61,9 @@ export function useLogsHighlighter() {
   }
 
   watch(
-    () => store.state.theme,
+    () => isDark.value,
     (newTheme) => {
-      currentColors.value = getThemeColors(newTheme === "dark");
+      currentColors.value = getThemeColors(newTheme);
     },
   );
 
@@ -212,7 +213,6 @@ export function useLogsHighlighter() {
   };
 
   /**
-   * Legacy function - kept for backward compatibility
    * @deprecated Use processHitsInChunks instead
    */
   const processHitsHighlighting = (data: any): Promise<any> => {
@@ -554,7 +554,6 @@ export function useLogsHighlighter() {
   }
 
   /**
-   * Legacy function - kept for backward compatibility
    * @deprecated Use createStyledSpanWithClasses instead
    */
   function createStyledSpan(
@@ -711,7 +710,6 @@ export function useLogsHighlighter() {
   }
 
   /**
-   * Legacy function - kept for backward compatibility
    * @deprecated Use colorizeObjectWithClasses instead
    */
   function colorizeObject(
@@ -726,7 +724,6 @@ export function useLogsHighlighter() {
 
   /**
    * Main colorization logic with integrated highlighting
-   * This is the core function extracted from LogsHighlighting.vue
    */
   function colorizeJson(
     data: any,
@@ -928,7 +925,7 @@ export function useLogsHighlighter() {
 
   return {
     colorizeJson,
-    colorizeJsonProgressive, // New progressive rendering function
+    colorizeJsonProgressive, // Progressive rendering function
     simpleHighlight,
     createStyledSpan,
     createStyledSpanWithClasses,

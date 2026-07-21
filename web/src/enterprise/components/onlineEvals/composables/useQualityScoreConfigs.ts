@@ -1,7 +1,6 @@
-// Tier 2 Overview composable.
+// Overview composable.
 // Single batched aggregate query against `_llm_scores` per config,
-// keyed by entity_id. No per-config "unhealthy" detection — the table no
-// longer surfaces an unhealthy column.
+// keyed by entity_id.
 
 import { computed, ref, type Ref } from "vue";
 import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuery";
@@ -14,7 +13,14 @@ import {
   type AgentFilterSelection,
 } from "../utils/agentFilterSql";
 
-export type ConfigStatus = "healthy" | "noData";
+// "unhealthy" | "warn" | "noThreshold" are legacy — no longer produced here,
+// but QualityConfigSidebar still branches on them.
+export type ConfigStatus =
+  | "healthy"
+  | "noData"
+  | "unhealthy"
+  | "warn"
+  | "noThreshold";
 
 export interface ScoreConfigRow {
   config: ScoreConfig;
@@ -29,6 +35,9 @@ export interface ScoreConfigRow {
   status: ConfigStatus;
   statusPriority: number;
   trendSparkline: number[];
+  /** Legacy threshold fields — no longer populated; sidebar guards on their absence */
+  hasThreshold?: boolean;
+  unhealthyPct?: number | null;
 }
 
 interface AggRow {
@@ -61,8 +70,7 @@ function joinId(config: ScoreConfig): string {
 
 /** Aggregate SQL that only references columns guaranteed to exist on the
  * `_llm_scores` schema, so it never trips DataFusion's parse-time column
- * check. No per-config unhealthy detection — the table doesn't render an
- * unhealthy column anymore. */
+ * check. */
 function buildAggSql(agentWhere: string | null): string {
   const where = combineWhere("score_config_id IS NOT NULL", agentWhere);
   return [

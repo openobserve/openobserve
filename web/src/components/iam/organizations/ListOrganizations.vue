@@ -17,15 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
-      :title="t('organization.header')"
-      :subtitle="t('iam.listOrganizations.subtitle')"
-      icon="corporate-fare"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+  <!-- OPageLayout owns the whole skeleton (header + body inset/bleed) — search
+       lives in the table's own toolbar. -->
+  <OPageLayout
+    :title="t('organization.header')"
+    :subtitle="t('iam.listOrganizations.subtitle')"
+    icon="corporate-fare"
+    bleed
+    :scroll="false"
+  >
       <template #actions>
         <OButton
           variant="primary"
@@ -36,9 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('organization.add') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
       <OTable
           :frame="false"
           :data="organizations"
@@ -54,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-organizations-list"
@@ -97,12 +97,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-type="{ row }">
             <OTag v-if="row.type" :value="row.type" />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <template #cell-plan="{ row }">
             <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <template #cell-status="{ row }">
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Edit is pinned first so it stays column-aligned across every row,
                  regardless of which trailing actions a row shows. It is disabled
                  while the org is being deleted (editing a deleting org is a no-op). -->
-            <div class="tw:flex tw:items-center tw:justify-start tw:gap-1">
+            <div class="flex items-center justify-start gap-1">
               <OButton
                 data-test="organization-name-edit"
                 variant="ghost"
@@ -176,13 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :org-name="cleanupTargetOrg.name"
       @update:open="showCleanupDialog = $event"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
 
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, computed } from "vue";
+import { defineComponent, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -191,7 +191,6 @@ import { useI18n } from "vue-i18n";
 import organizationsService from "@/services/organizations";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import JoinOrganization from "./JoinOrganization.vue";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
 import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -200,7 +199,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -209,7 +208,7 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -224,7 +223,7 @@ export default defineComponent({
     OTooltip,
     OTag,
     OBadge,
-    AppPageHeader,
+    OPageLayout,
     OIcon,
     OTable,
     OSearchInput,
@@ -249,15 +248,6 @@ export default defineComponent({
       identifier: "",
     });
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        minSize: 32,
-        maxSize: 40,
-        meta: { align: "left", compactPadding: true, cellClass: 'pl-4!', headerClass: 'pl-4!' },
-      },
       {
         id: "name",
         header: t("organization.name"),
@@ -320,9 +310,8 @@ export default defineComponent({
       size: 112,
       minSize: 96,
       maxSize: 140,
-      // Left-align so the Edit button anchors at the same x-position on every row,
-      // regardless of how many trailing actions (delete / progress) a row shows.
-      meta: { align: "left", actionCount: 3 },
+      // Center-aligned to match every other listing table's actions column.
+      meta: { align: "center", actionCount: 3 },
     });
 
     watch(
@@ -376,7 +365,6 @@ export default defineComponent({
         ? organizationsService.get_admin_org("_meta")
         : organizationsService.list(0, 1000000, "name", false, "");
       request.then((res) => {
-        let counter = 1;
         const billingPlans = {
           "0": "Free",
           "1": "Pay as you go",
@@ -386,7 +374,6 @@ export default defineComponent({
           // Common fields for all configurations
 
           const commonOrganization = {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
             name: data.name,
             identifier: data.identifier,
             type: convertToTitleCase(data.type),

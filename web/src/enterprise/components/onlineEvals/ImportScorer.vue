@@ -21,14 +21,14 @@ the Free Software Foundation, either version 3 of the License, or
       <div class="w-full h-full flex flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="text-center text-[0.9375rem] font-semibold text-(--color-text-heading) py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
           data-test="scorer-import-errors-title"
         >
           {{ t("onlineEvals.scorer.import.errors.title") }}
         </div>
         <div
           v-else
-          class="text-center text-[0.9375rem] font-semibold text-(--color-text-heading) py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
           data-test="scorer-import-output-title"
         >
           {{ t("onlineEvals.scorer.import.outputMessages") }}
@@ -46,7 +46,7 @@ the Free Software Foundation, either version 3 of the License, or
               >
                 <span
                   v-if="err.field === 'name'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="scorer-import-name-error"
                 >
                   {{ err.message }}
@@ -62,7 +62,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'nameConflict'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="scorer-import-name-conflict-error"
                 >
                   {{ err.message }}
@@ -78,7 +78,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'type'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="scorer-import-type-error"
                 >
                   {{ err.message }}
@@ -95,7 +95,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'scoreConfigRef'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="scorer-import-score-config-ref-error"
                 >
                   {{ err.message }}
@@ -112,7 +112,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'providerRef'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="scorer-import-provider-ref-error"
                 >
                   {{ err.message }}
@@ -127,13 +127,13 @@ the Free Software Foundation, either version 3 of the License, or
                   </div>
                 </span>
 
-                <span v-else class="text-(--color-error-600)">{{ err.message }}</span>
+                <span v-else class="text-error-600">{{ err.message }}</span>
               </div>
             </div>
           </div>
 
           <div v-if="creators.length" class="p-2.5 mb-2.5">
-            <div class="section-title text-(--color-text-heading) text-base mb-2.5 uppercase" data-test="scorer-import-creation-title">
+            <div class="section-title text-text-heading text-base mb-2.5 uppercase" data-test="scorer-import-creation-title">
               {{ t("onlineEvals.scorer.import.creation") }}
             </div>
             <div
@@ -145,9 +145,9 @@ the Free Software Foundation, either version 3 of the License, or
               <div
                 :class="{
                   'py-1.25 px-0 text-sm font-bold': true,
-                  'text-(--color-success-600)': c.status === 'success',
-                  'text-(--color-error-600)': c.status === 'error',
-                  'text-(--color-text-secondary)': c.status === 'exists',
+                  'text-status-success-text': c.status === 'success',
+                  'text-error-600': c.status === 'error',
+                  'text-text-secondary': c.status === 'exists',
                 }"
                 :data-test="`scorer-import-creation-${i}-message`"
               >
@@ -168,6 +168,7 @@ import { useI18n } from "vue-i18n";
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -270,14 +271,14 @@ function ensureScorerEnvelope(item: any): Record<string, any> {
   return item.scorer;
 }
 
-function updateName(itemIndex: number, value: string) {
+function updateName(itemIndex: number, value: string | number) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].name = value;
   syncEditor(arr);
 }
 
-function updateType(itemIndex: number, value: ScorerType) {
+function updateType(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -285,7 +286,7 @@ function updateType(itemIndex: number, value: ScorerType) {
   syncEditor(arr);
 }
 
-function updateScoreConfigRef(itemIndex: number, value: string) {
+function updateScoreConfigRef(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -298,7 +299,7 @@ function updateScoreConfigRef(itemIndex: number, value: string) {
   syncEditor(arr);
 }
 
-function updateProviderRef(itemIndex: number, value: string) {
+function updateProviderRef(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -338,7 +339,6 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     for (const e of item.errors) {
       const raw: any = rawItems[e.itemIndex] ?? {};
       const scorer = raw.scorer ?? raw;
-      const params = scorer?.params ?? {};
 
       if ((e.field === "name" || e.field === "nameConflict") && nameFixers[e.itemIndex] === undefined) {
         nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";

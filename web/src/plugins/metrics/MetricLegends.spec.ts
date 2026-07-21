@@ -21,17 +21,36 @@ import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
 /**
- * Helper to query the dropdown theme wrapper div. The migrated component
- * places the theme class on the first child <div> of the ODropdown default
- * slot. The ODropdown stub used in these tests renders the trigger and
- * default slots inline, so the wrapper is queryable from the test wrapper.
+ * Theming contract: the app puts `.dark` on <html> and flips `--color-*`
+ * design tokens; components no longer carry per-theme root classes
+ * (`theme-light`/`theme-dark`/`light-mode`/`dark-mode`). The assertions below
+ * therefore (a) guard that the legacy per-theme class mechanism has NOT come
+ * back, and (b) assert the structure the component actually renders now.
+ *
+ * The ODropdown stub used in these tests renders the trigger and default
+ * slots inline, so the dropdown content is queryable from the test wrapper.
  */
+const LEGACY_THEME_CLASSES = [
+  "theme-light",
+  "theme-dark",
+  "light-mode",
+  "dark-mode",
+];
+
+/** Every class present anywhere in the rendered component. */
+const renderedClasses = (w: any): string[] =>
+  w
+    .findAll("[class]")
+    .flatMap((el: any) => Array.from(el.element.classList as DOMTokenList));
+
+/** The content container rendered inside the ODropdown default slot. */
+const dropdownContent = (w: any) => w.find(".o-dropdown-stub > div");
 
 describe("MetricLegends", () => {
   let wrapper: any;
   let router: any;
 
-  const createWrapper = async (storeConfig = {}) => {
+  const createWrapper = async () => {
     // Create router for complete component setup
     router = createRouter({
       history: createWebHistory('/'),
@@ -189,14 +208,21 @@ describe("MetricLegends", () => {
       expect(dropdown.exists()).toBe(true);
     });
 
-    it("should render theme wrapper inside dropdown content", () => {
-      // The theme class wrapper replaces the old <q-card> container
-      const themeWrapper = wrapper.find('.theme-dark, .theme-light');
-      expect(themeWrapper.exists()).toBe(true);
+    it("should render an untheme-classed content wrapper inside dropdown content", () => {
+      // The dropdown content is a plain padded div: theming comes from `.dark`
+      // on <html> + --color-* tokens, not from a per-theme wrapper class.
+      const content = dropdownContent(wrapper);
+      expect(content.exists()).toBe(true);
+      expect(content.classes()).toContain("px-2");
+      // Guard: the legacy per-theme root class mechanism must not return.
+      expect(wrapper.find(".theme-dark, .theme-light").exists()).toBe(false);
+      // The content wrapper actually hosts the title + legends sections.
+      expect(content.find(".metric-legends-title").exists()).toBe(true);
+      expect(content.find(".legends").exists()).toBe(true);
     });
 
     it("should render title and legends sections", () => {
-      // The migrated component uses native divs instead of <q-card-section>
+      // The migrated component uses native section divs
       const title = wrapper.find('.metric-legends-title');
       const legends = wrapper.find('.legends');
       expect(title.exists()).toBe(true);
@@ -214,7 +240,7 @@ describe("MetricLegends", () => {
     });
 
     it("should render separator", () => {
-      // The migrated component uses a native border div instead of <q-separator>
+      // The migrated component uses a native top-border div as the separator
       const separator = wrapper.find('.border-t');
       expect(separator.exists()).toBe(true);
     });
@@ -296,43 +322,55 @@ describe("MetricLegends", () => {
   });
 
   describe("Theme Integration", () => {
-    it("should apply dark theme class when store theme is dark", async () => {
+    it("should not emit a per-theme class when store theme is dark", async () => {
       // Default store theme is 'dark'
       expect(wrapper.vm.store.state.theme).toBe('dark');
 
-      // Migrated component places theme class on the first div inside ODropdown content
-      const themeWrapper = wrapper.find('.theme-dark');
-      expect(themeWrapper.exists()).toBe(true);
+      // Theming is driven by `.dark` on <html> + --color-* tokens; the
+      // component must not reintroduce a per-theme root class.
+      const classes = renderedClasses(wrapper);
+      LEGACY_THEME_CLASSES.forEach((legacy) =>
+        expect(classes).not.toContain(legacy),
+      );
+      // It still renders its content wrapper regardless of theme.
+      expect(dropdownContent(wrapper).exists()).toBe(true);
     });
 
-    it("should apply light theme class when store theme is light", async () => {
+    it("should not emit a per-theme class when store theme is light", async () => {
       // Change store theme to light
       wrapper.vm.store.state.theme = 'light';
       await wrapper.vm.$nextTick();
 
-      const themeWrapper = wrapper.find('.theme-light');
-      expect(themeWrapper.exists()).toBe(true);
+      const classes = renderedClasses(wrapper);
+      LEGACY_THEME_CLASSES.forEach((legacy) =>
+        expect(classes).not.toContain(legacy),
+      );
+      expect(dropdownContent(wrapper).exists()).toBe(true);
     });
 
-    it("should react to theme changes", async () => {
-      // Reset store theme to dark first
+    it("should render identical markup across theme changes", async () => {
+      // Theme is no longer a render input for this component: switching the
+      // store theme must produce byte-identical markup, because the visual
+      // difference comes entirely from token values resolved in CSS.
       wrapper.vm.store.state.theme = 'dark';
       await wrapper.vm.$nextTick();
+      const darkHtml = wrapper.html();
 
-      // Start with dark theme
-      expect(wrapper.vm.store.state.theme).toBe('dark');
-      expect(wrapper.find('.theme-dark').exists()).toBe(true);
-
-      // Change to light theme
       wrapper.vm.store.state.theme = 'light';
       await wrapper.vm.$nextTick();
+      const lightHtml = wrapper.html();
 
-      expect(wrapper.find('.theme-light').exists()).toBe(true);
+      expect(lightHtml).toBe(darkHtml);
+      expect(lightHtml).not.toContain("theme-light");
+      expect(darkHtml).not.toContain("theme-dark");
     });
 
-    it("should have theme-based class binding", () => {
-      const themeWrapper = wrapper.find('.theme-dark, .theme-light');
-      expect(themeWrapper.exists()).toBe(true);
+    it("should have no theme-based class binding", () => {
+      expect(wrapper.find('.theme-dark, .theme-light').exists()).toBe(false);
+      // ...while still rendering all four legend entries.
+      expect(
+        wrapper.findAll('[data-test^="metrics-legends-item-"]').length,
+      ).toBe(4);
     });
   });
 
@@ -369,9 +407,12 @@ describe("MetricLegends", () => {
       expect(typeof wrapper.vm.store.state.theme).toBe('string');
     });
 
-    it("should use store theme for conditional class application", () => {
-      const themeClass = wrapper.vm.store.state.theme === 'dark' ? 'theme-dark' : 'theme-light';
-      expect(wrapper.find(`.${themeClass}`).exists()).toBe(true);
+    it("should not use store theme for conditional class application", () => {
+      // The store theme is still readable from the component, but it must not
+      // drive any conditional class: theming is token-based now.
+      expect(['dark', 'light']).toContain(wrapper.vm.store.state.theme);
+      expect(wrapper.find('.theme-dark, .theme-light').exists()).toBe(false);
+      expect(wrapper.find('.light-mode, .dark-mode').exists()).toBe(false);
     });
 
     it("should maintain store reactivity", async () => {
@@ -454,28 +495,25 @@ describe("MetricLegends", () => {
       expect(wrapper.vm.metricsIconMapping).toEqual(originalMapping);
     });
 
-    it("should handle undefined theme gracefully", async () => {
-      wrapper.vm.store.state.theme = undefined;
+    // A bogus store theme can no longer break rendering, because theme is not
+    // a render input. These cases assert the component still renders its full
+    // content and emits no legacy per-theme class for any junk value.
+    it.each([
+      ["undefined", undefined],
+      ["empty string", ''],
+      ["null", null],
+    ])("should handle %s theme gracefully", async (_label, themeValue) => {
+      wrapper.vm.store.state.theme = themeValue as any;
       await wrapper.vm.$nextTick();
 
-      // Should default to theme-light when undefined
-      expect(wrapper.find('.theme-light').exists()).toBe(true);
-    });
-
-    it("should handle empty string theme gracefully", async () => {
-      wrapper.vm.store.state.theme = '';
-      await wrapper.vm.$nextTick();
-
-      // Should default to theme-light when empty
-      expect(wrapper.find('.theme-light').exists()).toBe(true);
-    });
-
-    it("should handle null theme gracefully", async () => {
-      wrapper.vm.store.state.theme = null;
-      await wrapper.vm.$nextTick();
-
-      // Should default to theme-light when null
-      expect(wrapper.find('.theme-light').exists()).toBe(true);
+      expect(dropdownContent(wrapper).exists()).toBe(true);
+      expect(
+        wrapper.findAll('[data-test^="metrics-legends-item-"]').length,
+      ).toBe(4);
+      const classes = renderedClasses(wrapper);
+      LEGACY_THEME_CLASSES.forEach((legacy) =>
+        expect(classes).not.toContain(legacy),
+      );
     });
   });
 
@@ -526,15 +564,18 @@ describe("MetricLegends", () => {
     });
 
     it("should maintain semantic HTML structure", () => {
-      // The migrated component drops <q-card>/<q-card-section> in favor of
-      // native divs (themed wrapper + title + legends sections).
+      // The migrated component uses native divs for the card surface
+      // (content wrapper + title + legends sections). The wrapper
+      // carries no per-theme class — theming is `.dark` + --color-* tokens.
       const button = wrapper.find('[data-cy="metric-legends-button"]');
-      const themeWrapper = wrapper.find('.theme-dark, .theme-light');
+      const content = dropdownContent(wrapper);
       const titleSection = wrapper.find('.metric-legends-title');
       const legendsSection = wrapper.find('.legends');
 
       expect(button.exists()).toBe(true);
-      expect(themeWrapper.exists()).toBe(true);
+      expect(content.exists()).toBe(true);
+      expect(content.classes()).not.toContain('theme-dark');
+      expect(content.classes()).not.toContain('theme-light');
       expect(titleSection.exists()).toBe(true);
       expect(legendsSection.exists()).toBe(true);
     });

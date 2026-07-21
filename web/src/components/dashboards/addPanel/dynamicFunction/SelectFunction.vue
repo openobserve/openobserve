@@ -15,7 +15,7 @@
       <!-- Loop through the args for the first n-1 arguments -->
       <div class="w-full">
         <div
-          v-for="(arg, argIndex) in fields.args"
+          v-for="(arg, argIndex) in argRows"
           :key="argIndex + '-' + arg.type"
           class="w-full flex flex-col"
         >
@@ -23,10 +23,10 @@
             class="flex"
             :style="{ marginLeft: isChild ? '-48px' : '0px' }"
           >
-            <div class="mr-2 relative w-3" style="min-height: 50px">
+            <div class="mr-2 relative w-3 min-h-12.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="absolute top-0 w-px bg-[#001495] opacity-50"
+                class="absolute top-0 w-px bg-accent opacity-50"
                 :style="{
                   bottom:
                     argIndex === fields.args.length - 1
@@ -37,7 +37,7 @@
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="absolute" style="top: 30px; left: 5px">
+              <div class="absolute top-7.5 left-1.25 text-text-secondary">
                 <SubTaskArrow />
               </div>
             </div>
@@ -207,6 +207,11 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
+    interface FunctionArg {
+      type: string;
+      value: unknown;
+    }
+
     const { t } = useI18n();
     const dashboardPanelDataPageKey = inject(
       "dashboardPanelDataPageKey",
@@ -217,6 +222,10 @@ export default {
     );
 
     const fields = ref(addMissingArgs(props.modelValue));
+
+    // Typed view of the args used only for template iteration, so the v-for
+    // index resolves to `number` (v-model still writes through `fields`).
+    const argRows = computed<FunctionArg[]>(() => fields.value.args ?? []);
 
     watch(
       () => fields.value,
@@ -500,6 +509,8 @@ export default {
           return "123";
         case "histogramInterval":
           return "bar-chart";
+        default:
+          return undefined;
       }
     };
 
@@ -530,6 +541,7 @@ export default {
     return {
       t,
       fields,
+      argRows,
       // availableFunctions,
       getValidationForFunction,
       canAddArgument,
@@ -553,13 +565,15 @@ export default {
 };
 </script>
 
-<style>
-/* Make the trigger compact - only show the icon + chevron (no label text) */
-.arg-type-select span[class~="flex-1"][class~="truncate"] {
+<style scoped>
+/* keep(lib-override:OSelect): compact the arg-type OSelect trigger to icon +
+   chevron only — hides the internal label span and tightens the trigger button,
+   which live in the select's own DOM and aren't reachable via utilities. */
+.arg-type-select :deep(span[class~="flex-1"][class~="truncate"]) {
   display: none !important;
 }
 
-.arg-type-select button[type="button"] {
+.arg-type-select :deep(button[type="button"]) {
   min-width: 2rem;
   padding-inline-end: 1.5rem !important;
 }

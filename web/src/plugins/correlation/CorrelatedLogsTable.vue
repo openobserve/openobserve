@@ -16,14 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="correlated-logs-table flex flex-col h-full w-full"
-    :class="themeClass"
+    class="correlated-logs-table flex flex-col h-full w-full relative overflow-hidden"
     data-test="correlated-logs-table"
   >
     <!-- Header with Inline Filters -->
     <div
       v-if="!props.hideDimensionFilters"
-      class="correlation-controls p-0 border-b border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)]"
+      class="correlation-controls p-0 max-md:p-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
     >
       <!-- Dimension Filters Bar with Pending/Apply Pattern -->
       <template v-if="!isLoading || hasResults">
@@ -48,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon"
-            :class="{ 'text-white! bg-[var(--o2-theme-color)]!': wrapTableCells }"
+            :class="{ 'text-white! bg-theme-accent!': wrapTableCells }"
             data-test="correlated-logs-table-wrap-content-btn"
             @click="wrapTableCells = !wrapTableCells"
           >
@@ -80,7 +79,7 @@ class="mr-1" />
               <div class="column-visibility-list min-w-62.5 max-h-100 overflow-y-auto">
                 <!-- Select All / Deselect All -->
                 <ODropdownItem
-                  class="border-b border-solid border-[var(--o2-border-color)]"
+                  class="border-b border-solid border-card-glass-border"
                   data-test="select-all-columns"
                   @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
                 >
@@ -107,7 +106,7 @@ class="mr-1" />
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="['column-item', { 'dragging': draggedIndex === index }]"
+                  :class="['group cursor-grab transition-colors duration-200 hover:bg-interactive-hover-bg', { 'opacity-50 cursor-grabbing!': draggedIndex === index }]"
                   :data-test="`column-item-${field}`"
                   @select="(e) => { e.preventDefault(); toggleColumnVisibility(field); }"
                 >
@@ -125,7 +124,7 @@ class="mr-1" />
                     <OIcon
                       name="drag-indicator"
                       size="xs"
-                      class="drag-handle cursor-move"
+                      class="cursor-move opacity-40 transition-opacity duration-200 group-hover:opacity-80"
                     />
                   </template>
                 </ODropdownItem>
@@ -136,10 +135,10 @@ class="mr-1" />
       </template>
 
       <!-- Show skeleton while loading -->
-      <div v-else class="flex items-center gap-3 flex-wrap p-3">
-        <OSkeleton class="w-[200px] h-8" />
-        <OSkeleton class="w-[200px] h-8" />
-        <OSkeleton class="w-[200px] h-8" />
+      <div v-else class="flex items-center gap-3 flex-wrap p-3 max-md:flex-col max-md:items-start">
+        <OSkeleton class="w-50 h-8" />
+        <OSkeleton class="w-50 h-8" />
+        <OSkeleton class="w-50 h-8" />
       </div>
 
       <!-- Results Summary Row -->
@@ -156,7 +155,7 @@ class="mr-1" />
           </template>
           <OSkeleton
             v-else-if="isLoading"
-            class="w-[200px] h-[14px]"
+            class="w-50 h-3.5"
           />
         </div>
       </div> -->
@@ -174,7 +173,7 @@ class="mr-1" />
           variant="ghost"
           size="icon"
           class="h-5!"
-          :class="{ 'text-white! bg-[var(--o2-theme-color)]! hover:opacity-80': wrapTableCells }"
+          :class="{ 'text-white! bg-theme-accent! hover:opacity-80': wrapTableCells }"
           data-test="correlated-logs-table-wrap-content-btn"
           @click="wrapTableCells = !wrapTableCells"
         >
@@ -230,7 +229,7 @@ class="mr-1" />
           >
             <!-- Loading indicator -->
             <div
-              class="flex items-center justify-center gap-3"
+              class="flex items-center justify-center gap-3 max-md:flex-col"
             >
               <OSpinner size="sm" />
               <span class="text-sm opacity-70">
@@ -270,7 +269,7 @@ class="mr-1" />
         <!-- Pagination bar -->
         <div
           v-if="hasResults && totalPages > 1"
-          class="flex items-center justify-between px-4 py-2 border-t border-solid border-[var(--o2-border-color)] bg-[var(--o2-card-bg)] text-xs shrink-0"
+          class="flex items-center justify-between px-4 py-2 border-t border-solid border-card-glass-border bg-card-glass-bg text-xs shrink-0"
           data-test="correlated-logs-pagination"
         >
           <span class="opacity-60">
@@ -292,11 +291,9 @@ class="mr-1" />
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
 import {
-  buildSubjectButtons,
-  streamMatchesPatterns,
   SUBJECT_BUTTONS_BY_SET,
   resolveSetId,
-  type SubjectButton,
+  type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -323,6 +320,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { canvasFont } from "@/utils/fonts";
 
 // Props
 const props = defineProps<CorrelatedLogsProps>();
@@ -342,34 +340,25 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
-const { loadKeyFields, semanticGroups } = useServiceCorrelation();
+const { loadKeyFields } = useServiceCorrelation();
 
 // Use correlated logs composable
 const {
-  loading,
   error,
   searchResults,
   pagedResults,
-  totalHits,
-  took,
   currentFilters,
-  currentTimeRange,
   currentPage,
   totalPages,
   displayPageSize,
-  logStreamsCount,
   hasResults,
   isLoading,
   hasError,
   isEmpty,
   fetchCorrelatedLogs,
   goToPage,
-  updateFilter,
   updateFilters,
-  resetFilters,
-  refresh,
   isMatchedDimension,
-  isAdditionalDimension,
 } = useCorrelatedLogs(props);
 
 // Stream name for JSON preview — use first correlated stream, or source stream
@@ -510,9 +499,6 @@ watch(
 );
 
 // Computed
-const themeClass = computed(() =>
-  store.state.theme === "dark" ? "dark-theme" : "light-theme",
-);
 
 const matchedDimensions = computed(() => props.matchedDimensions);
 const additionalDimensions = computed(() => props.additionalDimensions || {});
@@ -524,12 +510,6 @@ const hideViewRelatedButton = computed(
 const hideSearchTermActions = computed(
   () => props.hideSearchTermActions ?? false,
 );
-
-// Combined dimensions for DimensionFiltersBar (merges matched and additional)
-const allDimensions = computed(() => ({
-  ...matchedDimensions.value,
-  ...additionalDimensions.value,
-}));
 
 // Track which dimensions are unstable (for UI styling)
 const unstableDimensionKeys = computed(
@@ -626,7 +606,7 @@ const getFilterOptions = (
     }
   }
 
-  // Convert to { label, value } format for q-select with map-options
+  // Convert to { label, value } format for the select with map-options
   return Array.from(uniqueValues).map((val) => ({
     label: val === SELECT_ALL_VALUE ? "All Values" : val,
     value: val,
@@ -725,7 +705,7 @@ watch(
   (fields) => {
     if (fields.length === 0) return;
     
-    // Added check for <=1 as _timestamp is also stored in localstorage, which is a bydefault column
+    // Check for <=1 since _timestamp is also stored in localStorage as a default column
     if(visibleColumns.value.size <= 1) initializeVisibleColumns(fields);
 
     // Initialize column order if not set
@@ -767,7 +747,7 @@ const columnMaxCap = computed(() => {
     : Math.max(0, containerWidth.value - TIMESTAMP_COL_WIDTH - 30);
 });
 
-const DEFAULT_LONG_TEXT_FIELDS = [];
+const DEFAULT_LONG_TEXT_FIELDS: string[] = [];
 
 // Measures a field's content width and returns the capped size plus whether the
 // raw measurement exceeded maxCap (used to build the dynamic long-text list).
@@ -784,12 +764,13 @@ const getColumnWidth = (
   }
 
   try {
-    // Font of table header
-    canvasContext.font = "bold 14px sans-serif";
+    // Font of table header — must match what actually renders, or the measured
+    // width is wrong and cells truncate/overflow.
+    canvasContext.font = canvasFont("14px", "sans", "bold");
     let max = canvasContext.measureText(field).width + 16;
 
     // Font of the table content
-    canvasContext.font = "12px monospace";
+    canvasContext.font = canvasFont("12px", "mono");
 
     const hits = searchResults.value || [];
     for (let i = 0; i < Math.min(5, hits.length); i++) {
@@ -968,18 +949,6 @@ const formatTimestamp = (timestamp: number): string => {
   );
 };
 
-/**
- * Format time range for display
- */
-const formatTimeRange = (range: {
-  startTime: number;
-  endTime: number;
-}): string => {
-  const start = formatTimestamp(range.startTime);
-  const end = formatTimestamp(range.endTime);
-  return `${start} - ${end}`;
-};
-
 // Compute selected fields from the columns
 watch(
   tableColumns,
@@ -1012,11 +981,7 @@ const handleApplyFilters = () => {
   updateFilters(pendingFilters.value);
 };
 
-const handleResetFilters = () => {
-  resetFilters();
-};
-
-const handleRowClick = (row: any) => {
+const handleRowClick = () => {
 };
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
@@ -1089,10 +1054,6 @@ const toggleColumnVisibility = (field: string) => {
 
 // Toggle all columns (select all / deselect all)
 const toggleSelectAll = () => {
-  const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
-  );
-
   if (areAllColumnsSelected.value) {
     // Deselect all (except timestamp)
     visibleColumns.value = new Set(["_timestamp"]);
@@ -1204,7 +1165,7 @@ const handleViewTrace = (log: any) => {
   router.push(query);
 };
 
-const handleNestedCorrelation = (row: any) => {
+const handleNestedCorrelation = () => {
   // Nested correlation is disabled (as per hideViewRelatedButton prop)
 };
 
@@ -1222,7 +1183,7 @@ onBeforeUnmount(() => {
 // Watch for prop changes
 watch(
   () => props.timeRange,
-  (newRange) => {
+  () => {
   },
   { deep: true },
 );
@@ -1265,70 +1226,30 @@ const chipDimensionSource = computed<Record<string, string>>(() => {
   return out;
 });
 
-type ChipKind = "context" | "subject";
-type DimensionChip = { key: string; label: string; value: string; kind: ChipKind; };
+type DimensionChip = import("./CorrelationEventHeader.vue").DimensionChip;
 
 const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
   const canonical = resolveSetId(props.matchedSetId);
   const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
-  return specs?.length ? new Set(specs.flatMap((s: SubjectButton) => s.semanticIds)) : new Set();
+  return specs?.length ? new Set(specs.flatMap((s: SubjectButtonSpec) => s.semanticIds)) : new Set();
 });
 
 const unifiedChips = computed<DimensionChip[]>(() =>
   Object.keys(chipDimensionSource.value)
     .filter((key) => !subjectSemanticIds.value.has(key))
-    .map((key): DimensionChip => ({
+    .map((key) => ({
       key,
       label: dimensionDisplayLabel(key),
       value: chipDimensionSource.value[key],
-      kind: "context",
-    })),
+      kind: "context" as DimensionChip["kind"],
+    } as DimensionChip)),
 );
 
 </script>
 
-<style lang="scss" scoped>
-.correlated-logs-table {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.correlation-controls {
-  background-color: var(--o2-card-bg);
-  border-bottom: 1px solid var(--o2-border-color);
-}
-
-.light-theme {
-  background-color: var(--o2-bg-light);
-  color: var(--o2-text-primary);
-}
-
-.dark-theme {
-  background-color: var(--o2-bg-dark);
-  color: var(--o2-text-primary-dark);
-}
-
-// Dimension dropdown styling (matches TelemetryCorrelationDashboard)
-.dimension-dropdown {
-  :deep(.q-field__control) {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  :deep(.q-field__native) {
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0.25rem;
-  }
-}
-
-// Table skeleton container
+<style scoped>
+/* keep(keyframes): scoped rewrites the animation name, so @keyframes and its consumer must stay together */
 [data-test="table-skeleton"] {
   animation: fadeIn 0.3s ease-in;
 }
@@ -1342,51 +1263,8 @@ const unifiedChips = computed<DimensionChip[]>(() =>
   }
 }
 
-.column-visibility-list .column-item {
-  cursor: grab;
-  transition: background-color 0.2s ease;
-}
-
-.column-visibility-list .column-item:hover {
-  background-color: var(--o2-hover-bg);
-}
-
-.column-visibility-list .column-item.dragging {
-  opacity: 0.5;
-  cursor: grabbing;
-}
-
-.column-visibility-list .column-item .drag-handle {
-  opacity: 0.4;
-  transition: opacity 0.2s ease;
-}
-
-.column-visibility-list .column-item:hover .drag-handle {
-  opacity: 0.8;
-}
-
-@media (max-width: 768px) {
-  .correlation-controls {
-    padding: 0.5rem;
-  }
-
-  .flex-wrap {
-    flex-direction: column;
-    align-items: flex-start !important;
-  }
-
-  // Adjust skeleton for mobile
-  [data-test="table-skeleton"] {
-    .flex {
-      flex-direction: column;
-    }
-  }
-}
-
-</style>
-
-<style lang="scss">
-.logs-table-container .o2-scroll-container {
+/* keep(lib-override:tenstack-table): stretch TenstackTable's internal scroll container to full height */
+.logs-table-container :deep(.o2-scroll-container) {
   height: 100% !important;
 }
 </style>

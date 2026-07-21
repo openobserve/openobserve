@@ -16,7 +16,7 @@
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { fillMissingTimestamps } from "./shared/dataProcessor";
 import { buildXAxis, buildYAxis, buildTooltip } from "./shared/axisBuilder";
-import { buildDynamicGrid, buildLegendConfig } from "./shared/gridBuilder";
+import { buildDynamicGrid } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 
 /**
@@ -61,7 +61,7 @@ export class TimeSeriesConverter implements PromQLChartConverter {
 
     // Build series for each query
     processedData.forEach((queryData) => {
-      queryData.series.forEach((seriesData, seriesIndex) => {
+      queryData.series.forEach((seriesData) => {
         // Fill data with null for missing timestamps
         const data = fillMissingTimestamps(
           seriesData.data,

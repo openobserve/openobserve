@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative rounded-lg overflow-hidden copy-content-block" :class="store.state.theme === 'dark' ? 'bg-[rgba(255,255,255,0.06)]' : 'bg-[rgba(0,0,0,0.05)]'">
+  <div class="relative rounded-default overflow-hidden copy-content-block bg-surface-subtle">
     <div class="absolute top-2 right-2 z-10">
       <OButton
         data-test="rum-copy-btn"
@@ -58,7 +58,7 @@ export default defineComponent({
       default: "", // Default value for displayContent prop (empty string in this case)
     },
   },
-  setup(props, { emit }) {
+  setup(props) {
     const store = useStore();
     const { t } = useI18n();
     const email = ref(store.state.userInfo.email);

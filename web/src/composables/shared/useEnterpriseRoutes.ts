@@ -28,6 +28,24 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// Workflows routes are gated on the backend /config flag `workflows_enabled`
+// (enterprise O2_WORKFLOWS_ENABLED). The enterprise/cloud build check is already
+// implicit — this whole block only runs for those builds.
+//
+// Checks `=== false`, NOT `!== true`, and that is deliberate: /config is fetched
+// without await, so the flag is briefly undefined at startup. Redirecting on
+// "not yet known" would bounce a bookmarked /workflows to home on a cold load.
+// The sidebar entry takes the opposite stance (it requires `=== true`, so it
+// never flashes in) — the two are not meant to match. Same split as
+// syntheticsRouteGuard above.
+const workflowsRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.workflows_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const IdentityAccessManagement = () =>
   import("@/views/IdentityAccessManagement.vue");
 
@@ -52,6 +70,15 @@ const Invitations = () => import("@/views/Invitations.vue");
 import Users from "@/views/User.vue";
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
+
+const WorkflowsList = () =>
+  import("@/components/workflows/WorkflowsList.vue");
+
+const WorkflowEditor = () =>
+  import("@/components/workflows/WorkflowEditor.vue");
+
+const WorkflowRuns = () =>
+  import("@/components/workflows/WorkflowRuns.vue");
 
 const useEnterpriseRoutes = () => {
   const routes: any = [
@@ -215,6 +242,52 @@ const useEnterpriseRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    });
+
+    // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
+    // renders in its <router-view> for add/edit.
+    routes.push({
+      path: "workflows",
+      name: "workflows",
+      component: WorkflowsList,
+      meta: {
+        title: "Workflows",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        workflowsRouteGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "add",
+          name: "createWorkflow",
+          component: WorkflowEditor,
+          meta: { title: "New Workflow" },
+          beforeEnter(to: any, from: any, next: any) {
+            workflowsRouteGuard(to, from, next);
+          },
+        },
+        {
+          path: "edit",
+          name: "workflowEditor",
+          component: WorkflowEditor,
+          meta: { title: "Edit Workflow" },
+          beforeEnter(to: any, from: any, next: any) {
+            workflowsRouteGuard(to, from, next);
+          },
+        },
+        {
+          // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
+          // from the editor so viewing a past run never drops the user into the
+          // builder; deep-linkable by ?run_id.
+          path: "runs",
+          name: "workflowRuns",
+          component: WorkflowRuns,
+          meta: { title: "Workflow Runs" },
+          beforeEnter(to: any, from: any, next: any) {
+            workflowsRouteGuard(to, from, next);
+          },
+        },
+      ],
     });
     routes[0].children.push(
       ...[

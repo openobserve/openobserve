@@ -60,13 +60,15 @@ describe("NoOrganizationSelected", () => {
     expect(wrapper.classes()).toContain('w-full');
     expect(wrapper.classes()).toContain('flex');
     expect(wrapper.classes()).toContain('flex-col');
-    expect(wrapper.classes()).toContain('flex-center');
+    expect(wrapper.classes()).toContain('items-center');
+    expect(wrapper.classes()).toContain('justify-center');
     expect(wrapper.classes()).toContain('gap-2');
   });
 
   it("should have correct font size styling", () => {
-    const style = wrapper.attributes('style');
-    expect(style).toContain('font-size: 1.5rem');
+    // Was inline `style="font-size: 1.5rem"`; now the `text-2xl` utility (1.5rem).
+    expect(wrapper.classes()).toContain('text-2xl');
+    expect(wrapper.attributes('style')).toBeUndefined();
   });
 
   it("should apply correct styling to no organization selected text", () => {

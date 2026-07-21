@@ -18,18 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
-    class="bg-surface-base"
     :class="[
-      frame ? 'border border-border-default rounded-xl' : '',
+      'bg-surface-base',
+      frame ? 'border border-border-default rounded-default' : '',
       store.state.printMode ? '' : 'h-full overflow-y-auto',
     ]"
   >
-    <div class="px-[0.625rem] render-dashboard-charts-container">
+    <div class="px-page-edge pt-2 render-dashboard-charts-container">
       <!-- flag to check if dashboardVariablesAndPanelsDataLoaded which is used while print mode-->
-      <span
+      <span class="hidden"
         v-if="isDashboardVariablesAndPanelsDataLoadedDebouncedValue"
         id="dashboardVariablesAndPanelsDataLoaded"
-        style="display: none"
       >
       </span>
 
@@ -71,14 +70,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <slot name="before_panels" />
-      <div class="displayDiv clear-both min-h-0 h-auto">
-        <div
+      <div class="displayDiv clear-both min-h-0 h-auto mt-2">
+        <div class="h-full w-full"
           v-if="
             store.state.printMode &&
             panels.length === 1 &&
             panels[0]?.type === 'table'
           "
-          style="height: 100%; width: 100%"
         >
           <!-- Panel-scoped Variables (if any, if using manager) -->
           <VariablesValueSelector
@@ -97,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="panel-variables-selector"
           />
 
-          <PanelContainer
+          <PanelContainer class="h-full w-full"
             @onDeletePanel="onDeletePanel"
             @onViewPanel="onViewPanel"
             :viewOnly="viewOnly"
@@ -137,7 +135,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:initial-variable-values="updateInitialVariableValues"
             @onEditLayout="openEditLayout"
             @contextmenu="$emit('chart:contextmenu', $event)"
-            style="height: 100%; width: 100%"
           />
         </div>
         <div
@@ -155,8 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :gs-h="getPanelLayout(item, 'h')"
             :gs-min-w="getMinimumWidth(item.type)"
             :gs-min-h="getMinimumHeight(item.type)"
-            class="grid-stack-item gridBackground bg-transparent! rounded-lg border-border-default!"
-            :class="store.state.theme == 'dark' ? 'dark border-border-default!' : ''"
+            class="grid-stack-item gridBackground bg-transparent! rounded-default border-border-default!"
           >
             <div class="grid-stack-item-content">
               <!-- Panel with Panel-Level Variables -->
@@ -273,7 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Explicit height wrapper: fills the dialog body's available space
              (90vh − body padding) so ViewPanel can use height:100% and
              flex:1 works all the way down without causing a body scrollbar. -->
-        <div class="view-panel-height-wrapper h-[calc(90vh-var(--spacing-dialog-content-py)*2)] -my-(--spacing-dialog-content-py) -mx-(--spacing-dialog-content-px) flex flex-col overflow-hidden">
+        <div class="view-panel-height-wrapper h-[calc(90vh-var(--spacing-dialog-content-py)*2)] -my-dialog-content-py -mx-dialog-content-px flex flex-col overflow-hidden">
           <ViewPanel
             :folderId="folderId"
             :dashboardId="dashboardData.dashboardId"
@@ -315,10 +311,7 @@ import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
 import { useRoute } from "vue-router";
-import {
-  checkIfVariablesAreLoaded,
-  updateDashboard,
-} from "../../utils/commons";
+import { updateDashboard } from "../../utils/commons";
 import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
@@ -326,14 +319,10 @@ import TabList from "@/components/dashboards/tabs/TabList.vue";
 import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
-import type { useVariablesManager as UseVariablesManagerType } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
 import { GridStack } from "gridstack";
 import {
-  getPanelTimeFromURL,
-  convertPanelTimeRangeToPicker,
   convertTimeObjToPickerFormat,
-  convertGlobalTimeToPickerFormat,
   resolvePanelTimeValue,
 } from "@/utils/dashboard/panelTimeUtils";
 import "gridstack/dist/gridstack.min.css";
@@ -486,8 +475,6 @@ export default defineComponent({
     // Create our own variables manager instead of injecting from parent
     // This makes RenderDashboardCharts self-contained and reusable
     const variablesManager = useVariablesManager();
-
-    // Removed committedVersion and getAllVariablesFlat - no longer needed after cleanup
 
     // Provide to child components (VariablesValueSelector, etc.)
     provide("variablesManager", variablesManager);
@@ -776,6 +763,7 @@ export default defineComponent({
         // refresh dashboard
         refreshDashboard();
       } finally {
+        /* no cleanup needed */
       }
     });
 
@@ -855,7 +843,7 @@ export default defineComponent({
       });
 
       // Trigger window resize after panel resize to update charts
-      gridStackInstance.on("resizestop", (event, element) => {
+      gridStackInstance.on("resizestop", () => {
         window.dispatchEvent(new Event("resize"));
       });
     }; // Update panel layout data from GridStack items
@@ -1029,7 +1017,7 @@ export default defineComponent({
 
     watch(
       () => [selectedTabId.value],
-      async (newPanels, oldPanels) => {
+      async () => {
         // Only refresh if the number of tab changes
         await nextTick();
         await refreshGridStack();
@@ -1225,7 +1213,7 @@ export default defineComponent({
      * Handles same-dashboard drilldown by pushing new var-* values
      * from the URL into the variables manager and committing them.
      */
-    const updateInitialVariableValues = async (...args: any) => {
+    const updateInitialVariableValues = async () => {
       // if view panel is open then close it
       showViewPanel.value = false;
 
@@ -1583,7 +1571,9 @@ export default defineComponent({
       // This prevents unnecessary route updates when panel refreshes without time changes
       const hasQueryChanged =
         Object.keys(query).some((key) => query[key] !== route.query[key]) ||
-        Object.keys(route.query).some((key) => !query.hasOwnProperty(key));
+        Object.keys(route.query).some(
+          (key) => !Object.prototype.hasOwnProperty.call(query, key),
+        );
 
       if (hasQueryChanged) {
         await router.replace({ query });
@@ -1706,28 +1696,19 @@ export default defineComponent({
   expressed as inline  utilities in the template above.
 -->
 <style>
-/* Table top toolbar (dynamic DOM — cannot be inlined) */
-.q-table__top {
-  border-bottom: 1px solid var(--color-border-default);
-  justify-content: flex-end;
-}
-
+/* keep(lib-override:gridstack): all selectors target GridStack-injected DOM
+   (.grid-stack*, .ui-resizable-*) that this template does not render, plus print
+   / @page setup — so the block stays an unscoped global. */
 /* When grid is static (disabled), hide resize handles */
 .grid-stack.grid-stack-static .ui-resizable-handle {
   display: none !important;
-}
-
-/* Dark-mode outline lives on the content child; pull it onto the design
-   token for a clean solid edge against the dark canvas. */
-.grid-stack-item.dark .grid-stack-item-content {
-  border-color: var(--color-border-default);
 }
 
 .grid-stack-item .grid-stack-item-content {
   border: 1px solid var(--color-border-default);
   border-radius: 0.375rem;
   overflow: visible;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
 }
 
 /* GridStack theme overrides */
@@ -1739,7 +1720,7 @@ export default defineComponent({
   opacity: 0.8;
   z-index: 1000;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0.5rem 1.5rem color-mix(in srgb, var(--color-black) 15%, transparent);
 }
 
 .grid-stack .grid-stack-item.ui-resizable-resizing {
@@ -1751,9 +1732,15 @@ export default defineComponent({
 }
 
 .grid-stack .grid-stack-item > .ui-resizable-handle.ui-resizable-se {
-  background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='%23999999' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
+  /* Drawn as a mask + background-color rather than a coloured SVG: a data: URI
+     cannot resolve var(), so this is the only way the handle takes a token. */
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='black' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
     no-repeat center;
-  background-size: 0.5rem 0.5rem;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path d='M8 2 L8 8 L2 8' stroke='black' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>")
+    no-repeat center;
+  background-color: var(--color-grey-400);
+  -webkit-mask-size: 0.5rem 0.5rem;
+  mask-size: 0.5rem 0.5rem;
   width: 1rem;
   height: 1rem;
   bottom: 0.125rem;
@@ -1791,18 +1778,11 @@ export default defineComponent({
     break-inside: avoid;
   }
 
-  /* Drop the previous `overflow: hidden` — it was clipping each panel to
-   * its grid-cell rectangle for the on-screen layout but, paired with
-   * print pagination, prevents browsers from honouring panel heights. */
+  /* Overflow must stay visible here: `hidden` clips each panel to its
+   * grid-cell rectangle which, paired with print pagination, prevents
+   * browsers from honouring panel heights. */
   .grid-stack-item-content {
     overflow: visible !important;
-  }
-
-  /* Virtual-scroll inserts padding divs above/below the rendered
-   * rows to simulate the full scroll height. In print mode these become
-   * empty white space. Hide them so no blank gaps appear in table panels. */
-  .q-virtual-scroll__padding {
-    display: none !important;
   }
 }
 
@@ -1811,5 +1791,15 @@ export default defineComponent({
 @page {
   size: A4 landscape;
   margin: 10mm;
+}
+</style>
+
+<style scoped>
+/* keep(lib-override:vue-grid-layout): the drag placeholder is DOM that
+   vue-grid-layout renders inside its own subtree, so it can only be reached
+   through `:deep()` from the `.displayDiv` grid host this component owns.
+   `!important` beats the library's own `.vue-grid-placeholder` background. */
+.displayDiv :deep(.vue-grid-item.vue-grid-placeholder) {
+  background: var(--color-dashboard-placeholder-bg) !important;
 }
 </style>

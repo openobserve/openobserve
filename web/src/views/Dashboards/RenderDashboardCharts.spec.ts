@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { shallowMount } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
 import i18n from "@/locales";
@@ -608,14 +608,6 @@ describe("RenderDashboardCharts", () => {
       (wrapper.vm as any).showViewPanel = true;
       await nextTick();
       expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
-    });
-
-    it("does not render the legacy q-dialog / q-card markup after migration", async () => {
-      wrapper = createWrapper();
-      await nextTick();
-      // The migrated markup must not include the old dialog selectors
-      expect(wrapper.find('[data-test="q-dialog-stub"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="q-card-stub"]').exists()).toBe(false);
     });
   });
 

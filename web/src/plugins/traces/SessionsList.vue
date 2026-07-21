@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="sessions-list h-full! flex flex-col bg-[var(--color-surface-base)] card-container"
+    class="sessions-list h-full! flex flex-col bg-card-glass-bg"
   >
     <!-- No LLM streams exist in the org at all — nothing to select, so show
          the rich first-run empty state on its own (no table chrome). -->
@@ -28,12 +28,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState size="hero" preset="no-llm-sessions" @action="onEmptyAction" />
     </div>
 
-    <!-- Streams exist: OTable owns the whole surface — toolbar (stream filter +
-         column chooser), server-side pagination footer, column resize, and the
-         empty/error body. Rendering it unconditionally keeps the stream
-         selector reachable even when a window returns no sessions. -->
+    <!-- Scope control — left-aligned Stream/Agent bar directly under the page
+         header, matching Agent Graph / Agent Behavior / LLM Insights so every
+         AI page places its scope selector identically. Sits above the table
+         rather than inside the OTable toolbar. -->
+    <div
+      v-if="!(streamsLoaded && availableStreams.length === 0)"
+      class="flex items-center gap-3 px-page-edge py-2 border-b border-border-default"
+    >
+      <OToggleGroup
+        :model-value="filterMode"
+        type="single"
+        data-test="sessions-list-filter-mode"
+        @update:model-value="onFilterModeChange"
+      >
+        <OToggleGroupItem value="agent" size="sm">{{ t('traces.sessionsList.agent') }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{ t('traces.sessionsList.stream') }}</OToggleGroupItem>
+      </OToggleGroup>
+
+      <div
+        v-if="filterMode === 'stream'"
+        data-test="sessions-list-stream-selector"
+        class="w-56 flex-shrink-0"
+      >
+        <OSkeleton type="text" v-if="!streamsLoaded" class="w-full h-8.5" />
+        <OSelect
+          v-else
+          v-model="activeStream"
+          :label="t('traces.sessionsList.streamLabel')"
+          label-position="inside"
+          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          labelKey="label"
+          valueKey="value"
+          class="w-full rounded-default"
+          @update:model-value="onStreamChange"
+        />
+      </div>
+      <div
+        v-else
+        data-test="sessions-list-agent-selector"
+        class="w-56 flex-shrink-0"
+      >
+        <OSkeleton type="text" v-if="!agentsLoaded" class="w-full h-8.5" />
+        <OSelect
+          v-else
+          v-model="activeAgent"
+          :label="t('traces.sessionsList.agent')"
+          label-position="inside"
+          :options="agentSelectOptions"
+          labelKey="label"
+          valueKey="value"
+          class="w-full rounded-default"
+          @update:model-value="onAgentChange"
+        />
+      </div>
+    </div>
+
+    <!-- Streams exist: OTable owns the data surface (column chooser, server-side
+         pagination footer, column resize, empty/error body). The scope control
+         lives in the page-level bar above; the header owns refresh + date.
+         NOTE: explicit v-if (not v-else) — the scope bar above carries its own
+         v-if, so a v-else here would chain to the bar and hide the table
+         whenever streams exist. -->
     <OTable
-      v-else
+      v-if="!(streamsLoaded && availableStreams.length === 0)"
       :data="sessions"
       :columns="tableColumns"
       :loading="loading"
@@ -57,87 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @row-click="(row: any) => handleRowClick(row)"
       @pagination-change="onPaginationChange"
     >
-      <!-- Toolbar: Stream/Agent mode + matching picker aligned with the table actions. -->
-      <template #toolbar>
-        <div class="flex items-center justify-end gap-2 flex-1 min-w-0">
-          <OToggleGroup
-            :model-value="filterMode"
-            type="single"
-            data-test="sessions-list-filter-mode"
-            @update:model-value="onFilterModeChange"
-          >
-            <OToggleGroupItem value="stream" size="sm">{{ t('traces.sessionsList.stream') }}</OToggleGroupItem>
-            <OToggleGroupItem value="agent" size="sm">{{ t('traces.sessionsList.agent') }}</OToggleGroupItem>
-          </OToggleGroup>
-
-          <div class="flex items-center justify-end gap-2 min-w-0">
-            <div
-              v-if="filterMode === 'stream'"
-              data-test="sessions-list-stream-selector"
-              class="w-[14rem] flex-shrink-0"
-            >
-              <!-- Hold a picker-shaped skeleton until the stream list lands, so
-                   the selector doesn't flash an empty dropdown then populate. -->
-              <SkeletonBox
-                v-if="!streamsLoaded"
-                width="100%"
-                height="2.125rem"
-                rounded
-              />
-              <OSelect
-                v-else
-                v-model="activeStream"
-                :label="t('traces.sessionsList.streamLabel')"
-                label-position="inside"
-                :options="availableStreams.map((s) => ({ label: s, value: s }))"
-                labelKey="label"
-                valueKey="value"
-                class="w-full rounded"
-                @update:model-value="onStreamChange"
-              />
-            </div>
-            <div
-              v-else
-              data-test="sessions-list-agent-selector"
-              class="w-[14rem] flex-shrink-0"
-            >
-              <!-- Same treatment for agents: toggling to Agent mode kicks off the
-                   listAgents fetch, so show the skeleton until it resolves
-                   instead of an empty agent picker. -->
-              <SkeletonBox
-                v-if="!agentsLoaded"
-                width="100%"
-                height="2.125rem"
-                rounded
-              />
-              <OSelect
-                v-else
-                v-model="activeAgent"
-                :label="t('traces.sessionsList.agent')"
-                label-position="inside"
-                :options="agentSelectOptions"
-                labelKey="label"
-                valueKey="value"
-                class="w-full rounded"
-                @update:model-value="onAgentChange"
-              />
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <template #toolbar-trailing>
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="loading"
-          data-test="sessions-list-refresh-btn"
-          @click="() => refresh()"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="sessionsRefresh" />
-        </OButton>
-      </template>
 
       <!-- Empty / error body — rendered inside the frame so the toolbar (and
            thus the stream selector) stays visible. -->
@@ -174,14 +151,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
         <!-- Timestamp -->
         <template #cell-firstSeenNanos="{ row }">
-          <span class="text-[0.75rem] tabular-nums">
+          <span class="text-xs tabular-nums">
             {{ formatTimestamp(row.firstSeenNanos) }}
           </span>
         </template>
 
         <!-- Session ID -->
         <template #cell-sessionId="{ row }">
-          <div class="text-[0.75rem] truncate w-full">
+          <div class="text-xs truncate w-full">
             {{ row.sessionId }}
             <OTooltip :content="row.sessionId" />
           </div>
@@ -199,22 +176,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-firstUserMessage="{ row }">
           <div
             v-if="row.firstUserMessage"
-            class="text-[0.75rem] text-[var(--color-text-secondary)] truncate w-full"
+            class="text-xs text-text-secondary truncate w-full"
           >
             {{ row.firstUserMessage }}
             <OTooltip :content="row.firstUserMessage" />
           </div>
-          <span v-else class="text-[0.75rem] text-[var(--color-text-muted)]">—</span>
+          <span v-else class="text-xs text-text-muted">—</span>
         </template>
 
         <!-- Turns -->
         <template #cell-turns="{ row }">
-          <span class="text-[0.75rem]">{{ row.turns }}</span>
+          <span class="text-xs">{{ row.turns }}</span>
         </template>
 
         <!-- Duration -->
         <template #cell-durationNanos="{ row }">
-          <span class="text-[0.75rem]">
+          <span class="text-xs">
             {{ formatDuration(row.durationNanos) }}
             <OTooltip :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`" />
           </span>
@@ -222,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Tokens -->
         <template #cell-tokens="{ row }">
-          <span class="text-[0.75rem] tabular-nums">
+          <span class="text-xs tabular-nums">
             {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
             <OTooltip :content="t('traces.sessionsList.tokenTooltip', { input: row.inputTokens.toLocaleString(), output: row.outputTokens.toLocaleString(), total: row.tokens.toLocaleString() })" />
           </span>
@@ -230,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Cost -->
         <template #cell-cost="{ row }">
-          <span class="text-[0.75rem]">${{ row.cost.toFixed(4) }}</span>
+          <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
         </template>
 
         <!-- Status (derived from error_count) -->
@@ -259,11 +236,11 @@ import { useSessions, type SessionRow } from "./composables/useSessions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import type { AcceptableValue } from "reka-ui";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
@@ -326,14 +303,17 @@ const activeStream = ref<string>(
 );
 const MODE_LS_KEY = "sessionsList_filterMode";
 const AGENT_LS_KEY = "sessionsList_agentFilter";
+// Default scope is "agent" — the AI module is agent-centric. Explicit choices
+// still win (URL `?type=`, then saved localStorage preference); the agent
+// default applies only when neither is present.
 const filterMode = ref<"stream" | "agent">(
   urlType === "agent"
     ? "agent"
     : urlType === "stream"
       ? "stream"
-      : localStorage.getItem(MODE_LS_KEY) === "agent"
-        ? "agent"
-        : "stream",
+      : localStorage.getItem(MODE_LS_KEY) === "stream"
+        ? "stream"
+        : "agent",
 );
 const activeAgent = ref<string>(localStorage.getItem(AGENT_LS_KEY) || ALL_AGENTS_VALUE);
 // `agents` / `agentsLoaded` are module-scoped (see useSessions) so the agent
@@ -528,7 +508,7 @@ function ensureStreamsLoaded(): Promise<void> {
 async function loadTraceStreams() {
   streamsLoaded.value = false;
   try {
-    const res = await getStreams("traces", false, false);
+    const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
     const llmStreams = list.filter(
       (stream: any) => stream?.settings?.is_llm_stream !== false,
@@ -662,7 +642,9 @@ function onStreamChange() {
   loadSessions(undefined, undefined, true);
 }
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(
+  mode?: AcceptableValue | AcceptableValue[] | boolean,
+) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;

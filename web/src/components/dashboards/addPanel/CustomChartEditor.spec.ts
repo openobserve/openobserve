@@ -56,7 +56,7 @@ let mockDashboardPanelData: any;
 
 describe("CustomChartEditor", () => {
   let wrapper: any;
-  const defaultModelValue = `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
+  const defaultModelValue = ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
   `;
 
   beforeEach(() => {
@@ -105,11 +105,12 @@ describe("CustomChartEditor", () => {
       wrapper = createWrapper();
 
       const container = wrapper.find('[data-test="dashboard-custom-chart-editor-container"]');
-      const style = container.element.getAttribute("style");
+      // Inline width/height/overflow are now utilities.
+      const classes = container.classes();
 
-      expect(style).toContain("width: 100%");
-      expect(style).toContain("height: 100%");
-      expect(style).toContain("overflow: hidden");
+      expect(classes).toContain("w-full");
+      expect(classes).toContain("h-full");
+      expect(classes).toContain("overflow-hidden");
     });
 
     it("should render inner container with correct height", () => {
@@ -117,9 +118,9 @@ describe("CustomChartEditor", () => {
 
       const innerContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-inner"]');
       expect(innerContainer.exists()).toBe(true);
-      const style = innerContainer.attributes("style");
-      expect(style).toContain("width: 100%");
-      expect(style).toContain("height: 100%");
+      const classes = innerContainer.classes();
+      expect(classes).toContain("w-full");
+      expect(classes).toContain("h-full");
     });
 
     it("should render column container with correct styling", () => {
@@ -127,9 +128,11 @@ describe("CustomChartEditor", () => {
 
       const colContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-flex-col"]');
       expect(colContainer.exists()).toBe(true);
-      const style = colContainer.attributes("style");
-      expect(style).toContain("flex-direction: column");
-      expect(style).toContain("height: 100%");
+      // Inline `flex-direction: column; height: 100%` -> flex-col / h-full.
+      const classes = colContainer.classes();
+      expect(classes).toContain("flex");
+      expect(classes).toContain("flex-col");
+      expect(classes).toContain("h-full");
     });
 
     it("should render query editor with correct attributes", () => {
@@ -455,16 +458,17 @@ describe("CustomChartEditor", () => {
       expect(queryEditor.classes()).toContain("javascript-query-editor");
     });
 
-    it("should configure QueryEditor with inline styling", () => {
+    it("should configure QueryEditor with layout utilities", () => {
       wrapper = createWrapper();
 
       const queryEditor = wrapper.find(
         '[data-test="dashboard-markdown-editor-query-editor"]',
       );
-      const style = queryEditor.attributes("style");
+      // Inline `padding-left: 20px; height: 100%` -> pl-5 (1.25rem) / h-full.
+      const classes = queryEditor.classes();
 
-      expect(style).toContain("padding-left: 20px");
-      expect(style).toContain("height: 100%");
+      expect(classes).toContain("pl-5");
+      expect(classes).toContain("h-full");
     });
   });
 
@@ -551,16 +555,14 @@ describe("CustomChartEditor", () => {
       // Check for inner div with proper styling
       const innerContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-inner"]');
       expect(innerContainer.exists()).toBe(true);
-      const innerStyle = innerContainer.attributes("style");
-      expect(innerStyle).toContain("width: 100%");
-      expect(innerStyle).toContain("height: 100%");
+      expect(innerContainer.classes()).toContain("w-full");
+      expect(innerContainer.classes()).toContain("h-full");
 
       // Check for flex-column container (replacement for old .col)
       const flexColContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-flex-col"]');
       expect(flexColContainer.exists()).toBe(true);
-      const colStyle = flexColContainer.attributes("style");
-      expect(colStyle).toContain("height: 100%");
-      expect(colStyle).toContain("flex-direction: column");
+      expect(flexColContainer.classes()).toContain("h-full");
+      expect(flexColContainer.classes()).toContain("flex-col");
     });
 
     it("should maintain component hierarchy", () => {

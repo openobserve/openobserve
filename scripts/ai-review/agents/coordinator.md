@@ -27,7 +27,14 @@ Bias toward approval. A single warning in an otherwise clean PR still gets `appr
 
 ## Output Format
 
-You MUST output exactly the review comment that will be posted to the PR. Include a marker comment for re-review detection.
+You MUST output exactly the review comment that will be posted to the PR.
+
+Do NOT emit any `<!-- ... -->` HTML comment marker. The runner prepends the correct
+provider-specific marker itself; emitting one yourself causes the wrong provider's comment
+to be overwritten. Start your output directly with the `## AI Code Review` heading.
+
+Output the review and nothing else — no preamble such as "Now I have all the context" and
+no trailing commentary. The first character of your output must be `#`.
 
 **Keep the top-level comment compact.** Only the decision line, a 1-2 sentence explanation, and a one-line count summary are visible by default. All findings go inside a single collapsed `<details>` block — nothing else.
 
@@ -39,7 +46,6 @@ If a finding has no reliable file/line, drop the backtick location prefix instea
 
 If findings exist:
 ```
-<!-- ai-code-review -->
 ## AI Code Review
 
 ### Decision: [approved | approved_with_comments | minor_issues | significant_concerns]
@@ -75,7 +81,6 @@ If findings exist:
 
 If NO issues across all reviewers:
 ```
-<!-- ai-code-review -->
 ## AI Code Review
 
 ### Decision: approved

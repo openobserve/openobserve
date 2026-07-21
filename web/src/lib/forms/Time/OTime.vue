@@ -13,7 +13,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -223,7 +223,7 @@ const heightClasses: Record<NonNullable<TimeProps["size"]>, string> = {
 };
 
 const fieldClasses = computed(() => [
-  "flex items-center w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-center w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
@@ -316,7 +316,7 @@ const fieldClasses = computed(() => [
         :side-offset="4"
         align="start"
         :class="[
-          'z-60 rounded-lg border shadow-md overflow-hidden bg-datepicker-popup-bg border-datepicker-popup-border outline-none',
+          'z-60 rounded-default border shadow-md overflow-hidden bg-datepicker-popup-bg border-datepicker-popup-border outline-none',
           withSeconds ? 'w-64' : 'w-56',
         ]"
         data-test="otime-popup"
@@ -328,7 +328,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'hour'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -340,7 +340,7 @@ const fieldClasses = computed(() => [
             <button
               type="button"
               :class="[
-                'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                 clockMode === 'minute'
                   ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -353,7 +353,7 @@ const fieldClasses = computed(() => [
               <button
                 type="button"
                 :class="[
-                  'text-2xl font-semibold tabular-nums rounded-sm px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
+                  'text-2xl font-semibold tabular-nums rounded-default px-1 pb-0.5 outline-none ring-offset-1 ring-offset-surface-base transition-[color,background-color,border-color,box-shadow] duration-150 border-b-2 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring',
                   clockMode === 'second'
                     ? 'text-datepicker-day-selected-bg border-datepicker-day-selected-bg'
                     : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
@@ -366,7 +366,7 @@ const fieldClasses = computed(() => [
 
           <!-- AM / PM horizontal pill -->
           <div
-            class="flex rounded-md border border-datepicker-border overflow-hidden ms-3 shrink-0"
+            class="flex rounded-default border border-datepicker-border overflow-hidden ms-3 shrink-0"
           >
             <button
               type="button"
@@ -525,8 +525,10 @@ const fieldClasses = computed(() => [
   </div>
 </template>
 
-<style>
-/* Hide the native browser clock picker dropdown */
+<style scoped>
+/* keep(lib-override:native-time): hide the browser's native clock-picker
+   indicator on <input type=time> (a custom analog-clock popover replaces it).
+   Scoped so the override only affects this component's input. */
 input[type="time"]::-webkit-calendar-picker-indicator {
   display: none;
 }

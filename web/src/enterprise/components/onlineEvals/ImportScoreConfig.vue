@@ -21,14 +21,14 @@ the Free Software Foundation, either version 3 of the License, or
       <div class="w-full h-full flex flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="text-center text-[0.9375rem] font-semibold text-(--color-text-heading) py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
           data-test="score-config-import-errors-title"
         >
           {{ t("onlineEvals.scoreConfig.import.errors.title") }}
         </div>
         <div
           v-else
-          class="text-center text-[0.9375rem] font-semibold text-(--color-text-heading) py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
           data-test="score-config-import-output-title"
         >
           {{ t("onlineEvals.scoreConfig.import.outputMessages") }}
@@ -46,7 +46,7 @@ the Free Software Foundation, either version 3 of the License, or
               >
                 <span
                   v-if="err.field === 'name'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="score-config-import-name-error"
                 >
                   {{ err.message }}
@@ -62,7 +62,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'nameConflict'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="score-config-import-name-conflict-error"
                 >
                   {{ err.message }}
@@ -78,7 +78,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'dataType'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="score-config-import-datatype-error"
                 >
                   {{ err.message }}
@@ -95,7 +95,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'numericRange' && numericRangeFixers[err.itemIndex]"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="score-config-import-numeric-range-error"
                 >
                   {{ err.message }}
@@ -119,7 +119,7 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'categories'"
-                  class="text-(--color-error-600)"
+                  class="text-error-600"
                   data-test="score-config-import-categories-error"
                 >
                   {{ err.message }}
@@ -129,18 +129,18 @@ the Free Software Foundation, either version 3 of the License, or
                       v-model="categoriesFixers[err.itemIndex]"
                       label="Categories (comma-separated) *"
                       placeholder="good, ok, bad"
-                      @update:model-value="updateCategories(err.itemIndex, $event)"
+                      @update:model-value="updateCategories(err.itemIndex, $event as string)"
                     />
                   </div>
                 </span>
 
-                <span v-else class="text-(--color-error-600)">{{ err.message }}</span>
+                <span v-else class="text-error-600">{{ err.message }}</span>
               </div>
             </div>
           </div>
 
           <div v-if="creators.length" class="p-2.5 mb-2.5">
-            <div class="text-base mb-2.5 uppercase text-(--color-text-heading)" data-test="score-config-import-creation-title">
+            <div class="text-base mb-2.5 uppercase text-text-heading" data-test="score-config-import-creation-title">
               {{ t("onlineEvals.scoreConfig.import.creation") }}
             </div>
             <div
@@ -152,9 +152,9 @@ the Free Software Foundation, either version 3 of the License, or
               <div
                 :class="{
                   'font-bold py-1.25 px-0 text-sm': true,
-                  'text-(--color-success-600)': c.status === 'success',
-                  'text-(--color-error-600)': c.status === 'error',
-                  'text-(--color-text-secondary)': c.status === 'exists',
+                  'text-status-success-text': c.status === 'success',
+                  'text-error-600': c.status === 'error',
+                  'text-text-secondary': c.status === 'exists',
                 }"
                 :data-test="`score-config-import-creation-${i}-message`"
               >
@@ -175,6 +175,7 @@ import { useI18n } from "vue-i18n";
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -255,14 +256,14 @@ function getBatch(): any[] | null {
   }
 }
 
-function updateName(itemIndex: number, value: string) {
+function updateName(itemIndex: number, value: string | number) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].name = value;
   syncEditor(arr);
 }
 
-function updateDataType(itemIndex: number, value: ScoreDataType) {
+function updateDataType(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].dataType = value;

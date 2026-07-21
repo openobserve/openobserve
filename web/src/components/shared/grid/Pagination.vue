@@ -22,8 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="flex items-center whitespace-nowrap w-50 justify-center"
-      style="justify-content: start"
+      class="flex items-center whitespace-nowrap w-50 justify-center justify-start"
     >
       <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput
@@ -135,8 +134,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";

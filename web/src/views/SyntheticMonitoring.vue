@@ -1,13 +1,11 @@
 <template>
-  <div class="flex flex-col h-full overflow-hidden relative">
-
-    <!-- PAGE HEADER -->
-    <AppPageHeader
-      :title="t('synthetics.pageTitle')"
-      :subtitle="t('synthetics.pageSubtitle')"
-      class="px-4 border-b border-border-default"
-      icon="radar"
-    >
+  <OPageLayout
+    class="relative"
+    :title="t('synthetics.pageTitle')"
+    :subtitle="t('synthetics.pageSubtitle')"
+    icon="radar"
+    bleed
+  >
       <template #actions>
         <OButton
           size="sm"
@@ -18,12 +16,10 @@
           {{ t('synthetics.newCheck.button') }}
         </OButton>
       </template>
-    </AppPageHeader>
-
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
       <!-- LEFT SIDEBAR: folder navigation -->
-      <div class="w-[14.375rem] shrink-0 overflow-y-auto">
+      <div class="w-rail shrink-0 overflow-y-auto">
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
@@ -208,14 +204,14 @@
         />
       </div>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";

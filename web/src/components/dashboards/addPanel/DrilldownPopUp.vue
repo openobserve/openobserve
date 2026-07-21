@@ -36,7 +36,7 @@
       required
       data-test="dashboard-config-panel-drilldown-name"
     />
-    <div style="margin-top: 0.75rem">
+    <div class="mt-3">
       <OFormToggleGroup name="type" :label="t('dashboard.goTo')">
         <OToggleGroupItem
           value="byDashboard"
@@ -65,7 +65,7 @@
       </OFormToggleGroup>
     </div>
 
-    <div v-if="drilldownData.type === 'logs'" style="margin-top: 10px">
+    <div class="mt-2.5" v-if="drilldownData.type === 'logs'">
       <div>
         <OFormToggleGroup
           name="data.logsMode"
@@ -81,17 +81,22 @@
         v-if="drilldownData.data.logsMode === 'custom'"
       >
         <template #default="{ field }">
-          <div style="margin-top: 10px">
-            <label class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.enterCustomQuery") }}</label>
-            <query-editor
-              data-test="scheduled-alert-sql-editor"
-              ref="queryEditorRef"
-              editor-id="alerts-query-editor"
-              style="height: 80px"
-              :debounceTime="300"
-              :query="drilldownData.data.logsQuery"
-              @update:query="updateQueryValue"
-            />
+          <div class="mt-2.5">
+            <label class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.enterCustomQuery") }}</label>
+            <!-- Fixed-height wrapper: CodeQueryEditor's root is h-full, so it
+                 fills this box. Putting h-20 on the editor itself collides with
+                 that h-full and collapses the editor. -->
+            <div class="h-20 mt-1">
+              <query-editor
+                class="h-full"
+                data-test="scheduled-alert-sql-editor"
+                ref="queryEditorRef"
+                editor-id="alerts-query-editor"
+                :debounceTime="300"
+                :query="drilldownData.data.logsQuery"
+                @update:query="updateQueryValue"
+              />
+            </div>
             <span
               v-if="field.state.meta.errors.length > 0"
               class="text-xs text-input-error-text leading-none mt-1 block"
@@ -105,7 +110,7 @@
       </component>
     </div>
     <div v-if="drilldownData.type == 'byUrl'">
-      <div style="margin-top: 10px; display: flex; flex-direction: column">
+      <div class="mt-2.5 flex flex-col">
         <OFormTextarea
           name="data.url"
           :label="t('dashboard.enterUrl')"
@@ -116,8 +121,8 @@
     </div>
 
     <div v-if="drilldownData.type == 'byDashboard'">
-      <div style="margin-top: 10px">
-        <div class="flex items-center my-[10px] w-full">
+      <div class="mt-2.5">
+        <div class="flex items-center my-2.5 w-full">
           <OFormSelect
             name="data.folder"
             :options="folderList"
@@ -128,7 +133,7 @@
             data-test="dashboard-drilldown-folder-select"
           />
         </div>
-        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.folder">
+        <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.folder">
           <OFormSelect
             name="data.dashboard"
             :options="dashboardList"
@@ -139,7 +144,7 @@
             data-test="dashboard-drilldown-dashboard-select"
           />
         </div>
-        <div class="flex items-center my-[10px] w-full" v-if="drilldownData.data.dashboard">
+        <div class="flex items-center my-2.5 w-full" v-if="drilldownData.data.dashboard">
           <OFormSelect
             name="data.tab"
             :options="tabList"
@@ -152,16 +157,10 @@
         </div>
 
         <!-- array of variables name and its values -->
-        <div style="margin-top: 30px">
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              margin-bottom: 10px;
-              align-items: center;
-            "
+        <div class="mt-7.5">
+          <div class="flex justify-between mb-2.5 items-center"
           >
-            <span class="o-input-label text-sm font-semibold leading-tight">{{ t("dashboard.variables") }}</span>
+            <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("dashboard.variables") }}</span>
             <OButton
               variant="primary"
               size="sm"
@@ -176,8 +175,7 @@
             v-for="(variable, index) in drilldownData.data.variables"
             :key="index"
           >
-            <div
-              style="display: flex; gap: 0.625rem; margin-bottom: 0.625rem; align-items: center"
+            <div class="flex gap-2.5 mb-2.5 items-center"
               :key="JSON.stringify(variableNamesFn ?? {})"
             >
               <OFormCombobox
@@ -193,10 +191,9 @@
                 :items="options.selectedValue"
               />
 
-              <OIcon
+              <OIcon class="cursor-pointer shrink-0"
                 size="sm"
                 name="close"
-                style="cursor: pointer; flex-shrink: 0"
                 @click="() => removeVariableRow(index)"
                 :data-test="`dashboard-drilldown-variable-remove-${index}`"
               />
@@ -205,7 +202,7 @@
         </div>
       </div>
       <!-- radio button for new tab -->
-      <div style="margin-top: 10px">
+      <div class="mt-2.5">
         <OFormSwitch
           name="data.passAllVariables"
           :label="t('dashboard.passAllCurrentVariables')"
@@ -217,7 +214,7 @@
     </div>
 
     <!-- radio button for new tab -->
-    <div style="margin-top: 10px">
+    <div class="mt-2.5">
       <OFormSwitch
         name="targetBlank"
         :label="t('dashboard.openInNewTab')"
@@ -246,7 +243,7 @@ import {
   getDashboard,
   getFoldersList,
 } from "../../../utils/commons";
-import { onMounted, onUnmounted } from "vue";
+import { onMounted } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import DrilldownUserGuide from "@/components/dashboards/addPanel/DrilldownUserGuide.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
@@ -361,14 +358,14 @@ export default defineComponent({
           )
         : getDefaultDrilldownData();
 
-    // ── OForm wiring (rule ②/③: form is the SOLE source, no mirror) ───────────
-    // Every scalar control is `name=`-only (no v-model). `data.variables[]` is a
-    // FORM-OWNED field-array (indexed OFormCombobox names). `type`/`logsMode` are
+    // OForm wiring: the form is the sole source (no mirror). Every scalar
+    // control is `name=`-only (no v-model). `data.variables[]` is a form-owned
+    // field-array (indexed OFormCombobox names). `type`/`logsMode` are
     // OFormToggleGroup (name=-owned); only `logsQuery` (Monaco) is a non-OForm*
-    // widget bridged into the schema via setFieldValue. This component OWNS
-    // <OForm>, so it creates the form with useOForm and reads it reactively via
-    // form.useStore to drive the v-if (type/logsMode/folder/dashboard), the
-    // cascades, and the async loaders — ONE source of truth, no mirror (rule ③).
+    // widget bridged into the schema via setFieldValue. This component creates
+    // the form with useOForm and reads it reactively via form.useStore to drive
+    // the v-if (type/logsMode/folder/dashboard), the cascades, and the async
+    // loaders.
     const drilldownPopUpSchema = makeDrilldownPopUpSchema(t);
     const form = useOForm<DrilldownPopUpForm>({
       defaultValues: getRecordData(),
@@ -379,17 +376,28 @@ export default defineComponent({
 
     // Bridge the Monaco logsQuery + cascade resets + array-row mutations into the
     // single form.
+    const setField = form.setFieldValue as (
+      name: string,
+      val: unknown,
+    ) => void;
     const setFormField = (name: string, val: unknown) => {
-      form.setFieldValue(name, val);
+      setField(name, val);
     };
+    // Casts: array-field helpers need real array paths; this facade writes by
+    // field keys don't survive DeepKeysOfType and resolve to `never`.
     const addVariableRow = () =>
-      form.pushFieldValue("data.variables", { name: "", value: "" });
-    const removeVariableRow = (index: number) =>
-      form.removeFieldValue("data.variables", index);
+      (form.pushFieldValue as (field: string, value: unknown) => void)(
+        "data.variables",
+        { name: "", value: "" },
+      );
+    const removeVariableRow = (index: number | string) =>
+      (form.removeFieldValue as (field: string, index: number) => void)(
+        "data.variables",
+        Number(index),
+      );
 
-    // Reactive READ of the form values (rule ③: form.useStore, NOT a local copy)
-    // — drives the v-if (type/logsMode/folder/dashboard), the cascades, and the
-    // async loaders.
+    // Reactive read of the form values (form.useStore) — drives the v-if
+    // (type/logsMode/folder/dashboard), the cascades, and the async loaders.
     const drilldownData = form.useStore((s: any) => s.values);
     const dashboardList: any = ref([]);
     const tabList: any = ref([]);
@@ -553,8 +561,8 @@ export default defineComponent({
 
     // @submit fires only after the Zod schema passes (name required +
     // type-conditional url/logsQuery/folder/dashboard/tab rules). The validated
-    // `value` is the sole source of truth (rule ②) — it carries every field,
-    // including the form-owned `data.variables[]` rows.
+    // `value` carries every field, including the form-owned `data.variables[]`
+    // rows.
     const onSubmit = async (value: DrilldownPopUpForm) => {
       const record = JSON.parse(JSON.stringify(value));
       // if editmode then made changes
@@ -750,9 +758,9 @@ export default defineComponent({
         form.reset(getRecordData());
 
         // NOTE: dependent lists are loaded in onMounted + refreshed by the
-        // folder / dashboard / drilldownData watches — do NOT re-fetch them here.
-        // Refreshing on every open reset the selected org when navigating away
-        // (#12932), so that on-open refresh was removed.
+        // folder / dashboard / drilldownData watches — do NOT re-fetch them
+        // here. Refreshing on every open resets the selected org when
+        // navigating away.
       },
     );
 

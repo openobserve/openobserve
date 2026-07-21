@@ -3,7 +3,7 @@
        transform-type fields inline (#tabs) and the action buttons (#actions).
        The name + transType controls are form-owned (OForm*); the parent
        AddFunction.vue provides the <OForm> context they inject. -->
-  <AppPageHeader
+  <OPageHeader
     :title="t('function.addFunction')"
     :back="{ label: t('function.header'), onClick: redirectToFunctions, dataTest: 'add-function-back-btn' }"
   >
@@ -24,27 +24,34 @@
         </div>
         <!-- Transform Type Radio Buttons -->
         <div class="flex items-center gap-4 h-9">
-          <OFormRadioGroup name="transType" orientation="horizontal" class="items-center gap-4">
+          <!-- Language toggle hidden when a host forces a single language
+               (e.g. workflow function nodes are JS-only); the info tip stays. -->
+          <OFormRadioGroup v-if="!hideTransType" name="transType" orientation="horizontal" class="items-center gap-4">
             <div class="flex items-center gap-1">
               <ORadio value="0" data-test="function-transform-type-vrl-radio" />
-              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[0]?.label }}</span>
+              <span class="text-compact font-medium leading-none">{{ transformTypeOptions[0]?.label }}</span>
             </div>
             <!-- JavaScript option only shown in _meta organization -->
             <div v-if="transformTypeOptions[1]" class="flex items-center gap-1">
               <ORadio value="1" data-test="function-transform-type-js-radio" />
-              <span class="text-[13px] font-medium leading-none">{{ transformTypeOptions[1]?.label }}</span>
+              <span class="text-compact font-medium leading-none">{{ transformTypeOptions[1]?.label }}</span>
             </div>
           </OFormRadioGroup>
           <!-- Info icon with tooltip -->
           <OIcon
             name="info-outline"
             size="sm"
-            class="cursor-pointer text-gray-500 shrink-0"
+            class="cursor-pointer text-icon-color shrink-0"
           >
             <OTooltip>
               <template #content>
-                <div class="font-semibold mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
-                <div>{{ transTypeValue === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+                <!-- Wrap in one column container: OTooltip renders the #content
+                     slot inside an inline-flex row, so sibling blocks would sit
+                     side-by-side. A single flex-col child keeps title over body. -->
+                <div class="flex flex-col">
+                  <div class="font-semibold mb-1">{{ transTypeValue === '1' ? t('function.javascript') : t('function.vrl') }} Tip:</div>
+                  <div>{{ transTypeValue === '1' ? t('function.jsFunctionHint') : t('function.vrlFunctionHint') }}</div>
+                </div>
               </template>
             </OTooltip>
           </OIcon>
@@ -58,13 +65,13 @@
         size="icon-sm"
         @click="emit('open:chat',!store.state.isAiChatEnabled)"
         data-test="menu-link-ai-item"
-        class="![background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)] transition-[background,box-shadow] duration-300 ease-in-out hover:![background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] rounded-md"
+        class="![background:var(--color-gradient-ai-subtle)] transition-[background,box-shadow] duration-300 ease-in-out hover:![background:var(--color-gradient-ai)] hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] rounded-default"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         :disabled="isSubmitting"
         @mouseenter="isHovered = true"
         @mouseleave="isHovered = false"
       >
-        <img :src="getBtnLogo" class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100 [.ai-hover-btn:hover_&]:rotate-180 [.ai-hover-btn:hover_&]:[filter:brightness(0)_invert(1)]" />
+        <img :src="getBtnLogo" class="opacity-70 transition-transform duration-600 [.ai-btn-active_&]:!opacity-100" />
       </OButton>
       <OButton
         data-test="add-function-fullscreen-btn"
@@ -106,17 +113,19 @@
         {{ t('function.save') }}
       </OButton>
     </template>
-  </AppPageHeader>
+  </OPageHeader>
 </template>
 <script setup lang="ts">
 import {
   ref,
   computed,
+  type PropType,
 } from "vue";
 import { inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import config from "../../aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -125,7 +134,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import { toggleFullscreen } from "@/utils/dom";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 const { t } = useI18n();
@@ -135,6 +144,7 @@ const { t } = useI18n();
 const router = useRouter();
 
 const store = useStore();
+const { isDark } = useTheme();
 
 const props = defineProps({
   disableName: {
@@ -146,8 +156,14 @@ const props = defineProps({
     default: true,
   },
   transformTypeOptions: {
-    type: Array,
+    type: Array as PropType<{ label: string; value: string | number }[]>,
     default: () => [],
+  },
+  // Hides the VRL/JS language toggle entirely (used when a host forces a single
+  // language — e.g. workflow function nodes are JavaScript-only).
+  hideTransType: {
+    type: Boolean,
+    default: false,
   },
   /** Drives the Save spinner + disables sibling actions while the form submits. */
   isSubmitting: {
@@ -181,7 +197,7 @@ const getBtnLogo = computed(() => {
         return getImageURL('images/common/ai_icon_dark.svg')
       }
 
-      return store.state.theme === 'dark'
+      return isDark.value
         ? getImageURL('images/common/ai_icon_dark.svg')
         : getImageURL('images/common/ai_icon_gradient.svg')
     })

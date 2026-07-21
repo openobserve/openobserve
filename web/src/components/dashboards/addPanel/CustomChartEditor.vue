@@ -17,23 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-chart-editor-container"
-    class="card-container"
-    style="
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    "
+    class="bg-card-glass-bg w-full h-full overflow-hidden flex flex-col"
   >
-    <div
+    <div class="w-full h-full flex flex-col"
       data-test="dashboard-custom-chart-editor-inner"
-      style="width: 100%; height: 100%; display: flex; flex-direction: column"
     >
       <div
         data-test="dashboard-custom-chart-editor-flex-col"
-        class="flex flex-col"
-        style="height: 100%; display: flex; flex-direction: column"
+        class="flex flex-col h-full"
       >
         <QueryEditor
           v-model:query="javascriptCodeContent"
@@ -41,12 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:query="onEditorValueChange"
           data-test="dashboard-markdown-editor-query-editor"
           language="javascript"
-          class="javascript-query-editor"
-          style="padding-left: 20px; height: 100%; flex: 1"
-          :style="{
-            backgroundColor:
-              store.state.theme == 'dark' ? '#1e1e1e' : '#fafafa',
-          }"
+          class="javascript-query-editor pl-5 h-full flex-1 bg-code-block-bg"
+         
         />
       </div>
     </div>
@@ -70,7 +57,7 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
+      default: ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
   `,
     },
   },
@@ -116,9 +103,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-</style>

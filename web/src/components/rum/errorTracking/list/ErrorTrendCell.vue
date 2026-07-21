@@ -32,20 +32,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-for="(value, index) in displayBuckets"
           :key="index"
-          class="trend-bar w-1.5"
+          class="trend-bar rounded-default w-1.5"
           :class="
             value > 0
               ? isUnhandled
-                ? 'trend-bar--unhandled'
-                : 'trend-bar--handled'
-              : 'trend-bar--empty'
+                ? 'bg-severity-error-color opacity-55'
+                : 'bg-severity-warning-color opacity-55'
+              : 'bg-card-glass-border opacity-60'
           "
           :style="{ height: barHeight(value) }"
         />
       </div>
       <small
-        class="trend-annotation"
-        :class="`trend-annotation--${annotation.kind}`"
+        class="italic"
+        :class="annotationClass"
         data-test="rum-error-trend-cell-annotation"
         >{{ annotationLabel }}</small
       >
@@ -62,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span
         v-for="index in 12"
         :key="index"
-        class="trend-bar trend-bar--empty w-1.5"
+        class="trend-bar rounded-default bg-card-glass-border opacity-60 w-1.5"
         :style="{ height: `${20 + ((index * 11) % 60)}%` }"
       />
     </div>
 
     <span
       v-else
-      class="text-[var(--o2-text-muted)]"
+      class="text-text-muted"
       :title="t('rum.trendNoData')"
       data-test="rum-error-trend-cell-empty"
       >—</span
@@ -166,6 +166,19 @@ const annotation = computed(() =>
   computeTrendAnnotation(props.buckets, props.status),
 );
 
+// Static per-kind utility strings (not built by interpolation) so Tailwind's
+// scanner sees every class it has to emit.
+const ANNOTATION_CLASS: Record<string, string> = {
+  spike: "text-severity-error-color not-italic font-semibold",
+  drop: "text-status-success-text",
+  new: "text-text-secondary",
+  flat: "text-text-secondary",
+};
+
+const annotationClass = computed(
+  () => ANNOTATION_CLASS[annotation.value.kind] ?? "",
+);
+
 const annotationLabel = computed(() => {
   const { kind, factor } = annotation.value;
   if (kind === "spike") return `▲ ${factor!.toFixed(1)}×`;
@@ -193,42 +206,3 @@ const ariaLabel = computed(() =>
 );
 </script>
 
-<style scoped lang="scss">
-.trend-bar {
-  border-radius: 0.0625rem;
-
-  &--unhandled {
-    background: var(--o2-severity-error-color);
-    opacity: 0.55;
-  }
-
-  &--handled {
-    background: var(--o2-severity-warning-color);
-    opacity: 0.55;
-  }
-
-  &--empty {
-    background: var(--o2-border-color);
-    opacity: 0.6;
-  }
-}
-
-.trend-annotation {
-  font-style: italic;
-
-  &--spike {
-    color: var(--o2-severity-error-color);
-    font-style: normal;
-    font-weight: var(--font-semibold);
-  }
-
-  &--drop {
-    color: var(--o2-status-success-text);
-  }
-
-  &--new,
-  &--flat {
-    color: var(--o2-text-caption);
-  }
-}
-</style>

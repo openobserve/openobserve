@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import i18n from "@/locales";
@@ -111,7 +111,11 @@ describe("SyntaxGuide", () => {
       const menu = document.querySelector('[data-test="syntax-guide-menu"]');
       expect(menu).toBeTruthy();
 
-      const title = document.querySelector(".syntax-guide-title .label");
+      // The .syntax-guide-title hook was removed when the rule moved to template
+
+      // utilities; the title still renders as .label inside the menu panel.
+
+      const title = document.querySelector('[data-test="syntax-guide-menu"] .label');
       expect(title?.textContent).toBe("Syntax Guide");
     });
 
@@ -120,10 +124,12 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const guideList = document.querySelector(".guide-list");
+      // .guide-list hook removed with its rule; the list is the panel's own <ul>.
+
+      const guideList = document.querySelector('[data-test="syntax-guide-menu"] ul');
       expect(guideList).toBeTruthy();
 
-      const listItems = document.querySelectorAll(".guide-list li");
+      const listItems = document.querySelectorAll('[data-test="syntax-guide-menu"] ul li');
       expect(listItems.length).toBeGreaterThan(0);
 
       // Check for specific normal mode content
@@ -159,7 +165,11 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const title = document.querySelector(".syntax-guide-title .label");
+      // The .syntax-guide-title hook was removed when the rule moved to template
+
+      // utilities; the title still renders as .label inside the menu panel.
+
+      const title = document.querySelector('[data-test="syntax-guide-menu"] .label');
       expect(title?.textContent).toBe("Syntax Guide: SQL Mode");
     });
 
@@ -168,10 +178,12 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const guideList = document.querySelector(".guide-list");
+      // .guide-list hook removed with its rule; the list is the panel's own <ul>.
+
+      const guideList = document.querySelector('[data-test="syntax-guide-menu"] ul');
       expect(guideList).toBeTruthy();
 
-      const listItems = document.querySelectorAll(".guide-list li");
+      const listItems = document.querySelectorAll('[data-test="syntax-guide-menu"] ul li');
       expect(listItems.length).toBeGreaterThan(0);
 
       // Check for specific SQL mode content
@@ -274,6 +286,10 @@ describe("SyntaxGuide", () => {
 
   // ─── New tests covering functionality added after Dec 29 2025 ───────────────
 
+  // Theming contract: `.dark` on <html> + --color-* tokens that flip
+  // automatically. The menu no longer carries a per-theme root class; it is
+  // styled solely by `.syntax-guide-menu` + tokens. These tests assert what the
+  // menu renders now AND guard that the legacy mechanism has not come back.
   describe("Menu theme class", () => {
     afterEach(() => {
       store.state.theme = "dark"; // restore shared store default
@@ -285,38 +301,60 @@ describe("SyntaxGuide", () => {
         .forEach((m) => m.remove());
     });
 
-    it("should apply theme-light class to menu when store theme is light", async () => {
+    it("should style the menu with tokens, not a theme-light class, when store theme is light", async () => {
       store.state.theme = "light";
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
       await button.trigger("click");
       await flushPromises();
 
       const menu = document.querySelector('[data-test="syntax-guide-menu"]');
-      expect(menu?.classList.contains("theme-light")).toBe(true);
+      expect(menu).not.toBeNull();
+      expect(menu?.classList.contains("syntax-guide-menu")).toBe(true);
+      expect(menu?.classList.contains("theme-light")).toBe(false);
+      expect(menu?.classList.contains("light-mode")).toBe(false);
     });
 
-    it("should apply theme-dark class to menu when store theme is dark", async () => {
-      const { createStore } = await import("vuex");
-      const darkStore = createStore({ state: { theme: "dark" } });
-
-      const darkWrapper = mount(SyntaxGuide, {
-        attachTo: "#app",
-        props: { sqlmode: false },
-        global: {
-          provide: { store: darkStore },
-          plugins: [i18n],
-        },
-      });
-
-      await flushPromises();
-      const button = darkWrapper.find('[data-cy="syntax-guide-button"]');
+    it("should style the menu with tokens, not a theme-dark class, when store theme is dark", async () => {
+      store.state.theme = "dark";
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
       await button.trigger("click");
       await flushPromises();
 
       const menu = document.querySelector('[data-test="syntax-guide-menu"]');
-      expect(menu?.classList.contains("theme-dark")).toBe(true);
+      expect(menu).not.toBeNull();
+      expect(menu?.classList.contains("syntax-guide-menu")).toBe(true);
+      expect(menu?.classList.contains("theme-dark")).toBe(false);
+      expect(menu?.classList.contains("dark-mode")).toBe(false);
+    });
 
-      darkWrapper.unmount();
+    it("should render the same menu classes regardless of store theme", async () => {
+      // Theme is not a render input for the menu: its class list must be
+      // identical across themes, since the visual difference comes from
+      // --color-* token values resolved in CSS.
+      const classesForTheme = async (theme: string) => {
+        store.state.theme = theme;
+        const w = mount(SyntaxGuide, {
+          attachTo: "#app",
+          props: { sqlmode: false },
+          global: { provide: { store }, plugins: [i18n] },
+        });
+        await flushPromises();
+        await w.find('[data-cy="syntax-guide-button"]').trigger("click");
+        await flushPromises();
+        const menu = document.querySelector('[data-test="syntax-guide-menu"]');
+        const classes = [...(menu?.classList ?? [])].sort().join(" ");
+        w.unmount();
+        document
+          .querySelectorAll('[data-test="syntax-guide-menu"]')
+          .forEach((m) => m.remove());
+        return classes;
+      };
+
+      const light = await classesForTheme("light");
+      const dark = await classesForTheme("dark");
+
+      expect(light).toContain("syntax-guide-menu");
+      expect(dark).toBe(light);
     });
   });
 

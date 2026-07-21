@@ -1,19 +1,18 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for DrilldownPopUp.vue. The drilldown record is a nested
-// object; the form owns its scalar fields and the schema reproduces the old
-// `isFormValid`/`nameError`/inline-URL gate as a Zod `superRefine` keyed off the
-// drilldown `type`:
-//   • name              → always required (was nameError + isFormValid guard)
-//   • type === byUrl     → data.url required + protocol regex (was inline URL div)
+// object; the form owns its scalar fields and a Zod `superRefine` gates them
+// off the drilldown `type`:
+//   • name              → always required
+//   • type === byUrl     → data.url required + protocol regex
 //   • type === logs      → data.logsQuery required when logsMode === "custom"
 //   • type === byDashboard → data.folder + data.dashboard + data.tab required
 //
 // Field wiring (all name=-owned; the form is the sole source):
-//   • type / logsMode are OFormToggleGroup (name=-owned); superRefine branches on
-//     them. Only logsQuery (Monaco) is a non-OForm* widget whose value is bridged
-//     into the schema via setFieldValue.
-//   • data.variables[] is a FORM-OWNED field-array (indexed OFormCombobox rows,
+//   • type / logsMode are OFormToggleGroup; superRefine branches on them. Only
+//     logsQuery (Monaco) is a non-OForm* widget whose value is bridged into the
+//     schema via setFieldValue.
+//   • data.variables[] is a form-owned field-array (indexed OFormCombobox rows,
 //     name `data.variables[i].name/value`); kept loose here (no per-row rule).
 //
 // Validation TIMING is owned by OForm (submit-then-change). Factory keeps the
@@ -21,10 +20,10 @@
 
 import { z } from "zod";
 
-// Protocol-only URL check (mirrors the old isFormURLValid regex).
+// Protocol-only URL check.
 const URL_PROTOCOL_REGEX = /^(http|https|ftp|file|mailto|telnet|data|ws|wss):\/\//;
 
-// DEFERRED array row — kept loose; not enforced in this pass.
+// Array row — kept loose (no per-row rules).
 export const drilldownVariableRowSchema = z.object({
   name: z.string().optional().default(""),
   value: z.string().optional().default(""),
@@ -46,17 +45,28 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
           dashboard: z.string().optional().default(""),
           tab: z.string().optional().default(""),
           passAllVariables: z.boolean().optional().default(true),
-          // DEFERRED dynamic array — not enforced (see header note).
+          // Dynamic array — kept loose (no per-row rules).
           variables: z
             .array(drilldownVariableRowSchema)
             .optional()
             .default([]),
         })
-        .default({}),
+        // Fully-shaped default: zod v4's .default() returns the value as-is
+        // (no inner-default fill), so it must match the output shape.
+        .default({
+          logsMode: "auto",
+          logsQuery: "",
+          url: "",
+          folder: "",
+          dashboard: "",
+          tab: "",
+          passAllVariables: true,
+          variables: [],
+        }),
     })
     .superRefine((val, ctx) => {
       const trimmed = (s: unknown) => String(s ?? "").trim();
-      const data = val.data ?? {};
+      const data = val.data ?? ({} as NonNullable<typeof val.data>);
 
       if (val.type === "byUrl") {
         const url = trimmed(data.url);

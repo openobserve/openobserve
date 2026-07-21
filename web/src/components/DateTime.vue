@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'min-w-[286px]': !disableRelative && selectedType === 'absolute',
+            'min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
           }"
           :disabled="disable"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span class="date-time-label font-semibold flex-1 text-left">{{ triggerLabel }}</span>
           <template #icon-right
-            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow transition-transform duration-250 ml-auto text-[18px]!"
+            ><OIcon name="arrow-drop-down" size="sm" class="date-time-arrow transition-transform duration-250 ml-auto text-lg!"
           /></template>
         </OButton>
       </template>
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanel v-if="!disableRelative" name="relative">
             <div class="date-time-table relative flex flex-col">
               <div
-                class="relative-row flex items-center border-b border-(--o2-border) pl-3 py-2"
+                class="relative-row [&>*]:mr-1.5 flex items-center border-b border-border-default pl-3 py-2"
                 v-for="(period, index) in relativePeriods"
                 :key="'date_' + index"
               >
@@ -93,12 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       queryRangeRestrictionInHour > 0
                     "
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
+                    class="h-8! w-8! font-bold! disabled:opacity-35"
                     :class="
                       selectedType == 'relative' &&
                       relativePeriod == period.value &&
                       relativeValue == item
-                        ? 'rp-selector-selected'
-                        : `rp-selector ${relativePeriod}`
+                        ? 'bg-button-primary! text-button-primary-foreground!'
+                        : `bg-[color-mix(in_srgb,var(--color-text-heading)_7%,transparent)]! ${relativePeriod}`
                     "
                     variant="ghost"
                     size="xs"
@@ -121,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
-              <div class="relative-row flex items-center border-b border-(--o2-border) px-3 py-2">
+              <div class="relative-row [&>*]:mr-1.5 flex items-center border-b border-border-default px-3 py-2">
                 <div class="text-sm font-semibold min-w-18.75">{{ t("common.custom") }}</div>
                 <OTooltip
                   side="right"
@@ -180,14 +181,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:end-date="selectedDate.to = $event"
                 />
               </div>
-              <div class="pr-6 pl-6 text-[0.625rem]">{{ t("common.datetimeMessage") }}</div>
+              <div class="pr-6 pl-6 text-3xs">{{ t("common.datetimeMessage") }}</div>
               <OSeparator v-if="!disableRelative" class="my-2" />
 
               <table v-if="!hideRelativeTime" class="px-3 w-[calc(100%-0.8rem)] mx-[0.4rem] mt-2 mb-[0.3rem] startEndTime">
                 <tbody>
                   <tr>
-                    <td class="label o-input-label pr-1.5 text-xs font-semibold w-1/2">Start time</td>
-                    <td class="label o-input-label pl-1.5 text-xs font-semibold w-1/2">End time</td>
+                    <td class="label o-input-label text-compact font-medium leading-tight text-input-label-text pr-1.5 w-1/2">Start time</td>
+                    <td class="label o-input-label text-compact font-medium leading-tight text-input-label-text pl-1.5 w-1/2">End time</td>
                   </tr>
                   <tr>
                     <td class="pr-1.5 w-1/2">
@@ -269,7 +270,6 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
-// @ts-nocheck
 import {
   ref,
   defineComponent,
@@ -277,10 +277,9 @@ import {
   onMounted,
   watch,
   nextTick,
-  onActivated,
-  onBeforeUnmount,
-  onBeforeMount,
+  type PropType,
 } from "vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import {
   getImageURL,
   useLocalTimezone,
@@ -290,8 +289,17 @@ import {
 import { subtractRelativeTime } from "@/utils/date";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
 import { toZonedTime } from "date-fns-tz";
+
+interface ConsumableDateTime {
+  startTime: number;
+  endTime: number;
+  relativeTimePeriod: string | null;
+  selectedDate?: unknown;
+  selectedTime?: unknown;
+  valueType?: string;
+  userChangedValue?: boolean;
+}
 
 export default defineComponent({
   components: {
@@ -325,6 +333,7 @@ export default defineComponent({
       default: false,
     },
     initialTimezone: {
+      type: String as PropType<string | null>,
       required: false,
       default: null,
     },
@@ -361,11 +370,11 @@ export default defineComponent({
       default: null,
     },
     menuAlign: {
-      type: String,
+      type: String as PropType<"center" | "start" | "end">,
       default: "end",
     },
     variant: {
-      type: String,
+      type: String as PropType<ButtonVariant>,
       default: "outline",
     },
   },
@@ -394,7 +403,6 @@ export default defineComponent({
     });
     const browserTime =
       "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
-    const router = useRouter();
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
@@ -455,7 +463,7 @@ export default defineComponent({
       { label: t("common.months"), value: "M" },
     ]);
 
-    const relativeDates = {
+    const relativeDates: Record<string, number[]> = {
       s: [1, 5, 10, 15, 30, 45],
       m: [1, 5, 10, 15, 30, 45],
       h: [1, 2, 3, 6, 8, 12],
@@ -464,7 +472,7 @@ export default defineComponent({
       M: [1, 2, 3, 4, 5, 6],
     };
 
-    const relativeDatesInHour = {
+    const relativeDatesInHour: Record<string, number[]> = {
       s: [1, 1, 1, 1, 1, 1],
       m: [1, 1, 1, 1, 1, 1],
       h: [1, 2, 3, 6, 8, 12],
@@ -473,7 +481,7 @@ export default defineComponent({
       M: [744, 1488, 2232, 2976, 3720, 4464],
     };
 
-    let relativePeriodsMaxValue: object = ref({
+    let relativePeriodsMaxValue = ref<Record<string, number>>({
       s: 0,
       m: 0,
       h: 0,
@@ -490,17 +498,10 @@ export default defineComponent({
 
     /**
      * The label as of the last APPLY, which is what the trigger button shows.
-     *
-     * `getDisplayValue` reads the picker's *pending* selection — the refs that
-     * clicking "Past 6 Hours" mutates on the spot. With `autoApply` that is also
-     * the applied range, so the two never disagree. WITHOUT it (dashboards, the
-     * metrics explorer) a selection only takes effect when the user presses
-     * Apply, so binding the trigger to the pending label made the button
-     * advertise a window that nothing was querying yet: pick "Past 6 Hours",
-     * don't apply, and the button reads 6h while the panels are still on 15m.
-     *
-     * So the trigger renders this instead: the range that is actually in force.
-     * Every path that genuinely applies a range stamps it via `markApplied`.
+     * With `autoApply` off, a selection only takes effect when the user presses
+     * Apply, so the trigger renders the range actually in force rather than the
+     * pending selection in `getDisplayValue`. Every path that applies a range
+     * stamps it via `markApplied`.
      */
     const appliedDisplayValue = ref("");
 
@@ -588,7 +589,7 @@ export default defineComponent({
       },
     );
 
-    const setRelativeDate = (period, value) => {
+    const setRelativeDate = (period: string, value: number) => {
       selectedType.value = "relative";
       relativePeriod.value = period;
       relativeValue.value = value;
@@ -608,12 +609,13 @@ export default defineComponent({
             : 15;
       }
 
-      relativeValue.value = parseInt(relativeValue.value);
+      // relativeValue can hold a string at runtime (text input); parseInt coerces
+      relativeValue.value = parseInt(relativeValue.value as unknown as string);
 
       if (props.autoApply) saveDate("relative-custom");
     };
 
-    const setRelativeTime = (period) => {
+    const setRelativeTime = (period: string) => {
       const periodString = period?.match(/(\d+)([smhdwM])/);
 
       if (periodString) {
@@ -630,7 +632,7 @@ export default defineComponent({
       }
     };
 
-    const resetTime = (startTime, endTime) => {
+    const resetTime = (startTime: string, endTime: string) => {
       if (!startTime || !endTime) {
         var dateString = new Date().toLocaleDateString("en-ZA");
 
@@ -654,7 +656,7 @@ export default defineComponent({
       return;
     };
 
-    const setAbsoluteTime = (startTime, endTime) => {
+    const setAbsoluteTime = (startTime: number, endTime: number) => {
       // Parent-invoked setter — the resulting auto-apply emit is programmatic.
       markProgrammaticDateChange();
       if (!startTime || !endTime) {
@@ -674,7 +676,7 @@ export default defineComponent({
       selectedTime.value.endTime = endDateTime.time;
     };
 
-    function convertUnixTime(unixTimeMicros) {
+    function convertUnixTime(unixTimeMicros: number) {
       // Convert microseconds to milliseconds and create a new Date object
       var date = toZonedTime(unixTimeMicros / 1000, store.state.timezone);
 
@@ -716,16 +718,14 @@ export default defineComponent({
      * Promote the pending selection to the applied one, so the trigger button
      * starts advertising it. Called from every path that actually puts a range
      * into force — Apply, `refresh()`, mount, and the parent-invoked setters.
-     * Deliberately NOT called from `setRelativeDate` / `onCustomPeriodSelect` /
-     * the popup's absolute inputs when `autoApply` is off: those are pending
-     * until the user presses Apply, and that is exactly the gap the trigger was
-     * lying about.
+     * NOT called from `setRelativeDate` / `onCustomPeriodSelect` / the popup's
+     * absolute inputs when `autoApply` is off: those stay pending until Apply.
      */
     const markApplied = () => {
       appliedDisplayValue.value = getDisplayValue.value;
     };
 
-    const saveDate = (dateType) => {
+    const saveDate = (dateType?: string | null) => {
       markApplied();
       const date = getConsumableDateTime();
       // if (isNaN(date.endTime) || isNaN(date.startTime)) {
@@ -740,7 +740,7 @@ export default defineComponent({
       }
     };
 
-    function formatDate(d) {
+    function formatDate(d: Date) {
       var year = d.getFullYear();
       var month = ("0" + (d.getMonth() + 1)).slice(-2); // Months are zero-based
       var day = ("0" + d.getDate()).slice(-2);
@@ -754,7 +754,10 @@ export default defineComponent({
       };
     }
 
-    const setCustomDate = (dateType, dateobj) => {
+    const setCustomDate = (
+      dateType: string,
+      dateobj: { start: number; end: number },
+    ) => {
       // Parent-invoked setter (e.g. metrics-brush time range) — programmatic.
       var start_date = new Date(Math.floor(dateobj.start));
       const startObj = formatDate(start_date);
@@ -769,8 +772,6 @@ export default defineComponent({
 
       selectedType.value = dateType;
       markProgrammaticDateChange();
-      // A parent-invoked range (chart brush-zoom, saved view) is applied by the
-      // act of setting it — not left pending on an Apply the user never sees.
       markApplied();
     };
 
@@ -784,7 +785,7 @@ export default defineComponent({
     };
 
     const getPeriodLabel = computed(() => {
-      const periodMapping = {
+      const periodMapping: Record<string, string> = {
         s: "Seconds",
         m: "Minutes",
         h: "Hours",
@@ -799,7 +800,7 @@ export default defineComponent({
       return !isNaN(Date.parse(`${dateStr} ${timeStr}`));
     }
 
-    const getConsumableDateTime = () => {
+    const getConsumableDateTime = (): ConsumableDateTime => {
       if (selectedType.value == "relative") {
         let period = getPeriodLabel.value.toLowerCase();
         let periodValue = relativeValue.value;
@@ -810,7 +811,7 @@ export default defineComponent({
           periodValue = periodValue * 7;
         }
 
-        const subtractObject = {};
+        const subtractObject: Record<string, number> = {};
 
         if (period && periodValue) subtractObject[period] = periodValue;
         else {
@@ -912,12 +913,15 @@ export default defineComponent({
         selectedType.value = "relative";
       } else {
         if (
-          dateobj.hasOwnProperty("selectedDate") &&
-          dateobj.hasOwnProperty("selectedTime") &&
-          dateobj.selectedDate.hasOwnProperty("from") &&
-          dateobj.selectedDate.hasOwnProperty("to") &&
-          dateobj.selectedTime.hasOwnProperty("startTime") &&
-          dateobj.selectedTime.hasOwnProperty("endTime")
+          Object.prototype.hasOwnProperty.call(dateobj, "selectedDate") &&
+          Object.prototype.hasOwnProperty.call(dateobj, "selectedTime") &&
+          Object.prototype.hasOwnProperty.call(dateobj.selectedDate, "from") &&
+          Object.prototype.hasOwnProperty.call(dateobj.selectedDate, "to") &&
+          Object.prototype.hasOwnProperty.call(
+            dateobj.selectedTime,
+            "startTime",
+          ) &&
+          Object.prototype.hasOwnProperty.call(dateobj.selectedTime, "endTime")
         ) {
           selectedDate.value = dateobj.selectedDate;
           selectedTime.value = dateobj.selectedTime;
@@ -946,10 +950,7 @@ export default defineComponent({
     );
 
     const getDisplayValue = computed(() => {
-      if (props.disableRelative) {
-        selectedType.value = "absolute";
-      }
-      if (selectedType.value === "relative") {
+      if (!props.disableRelative && selectedType.value === "relative") {
         return `Past ${relativeValue.value} ${getPeriodLabel.value}`;
       } else {
         if (selectedDate.value != null) {
@@ -978,7 +979,7 @@ export default defineComponent({
       }
     });
 
-    const timezoneFilterFn = (val, update) => {
+    const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
       filteredTimezone.value = filterColumns(timezoneOptions, val, update);
     };
 
@@ -999,7 +1000,7 @@ export default defineComponent({
       return filteredOptions;
     };
 
-    const optionsFn = (date) => {
+    const optionsFn = (date: string) => {
       const formattedDate = timestampToTimezoneDate(
         new Date().getTime(),
         store.state.timezone,
@@ -1011,7 +1012,7 @@ export default defineComponent({
       return date >= "1999/01/01" && date <= formattedDate;
     };
 
-    const setDateType = (type) => {
+    const setDateType = (type: string) => {
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
       if (props.autoApply)
@@ -1169,6 +1170,7 @@ export default defineComponent({
           if (relativePeriodsMaxValue.value[period.value] > -1) {
             return period;
           }
+          return undefined;
         });
 
         if (props.queryRangeRestrictionInHour > 0) {
@@ -1288,12 +1290,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.date-time-button.isOpen .date-time-arrow {
-  transform: rotate(180deg);
-}
-
-.date-time-table .relative-row > * {
-  margin-right: 6px;
-}
-</style>

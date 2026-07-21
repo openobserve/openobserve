@@ -44,7 +44,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
 // Mock color palette utility
 const mockColorPalette = ["#ff0000", "#00ff00", "#0000ff", "#ffff00"];
 vi.mock("@/utils/dashboard/colorPalette", () => ({
-  getColorPalette: vi.fn((theme: string) => mockColorPalette),
+  getColorPalette: vi.fn(() => mockColorPalette),
 }));
 
 // Mock Vuex store
@@ -463,7 +463,7 @@ describe("ColorPaletteDropDown", () => {
       expect(flexContainer.classes()).toContain("items-center");
     });
 
-    it("should render q-select with correct props", () => {
+    it("should render the select with correct props", () => {
       const select = wrapper.find("[data-test='color-palette-select']");
       expect(select.exists()).toBeTruthy();
     });
@@ -712,7 +712,6 @@ describe("ColorPaletteDropDown", () => {
     it("should maintain reactivity throughout lifecycle", async () => {
       wrapper = createWrapper();
 
-      const initialMode = mockDashboardPanelData.data.config.color.mode;
       mockDashboardPanelData.data.config.color.mode = "fixed";
       await nextTick();
 

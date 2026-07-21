@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Source Event Banner -->
   <div
     v-if="sourceEvent && (sourceEvent.timestamp || sourceEvent.message)"
-    class="source-event-banner flex items-start gap-3 px-4 py-2 border-b border-solid border-[var(--o2-border-color)]"
+    class="flex items-start gap-3 px-page-edge py-2 border-b border-solid border-card-glass-border bg-card-glass-bg"
   >
     <OTag
       v-if="sourceEvent.severity"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
     <span
       v-if="sourceEvent.message"
-      class="text-xs flex-1 font-mono text-typography-meta source-event-message"
+      class="text-xs flex-1 font-mono text-typography-meta line-clamp-2 text-ellipsis whitespace-normal wrap-break-word leading-[1.4]"
       :title="sourceEvent.message"
     >
       {{ sourceEvent.message }}
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Chips Row -->
   <div
     v-if="hasChips || $slots['chip-actions']"
-    class="flex items-center gap-6 px-4 border-b border-solid border-[var(--o2-border-color)]"
+    class="flex items-center gap-6 px-page-edge border-b border-solid border-card-glass-border"
   >
     <!-- Context chips (Correlated by) — flex-1 so it occupies exactly the space
          left after the shrink-0 subject section (toggles + dynamic badge). Its
@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="single"
         size="xs"
         class="h-7!"
-        @update:model-value="(v: string | undefined) => emit('update:activeSubject', v ?? null)"
+        @update:model-value="(v: boolean | AcceptableValue | AcceptableValue[]) => emit('update:activeSubject', typeof v === 'string' ? v : null)"
       >
         <OToggleGroupItem
           v-for="chip in subjectChips"
@@ -158,6 +158,7 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import type { AcceptableValue } from "reka-ui";
 import {
   convertTimeFromNsToMs,
   convertTimeFromMicroToMilli,
@@ -317,19 +318,3 @@ const formatEventTimestamp = (ts: number | string | undefined): string => {
   }
 };
 </script>
-
-<style scoped>
-.source-event-banner {
-  background: var(--o2-card-bg, var(--o2-bg-color));
-}
-.source-event-message {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: normal;
-  word-break: break-word;
-  line-height: 1.4;
-}
-</style>

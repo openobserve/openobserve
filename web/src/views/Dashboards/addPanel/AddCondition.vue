@@ -2,10 +2,10 @@
   <div class="condition flex items-center gap-2">
     <OSelect
       v-if="conditionIndex !== 0"
-      v-model="condition.logicalOperator"
+      v-model="conditionModel.logicalOperator"
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator w-fit max-w-[8rem]"
+      class="condition-logical-operator w-fit max-w-32"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup class="axis-field shrink-0" radius="sm">
@@ -23,11 +23,11 @@
           </OButton>
         </template>
         <div class="p-4 w-72">
-          <div style="display: flex; align-items: center; gap: 4px">
+          <div class="flex items-center gap-1">
             <StreamFieldSelect
               class="w-full"
               :streams="getAllSelectedStreams()"
-              v-model="condition.column"
+              v-model="conditionModel.column"
               :data-test="`dashboard-add-condition-column-${conditionIndex}`"
             />
             <OButton
@@ -42,7 +42,7 @@
           <div>
             <div class="p-1">
               <div class="gap-1">
-                <OTabs v-model="condition.type" dense>
+                <OTabs v-model="conditionModel.type" dense>
                   <OTab
                     name="list"
                     :label="t('common.list')"
@@ -58,16 +58,15 @@
                 </OTabs>
                 <OSeparator />
                 <div>
-                  <OTabPanels v-model="condition.type" animated>
+                  <OTabPanels v-model="conditionModel.type" animated>
                     <OTabPanel name="condition">
                       <div class="flex flex-col gap-2">
                         <OSelect
-                          v-model="condition.operator"
+                          v-model="conditionModel.operator"
                           :options="operators"
                           :label="t('common.operator')"
-                          style="width: 100%"
                           data-test="dashboard-add-condition-operator"
-                          class="o2-custom-select-dashboard"
+                          class="o2-custom-select-dashboard w-full"
                         />
                         <OCombobox
                           v-if="
@@ -76,7 +75,7 @@
                             )
                           "
                           :label="t('common.value')"
-                          v-model="condition.value"
+                          v-model="conditionModel.value"
                           :items="dashboardVariablesFilterItems"
                           search-regex="(?:^|[^$])\$?(\w+)"
                           data-test="dashboard-add-condition-value"
@@ -85,7 +84,7 @@
                     </OTabPanel>
                     <OTabPanel name="list">
                       <OSelect
-                        v-model="condition.values"
+                        v-model="conditionModel.values"
                         :options="sortedFilteredListOptions"
                         :label="t('common.selectFilter')"
                         multiple
@@ -125,6 +124,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
@@ -171,6 +171,9 @@ export default defineComponent({
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18n();
     const searchTerm = ref("");
+
+    // Same reference as props.condition; mutation targets its nested fields only.
+    const conditionModel = computed(() => props.condition);
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
       useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
 
@@ -236,7 +239,7 @@ export default defineComponent({
           : builtCondition;
     };
 
-    const emitLogicalOperatorChange = (newOperator: string) => {
+    const emitLogicalOperatorChange = (newOperator: SelectModelValue) => {
       emit("logical-operator-change", newOperator);
     };
 
@@ -245,14 +248,14 @@ export default defineComponent({
     };
 
     const removeColumnName = () => {
-      props.condition.column = {};
+      conditionModel.value.column = {};
     };
 
     watch(
       () => props.condition.column,
       (newColumn, oldColumn) => {
         if (newColumn !== oldColumn) {
-          props.condition.values = [];
+          conditionModel.value.values = [];
         }
       },
     );
@@ -274,6 +277,7 @@ export default defineComponent({
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
+      conditionModel,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,
       getAllSelectedStreams,

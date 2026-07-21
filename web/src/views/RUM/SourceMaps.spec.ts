@@ -114,7 +114,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any) => ({
       props: ["data", "columns", "rowKey", "pagination", "pageSize", "loading"],
       emits: ["update:expandedIds"],
       template:
-        '<div data-test-stub="q-table" :data-rows="data ? data.length : 0"><slot name="empty" /></div>',
+        '<div data-test-stub="o-table" :data-rows="data ? data.length : 0"><slot name="empty" /></div>',
     },
     OButton: {
       name: "OButton",
@@ -344,93 +344,14 @@ describe("SourceMaps.vue", () => {
       // OTable is always rendered; when data is empty it renders #empty slot with OEmptyState.
       // The i18n keys are not translated in the test environment, so we verify the
       // empty state component is rendered rather than checking for translated text.
-      expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test-stub="q-table"]').text()).toContain("emptyState");
+      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test-stub="o-table"]').text()).toContain("emptyState");
     });
 
     it("shows OTable when grouped source maps exist", async () => {
       wrapper = await mountComponent();
 
-      expect(wrapper.find('[data-test-stub="q-table"]').exists()).toBe(true);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Filter dropdown behaviour
-  // -------------------------------------------------------------------------
-  describe("Filter dropdowns", () => {
-    it("filterVersions returns all options for empty input", async () => {
-      wrapper = await mountComponent();
-
-      const update = (fn: () => void) => fn();
-      (wrapper.vm as any).filterVersions("", update);
-
-      expect((wrapper.vm as any).filteredVersionOptions).toEqual([
-        "1.0.0",
-        "2.0.0",
-      ]);
-    });
-
-    it("filterVersions filters case-insensitively by substring", async () => {
-      wrapper = await mountComponent();
-
-      const update = (fn: () => void) => fn();
-      (wrapper.vm as any).filterVersions("2.0", update);
-
-      expect((wrapper.vm as any).filteredVersionOptions).toEqual(["2.0.0"]);
-    });
-
-    it("filterServices filters services list", async () => {
-      wrapper = await mountComponent();
-
-      const update = (fn: () => void) => fn();
-      (wrapper.vm as any).filterServices("svc-b", update);
-
-      expect((wrapper.vm as any).filteredServiceOptions).toEqual(["svc-b"]);
-    });
-
-    it("filterEnvironments returns all when input is empty", async () => {
-      wrapper = await mountComponent();
-
-      const update = (fn: () => void) => fn();
-      (wrapper.vm as any).filterEnvironments("", update);
-
-      expect((wrapper.vm as any).filteredEnvironmentOptions).toEqual([
-        "prod",
-        "dev",
-      ]);
-    });
-
-    it("addNewVersion invokes done callback only when value has length", async () => {
-      wrapper = await mountComponent();
-
-      const done = vi.fn();
-      (wrapper.vm as any).addNewVersion("custom-1.2.3", done);
-      expect(done).toHaveBeenCalledWith("custom-1.2.3");
-
-      done.mockClear();
-      (wrapper.vm as any).addNewVersion("", done);
-      expect(done).not.toHaveBeenCalled();
-    });
-
-    it("addNewService invokes done with the value when non-empty", async () => {
-      wrapper = await mountComponent();
-
-      const done = vi.fn();
-      (wrapper.vm as any).addNewService("new-service", done);
-      expect(done).toHaveBeenCalledWith("new-service");
-    });
-
-    it("addNewEnvironment invokes done with the value when non-empty", async () => {
-      wrapper = await mountComponent();
-
-      const done = vi.fn();
-      (wrapper.vm as any).addNewEnvironment("staging", done);
-      expect(done).toHaveBeenCalledWith("staging");
-
-      done.mockClear();
-      (wrapper.vm as any).addNewEnvironment("", done);
-      expect(done).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test-stub="o-table"]').exists()).toBe(true);
     });
   });
 

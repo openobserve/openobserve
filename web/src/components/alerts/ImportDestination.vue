@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -21,21 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="destination"
     :is-importing="isDestinationImporting"
     container-class=""
-    container-style=""
     @back="arrowBackFn"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default min-w-100">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
           {{ destinationErrorsToDisplay.length > 0 ? t('alert_destinations.import.errorValidations') : t('alert_destinations.import.outputMessages') }}
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">{{ t('alert_destinations.import.outputMessages') }}</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('alert_destinations.import.outputMessages') }}</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
           <!-- Destination Errors Section -->
@@ -59,14 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Destination Name Error -->
                   <span
                     data-test="destination-import-name-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'destination_name'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-name-input"
                         :model-value="userSelectedDestinationName[index] || ''"
@@ -83,14 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- URL Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'url'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-url-input"
                         :model-value="userSelectedDestinationUrl[index] || ''"
@@ -107,14 +106,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Type Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'type'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSelect
                         data-test="destination-import-type-input"
                         :model-value="userSelectedDestinationType[index] || ''"
@@ -131,14 +130,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Method Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'method'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSelect
                         data-test="destination-import-method-input"
                         :model-value="userSelectedDestinationMethod[index] || ''"
@@ -155,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Template Name Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'template_name'
@@ -177,21 +176,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :error="!!templateErrors[index]"
                         :error-message="templateErrors[index]"
                         @search="filterTemplates"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
 
                   <!-- Email Input Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'email_input'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-emails-input"
                         :model-value="userSelectedEmails[index] || ''"
@@ -208,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Action ID Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'action_id'
@@ -228,25 +226,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :label="t('alert_destinations.import.actions') + ' *'"
                         labelKey="label"
                         valueKey="value"
-                        class="py-2 showLabelOnTop no-case"
+                        class="py-2 showLabelOnTop no-case w-75!"
                         :error="!!actionErrors[index]"
                         :error-message="actionErrors[index]"
                         @search="filterActions"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
 
                   <!-- Skip TLS Verify Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'skip_tls_verify'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSwitch
                         data-test="destination-import-skip-tls-verify-input"
                         :model-value="userSelectedSkipTlsVerify[index] ?? false"
@@ -257,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </span>
 
-                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
@@ -281,7 +278,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{
                   'font-bold py-1.25 px-0 text-sm wrap-break-word': true,
                   'text-green ': val.success,
-                  'text-red': !val.success,
+                  'text-status-negative': !val.success,
                 }"
                 :data-test="`destination-import-creation-${index}-message`"
               >
@@ -311,7 +308,9 @@ import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -356,14 +355,14 @@ export default defineComponent({
     const destinationTypes = ["http", "email"];
     const destinationMethods = ["post", "get", "put"];
 
-    const userSelectedTemplates = ref<string[]>([]);
+    const userSelectedTemplates = ref<SelectModelValue[]>([]);
     const userSelectedDestinationType = ref<any[]>([]);
     const userSelectedDestinationMethod = ref<any[]>([]);
     const userSelectedDestinationName = ref<any[]>([]);
     const userSelectedDestinationUrl = ref<any[]>([]);
     const userSelectedEmails = ref<any[]>([]);
     const userSelectedActionId = ref<any[]>([]);
-    const userSelectedSkipTlsVerify = ref<boolean[]>([]);
+    const userSelectedSkipTlsVerify = ref<SwitchValue[]>([]);
     const filteredTemplates = ref<string[]>([]);
     const filteredActions = ref<any[]>([]);
     const templateErrors = reactive<Record<number, string>>({});
@@ -448,7 +447,7 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationName = (destinationName: string, index: number) => {
+    const updateDestinationName = (destinationName: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = destinationName;
         // Directly update jsonStr without triggering editor re-render
@@ -472,7 +471,7 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationTemplate = (template: string, index: number) => {
+    const updateDestinationTemplate = (template: SelectModelValue, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].template = template;
         // Directly update jsonStr without triggering editor re-render
@@ -484,7 +483,7 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationAction = (id: string, index: number) => {
+    const updateDestinationAction = (id: SelectModelValue, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].action_id = id;
         // Directly update jsonStr without triggering editor re-render
@@ -496,9 +495,10 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationEmails = (emails: string, index: number) => {
+    const updateDestinationEmails = (emails: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].emails = emails
+        // OInput is a text field here, so the emitted value is always a string.
+        baseImportRef.value.jsonArrayOfObj[index].emails = (emails as string)
           .split(",")
           .map((email) => email.trim());
         // Directly update jsonStr without triggering editor re-render
@@ -510,7 +510,7 @@ export default defineComponent({
       }
     };
 
-    const updateSkipTlsVerify = (value: boolean, index: number) => {
+    const updateSkipTlsVerify = (value: SwitchValue, index: number) => {
       userSelectedSkipTlsVerify.value[index] = value;
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].skip_tls_verify = value;
@@ -788,7 +788,7 @@ export default defineComponent({
 
         // Validate headers should not be present for email type
         if (
-          input.hasOwnProperty("headers") &&
+          Object.prototype.hasOwnProperty.call(input, "headers") &&
           Object.keys(input.headers).length !== 0
         ) {
           destinationErrors.push(

@@ -206,12 +206,10 @@ describe("GroupRoles Component", () => {
       expect(wrapper.vm.users).toHaveLength(2);
       expect(wrapper.vm.users[0]).toEqual({
         role_name: "admin",
-        "#": 1,
         isInGroup: true, // admin is in groupRoles prop
       });
       expect(wrapper.vm.users[1]).toEqual({
         role_name: "user",
-        "#": 2,
         isInGroup: true, // user is in groupRoles prop
       });
     });
@@ -410,7 +408,6 @@ describe("GroupRoles Component", () => {
 
     it("fetches data when switching to 'all' for first time", async () => {
       wrapper.vm.hasFetchedOrgUsers = false;
-      const initialLength = wrapper.vm.users.length;
 
       await wrapper.vm.updateUserTable("all");
 
@@ -430,8 +427,6 @@ describe("GroupRoles Component", () => {
 
   describe("Props Watching", () => {
     it("updates when groupRoles prop changes", async () => {
-      const initialGroupUsersMapSize = wrapper.vm.groupUsersMap.size;
-
       await wrapper.setProps({ groupRoles: ["admin", "user", "developer"] });
       await flushPromises();
 

@@ -20,14 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :class="[containerClass]"
     :style="containerStyle"
   >
-    <!-- Header Section — the standard AppPageHeader (back tile + title + actions)
+    <!-- Header Section — the standard OPageHeader (back tile + title + actions)
          used across the app. Hidden when the host page provides its own page
-         header, e.g. the pipeline shell's AppPageHeader (avoids a duplicate). -->
-    <AppPageHeader
+         header, e.g. the pipeline shell's OPageHeader (avoids a duplicate). -->
+    <OPageHeader
       v-if="!hideHeader"
       :title="title"
       :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="-mx-[0.625rem] px-4 border-b border-border-default"
+      class="shrink-0 border-b border-border-default"
       :class="headerContainerClass"
     >
       <template #actions>
@@ -52,8 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`${testPrefix}-import-json-btn`"
         >{{ t('dashboard.import') }}</OButton>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
 
+    <!-- No px-page-edge here: the tabs section carries its own px-page-edge so
+         it aligns with the header back-button icon (which is inset one
+         page-edge from the container). A page-edge on this wrapper too would
+         double the inset and push the content past the header icon. -->
     <div class="flex flex-1 min-h-0" :class="contentWrapperClass">
       <div class="flex w-full min-h-0" :style="contentStyle">
         <OSplitter
@@ -67,8 +71,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #before>
             <div class="w-full h-full flex flex-col border-r border-border-default">
               <!-- Tabs Section -->
-              <div class="card-container py-2 px-2 mb-1 shrink-0">
-                <div class="app-tabs-container h-[36px] w-fit">
+              <div class="bg-card-glass-bg py-2.5 px-page-edge mb-1 shrink-0">
+                <div class="app-tabs-container h-9 w-fit">
                   <app-tabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
@@ -82,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url card-container py-1 flex-1 min-h-0 flex flex-col"
+                class="editor-container-url bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom URL input section -->
@@ -102,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-url-editor mx-2 flex-1 min-h-0"
+                    class="import-url-editor flex-1 min-h-0 border border-card-glass-border rounded-default overflow-hidden"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -111,13 +115,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json card-container py-1 flex-1 min-h-0 flex flex-col"
+                class="editor-container-json bg-card-glass-bg py-1 flex-1 min-h-0 flex flex-col"
               >
                 <div class="mx-2 mt-1 pb-2 flex flex-col flex-1 min-h-0">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="mb-1 flex shrink-0">
-                      <div style="width: 100%" class="pr-2">
+                    <div class="mb-1 flex shrink-0 w-full">
+                      <div class="w-full">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
@@ -147,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-file-editor mx-2 flex-1 min-h-0"
+                    class="import-file-editor flex-1 min-h-0 border border-card-glass-border rounded-default overflow-hidden"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -162,16 +166,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container w-full h-full flex flex-col min-h-0"
+              class="bg-card-glass-bg w-full h-full flex flex-col min-h-0"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+                  <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
                   <OSeparator class="mt-1 shrink-0" />
                   <div class="error-report-container flex-1 min-h-0 overflow-auto">
-                    <div class="text-center p-3 text-gray-400">
+                    <div class="text-center p-3 text-text-muted">
                       No messages to display
                     </div>
                   </div>
@@ -192,16 +196,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  reactive,
   watch,
   defineAsyncComponent,
   computed,
   onBeforeUnmount,
+  type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
-import AppPageHeader from "./AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -219,7 +223,7 @@ export default defineComponent({
       () => import("@/components/CodeQueryEditor.vue"),
     ),
     AppTabs,
-    AppPageHeader,
+    OPageHeader,
     OButton,
     OInput,
     OIcon,
@@ -231,9 +235,11 @@ export default defineComponent({
       type: String,
       required: true,
     },
-    // Tabs configuration
+    // Tabs configuration (shape matches AppTabs' Tab interface)
     tabs: {
-      type: Array,
+      type: Array as PropType<
+        { label: string; value: string; icon?: string; disabled?: boolean }[]
+      >,
       default: () => [
         {
           label: "File Upload / JSON",
@@ -286,7 +292,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "px-[0.625rem] mb-[0.625rem]",
+      default: "mb-2.5",
     },
     containerStyle: {
       type: String,
@@ -302,7 +308,7 @@ export default defineComponent({
     },
     titleClass: {
       type: String,
-      default: "font-[600] text-[20px]",
+      default: "font-[600] text-xl",
     },
     contentWrapperClass: {
       type: String,
@@ -541,29 +547,12 @@ export default defineComponent({
 </script>
 
 <style>
-/*
- * Box styling (border, radius, padding, height) lives on the editor SHELL
- * wrapper — never on Monaco's internal .monaco-editor element. Monaco sizes
- * its inner .overflow-guard to the full box it measures; adding border/padding
- * directly to that element shrinks the content box and forces phantom
- * horizontal + vertical scrollbars. Styling the wrapper lets Monaco fill a
- * clean box and removes the scrollbars without any !important overrides.
- */
-.import-editor-shell {
-  box-sizing: border-box;
-  /* w-full (100%) + mx-2 (1rem total) would overflow by 1rem and add a
-     horizontal scrollbar; subtract the margins so the box stays inside and
-     keeps a right-side gap. The height comes from flex (flex-1 min-h-0) so the
-     editor grows to fill the pane instead of a brittle calc(100vh - Npx). */
-  width: calc(100% - 1rem);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-  overflow: hidden;
-}
-
+/* keep(scrollbar): cross-file shared scroll container. .error-report-container
+   supplies overflow scrolling to BaseImport, ImportAlert.vue and
+   ImportPipeline.vue (those two carry no local overflow utility), so the rule
+   must stay an unscoped global rather than be inlined here. */
 .error-report-container {
   overflow: auto;
   resize: none;
 }
-
 </style>

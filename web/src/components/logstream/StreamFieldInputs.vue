@@ -1,6 +1,7 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="o-input-label text-sm font-semibold leading-tight">
+    <div v-if="showHeader" data-test="alert-conditions-text" class="o-input-label text-compact font-medium leading-tight text-input-label-text">
+
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!formRows.length">
@@ -29,7 +30,7 @@
         class="flex flex-wrap items-start gap-2 mt-2"
         :data-test="`add-stream-field-row-${index}`"
       >
-        <div data-test="add-stream-field-name-input" class="flex-1 min-w-[160px]">
+        <div data-test="add-stream-field-name-input" class="flex-1 min-w-40">
           <OFormInput
             :data-test="`add-stream-field-name-input-${index}`"
             :name="`${formFieldName}[${index}].name`"
@@ -42,7 +43,7 @@
         <div
           v-if="visibleInputs.index_type"
           data-test="add-stream-field-index-type-select"
-          class="min-w-[140px]"
+          class="min-w-35"
         >
           <OFormSelect
             :name="`${formFieldName}[${index}].index_type`"
@@ -54,7 +55,7 @@
         </div>
         <div
           v-if="visibleInputs.data_type"
-          class="min-w-[100px]"
+          class="min-w-25"
         >
           <OFormSelect
             data-test="add-stream-field-data-type-select"
@@ -115,13 +116,12 @@ import {
   makeStreamFieldRow,
 } from "./StreamFieldInputs.schema";
 
-// FORM-ONLY (migrated 2026-07-01). The rows are now owned by the parent's
-// TanStack form: this component `inject`s that form, reads the array reactively
-// via form.useStore, renders indexed OForm* fields (`${formFieldName}[i].name`),
-// and mutates rows with form.pushFieldValue / form.removeFieldValue. Per-row
-// validation lives in the parent schema (see StreamFieldInputs.schema.ts) — this
-// component no longer carries its own validate()/error refs. It MUST be rendered
-// inside an <OForm> whose schema has an array field named `formFieldName`.
+// FORM-ONLY. The rows are owned by the parent's TanStack form: this component
+// `inject`s that form, reads the array reactively via form.useStore, renders
+// indexed OForm* fields (`${formFieldName}[i].name`), and mutates rows with
+// form.pushFieldValue / form.removeFieldValue. Per-row validation lives in the
+// parent schema (see StreamFieldInputs.schema.ts). It MUST be rendered inside an
+// <OForm> whose schema has an array field named `formFieldName`.
 const props = defineProps({
   /** Dot-path of the array field on the parent form (e.g. "fields"). */
   formFieldName: {

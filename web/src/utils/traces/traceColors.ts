@@ -1,10 +1,18 @@
 /**
  * Trace Span Color Utilities
- * Provides helper functions to access the 50 span colors defined in _variables.scss
+ *
+ * `getSpanColor(i)` returns the theme-aware CSS var for span colour i — the
+ * `--color-span-*` set (50 colours) in tokens/base.css — prefer it wherever a CSS
+ * colour is accepted.
+ *
+ * `getSpanColorHex(i, theme)` returns a raw hex from the two arrays below, for the
+ * canvas/ECharts call sites that cannot consume a CSS var. NOTE: these arrays hold
+ * 35 entries and do NOT match the 50 --color-span-* token values.
  */
 
 /**
- * Light mode span colors (50 colors)
+ * Light-mode span colours — 35-entry raw-hex fallback for getSpanColorHex (NOT the
+ * --color-span-* token set; see the file header). Used only where a CSS var can't go.
  */
 export const LIGHT_SPAN_COLORS = [
   "#10B981",
@@ -94,7 +102,7 @@ export const DARK_SPAN_COLORS = [
 export const getSpanColor = (index: number): string => {
   // Ensure index is within bounds (1-50)
   const colorIndex = ((index - 1) % 50) + 1;
-  return `var(--o2-span-${colorIndex})`;
+  return `var(--color-span-${colorIndex})`;
 };
 
 /**
@@ -128,7 +136,7 @@ export const getServiceColor = (serviceName: string): string => {
 
   // Map hash to color index (1-50)
   const colorIndex = (Math.abs(hash) % 50) + 1;
-  return `var(--o2-span-${colorIndex})`;
+  return `var(--color-span-${colorIndex})`;
 };
 
 /**
@@ -164,7 +172,7 @@ export const getSpanColorWithOpacity = (
   opacity: number = 1,
 ): string => {
   const colorIndex = ((index - 1) % 50) + 1;
-  return `color-mix(in srgb, var(--o2-span-${colorIndex}) ${opacity * 100}%, transparent)`;
+  return `color-mix(in srgb, var(--color-span-${colorIndex}) ${opacity * 100}%, transparent)`;
 };
 
 /**
@@ -177,7 +185,7 @@ export const getAllSpanColors = (
   theme: "light" | "dark" = "light",
 ): string[] => {
   const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  // Return reversed order to maintain existing behavior (was 50-i)
+  // Return reversed order to maintain existing behavior
   return [...colors].reverse();
 };
 
@@ -185,12 +193,12 @@ export const getAllSpanColors = (
  * Trace UI color utilities
  */
 export const traceUIColors = {
-  surface: "var(--o2-trace-surface)",
-  border: "var(--o2-trace-border)",
-  textPrimary: "var(--o2-trace-text-primary)",
-  textSecondary: "var(--o2-trace-text-secondary)",
-  hover: "var(--o2-trace-hover)",
-  selected: "var(--o2-trace-selected)",
+  surface: "var(--color-trace-surface)",
+  border: "var(--color-trace-border)",
+  textPrimary: "var(--color-trace-text-primary)",
+  textSecondary: "var(--color-trace-text-secondary)",
+  hover: "var(--color-trace-hover)",
+  selected: "var(--color-trace-selected)",
 };
 
 /**
@@ -204,7 +212,7 @@ export const generateServiceColorMap = (
   const colorMap = new Map<string, string>();
   const usedColors = new Set<number>();
 
-  serviceNames.forEach((serviceName, index) => {
+  serviceNames.forEach((serviceName) => {
     // Use hash for consistency, but track used colors to maximize distinction
     let hash = 0;
     for (let i = 0; i < serviceName.length; i++) {
@@ -221,7 +229,7 @@ export const generateServiceColorMap = (
     }
 
     usedColors.add(colorIndex);
-    colorMap.set(serviceName, `var(--o2-span-${colorIndex})`);
+    colorMap.set(serviceName, `var(--color-span-${colorIndex})`);
   });
 
   return colorMap;
@@ -232,7 +240,7 @@ export const generateServiceColorMap = (
  * @param backgroundColor - Background color CSS variable
  * @returns 'white' or 'black'
  */
-export const getContrastTextColor = (backgroundColor: string): string => {
+export const getContrastTextColor = (_backgroundColor: string): string => {
   // For now, return white for all span colors as they're designed with good contrast
   // Can be enhanced with actual luminance calculation if needed
   return "white";
@@ -242,20 +250,20 @@ export const getContrastTextColor = (backgroundColor: string): string => {
  * Status colors (error, success, warning)
  */
 export const statusColors = {
-  error: "var(--o2-red-800)",
-  success: "var(--o2-green-700)",
-  warning: "var(--o2-yellow-700)",
-  info: "var(--o2-blue-700)",
+  error: "var(--color-status-error-text)",
+  success: "var(--color-status-success-text)",
+  warning: "var(--color-status-warning-text)",
+  info: "var(--color-status-info-text)",
 };
 
 /**
  * Span kind colors (following OpenTelemetry span kinds)
  */
 export const spanKindColors = {
-  client: "var(--o2-span-1)", // Blue
-  server: "var(--o2-span-3)", // Green
-  producer: "var(--o2-span-7)", // Pink
-  consumer: "var(--o2-span-4)", // Purple
-  internal: "var(--o2-span-10)", // Amber
-  unspecified: "var(--o2-gray-700)",
+  client: "var(--color-span-1)", // Blue
+  server: "var(--color-span-3)", // Green
+  producer: "var(--color-span-7)", // Pink
+  consumer: "var(--color-span-4)", // Purple
+  internal: "var(--color-span-10)", // Amber
+  unspecified: "var(--color-text-muted)",
 };

@@ -35,7 +35,7 @@ markup — don't guess a prop name.
 | I need to… | Use | Reference |
 | --- | --- | --- |
 | Trigger an action (submit, add, open) | `OButton` (`OButtonGroup` for a set) | core-controls-table |
-| Show a page/module header | `AppPageHeader` (rule 1) | — |
+| Show a page/module header | `OPageHeader` (rule 1) | — |
 | Render tabular data | `OTable` + `OTableColumnDef[]` | core-controls-table |
 | Show a status label / count / tag | `OBadge`, `OTag`, `ODimensionChip` | core-display |
 | Group content in a surface | `OCard` (+ `OCardSection`, `OCardActions`) | core-display |

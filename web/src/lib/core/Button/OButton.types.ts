@@ -68,7 +68,7 @@ export type ButtonSize =
   | "icon-circle-sm"
   // 30×30px square — matches toolbar icon button height (share/hamburger/auto-refresh)
   | "icon-toolbar"
-  // 26px rounded-lg — compact modern icon button for panel header collapse/expand
+  // 26px rounded-default — compact modern icon button for panel header collapse/expand
   | "icon-panel"
   // Tall narrow vertical rectangle — 32×20px for splitter collapse/expand buttons
   | "sidebar-button"
@@ -90,7 +90,7 @@ export interface ButtonProps extends PrimitiveProps {
   active?: boolean;
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
-  /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
+  /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
   block?: boolean;  /**
    * Renders an OIcon to the left of the label.
    * If the #icon-left slot is also provided, the slot takes precedence.

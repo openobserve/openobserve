@@ -512,8 +512,9 @@ describe("GeoMapRenderer", () => {
       wrapper = createWrapper();
       
       const chartContainer = wrapper.find('#chart-map');
-      expect(chartContainer.attributes('style')).toContain('height: 100%');
-      expect(chartContainer.attributes('style')).toContain('width: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(chartContainer.classes()).toContain('h-full');
+      expect(chartContainer.classes()).toContain('w-full');
     });
 
     it("should have correct wrapper div styling", () => {
@@ -521,9 +522,10 @@ describe("GeoMapRenderer", () => {
 
       const rootDiv = wrapper.find('[data-test="dashboard-geomap-renderer"]');
       expect(rootDiv.exists()).toBe(true);
-      expect(rootDiv.attributes('style')).toContain('padding: 5px');
-      expect(rootDiv.attributes('style')).toContain('height: 100%');
-      expect(rootDiv.attributes('style')).toContain('width: 100%');
+      // Padding/sizing moved from an inline style to Tailwind utilities.
+      expect(rootDiv.classes()).toContain('p-1.25');
+      expect(rootDiv.classes()).toContain('h-full');
+      expect(rootDiv.classes()).toContain('w-full');
     });
   });
 
@@ -799,7 +801,7 @@ describe("GeoMapRenderer", () => {
           series: [{
             type: "scatter",
             coordinateSystem: "lmap",
-            data: Array.from({ length: 1000 }, (_, i) => [
+            data: Array.from({ length: 1000 }, () => [
               116 + Math.random(),
               39 + Math.random(),
               Math.random() * 100

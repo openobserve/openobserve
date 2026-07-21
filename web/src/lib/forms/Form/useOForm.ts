@@ -12,7 +12,7 @@
 // `inject(FORM_CONTEXT_KEY)` and call `form.useStore(...)` directly. And simple
 // forms with no parent-side conditional rendering keep the plain
 // <OForm :schema :default-values @submit> form (OForm creates the form itself
-// via this same helper). See START-HERE.md (Rule ③) for the full rationale.
+// via this same helper).
 //
 // The config here MUST stay identical to OForm.vue's fallback so an internal and
 // an externally-supplied form behave the same: submit-then-change timing
@@ -20,6 +20,15 @@
 // (which drives the auto Save spinner and guards double-submit).
 
 import { useForm, revalidateLogic } from "@tanstack/vue-form";
+import type { DeepKeys } from "@tanstack/form-core";
+
+/**
+ * The set of valid field-path strings for a form of shape `T` (what
+ * setFieldValue/validateField/getFieldMeta accept as their first argument).
+ * Components that access fields by a dynamically-built string cast the string
+ * to this so it satisfies TanStack's DeepKeys union without widening the form.
+ */
+export type FormFieldPath<T> = DeepKeys<T>;
 
 export interface UseOFormOptions<T extends Record<string, unknown>> {
   /** Initial values for all fields (same shape as OForm's :default-values). */
@@ -44,7 +53,11 @@ export function useOForm<T extends Record<string, unknown>>(
   options: UseOFormOptions<T>,
 ) {
   return useForm({
-    defaultValues: options.defaultValues as Record<string, unknown>,
+    // Pass defaultValues unwidened so the form generic `T` flows into useForm and
+    // the array-field helpers (pushFieldValue/removeFieldValue) resolve real
+    // array paths instead of `never`. Components doing dynamic string field access
+    // cast the path to `FormFieldPath<T>` (see useOForm exports below).
+    defaultValues: options.defaultValues,
     // When a schema is supplied, validation TIMING is submit-then-change: nothing
     // runs until the first submit, then it re-validates on every change. The
     // schema lives in the single `onDynamic` source TanStack runs.

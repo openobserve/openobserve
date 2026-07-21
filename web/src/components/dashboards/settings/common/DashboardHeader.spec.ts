@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import DashboardHeader from "./DashboardHeader.vue";
 
@@ -149,7 +149,7 @@ describe("DashboardHeader", () => {
 
       expect(backButton.props('variant')).toBe('outline');
       expect(backButton.props('size')).toBe('icon-xs');
-      // Migration replaced q-mr-sm with mr-2.
+      // Migration replaced the legacy margin class with mr-2.
       expect(backButton.classes().some((c) => c.includes("mr-2"))).toBe(true);
     });
 

@@ -66,13 +66,6 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
     }
     let func_trans_type = func.trans_type.unwrap_or(0);
 
-    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if func_trans_type == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
-    }
-
     if let Some(_existing_fn) = check_existing_fn(&org_id, &func.name).await {
         Ok(MetaHttpResponse::bad_request(FN_ALREADY_EXIST))
     } else {
@@ -137,13 +130,6 @@ pub async fn test_run_function(
         })
         .unwrap_or(0); // Default to VRL for backward compatibility
 
-    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if trans_type == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
-    }
-
     match trans_type {
         0 => test_run_vrl_function(org_id, function, events).await,
         1 => test_run_js_function(org_id, function, events).await,
@@ -170,7 +156,7 @@ async fn test_run_vrl_function(
         Ok(program) => {
             let registry = program
                 .config
-                .get_custom::<vector_enrichment::TableRegistry>()
+                .get_custom::<transform::vector_enrichment::TableRegistry>()
                 .unwrap();
             registry.finish_load();
             program
@@ -356,13 +342,6 @@ pub async fn update_function(
             return Ok(MetaHttpResponse::not_found(FN_NOT_FOUND));
         }
     };
-
-    // JavaScript functions are only allowed in _meta org (for SSO claim parsing)
-    if func.trans_type.unwrap_or(0) == 1 && org_id != "_meta" {
-        return Ok(MetaHttpResponse::bad_request(
-            "JavaScript functions are only allowed in the '_meta' organization. Please use VRL functions for other organizations.",
-        ));
-    }
 
     if func == existing_fn {
         return Ok(MetaHttpResponse::json(func));
@@ -646,31 +625,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_js_function_blocked_in_regular_org() {
-        use http_body_util::BodyExt;
-        use serde_json::json;
-
-        let org_id = "default";
-        let function = "function transform(row) { row.processed = true; return row; }".to_string();
-        let events = vec![json!({"field": "value"})];
-        let trans_type = Some(1); // JavaScript
-
-        let response = test_run_function(org_id, function, events, trans_type)
-            .await
-            .unwrap();
-
-        // JavaScript functions should be blocked in non-_meta orgs
-        assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
-
-        // Verify error message
-        let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(
-            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
-        );
-    }
-
-    #[tokio::test]
     async fn test_save_js_function_allowed_in_meta_org() {
         let org_id = "_meta";
         let function = Transform {
@@ -691,34 +645,6 @@ mod tests {
 
         // Clean up
         let _ = delete_function(org_id, "test_js_fn").await;
-    }
-
-    #[tokio::test]
-    async fn test_save_js_function_blocked_in_regular_org() {
-        let org_id = "default";
-        let function = Transform {
-            name: "test_js_fn_blocked".to_owned(),
-            function: "function transform(row) { return row; }".to_owned(),
-            params: "row".to_owned(),
-            trans_type: Some(1), // JavaScript
-            num_args: 1,
-            streams: None,
-        };
-
-        let response = save_function(org_id.to_string(), function).await;
-
-        // JavaScript functions should be blocked in non-_meta orgs
-        assert!(response.is_ok());
-        let resp = response.unwrap();
-        assert_eq!(resp.status(), http::StatusCode::BAD_REQUEST);
-
-        // Verify error message
-        use http_body_util::BodyExt;
-        let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
-        let body_str = String::from_utf8(body_bytes.to_vec()).unwrap();
-        assert!(
-            body_str.contains("JavaScript functions are only allowed in the '_meta' organization")
-        );
     }
 
     #[tokio::test]

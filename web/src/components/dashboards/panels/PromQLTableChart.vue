@@ -15,24 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <div class="h-full w-full flex flex-col relative"
     data-test="promql-table-chart"
-    style="
-      height: 100%;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    "
   >
-    <div style="height: 100%; position: relative">
+    <div class="h-full relative">
       <TableRenderer
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
-        :wrap-cells="config.wrap_table_cells"
-        :value-mapping="config.mappings ?? []"
-        :show-pagination="config.table_pagination && !store.state.printMode"
-        :rows-per-page="config.table_pagination_rows_per_page"
+        :wrap-cells="panelConfig.wrap_table_cells"
+        :value-mapping="panelConfig.mappings ?? []"
+        :show-pagination="panelConfig.table_pagination && !store.state.printMode"
+        :rows-per-page="panelConfig.table_pagination_rows_per_page"
         :enable-filtering="enableFiltering"
         @row-click="$emit('row-click', $event)"
       >
@@ -41,10 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bottom="scope" v-if="showLegendFooter">
           <div class="flex items-center w-full" data-test="dashboard-table-pagination">
             <div class="flex items-center gap-1">
-              <OSelect
+              <OSelect class="min-w-50 max-w-100"
                 v-model="selectedLegend"
                 :options="legendOptions"
-                style="min-width: 200px; max-width: 400px"
                 :placeholder="t('dashboard.promQLTableChart.selectSeriesToFilter')"
               >
                 <template #icon-left>
@@ -54,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex-1" />
             <TablePaginationControls
-              :show-pagination="config.table_pagination && !store.state.printMode"
+              :show-pagination="panelConfig.table_pagination && !store.state.printMode"
               :pagination="scope.pagination"
               :pagination-options="scope.paginationOptions"
               :total-rows="scope.totalRows"
@@ -123,7 +115,7 @@ export default defineComponent({
         console.warn("No rows found in table data");
         return [];
       }
-      // Add unique ID to each row for q-table
+      // Add unique ID to each row for the table
       const rows = props.data.rows.map((row: any, index: number) => ({
         id: `row_${index}`,
         ...row,
@@ -207,7 +199,7 @@ export default defineComponent({
     // Watch for data changes and set default legend only if not already set or legend options changed
     watch(
       () => props.data,
-      (newData) => {
+      () => {
         // Only set default legend if no legend is selected yet or if current selection is invalid
         if (legendOptions.value.length > 0) {
           const currentSelectionValid = legendOptions.value.some(
@@ -232,7 +224,7 @@ export default defineComponent({
     );
 
     // Make config reactive to prop changes
-    const config = computed(() => props.config || {});
+    const panelConfig = computed(() => props.config || {});
 
     const downloadTableAsCSV = (title?: string) => {
       innerTableRef.value?.downloadTableAsCSV(title);
@@ -255,7 +247,7 @@ export default defineComponent({
       selectedLegend,
       legendOptions,
       showLegendFooter,
-      config,
+      panelConfig,
       downloadTableAsCSV,
       downloadTableAsJSON,
     };

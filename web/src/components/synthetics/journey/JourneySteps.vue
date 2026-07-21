@@ -13,6 +13,12 @@
   parent views or composables.
 -->
 
+<script lang="ts">
+// Named export for consumers (BrowserJourney, RunDetail). Lives in a plain
+// <script> block because `export` is illegal inside <script setup>.
+export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
+</script>
+
 <script setup lang="ts" generic="TData extends Record<string, any>">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
@@ -23,12 +29,10 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { StepAction } from "@/types/synthetics";
 import { ACTION_LABELS, ACTION_ICONS } from "@/constants/synthetics";
 
 const { t } = useI18n();
-
-// ── Re-export StepDotState for consumers ──────────────────────────
-export type StepDotState = "pending" | "active" | "pass" | "fail" | "skip";
 
 // ── Props ──────────────────────────────────────────────────────────
 const props = withDefaults(
@@ -99,16 +103,24 @@ const emit = defineEmits<{
 defineSlots<{
   expansion: (props: { row: TData }) => any;
   empty: () => any;
+  "screenshot-thumb": (props: { row: TData }) => any;
 }>();
+
+// Type guard: narrows an arbitrary row value to a known StepAction key.
+function isStepAction(value: string): value is StepAction {
+  return value in ACTION_ICONS;
+}
 
 function actionIcon(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
-  return ACTION_ICONS[action] ?? "ads-click";
+  return isStepAction(action) ? ACTION_ICONS[action] : "ads-click";
 }
 
 function actionLabel(row: TData): string {
   const action: string = row[props.actionKey] ?? "";
-  return ACTION_LABELS[action] ?? action.charAt(0).toUpperCase() + action.slice(1);
+  return isStepAction(action)
+    ? ACTION_LABELS[action]
+    : action.charAt(0).toUpperCase() + action.slice(1);
 }
 
 function stepName(row: TData): string {
@@ -220,10 +232,10 @@ function handleUpdateExpanded(ids: string[]) {
     <!-- ── cell-screenshot: Thumbnail (results mode) ───────────── -->
     <template v-if="mode === 'results'" #cell-screenshot="{ row }">
       <div
-        class="w-18 h-12 shrink-0 rounded border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
+        class="w-18 h-12 shrink-0 rounded-default border border-border-default bg-surface-subtle flex items-center justify-center overflow-hidden"
       >
         <slot name="screenshot-thumb" :row="row">
-          <OIcon name="image" size="xs" class="text-text-caption" />
+          <OIcon name="image" size="xs" class="text-text-secondary" />
         </slot>
       </div>
     </template>
@@ -253,7 +265,7 @@ function handleUpdateExpanded(ids: string[]) {
 
         <!-- Action icon chip -->
         <span
-          class="bg-primary-50 rounded p-1 shrink-0 flex items-center"
+          class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center"
         >
           <OIcon
             :name="actionIcon(row)"

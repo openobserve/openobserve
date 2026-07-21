@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -231,11 +231,6 @@ const createFreshMockData = (overrides = {}) => {
 describe("DashboardQueryEditor", () => {
   let wrapper: any;
 
-  const defaultProps = {
-    dashboardPanelData: createFreshMockData(),
-    promqlMode: false,
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
 
@@ -274,20 +269,6 @@ describe("DashboardQueryEditor", () => {
               "language",
             ],
             emits: ["update:query", "updateQuery", "runQuery"],
-          },
-          "q-tabs": true, // Stub as true to prevent rendering
-          "q-tab": {
-            template: "<div><slot /></div>",
-            props: ["name", "label"],
-          },
-          "q-splitter": {
-            template:
-              '<div><slot name="before"></slot><slot name="after"></slot></div>',
-            props: ["modelValue", "limits", "disable"],
-          },
-          "q-select": {
-            template: '<div data-test="vrl-function-select"></div>',
-            props: ["modelValue", "options"],
           },
         },
         mocks: {
@@ -565,14 +546,12 @@ describe("DashboardQueryEditor", () => {
       wrapper = createWrapper();
 
       // Test editor configuration via the splitter component lookup
-      const splitter = wrapper.findComponent({ name: "QSplitter" });
+      const splitter = wrapper.findComponent({ name: "OSplitter" });
       expect(splitter.exists() || wrapper.exists()).toBe(true);
     });
 
     it("should handle query text changes", async () => {
       wrapper = createWrapper();
-
-      const initialQuery = wrapper.vm.dashboardPanelData.data.queries[0].query;
 
       // Simulate query change
       wrapper.vm.dashboardPanelData.data.queries[0].query =
@@ -653,8 +632,6 @@ describe("DashboardQueryEditor", () => {
   describe("Performance and Optimization", () => {
     it("should handle component updates efficiently", async () => {
       wrapper = createWrapper();
-
-      const initialRenderCount = wrapper.vm.$el ? 1 : 0;
 
       // Update panel data
       wrapper.vm.dashboardPanelData.data.queries[0].query = "Updated query";

@@ -17,15 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
   <div class="flex flex-col h-full p-0">
-    <div v-if="!showAddDialog" class="flex flex-col h-full">
-      <!-- Standard section header: title + actions only. Search moved into the
-           table's own toolbar below. -->
-      <AppPageHeader
-        :title="t('cipherKey.header')"
-        icon="key"
-        :subtitle="t('settings.cipherKeysPage.subtitle')"
-        class="shrink-0 px-4 border-b border-border-default"
-      >
+    <OPageLayout
+      v-if="!showAddDialog"
+      :title="t('cipherKey.header')"
+      icon="key"
+      :subtitle="t('settings.cipherKeysPage.subtitle')"
+      bleed
+    >
         <template #actions>
           <OButton
             variant="primary"
@@ -36,8 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(`cipherKey.add`) }}
           </OButton>
         </template>
-      </AppPageHeader>
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         :data="visibleRows"
@@ -53,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="settings-cipher-keys"
@@ -112,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedKeys.length > 0"
           #bottom
         >
-          <span class="text-xs text-text-primary font-medium">
+          <span class="text-xs text-text-body font-medium">
             {{ t('settings.cipherKeysPage.selected', { count: selectedKeys.length }) }}
           </span>
           <OButton
@@ -127,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </div>
+    </OPageLayout>
     <div v-else>
       <add-cipher-key @cancel:hideform="hideAddDialog" />
     </div>
@@ -157,9 +155,6 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import segment from "@/services/segment_analytics";
-import { convertToTitleCase } from "@/utils/zincutils";
-import config from "@/aws-exports";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -169,15 +164,15 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageCipherKeys",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     AddCipherKey,
     ConfirmDialog,
@@ -195,13 +190,6 @@ export default defineComponent({
     const loading = ref(false);
     const filterQuery = ref("");
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("cipherKey.name"),
@@ -289,7 +277,7 @@ export default defineComponent({
       selectedKeys.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
-    const addCipherKey = (evt: any) => {
+    const addCipherKey = () => {
       router.push({
         query: {
           action: "add",
@@ -322,7 +310,6 @@ export default defineComponent({
           const responseData = response.data.keys;
           for (let i = 0; i < responseData.length; i++) {
             data.push({
-              "#": i + 1,
               name: responseData[i].name,
               store_type: responseData[i].key.store.type,
               mechanism_type: responseData[i].key.mechanism.type,

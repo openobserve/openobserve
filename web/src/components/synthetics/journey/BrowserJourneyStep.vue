@@ -193,7 +193,7 @@ function toggleExpanded() {
 </script>
 
 <template>
-  <div class="rounded border border-border-default bg-surface-base mb-1">
+  <div class="rounded-default border border-border-default bg-surface-base mb-1">
     <!-- Compact row -->
     <div
       class="flex items-center gap-2 px-2 h-9 min-h-9 group relative"
@@ -233,7 +233,7 @@ function toggleExpanded() {
       </span>
 
       <!-- Action icon chip -->
-      <span class="bg-primary-50 rounded p-1 shrink-0 flex items-center">
+      <span class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center">
         <OIcon :name="actionIcon" size="sm" class="text-primary-500" aria-hidden="true" />
       </span>
 
@@ -307,7 +307,7 @@ function toggleExpanded() {
     <!-- Inline error card (shown when a step fails during replay) -->
     <div
       v-if="showErrorCard"
-      class="border border-badge-error-ol-border/30 rounded-lg mx-6 my-2 overflow-hidden"
+      class="border border-badge-error-ol-border/30 rounded-default mx-6 my-2 overflow-hidden"
       data-test="synthetics-journey-step-error-card"
     >
       <!-- Header -->
@@ -319,7 +319,7 @@ function toggleExpanded() {
 
       <!-- Error message -->
       <div class="px-3 py-3">
-        <p class="text-[12.5px] text-text-body m-0">
+        <p class="text-xs text-text-body m-0">
           {{ se?.message || props.replayResult?.error }}
         </p>
       </div>
@@ -349,19 +349,19 @@ function toggleExpanded() {
         </div>
         <pre
           v-if="showStackTrace"
-          class="mt-2 bg-code-bg rounded p-3 overflow-x-auto max-h-[300px] overflow-y-auto text-xs font-mono leading-relaxed m-0"
+          class="mt-2 bg-code-bg rounded-default p-3 overflow-x-auto max-h-75 overflow-y-auto text-xs font-mono leading-relaxed m-0"
           data-test="synthetics-journey-step-stack-content"
-        >{{ se.stack }}</pre>
+        >{{ se?.stack }}</pre>
       </div>
 
       <!-- Info boxes -->
       <div v-if="se?.selector" class="flex gap-4 px-3 pb-3">
         <div class="flex flex-col gap-1">
-          <span class="text-[11px] font-medium text-text-label">{{ t('synthetics.stepErrors.selectorTestId') }}</span>
+          <span class="text-2xs font-medium text-text-label">{{ t('synthetics.stepErrors.selectorTestId') }}</span>
           <span class="text-xs font-mono text-status-error-text">{{ se.selector }}</span>
         </div>
         <div class="flex flex-col gap-1">
-          <span class="text-[11px] font-medium text-text-label">{{ t('synthetics.stepErrors.waited') }}</span>
+          <span class="text-2xs font-medium text-text-label">{{ t('synthetics.stepErrors.waited') }}</span>
           <span class="text-xs font-mono text-text-secondary">{{ errorDurationFormatted }} · {{ exitReasonTag }}</span>
         </div>
       </div>

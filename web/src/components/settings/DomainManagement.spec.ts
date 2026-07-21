@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach, afterAll } from "vitest";
 import DomainManagement from "./DomainManagement.vue";
 import {
@@ -247,7 +247,6 @@ describe("DomainManagement Component", () => {
     });
 
     it("should validate domain names correctly", async () => {
-      const vm = wrapper.vm;
       
       // Valid domains
       expect(isValidDomain("example.com")).toBe(true);
@@ -262,7 +261,6 @@ describe("DomainManagement Component", () => {
     });
 
     it("should validate email addresses for specific domains", async () => {
-      const vm = wrapper.vm;
       
       // Valid emails for domain
       expect(isValidEmail("user@example.com", "example.com")).toBe(true);
@@ -298,7 +296,6 @@ describe("DomainManagement Component", () => {
     });
 
     it("should not add invalid domain", async () => {
-      const vm = wrapper.vm;
       
       expect(isValidDomain("invalid-domain")).toBe(false);
     });
@@ -632,7 +629,6 @@ describe("DomainManagement Component", () => {
 
     describe("Security and XSS Prevention", () => {
       it("should sanitize malicious input in domain names", async () => {
-        const vm = wrapper.vm;
         
         const xssAttempts = [
           "<script>alert('xss')</script>",
@@ -648,7 +644,6 @@ describe("DomainManagement Component", () => {
       });
 
       it("should prevent SQL injection attempts", async () => {
-        const vm = wrapper.vm;
         
         const sqlInjections = [
           "'; DROP TABLE users; --",
@@ -667,7 +662,6 @@ describe("DomainManagement Component", () => {
 
     describe("Data Type and Format Validation", () => {
       it("should handle null and undefined values gracefully", async () => {
-        const vm = wrapper.vm;
         
         // Test null/undefined domain validation
         expect(isValidDomain(null)).toBe(true); // null treated as empty
@@ -681,7 +675,6 @@ describe("DomainManagement Component", () => {
       });
 
       it("should reject non-string inputs", async () => {
-        const vm = wrapper.vm;
         
         const nonStringInputs = [
           123,
@@ -699,7 +692,6 @@ describe("DomainManagement Component", () => {
       });
 
       it("should handle extremely large input values", async () => {
-        const vm = wrapper.vm;
         
         const hugeDomain = "a".repeat(10000) + ".com";
         const hugeEmail = "a".repeat(10000) + "@test.com";
@@ -711,7 +703,6 @@ describe("DomainManagement Component", () => {
 
     describe("Error Boundary Testing", () => {
       it("should handle component errors gracefully", async () => {
-        const vm = wrapper.vm;
         
         // Force an error condition
         mockDomainManagement.getDomainRestrictions.mockRejectedValue(
@@ -810,7 +801,6 @@ describe("DomainManagement Component", () => {
       });
 
       it("should prevent race conditions in form validation", async () => {
-        const vm = wrapper.vm;
         
         // Rapid validation calls
         const validationPromises = [

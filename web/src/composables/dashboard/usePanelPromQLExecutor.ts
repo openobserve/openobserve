@@ -98,10 +98,16 @@ export const usePanelPromQLExecutor = (ctx: {
       const queryMetadata: any[] = [];
       const completedQueries = new Set<number>(); // Track completed queries
 
-      // Process each query using streaming
-      // Process all queries in parallel using Promise.all
+      // Process all queries in parallel using streaming
       await Promise.all(
-        panelSchema.value.queries.map(async (it, queryIndex) => {
+        panelSchema.value.queries.map(async (
+          it: {
+            query: string;
+            tabName?: string;
+            config: { step_value?: string; query_type?: string };
+          },
+          queryIndex: number,
+        ) => {
           const { query: query1, metadata: metadata1 } = replaceQueryValue(
             it.query,
             startISOTimestamp,
@@ -131,10 +137,7 @@ export const usePanelPromQLExecutor = (ctx: {
 
           // "0" is not a step — it is the panel schema's way of saying "no step
           // set, let the server decide", and it is what a dashboard panel
-          // carries by default. Treating it as an explicit value made it beat
-          // the heatmap cap below (the metrics editor's blob has `null` here,
-          // which is why the same heatmap was bounded there and unbounded on a
-          // dashboard). Normalising it to `undefined` changes nothing else: the
+          // carries by default. Normalising it to `undefined` here is safe: the
           // fallback at the end sends "0" anyway.
           const explicitStep = (value?: string) => {
             const trimmed = value?.trim();
@@ -148,35 +151,18 @@ export const usePanelPromQLExecutor = (ctx: {
 
           // A heatmap's cost is COLUMNS x ROWS, and `step: "0"` hands the column
           // count to the backend — which returns ~300 points regardless of
-          // range. Against a ~24-bucket histogram that is ~7,000 cells for a
-          // full-size panel, and ECharts falls over drawing them. Nothing is
-          // gained by it either: you cannot see more columns than the panel has
-          // pixels.
-          //
-          // So a heatmap without an explicit step gets one that bounds the
-          // columns. EVERY heatmap, not only the Prometheus-histogram mode that
-          // prompted this: the argument is about pixels, not about buckets, so
-          // it holds for a `sum by (pod)` heatmap just as well, and a rule that
-          // applied to one chart and not another would be a rule nobody could
-          // predict. A saved panel therefore redraws at up to 120 columns rather
-          // than ~300 — coarser, but only in a dimension the panel was never
-          // wide enough to show. An explicit `step_value` still wins.
-          //
-          // Same helper the Metrics Explorer cards use (a coarse step is why the
-          // same metric renders fine on a card and kills the editor), so the two
-          // cannot drift.
+          // range. Against a multi-bucket histogram that is enough cells to make
+          // ECharts fall over. So a heatmap without an explicit step gets one
+          // that bounds the columns (applies to EVERY heatmap). An explicit
+          // `step_value` still wins.
           const isHeatmap = panelSchema.value?.type === "heatmap";
           const heatmapStepValue =
             isHeatmap && !queryStepValue && !panelStepValue
               ? `${computeStepSeconds(
                   // MILLISECONDS. `usePanelDataLoader` builds these with
-                  // `new Date(...).getTime()` (:408), and only the request payload
-                  // converts to the microseconds the backend wants — these raw
-                  // values never are. Dividing by 1e6 made the range look ~1000x
-                  // shorter, so the step collapsed to MIN_STEP_SECONDS and the cap
-                  // silently inverted: 15s columns at ANY range. A 24h heatmap asked
-                  // for 5,760 columns instead of 120 — worse than no cap at all,
-                  // because the backend's own default would have returned ~300.
+                  // `new Date(...).getTime()`; only the request payload converts
+                  // to the microseconds the backend wants — these raw values
+                  // never are. Divide by 1000 (not 1e6) to get seconds.
                   (endISOTimestamp - startISOTimestamp) / 1000,
                   HEATMAP_MAX_COLUMNS,
                 )}s`
@@ -270,13 +256,9 @@ export const usePanelPromQLExecutor = (ctx: {
             // Mark this query as completed (even with error)
             completedQueries.add(queryIndex);
 
-            // Through the shared reader. The backend hands back its internal
-            // envelope ("Error during planning: ErrorCode# {...}") rather than a
-            // sentence, and reading `content.message` raw is what put that in
-            // front of users. This is the path a dashboard actually takes —
-            // `usePanelDataLoader.processApiError` handles the axios path and is
-            // never called for a streaming query, so unwrapping there alone left
-            // the envelope on screen exactly where it is most often seen.
+            // parseSearchError unwraps the backend's internal error envelope
+            // ("Error during planning: ErrorCode# {...}") into a readable
+            // sentence; the raw `content.message` would show the envelope.
             const parsed = parseSearchError(err, "Unknown error");
 
             state.errorDetail = {
@@ -294,7 +276,7 @@ export const usePanelPromQLExecutor = (ctx: {
             }
           };
 
-          const handlePromQLComplete = (data: any, _: any) => {
+          const handlePromQLComplete = () => {
             // Mark this query as completed
             completedQueries.add(queryIndex);
 
@@ -326,7 +308,7 @@ export const usePanelPromQLExecutor = (ctx: {
             }
           };
 
-          const handlePromQLReset = (data: any, res: any) => {
+          const handlePromQLReset = () => {
             // Reset handling if needed
           };
 

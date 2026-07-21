@@ -20,17 +20,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col gap-0.5 min-w-0" data-test="rum-error-issue-cell">
     <div class="flex items-baseline gap-1 min-w-0">
       <span
-        class="issue-cell__type shrink-0"
+        class="font-semibold shrink-0"
         :class="
           isUnhandled
-            ? 'issue-cell__type--unhandled'
-            : 'issue-cell__type--handled'
+            ? 'text-severity-error-color'
+            : 'text-severity-warning-color'
         "
         data-test="rum-error-issue-cell-type"
         >{{ issue.error_type || t("rum.error") }}:</span
       >
       <span
-        class="font-semibold truncate min-w-0 text-[var(--o2-text-body)]"
+        class="font-semibold truncate min-w-0 text-text-body"
         :title="issue.error_message"
         data-test="rum-error-issue-cell-message"
         >{{ issue.error_message }}</span
@@ -102,17 +102,3 @@ const topFrame = computed(() => parseTopFrame(props.issue.error_stack));
 
 const route = computed(() => routeFromUrl(props.issue.view_url));
 </script>
-
-<style scoped lang="scss">
-.issue-cell__type {
-  font-weight: var(--font-semibold);
-
-  &--unhandled {
-    color: var(--o2-severity-error-color);
-  }
-
-  &--handled {
-    color: var(--o2-severity-warning-color);
-  }
-}
-</style>

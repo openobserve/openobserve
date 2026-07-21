@@ -134,7 +134,7 @@ describe("useCustomDebouncer", () => {
     const initialValue = "initial";
     const newValue = "activated";
     const delay = 500;
-    const { valueRef, setImmediateValue, setDebounceValue } = useCustomDebouncer(initialValue, delay);
+    const { valueRef, setImmediateValue } = useCustomDebouncer(initialValue, delay);
     
     // Simulate deactivation first
     onDeactivatedCallback.current();

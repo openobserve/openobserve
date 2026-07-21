@@ -18,12 +18,12 @@
   <div data-test="dashboard-join-pop-up" class="w-156 flex flex-col max-h-[54vh] overflow-hidden">
     <div class="flex justify-between items-center mb-3.75" data-test="dashboard-join-pop-up-header">
       <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-(--q-primary)">
+        <div class="flex items-center gap-2 text-theme-accent">
           <LeftJoinSvg class="h-5.25" />
           <label>{{ t('dashboard.addJoinPopUp.join') }}</label>
         </div>
         <OSelect
-          v-model="mainStream"
+          :model-value="mainStream"
           :options="[]"
           disabled
           :label="t('dashboard.addJoinPopUp.joiningStream')"
@@ -31,7 +31,7 @@
         />
       </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-theme-accent">
         <LeftJoinLineSvg class="h-10 w-14.5" />
       </div>
 
@@ -39,7 +39,7 @@
         <label for="joinType">{{ t('dashboard.addJoinPopUp.joinType') }}</label>
         <div class="flex justify-center items-center gap-2">
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
             @click="handleJoinTypeChange('left')"
             :aria-label="t('panel.leftJoin')"
             data-test="dashboard-join-type-left"
@@ -48,7 +48,7 @@
             <div :class="getJoinTypeLabelClass('left')">{{ t('dashboard.addJoinPopUp.left') }}</div>
           </div>
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
             @click="handleJoinTypeChange('inner')"
             :aria-label="t('panel.innerJoin')"
             data-test="dashboard-join-type-inner"
@@ -57,7 +57,7 @@
             <div :class="getJoinTypeLabelClass('inner')">{{ t('dashboard.addJoinPopUp.inner') }}</div>
           </div>
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
             @click="handleJoinTypeChange('right')"
             :aria-label="t('panel.rightJoin')"
             data-test="dashboard-join-type-right"
@@ -68,18 +68,18 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-theme-accent">
         <RightJoinLineSvg class="h-10 w-14.5" />
       </div>
 
       <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-(--q-primary)">
+        <div class="flex items-center gap-2 text-theme-accent">
           <RightJoinSvg class="h-5.25" />
           <label>{{ t('dashboard.addJoinPopUp.on') }}</label>
         </div>
 
         <OSelect
-          v-model="modelValue.stream"
+          v-model="modelValueModel.stream"
           :options="streamOptions"
           :label="t('dashboard.addJoinPopUp.onStream')"
           searchable
@@ -89,23 +89,19 @@
     </div>
 
     <div class="flex items-center gap-4">
-      <div class="border-t border-gray-200 flex-1"></div>
+      <div class="border-t border-border-default flex-1"></div>
       <div
-        :class="[
-          'py-2 text-center text-xs',
-          store.state.theme === 'dark' ? 'text-white' : 'text-gray-700',
-        ]"
+        class="py-2 text-center text-xs text-text-body"
         v-if="showJoinSummary"
       >
         {{ t('dashboard.addJoinPopUp.performing') }}
         <span
-          class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold"
-          style="background-color: color-mix(in srgb, var(--o2-primary-color) 15%, transparent); color: var(--o2-primary-color);"
+          class="inline-flex items-center rounded-default px-1.5 py-0.5 text-xs font-semibold bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent"
         >{{ joinTypeLabel }} {{ t('dashboard.addJoinPopUp.join') }}</span> {{ t('dashboard.addJoinPopUp.between') }}
         <span class="font-semibold">{{ mainStream }}</span> {{ t('dashboard.addJoinPopUp.and') }}
         <span class="font-semibold">{{ modelValue.stream }}</span>
       </div>
-      <div class="border-t border-gray-200 flex-1"></div>
+      <div class="border-t border-border-default flex-1"></div>
     </div>
 
     <div class="mb-2.5 flex flex-col min-h-0 flex-1">
@@ -123,14 +119,14 @@
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
-        class="mb-2.5 p-2.5 border border-border-default rounded"
+        class="mb-2.5 p-2.5 border border-border-default rounded-default"
       >
         <div class="mb-2 font-medium">{{ t('dashboard.addJoinPopUp.clause', { number: argIndex + 1 }) }}</div>
         <div class="flex items-center gap-2.5">
           <div class="flex-1 min-w-0 overflow-hidden">
             <StreamFieldSelect
               :streams="getStreamsBasedJoinIndex()"
-              v-model="modelValue.conditions[argIndex].leftField"
+              v-model="modelValueModel.conditions[argIndex].leftField"
               :data-test="`dashboard-join-condition-left-field-${argIndex}`"
             />
           </div>
@@ -138,7 +134,7 @@
           <div class="flex-1 min-w-0 overflow-hidden">
             <OSelect
               :label-position="'inside'"
-              v-model="modelValue.conditions[argIndex].operation"
+              v-model="modelValueModel.conditions[argIndex].operation"
               :options="operationSelectOptions"
               :label="t('dashboard.addJoinPopUp.selectOperation')"
               :data-test="`dashboard-join-condition-operation-${argIndex}`"
@@ -148,7 +144,7 @@
           <div class="flex-1 min-w-0 overflow-hidden">
             <StreamFieldSelect
               :streams="rightFieldStreams"
-              v-model="modelValue.conditions[argIndex].rightField"
+              v-model="modelValueModel.conditions[argIndex].rightField"
               :data-test="`dashboard-join-condition-right-field-${argIndex}`"
             />
           </div>
@@ -217,6 +213,17 @@ export interface StreamOption {
   value: string;
 }
 
+// Shape returned by useStreams' getStreams for a specific stream type.
+interface StreamListEntry {
+  name: string;
+}
+
+interface GetStreamsResponse {
+  name: string;
+  list: StreamListEntry[];
+  schema: boolean;
+}
+
 export interface JoinFieldReference {
   streamAlias: string;
   field: string;
@@ -240,12 +247,6 @@ export interface StreamReference {
   stream: string;
   streamAlias?: string;
 }
-
-const JOIN_TYPES = {
-  INNER: "inner",
-  LEFT: "left",
-  RIGHT: "right",
-} as const;
 
 const JOIN_OPERATIONS = ["=", "!=", ">", "<", ">=", "<="] as const;
 
@@ -323,6 +324,9 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
     );
+
+    // Same reference as props.modelValue; mutation targets its nested fields only.
+    const modelValueModel = computed(() => props.modelValue);
 
     const streamOptions = ref<StreamOption[]>([]);
     const operationOptions = [...JOIN_OPERATIONS];
@@ -448,10 +452,13 @@ export default defineComponent({
      */
     async function fetchStreamList(streamType: string): Promise<void> {
       try {
-        const response = await getStreams(streamType, false);
+        const response = (await getStreams(
+          streamType,
+          false,
+        )) as GetStreamsResponse;
 
         streamOptions.value = response.list.map(
-          (stream: any): StreamOption => ({
+          (stream: StreamListEntry): StreamOption => ({
             label: stream.name,
             value: stream.name,
           }),
@@ -461,7 +468,7 @@ export default defineComponent({
         if (streamOptions.value.length > 0) {
           if (!props.modelValue.stream) {
             // No stream selected, select first one
-            props.modelValue.stream = streamOptions.value[0].value;
+            modelValueModel.value.stream = streamOptions.value[0].value;
           } else {
             // Check if current stream is valid
             const isCurrentStreamValid = streamOptions.value.some(
@@ -469,7 +476,7 @@ export default defineComponent({
             );
 
             if (!isCurrentStreamValid) {
-              props.modelValue.stream = streamOptions.value[0].value;
+              modelValueModel.value.stream = streamOptions.value[0].value;
             }
           }
         }
@@ -494,7 +501,7 @@ export default defineComponent({
      */
     function handleJoinTypeChange(type: "inner" | "left" | "right"): void {
       try {
-        props.modelValue.joinType = type;
+        modelValueModel.value.joinType = type;
       } catch (error) {
         console.error("Error changing join type:", error);
       }
@@ -506,7 +513,7 @@ export default defineComponent({
     function handleAddCondition(index: number): void {
       try {
         const newCondition = createDefaultCondition();
-        props.modelValue.conditions.splice(index + 1, 0, newCondition);
+        modelValueModel.value.conditions.splice(index + 1, 0, newCondition);
       } catch (error) {
         console.error("Error adding condition:", error);
       }
@@ -527,7 +534,7 @@ export default defineComponent({
           return;
         }
 
-        props.modelValue.conditions.splice(index, 1);
+        modelValueModel.value.conditions.splice(index, 1);
       } catch (error) {
         console.error("Error removing condition:", error);
       }
@@ -549,6 +556,7 @@ export default defineComponent({
     return {
       t,
       store,
+      modelValueModel,
       operationOptions,
       operationSelectOptions,
       streamOptions,

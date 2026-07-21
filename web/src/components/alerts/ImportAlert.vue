@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
       <div class="flex items-end gap-2 my-[0.725rem]">
-        <div style="width: calc(69%)">
+        <div class="w-[69%]">
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div style="width: calc(30%)" data-test="alert-folder-dropdown">
+        <div class="w-[30%]" data-test="alert-folder-dropdown">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -50,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="mb-1 flex items-start gap-2" style="width: calc(100% - 10px)">
-        <div style="width: calc(69%)">
+      <div class="mb-1 flex items-start gap-2 w-[calc(100%-0.625rem)]">
+        <div class="w-[69%]">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
           />
         </div>
-        <div style="width: calc(30%)">
+        <div class="w-[30%]">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -76,14 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default min-w-100">
       <div
         v-if="alertErrorsToDisplay.length > 0"
-        class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+        class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
       >
         Error Validations
       </div>
-      <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+      <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
       <OSeparator class="mt-1 shrink-0" />
       <div class="error-report-container flex-1 min-h-0">
         <!-- Alert Errors Section -->
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-import-error-${index}-${errorIndex}`"
               >
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'alert_name'
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ errorMessage.message }}
 
-                  <div style="width: 300px">
+                  <div class="w-75">
                     <OInput
                       data-test="alert-import-name-input"
                       :model-value="userSelectedAlertName[index] || ''"
@@ -119,22 +119,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!userSelectedAlertName[index]?.toString().trim()"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedAlertName[index] = val;
-                        updateAlertName(val, index);
+                        userSelectedAlertName[index] = val as string;
+                        updateAlertName(val as string, index);
                       }"
                     />
                   </div>
                 </span>
                 <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'stream_name'
                   "
                 >
                   {{ errorMessage.message }}
-                  <div style="width: 300px">
+                  <div class="w-75">
                     <OSelect
                       data-test="alert-import-stream-name-input"
                       :model-value="userSelectedStreamName[index] || ''"
@@ -144,14 +144,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!userSelectedStreamName[index]"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedStreamName[index] = val;
-                        updateStreamFields(val, index);
+                        userSelectedStreamName[index] = val as string;
+                        updateStreamFields(val as string, index);
                       }"
                     />
                   </div>
                 </span>
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'destination_name'
@@ -167,18 +167,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       multiple
                       searchable
                       @search="filterDestinations"
-                      style="width: 300px"
+                      class="w-75!"
                       :error="!userSelectedDestinations[index]?.length"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedDestinations[index] = val;
-                        updateUserSelectedDestinations(val, index);
+                        userSelectedDestinations[index] = val as string[];
+                        updateUserSelectedDestinations(val as string[], index);
                       }"
                     />
                   </div>
                 </span>
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'stream_type'
@@ -191,18 +191,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :model-value="userSelectedStreamType[index] || ''"
                       :options="streamTypes"
                       :label="t('alerts.streamType') + ' *'"
-                      style="width: 300px"
+                      class="w-75!"
                       :error="!userSelectedStreamType[index]"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedStreamType[index] = val;
-                        updateStreams(val, index);
+                        userSelectedStreamType[index] = val as string;
+                        updateStreams(val as string, index);
                       }"
                     />
                   </div>
                 </span>
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'timezone'
@@ -217,25 +217,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       label="Timezone *"
                       searchable
                       @search="timezoneFilterFn"
-                      style="width: 300px"
+                      class="w-75!"
                       :error="!userSelectedTimezone[index]"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedTimezone[index] = val;
-                        updateTimezone(val, index);
+                        userSelectedTimezone[index] = val as string;
+                        updateTimezone(val as string, index);
                       }"
                     />
                   </div>
                 </span>
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'org_id'
                   "
                 >
                   {{ errorMessage.message }}
-                  <div style="width: 300px">
+                  <div class="w-75">
                     <OSelect
                       data-test="alert-import-org-id-input"
                       :model-value="userSelectedOrgId[index] || null"
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="value"
                       @update:model-value="(val) => {
                         userSelectedOrgId[index] = val;
-                        updateOrgId(val?.value || val, index);
+                        updateOrgId(((val as unknown as { value?: string })?.value || val) as string, index);
                       }"
                     />
                   </div>
@@ -274,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="{
                 'py-1.25 px-0 text-sm font-bold': true,
                 'text-green ': val.success,
-                'text-red': !val.success,
+                'text-status-negative': !val.success,
               }"
               :data-test="`alert-import-creation-${index}-message`"
             >
@@ -490,7 +490,7 @@ export default defineComponent({
       getActiveFolderAlerts(activeFolderId.value as string);
     });
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       alertErrorsToDisplay.value = [];
       templateErrorsToDisplay.value = [];
       destinationErrorsToDisplay.value = [];
@@ -639,8 +639,6 @@ export default defineComponent({
           field: "alert_name",
         });
       }
-      const organizationData = store.state.organizations;
-      const orgList = organizationData.map((org: any) => org.identifier);
 
       // 2. Validate 'org_id' field
       if (
@@ -954,7 +952,7 @@ export default defineComponent({
 
       if (
         (input.trigger_condition.frequency_type == "cron" &&
-          !input.trigger_condition.hasOwnProperty("timezone")) ||
+          !Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) ||
         input.trigger_condition.timezone === ""
       ) {
         alertErrors.push({
@@ -997,19 +995,19 @@ export default defineComponent({
     };
 
     const createAlert = async (input: any, index: any, folderId: any) => {
-      if (!input.hasOwnProperty("context_attributes")) {
+      if (!Object.prototype.hasOwnProperty.call(input, "context_attributes")) {
         input.context_attributes = {};
       }
-      if (!input.trigger_condition.hasOwnProperty("timezone")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) {
         input.trigger_condition.timezone = store.state.timezone;
       }
-      if (!input.trigger_condition.hasOwnProperty("tolerance_in_secs")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "tolerance_in_secs")) {
         input.trigger_condition.tolerance_in_secs = null;
       }
       input.folder_id = folderId;
       input.owner = store.state.userInfo.email;
       input.last_edited_by = store.state.userInfo.email;
-      if (input.hasOwnProperty("id")) delete input.id;
+      if (Object.prototype.hasOwnProperty.call(input, "id")) delete input.id;
 
       // VERSION DETECTION AND CONVERSION
       // Convert V0 and V1 conditions to V2 format before creating alert

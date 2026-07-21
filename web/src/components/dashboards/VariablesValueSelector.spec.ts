@@ -81,7 +81,7 @@ vi.mock("@/utils/date", () => ({
 }));
 
 vi.mock("@/utils/query/sqlUtils", () => ({
-  addLabelsToSQlQuery: vi.fn((query: string, filters: any[]) =>
+  addLabelsToSQlQuery: vi.fn((query: string) =>
     Promise.resolve(query),
   ),
 }));
@@ -90,8 +90,8 @@ vi.mock("@/utils/zincutils", () => ({
   b64EncodeUnicode: vi.fn((str: string) => btoa(str)),
   escapeSingleQuotes: vi.fn((str: string) => str.replace(/'/g, "''")),
   generateTraceContext: vi.fn(() => ({ traceId: "test-trace-id" })),
-  isStreamingEnabled: vi.fn((state: any) => false),
-  isWebSocketEnabled: vi.fn((state: any) => false),
+  isStreamingEnabled: vi.fn(() => false),
+  isWebSocketEnabled: vi.fn(() => false),
 }));
 
 vi.mock("@/utils/dashboard/variables/variablesDependencyUtils", () => ({
@@ -230,15 +230,7 @@ describe("VariablesValueSelector", () => {
       },
       global: {
         plugins: [],
-        stubs: {
-          "q-input": {
-            name: "QInput",
-            template:
-              '<input v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
-            props: ["modelValue", "label", "dense", "outlined", "readonly"],
-            emits: ["update:modelValue"],
-          },
-        },
+        stubs: {},
       },
     });
   };
@@ -1320,9 +1312,6 @@ describe("VariablesValueSelector", () => {
 
     it("should not update if value has not changed", async () => {
       const vm = wrapper.vm as any;
-      const regionVariable = vm.variablesData.values.find(
-        (v: any) => v.name === "region",
-      );
 
       const emittedEventsBefore = wrapper.emitted("variablesData")?.length || 0;
 

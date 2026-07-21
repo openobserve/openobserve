@@ -16,12 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="h-full"
-    :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+    class="h-full bg-surface-base"
   >
     <div>
       <div class="flex justify-between items-center px-3 py-2">
-        <div data-test="add-pipeline-section-title" style="font-size: 18px">
+        <div data-test="add-pipeline-section-title" style="font-size: var(--text-lg)">
           {{ t("pipeline.addPipeline") }}
         </div>
         <OIcon
@@ -33,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="w-full bg-gray-300" style="height: 1px" />
+      <div class="w-full bg-separator" style="height: 1px" />
 
       <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits
            natively via type="submit" (no form-id needed; R4 case 1). -->
@@ -45,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="px-3">
           <div
             data-test="add-pipeline-name-input"
-            class="alert-name-input o2-input"
-            style="padding-top: 12px"
+            class="alert-name-input o2-input pt-3"
           >
             <OFormInput
               name="name"
@@ -71,8 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             data-test="add-pipeline-stream-type-select"
-            class="alert-stream-type o2-input mr-2 mb-2"
-            style="padding-top: 0"
+            class="alert-stream-type o2-input mr-2 mb-2 pt-0"
           >
             <OFormSelect
               name="stream_type"
@@ -89,8 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             data-test="add-pipeline-stream-select"
-            class="o2-input"
-            style="padding-top: 0"
+            class="o2-input pt-0"
           >
             <OFormSelect
               name="stream_name"
@@ -144,7 +140,7 @@ import {
   type AddPipelineForm,
 } from "./StreamSelection.schema";
 
-const props = defineProps({
+defineProps({
   isUpdating: {
     type: Boolean,
     required: false,
@@ -182,8 +178,8 @@ const streamTypes = ref([
   { label: "Traces", value: "traces" },
 ]);
 
-const indexOptions = ref([]);
-const filteredStreams = ref([]);
+const indexOptions = ref<string[]>([]);
+const filteredStreams = ref<string[]>([]);
 
 // Refetch the stream list (+ reset the dependent stream_name) for a stream_type.
 // Reads/writes the FORM-owned values (the select is form-owned now).

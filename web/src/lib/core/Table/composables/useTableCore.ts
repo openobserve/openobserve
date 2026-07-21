@@ -6,13 +6,20 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useVueTable,
-  type AggregationFns,
+  type AggregationFn,
   type ColumnDef,
   type Row,
-  type Table,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
 import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
+
+// Register the custom "avg" fn (provided via table options below) so
+// OTableColumnDef.aggregate values type-check against AggregationFnOption.
+declare module "@tanstack/table-core" {
+  interface AggregationFns {
+    avg: AggregationFn<unknown>;
+  }
+}
 
 /**
  * Creates and manages the TanStack Table instance.
@@ -48,12 +55,12 @@ export function useTableCore<TData>(
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
   },
-  emit: any,
+  _emit?: unknown,
 ) {
   // ── Effective columns ───────────────────────────────────────────
   // When `showIndex` is set (and the caller hasn't already declared a `#`
   // column), prepend an auto-rendered, auto-numbered row-index column. Its
-  // value is derived from the row's position so pages no longer hand-roll a
+  // value is derived from the row's position so pages need not hand-roll a
   // `"#"` field in their data. Under server pagination we add the page offset
   // so numbering stays continuous across pages.
   const indexColumn = computed<OTableColumnDef<TData> | null>(() => {
@@ -77,7 +84,9 @@ export function useTableCore<TData>(
         const n = index + 1 + offset;
         return n <= 9 ? `0${n}` : `${n}`;
       }) as any,
-      meta: { align: "left" },
+      // tabular-nums: uniform digit width so 3-/4-digit values never clip to
+      // "2…" on the fixed-width column (see TABLE_INDEX_COL_SIZE).
+      meta: { align: "left", cellClass: "tabular-nums" },
     };
   });
 
@@ -86,6 +95,23 @@ export function useTableCore<TData>(
   // column can stay pinned flush-right. Only added when resizing is on and the
   // table has no explicit elastic (`autoWidth`) column — if a column is marked
   // autoWidth, THAT column is the filler instead and no spacer is needed.
+  // Whether an invisible trailing `__spacer__` column will be appended. When
+  // true the actions column is NOT the row's last cell (the spacer is), so it
+  // keeps px-2; when false the actions column is last and gets the 1rem right
+  // edge inset. `actionColumnWidth` reads this to budget the right padding.
+  const hasTrailingSpacer = computed<boolean>(() => {
+    const base = indexColumn.value
+      ? [indexColumn.value, ...props.columns]
+      : props.columns;
+    const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
+    return (
+      (props.enableColumnResize ?? false) &&
+      !props.horizontalScroll &&
+      !props.defaultColumns &&
+      !hasAutoWidth
+    );
+  });
+
   const effectiveColumns = computed<OTableColumnDef<TData>[]>(() => {
     const base = indexColumn.value
       ? [indexColumn.value, ...props.columns]
@@ -97,13 +123,7 @@ export function useTableCore<TData>(
     // flush-right) and blank space lands in the spacer when a column shrinks.
     // `flex` tables need it too — the flex column freezes after the first resize
     // and no longer re-absorbs, so the spacer takes over.
-    const hasAutoWidth = base.some((c) => c.meta?.autoWidth);
-    const wantSpacer =
-      (props.enableColumnResize ?? false) &&
-      !props.horizontalScroll &&
-      !props.defaultColumns &&
-      !hasAutoWidth;
-    if (!wantSpacer) return base;
+    if (!hasTrailingSpacer.value) return base;
     const spacer: OTableColumnDef<TData> = {
       id: "__spacer__",
       header: "",
@@ -129,11 +149,18 @@ export function useTableCore<TData>(
   // header. Computed (not DOM-measured) so the skeleton and loaded table match.
   const ACTION_ICON_BTN = 32; // OButton size="icon-sm" → w-8
   const ACTION_BTN_GAP = 4; // gap-1 between buttons
-  const ACTION_CELL_PAD = 16; // td px-2
   const ACTIONS_HEADER_MIN = 80; // enough to show the "Actions" header in full
+  // The page-edge inset (--spacing-page-edge) that OTable applies to the last
+  // cell's right padding, in px. Keep in sync with the token (0.75rem = 12px).
+  const PAGE_EDGE_PX = 12;
   const actionColumnWidth = (actionCount?: number): number => {
     const n = Math.max(1, Number(actionCount) || 2);
-    const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + ACTION_CELL_PAD;
+    // Cell padding: px-2 is 8+8=16. When the actions column is the row's last
+    // cell (no trailing spacer) the edge inset replaces its right padding with
+    // the page-edge inset, so budget 8 + PAGE_EDGE_PX — exact, so the buttons
+    // land on the same right-edge grid line as everything else (no over-width).
+    const cellPad = hasTrailingSpacer.value ? 16 : 8 + PAGE_EDGE_PX;
+    const content = n * ACTION_ICON_BTN + (n - 1) * ACTION_BTN_GAP + cellPad;
     return Math.max(content, ACTIONS_HEADER_MIN);
   };
 
@@ -207,7 +234,7 @@ export function useTableCore<TData>(
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell
-          ? ((info: any) => {
+          ? (() => {
               if (typeof col.cell === "string") return col.cell;
               return col.cell;
             })
@@ -228,7 +255,9 @@ export function useTableCore<TData>(
         enableResizing: (rigid || col.meta?.autoWidth || col.meta?.spacer) ? false : (col.resizable ?? props.enableColumnResize ?? false),
         enablePinning: col.pinnable ?? props.enableColumnPin ?? false,
         meta: {
-          align: col.meta?.align ?? "left",
+          // Action columns (pinned-right icon buttons) center by default — the
+          // app-wide convention — unless a column opts into a specific align.
+          align: col.meta?.align ?? (isActionCol ? "center" : "left"),
           headerClass: col.meta?.headerClass ?? "",
           cellClass: col.meta?.cellClass ?? "",
           isAction: col.isAction,
@@ -255,7 +284,7 @@ export function useTableCore<TData>(
   );
 
   // Built-in aggregation functions for footer totals
-  const aggregationFns: AggregationFns<TData> = {
+  const aggregationFns: Record<string, AggregationFn<TData>> = {
     sum: (columnId: string, leafRows: Row<TData>[]) => {
       return leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0);
     },

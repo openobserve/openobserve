@@ -973,6 +973,8 @@ pub fn service_routes() -> Router {
             // Topology
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
             .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
+            // Agent behavior signals (loop / failure / cost) — reads the derived _agent_signals stream
+            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
 
             // Patterns
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
@@ -984,6 +986,39 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/service_streams/config/identity", get(service_streams::get_identity_config).put(service_streams::save_identity_config))
             .route("/{org_id}/service_streams/_reset", delete(service_streams::reset_services))
             .route("/{org_id}/storage",get(organization::storage::get).post(organization::storage::save).put(organization::storage::update));
+
+        if get_o2_config().common.workflows_enabled {
+            // workflows
+            router = router
+                .route(
+                    "/{org_id}/workflows",
+                    get(workflows::list_workflows).post(workflows::save_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}",
+                    delete(workflows::delete_workflows).put(workflows::update_workflows),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/test",
+                    post(workflows::test_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/history",
+                    get(workflows::get_workflow_history),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/errors/{run_id}",
+                    get(workflows::get_workflow_errors),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/retry",
+                    post(workflows::retry_workflow),
+                )
+                .route(
+                    "/{org_id}/workflows/{id}/enable",
+                    put(workflows::enable_workflow),
+                );
+        }
 
         // Synthetics — all routes gated behind O2_SYNTHETICS_ENABLED. When off,
         // nothing is registered and every synthetics path 404s.

@@ -17,15 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. The user search moved into
-         the table's own toolbar (built-in global filter) per the layout system. -->
-    <AppPageHeader
+  <OPageLayout
       :title="t('iam.basicUsers')"
       :subtitle="t('user.subtitle')"
-      icon="person"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+      icon="person" bleed>
       <template #actions>
         <member-invitation
           v-if="config.isCloud == 'true'"
@@ -43,9 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('user.add') }}
         </OButton>
       </template>
-    </AppPageHeader>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           :key="tableKey"
           :frame="false"
@@ -65,6 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-row-selectable="(row: any) => row.enableDelete"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-users-list"
@@ -107,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Auth type badge (Native / SSO / LDAP) — enterprise/cloud only -->
           <template #cell-auth="{ row }">
             <OTag v-if="row.auth_type" type="authType" :value="row.auth_type" />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <!-- Roles badges — typed userRole tags for built-in roles, custom
@@ -175,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || t('iam.user.organizationMembers')) : t('iam.basicUsers') }}</span>
+            <span class="text-xs font-normal">{{ rows.length }} {{ isEnterpriseOrCloud ? (t('iam.organizationMembers') || t('iam.user.organizationMembers')) : t('iam.basicUsers') }}</span>
             <OButton
               v-if="selectedUsers.length > 0"
               data-test="users-list-delete-users-btn"
@@ -244,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('user.deleteUsersMsg', { count: selectedUsers.length }) }}</p>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -254,7 +249,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
@@ -278,17 +273,17 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed, nextTick } from "vue";
-import { getRoles as getCustomRolesApi, getRoleUsers } from "@/services/iam";
+import { computed } from "vue";
+import { getRoles as getCustomRolesApi } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "UserPageOpenSource",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OTable,
     UpdateUserRole,
     AddUser,
@@ -306,7 +301,7 @@ export default defineComponent({
     "deleted:fields",
     "updated:dates",
   ],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -392,15 +387,6 @@ export default defineComponent({
 
     const columns = computed<OTableColumnDef[]>(() => {
       const cols: OTableColumnDef[] = [
-        {
-          id: "#",
-          header: "#",
-          accessorFn: (row: any) => row["#"],
-          size: TABLE_INDEX_COL_SIZE,
-          minSize: 32,
-          maxSize: 50,
-          meta: { compactPadding: true, align: "left" },
-        },
         {
           id: "email",
           header: t("user.email"),
@@ -488,8 +474,8 @@ export default defineComponent({
     const isBuiltinRole = (r: string) =>
       BUILTIN_ROLES.has(String(r ?? "").toLowerCase());
     const userEmail: any = ref("");
-    const options = ref([]);
-    const customRoles = ref([]);
+    const options = ref<{ label: string; value: string }[]>([]);
+    const customRoles = ref<string[]>([]);
     const selectedRole = ref();
     const currentUserRole = ref("");
     let deleteUserEmail = "";
@@ -551,71 +537,6 @@ export default defineComponent({
       });
     }
 
-    let hydrateGeneration = 0;
-
-    const clearLoading = (targets: any[]) => {
-      for (const u of targets) {
-        u.custom_roles_loading = false;
-      }
-    };
-
-    // Inverts OFGA per-role memberships into per-user role lists.
-    // Cost: O(R) HTTP calls where R is the number of custom roles,
-    // independent of the user count.
-    const hydrateCustomRoles = async () => {
-      const myGen = ++hydrateGeneration;
-      const orgId = store.state.selectedOrganization.identifier;
-      const targets = usersState.users.filter(
-        (u: any) => (u.rawEmail || u.email) && u.status !== "pending",
-      );
-      if (targets.length === 0) return;
-
-      const byEmail = new Map<string, any>();
-      for (const u of targets) {
-        byEmail.set(String(u.rawEmail || u.email).toLowerCase(), u);
-      }
-
-      try {
-        // Always fetch a fresh role list scoped to this hydration run so we
-        // don't race with concurrent picker loads mutating the shared ref.
-        // Silent mode: hydration is a background operation; surface fetch
-        // errors via the per-row loading state, not a toast.
-        let roleNames: string[] = [];
-        try {
-          const res = await getCustomRolesApi(orgId);
-          roleNames = Array.isArray(res.data) ? res.data : [];
-        } catch {
-          roleNames = [];
-        }
-        if (myGen !== hydrateGeneration) return;
-        if (roleNames.length === 0) return;
-
-        const results = await Promise.all(
-          roleNames.map((role) =>
-            getRoleUsers(role, orgId)
-              .then((r) => ({ role, emails: Array.isArray(r.data) ? r.data : [] }))
-              .catch(() => ({ role, emails: [] as string[] })),
-          ),
-        );
-        if (myGen !== hydrateGeneration) return;
-
-        for (const { role, emails } of results) {
-          for (const email of emails) {
-            const row = byEmail.get(String(email).toLowerCase());
-            if (!row) continue;
-            const next = Array.isArray(row.custom_roles)
-              ? row.custom_roles
-              : [];
-            if (next.indexOf(role) === -1) {
-              row.custom_roles = [...next, role];
-            }
-          }
-        }
-      } finally {
-        clearLoading(targets);
-      }
-    };
-
     const loading = ref(false);
     const getOrgMembers = () => {
       const dismiss = toast({
@@ -636,7 +557,6 @@ export default defineComponent({
               users = [...res.data.data, ...invitedMembers];
             }
 
-            let counter = 1;
             currentUserRole.value = "";
             usersState.users = users.map((data: any) => {
               if (store.state.userInfo.email?.toLowerCase() == data.email?.toLowerCase()) {
@@ -669,18 +589,16 @@ export default defineComponent({
 
 
               return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: maskText(data.email),
                 rawEmail: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
-                // Store the display-cased role (e.g. "Admin", "Admin (Invited)") so
-                // the edit/update payloads stay byte-identical to pre-migration, which
-                // sent the capitalized value. The role options from getRoles use the
-                // lowercase value ("admin"), so this seeded "Admin" doesn't match an
-                // option — but OSelect renders the raw value as a fallback, so the
-                // field still displays "Admin" correctly. The only cosmetic quirk is
-                // that the open dropdown won't highlight the lowercase option as active.
+                // Store the display-cased role (e.g. "Admin", "Admin (Invited)").
+                // The role options from getRoles use the lowercase value ("admin"),
+                // so this seeded "Admin" doesn't match an option — but OSelect renders
+                // the raw value as a fallback, so the field still displays "Admin"
+                // correctly. The only cosmetic quirk is that the open dropdown won't
+                // highlight the lowercase option as active.
                 role:
                   data?.status == "pending"
                     ? toCamelCase(data.role) + " (Invited)"
@@ -711,11 +629,10 @@ export default defineComponent({
             // Enterprise/cloud: the org-members API only returns a single
             // `role` per user, so users with multiple role assignments
             // (e.g. Viewer + custom "nmcdev") look incomplete. Fetch the
-            // full role list for *all* users in a single request — fire-and-
-            // forget — and re-render the rows when it resolves. This replaces
-            // the previous one-request-per-user pattern (N auth checks + N
-            // OpenFGA reads) with a single batched call, and keeps the table
-            // responsive instead of blocking the whole UI on the role API.
+            // full role list for *all* users in a single batched request —
+            // fire-and-forget — and re-render the rows when it resolves,
+            // keeping the table responsive instead of blocking the whole UI
+            // on the role API.
             if (isEnterpriseOrCloud) {
               const orgId = store.state.selectedOrganization.identifier;
               // Don't await — let the batched role fetch run in the background.
@@ -777,8 +694,6 @@ export default defineComponent({
     //   }
     // });
 
-    const currentUser = computed(() => store.state.userInfo.email);
-
     const updateUserActions = () => {
       usersState.users.forEach((member: any) => {
         member.enableEdit = shouldAllowEdit(member);
@@ -790,8 +705,7 @@ export default defineComponent({
     // Refresh handler for the toolbar refresh button. getOrgMembers() only seeds
     // default action flags on each row — the real per-row permissions are
     // computed by updateUserActions(), so it must run after every reload (this
-    // mirrors the onBeforeMount sequence). Binding refresh straight to
-    // getOrgMembers skipped this step and blanked out all row actions.
+    // mirrors the onBeforeMount sequence).
     const refreshUsers = async () => {
       try {
         await getOrgMembers();
@@ -1118,7 +1032,7 @@ export default defineComponent({
 
       organizationsService
         .revoke_invite(store.state.selectedOrganization.identifier, revokeInviteToken)
-        .then(async (res: any) => {
+        .then(async () => {
           dismiss();
           toast({
             message: t('iam.user.invitationRevokedSuccess'),
@@ -1348,12 +1262,13 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): compact role chip styling (child OTag DOM) */
 :deep(.o2-role-chip) {
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 0.125rem 0.5rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: 0.375rem;
   line-height: 1.4;
 }
 </style>

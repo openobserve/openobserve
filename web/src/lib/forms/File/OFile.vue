@@ -18,7 +18,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real file input; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -184,7 +184,7 @@ function formatSize(bytes: number) {
 }
 
 const wrapperClasses = computed(() => [
-  "relative flex items-center gap-2 w-full rounded-md border px-3 py-1 transition-[color,background-color,border-color,box-shadow] duration-150",
+  "relative flex items-center gap-2 w-full rounded-default border px-3 py-1 transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   heightClasses[props.size ?? "md"],
   isDragging.value
@@ -204,7 +204,7 @@ const wrapperClasses = computed(() => [
     <label
       v-if="$slots.label || label || $slots.tooltip"
       :for="inputId"
-      class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
+      class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center gap-1"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
@@ -274,13 +274,13 @@ const wrapperClasses = computed(() => [
         <span
           v-for="(file, i) in files"
           :key="`${file.name}-${i}`"
-          class="inline-flex items-center gap-1 rounded-md bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-[12rem] shrink-0"
+          class="inline-flex items-center gap-1 rounded-default bg-file-chip-bg text-file-chip-text px-2 py-0.5 text-xs max-w-48 shrink-0"
           :data-test="`o-file-chip-${i}`"
         >
           <span class="truncate" :title="`${file.name} (${formatSize(file.size)})`">
             {{ file.name }}
           </span>
-          <span class="text-[0.65rem] opacity-70 shrink-0">
+          <span class="text-3xs opacity-70 shrink-0">
             {{ formatSize(file.size) }}
           </span>
           <button
@@ -352,8 +352,11 @@ const wrapperClasses = computed(() => [
 </template>
 
 <style scoped>
-/* Single-line file chips: keep horizontal scrolling but hide the scrollbar so
-   the row stays a clean one-line input regardless of how many files are chosen. */
+/* keep(scrollbar): single-line file chips — keep horizontal scrolling but hide
+   the scrollbar so the row stays a clean one-line input regardless of how many
+   files are chosen. `scrollbar-width`/`-ms-overflow-style` and the
+   `::-webkit-scrollbar` pseudo-element are native-control surfaces with no
+   Tailwind utility equivalent. */
 .o-file-chips {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge legacy */

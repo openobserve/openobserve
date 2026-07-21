@@ -30,13 +30,10 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       name: requiredText(t("onlineEvals.job.validation.nameRequired")),
       stream: requiredText(t("onlineEvals.job.validation.streamRequired")),
       description: z.string().optional().default(""),
-      // Internal metadata (not a rendered control) — kept in the form per
-      // note 3 (non-validated → optional).
+      // Internal metadata (not a rendered control), non-validated.
       streamType: z.string().optional().default("traces"),
-      // Scorer selection is NOT validated here: the composite JobScorerPicker
-      // has no inline error slot, so the "≥1 scorer" rule is enforced as a toast
-      // guard in the component's onSubmit (see JobFormPage.vue). Bridged from the
-      // picker via setFieldValue.
+      // Not validated here: JobScorerPicker has no inline error slot, so the
+      // "≥1 scorer" rule is enforced as a toast guard in the component's onSubmit.
       scorerIds: z.array(z.string()),
       samplingMode: z.string().default("rate"),
       samplingValue: z.string().optional().default(""),

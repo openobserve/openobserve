@@ -107,10 +107,9 @@ export default function (store: any) {
           to.path !== "/cb" &&
           to.path != "/web/cb"
         ) {
-          // if query params contains redirect_url, store that URL in session storage
-          // else store the current URL in session storage
-          // this conditions added specifically for short URL feature where user will be redirected to backend API endpoint
-          // if user is not logged in, then user will be redirected to login page and after successful login, user will be redirected to the short URL
+          // If query params contain short_url, store that URL; else store the
+          // current URL. Needed for the short URL feature: after login the user
+          // is redirected to the stored short URL.
           if (Object.hasOwn(to.query, "short_url")) {
             window.sessionStorage.setItem("redirectURI", to.query.short_url);
           } else {
@@ -129,8 +128,7 @@ export default function (store: any) {
         next();
       }
     } else {
-      const sessionUserInfo = getDecodedUserInfo();
-      const userID = JSON.parse(String(sessionUserInfo)).email;
+      getDecodedUserInfo();
 
       segment.track("page view", {
         path: to.path,

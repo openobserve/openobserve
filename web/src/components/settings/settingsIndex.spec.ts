@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
@@ -145,11 +145,11 @@ describe("SettingsIndex.vue", () => {
         },
         stubs: {
           "router-view": true,
-          PageLayout: {
+          OPageLayout: {
             template: '<div><slot name="sidebar" /><slot /></div>',
           },
           SectionRail: true,
-          AppPageHeader: true,
+          OPageHeader: true,
           ConstrainedPage: {
             template: "<div><slot /></div>",
           },
@@ -324,8 +324,7 @@ describe("SettingsIndex.vue", () => {
       const allItems = wrapper.vm.sectionGroups.flatMap(
         (g: any) => g.items ?? [],
       );
-      const regexItem = allItems.find((i: any) => i.key === "regex_patterns");
-      // regexItem may be undefined if not enterprise (isEnterprise defaults to 'false')
+      // regex_patterns item may be undefined if not enterprise (isEnterprise defaults to 'false')
       // so this test just verifies the structure is accessible without throwing
       expect(Array.isArray(allItems)).toBe(true);
     });

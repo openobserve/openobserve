@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="step-advanced w-full"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE <OForm>
          and provides FORM_CONTEXT_KEY. The OForm* fields below inject that form
@@ -26,16 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          AddAlert.schema.ts validates on save. -->
     <div>
     <div
-      class="step-content rounded-lg bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
+      class="step-content rounded-default bg-surface-overlay border border-border-default"
     >
       <!-- Section header -->
       <div
-        class="section-header flex items-center py-[10px] px-3"
-        :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
+        class="section-header flex items-center py-2.5 px-3 border-b border-border-default"
       >
-        <div class="section-header-accent w-[3px] h-4 rounded-[2px] mr-2 shrink-0 bg-[var(--q-primary)]" />
+        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
         <span
-          class="section-header-title text-[13px] font-semibold text-[var(--color-text-primary)]"
+          class="section-header-title text-compact font-semibold text-text-heading"
         >{{
           t("alerts.additional_settings")
         }}</span>
@@ -45,8 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Template Override -->
         <div>
           <div
-            class="subsection-label flex items-center text-xs font-semibold mb-2"
-            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+            class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
           >
             <span>{{ t("alerts.template") }}</span>
             <OButton
@@ -66,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="formattedTemplates"
               clearable
               :placeholder="t('alerts.advanced.selectTemplate')"
-              class="min-w-[240px] max-w-[300px]"
+              class="min-w-60 max-w-75"
               data-test="advanced-template-override-select"
             >
               <template #empty>{{ t("alerts.advanced.noTemplatesAvailable") }}</template>
@@ -85,8 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Context Variables -->
         <div>
           <div
-            class="subsection-label flex items-center text-xs font-semibold mb-2"
-            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+            class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
           >
             <span>{{ t("alerts.additionalVariables") }}</span>
             <OButton
@@ -127,13 +123,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-variables-key-input"
                 :name="`context_attributes[${index}].key`"
                 :placeholder="t('common.name')"
-                class="min-w-[140px]"
+                class="min-w-35"
               />
               <OFormInput
                 data-test="alert-variables-value-input"
                 :name="`context_attributes[${index}].value`"
                 :placeholder="t('common.value')"
-                class="min-w-[200px]"
+                class="min-w-50"
               />
               <OButton
                 data-test="alert-variables-delete-variable-btn"
@@ -159,8 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Description -->
         <div>
           <div
-            class="subsection-label flex items-center text-xs font-semibold mb-2"
-            :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+            class="subsection-label flex items-center text-xs font-semibold mb-2 text-text-secondary"
           >
             <span>{{ t("alerts.description") }}</span>
           </div>
@@ -175,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div>
           <div class="flex items-center justify-between mb-2">
             <div
-              class="subsection-label flex items-center text-xs font-semibold"
-              :class="store.state.theme === 'dark' ? 'text-[#9ca3af]' : 'text-[#6b7280]'"
+              class="subsection-label flex items-center text-xs font-semibold text-text-secondary"
             >
               <span>{{ t("alerts.row") }}</span>
               <OButton
@@ -243,6 +237,7 @@ import {
   computed,
   inject,
   type PropType,
+  type Ref,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -347,7 +342,7 @@ export default defineComponent({
 
     // ── Reactive form reads (single source of truth for preview + help
     //    drawer). ────────────────────────────────────────────────────────────
-    const variableRows = form.useStore(
+    const variableRows: Ref<Variable[]> = form.useStore(
       (s: any) => (s.values?.context_attributes ?? []) as Variable[],
     );
     const templateValue = form.useStore(

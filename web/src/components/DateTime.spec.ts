@@ -21,13 +21,13 @@ vi.mock("@/utils/zincutils", () => ({
   getCachedTimestamp: vi.fn(() => Date.now()),
   useLocalTimezone: vi.fn(() => "UTC"),
   getImageURL: vi.fn((path) => `/mocked/${path}`),
-  convertToUtcTimestamp: vi.fn((dateStr, tz) => new Date(dateStr).getTime() * 1000)
+  convertToUtcTimestamp: vi.fn((dateStr) => new Date(dateStr).getTime() * 1000)
 }));
 
 vi.mock("@/utils/date", () => ({
   generateDurationLabel: vi.fn(() => "15m"),
   formatDateWithTimezone: vi.fn(() => "2023-01-01 10:00:00"),
-  subtractRelativeTime: vi.fn((endDate: Date, _period: Record<string, number>) => {
+  subtractRelativeTime: vi.fn((endDate: Date) => {
     const result = new Date(endDate);
     result.setMinutes(result.getMinutes() - 15);
     return result;
@@ -35,7 +35,7 @@ vi.mock("@/utils/date", () => ({
 }));
 
 vi.mock("date-fns-tz", () => ({
-  toZonedTime: vi.fn((date, tz) => new Date(date))
+  toZonedTime: vi.fn((date) => new Date(date))
 }));
 
 describe("DateTime Component", () => {
@@ -73,27 +73,7 @@ describe("DateTime Component", () => {
         provide: {
           store,
         },
-        stubs: {
-          'q-btn': true,
-          'q-menu': true,
-          'q-separator': true,
-          'q-select': true,
-          'q-input': true,
-          'q-date': true,
-          'q-time': true,
-          'q-card': true,
-          'q-card-section': true,
-          'q-card-actions': true,
-          'q-tabs': true,
-          'q-tab': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-item': true,
-          'q-item-section': true,
-          'q-item-label': true,
-          'q-list': true,
-          'q-tooltip': true
-        }
+        stubs: {}
       },
     });
   };

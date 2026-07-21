@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="rounded-md overflow-hidden min-h-0 h-full flex flex-col"
+    class="rounded-default overflow-hidden min-h-0 h-full flex flex-col"
     data-test="home-page"
   >
     <!-- No card-container here: the page already renders inside MainLayout's
@@ -26,8 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <div
-      class="h-full overflow-hidden flex flex-col min-h-0"
+    <OPageLayout
+      :title="t('menu.home')"
+      :subtitle="t('home.subtitle')"
+      icon="home"
+      :tabs-below="tabOrder.length > 1"
+      bleed
     >
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
@@ -35,17 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            exists we hand-draw the border so the header still reads as a header.
            The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);
            OTabs draws the active underline flush with the header's divider. -->
-      <AppPageHeader
-        :title="t('menu.home')"
-        :subtitle="t('home.subtitle')"
-        icon="home"
-        :tabs-below="tabOrder.length > 1"
-        class="shrink-0 px-4"
-        :class="
-          tabOrder.length > 1 ? '' : 'border-b border-border-default'
-        "
-      >
-        <template v-if="tabOrder.length > 1" #tabs>
+        <template v-if="tabOrder.length > 1" #header-tabs>
           <OTabs
             v-model="activeHomeTab"
             align="left"
@@ -63,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <button
                 v-if="tab.id.startsWith('dash:')"
                 type="button"
-                class="home-tab-close q-ml-xs"
+                class="ml-1 inline-flex items-center justify-center w-4 h-4 leading-none border-none bg-transparent rounded-default cursor-pointer opacity-60 text-sm text-text-secondary transition-all duration-200 ease-[ease] hover:opacity-100 hover:bg-surface-subtle-hover hover:text-text-body"
                 :data-test="`home-tab-close-${tab.id}`"
                 :aria-label="t('home.removeHomeDashboard')"
                 @mousedown.stop.prevent
@@ -80,7 +74,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTab>
           </OTabs>
         </template>
-      </AppPageHeader>
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
            here (not on the root) so the header above stays full-bleed. The
@@ -111,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mr-2.5">
+        <div v-if="activeHomeTab === 'usage'" class="flex-1 min-h-0 overflow-hidden -mx-2.5">
           <UsageTab />
         </div>
 
@@ -129,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-    </div>
+    </OPageLayout>
   </div>
 </template>
 
@@ -152,7 +145,7 @@ import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -220,7 +213,7 @@ export default defineComponent({
 
     // The pinned dashboard could not be loaded (deleted / inaccessible). Clear
     // the pin and tell the user why — distinct from a deliberate close.
-    function onPinnedUnavailable(_dashboardId: string) {
+    function onPinnedUnavailable() {
       removeHomePin();
       toast({
         variant: "error",
@@ -248,7 +241,9 @@ export default defineComponent({
           });
           return ordered;
         }
-      } catch {}
+      } catch {
+        /* ignore: fall back to default tab order */
+      }
       return [...DEFAULT_TABS.value];
     }
 
@@ -370,13 +365,13 @@ export default defineComponent({
     OTabs,
     OTab,
     OTooltip,
-    AppPageHeader,
+    OPageLayout,
     PinnedDashboardTab,
   },
 });
 </script>
 
-<style>
+<style scoped>
 /*
  * HomeView Styles — Tab bar and page layout only.
  * Usage-tab-specific styles live in UsageTab.vue.
@@ -384,31 +379,14 @@ export default defineComponent({
 
 /* Home tab bar now uses the shared OTabs component (see template). */
 
-.home-tab-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  line-height: 1;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  opacity: 0.6;
-  font-size: var(--text-base);
-  color: var(--color-text-secondary);
-  transition: all 0.2s ease;
-}
-
-.home-tab-close:hover {
-  opacity: 1;
-  background: var(--color-surface-subtle-hover);
-  color: var(--color-text-primary);
-}
+/* keep(lib-override): every selector below reaches into the AI chat component's own DOM
+   (.chat-container / .chat-content / .messages-container / .chat-header /
+   .unified-input-box), so none of it is addressable from this template's utilities.
+   The brand ribbon gradient + accent glow use the --color-gradient-brand-ribbon and
+   --color-ai-accent tokens. */
 
 /* Chat fills remaining width and height */
-.home-ai-panel .chat-container {
+.home-ai-panel :deep(.chat-container) {
   flex: 1;
   height: 100%;
   box-shadow: none;
@@ -419,8 +397,8 @@ export default defineComponent({
 
 /* Allow the input's gradient glow + shadow to spill outside the container.
    messages-container has its own overflow-y, so the page itself won't grow. */
-.home-ai-panel .chat-content-wrapper,
-.home-ai-panel .chat-content {
+.home-ai-panel :deep(.chat-content-wrapper),
+.home-ai-panel :deep(.chat-content) {
   overflow: visible;
 }
 
@@ -430,77 +408,70 @@ export default defineComponent({
    to their content height and push the input bar off the bottom. min-height:0
    lets them shrink within their flex columns so the message list scrolls and
    the input stays pinned at the bottom. */
-.home-ai-panel .chat-content,
-.home-ai-panel .messages-container {
+.home-ai-panel :deep(.chat-content),
+.home-ai-panel :deep(.messages-container) {
   min-height: 0;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
-.home-ai-panel .chat-header,
-.home-ai-panel .chat-content-wrapper > [role="separator"] {
+.home-ai-panel :deep(.chat-header),
+.home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
   display: none;
 }
 
 /* Gradient border on the prompt input — home tab only.
    Uses the dual-background trick: bg color for padding-box, gradient for border-box.
-   2px border for stronger presence + layered shadows for depth. */
-.home-ai-panel .unified-input-box {
+   Heavier border for stronger presence + layered shadows for depth. */
+.home-ai-panel :deep(.unified-input-box) {
+  --color-ai-input-bg: var(--color-white);
   position: relative;
-  border: 2px solid transparent !important;
+  border: 0.125rem solid transparent !important;
   background:
-    linear-gradient(
-        var(--o2-ai-input-bg, #ffffff),
-        var(--o2-ai-input-bg, #ffffff)
-      )
-      padding-box,
-    linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff) border-box !important;
+    linear-gradient(var(--color-ai-input-bg), var(--color-ai-input-bg)) padding-box,
+    var(--color-gradient-brand-ribbon) border-box !important;
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.06),
-    0 8px 20px -2px rgba(15, 23, 42, 0.12),
-    0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 6%, transparent),
+    0 0.5rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 12%, transparent),
+    0 1.125rem 2.75rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
 }
 
-.home-ai-panel .unified-input-box {
-  --o2-ai-input-bg: #ffffff;
-}
-
-.dark .home-ai-panel .unified-input-box {
-  --o2-ai-input-bg: #191919;
+.dark .home-ai-panel :deep(.unified-input-box) {
+  --color-ai-input-bg: var(--color-surface-panel);
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    0 8px 22px -2px rgba(0, 0, 0, 0.55),
-    0 20px 48px -10px rgba(123, 97, 255, 0.45) !important;
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 45%, transparent),
+    0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent) !important;
 }
 
 /* Soft ambient glow behind the input */
-.home-ai-panel .unified-input-box::before {
+.home-ai-panel :deep(.unified-input-box::before) {
   content: "";
   position: absolute;
-  inset: -10px;
+  inset: -0.625rem;
   border-radius: inherit;
-  background: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  background: var(--color-gradient-brand-ribbon);
   opacity: 0.22;
-  filter: blur(22px);
+  filter: blur(1.375rem);
   z-index: -1;
   pointer-events: none;
 }
 
 /* Stronger glow + shadow on focus, no harsh ring */
-.home-ai-panel .unified-input-box:focus-within {
+.home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 6px 16px -2px rgba(15, 23, 42, 0.1),
-    0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
+    0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
+    0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent) !important;
 }
 
-.dark .home-ai-panel .unified-input-box:focus-within {
+.dark .home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 6px 20px -2px rgba(0, 0, 0, 0.55),
-    0 18px 44px -8px rgba(123, 97, 255, 0.42) !important;
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
+    0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent) !important;
 }
 
-.home-ai-panel .unified-input-box:focus-within::before {
+.home-ai-panel :deep(.unified-input-box:focus-within::before) {
   opacity: 0.4;
 }
 

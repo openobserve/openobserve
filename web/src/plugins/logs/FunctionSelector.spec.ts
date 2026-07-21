@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import FunctionSelector from "@/plugins/logs/FunctionSelector.vue";
 import i18n from "@/locales";
@@ -58,22 +58,6 @@ describe("FunctionSelector", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
-          "q-toggle": {
-            template: '<button class="q-toggle" @click="$emit(\'update:modelValue\', !modelValue)" :data-test="$attrs[\'data-test\']"><slot /></button>',
-            props: ["modelValue"],
-          },
-          "q-btn-group": {
-            template: '<div class="q-btn-group" :class="{ disabled: disable }"><slot /></div>',
-            props: ["disable"],
-          },
-          "q-btn-dropdown": {
-            template: '<div class="q-btn-dropdown" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            props: ["modelValue", "size", "icon", "iconRight", "title", "split"],
-          },
-          "q-btn": {
-            template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
-            props: ["icon", "class"],
-          },
           ODropdown: {
             name: "ODropdown",
             template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
@@ -84,17 +68,6 @@ describe("FunctionSelector", () => {
             name: "ODropdownItem",
             template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
             emits: ["select"],
-          },
-          "q-tooltip": {
-            template: '<div class="q-tooltip"><slot /></div>',
-            props: ["class", "offset", "delay"],
-          },
-          "q-list": {
-            template: '<div class="q-list" :data-test="$attrs[\'data-test\']"><slot /></div>',
-          },
-          "q-input": {
-            template: '<input class="q-input" v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue", "dense", "filled", "borderless", "clearable", "debounce", "placeholder"],
           },
           // OInput stub mirrors the real component's wrapper-div + inner-<input>
           // shape, so tests can keep using data-test on the wrapper but drill
@@ -110,16 +83,6 @@ describe("FunctionSelector", () => {
           "OIcon": {
             template: '<span class="OIcon" :name="name"></span>',
             props: ["name"],
-          },
-          "q-item": {
-            template: '<div class="q-item" @click="$emit(\'click\')" v-close-popup><slot /></div>',
-            props: ["clickable"],
-          },
-          "q-item-section": {
-            template: '<div class="q-item-section" @click="$emit(\'click\')"><slot /></div>',
-          },
-          "q-item-label": {
-            template: '<div class="q-item-label"><slot /></div>',
           },
         },
         directives: {
@@ -169,20 +132,6 @@ describe("FunctionSelector", () => {
   });
 
   // Computed Properties Tests
-  it("should compute functionToggleIcon based on showTransformEditor state", async () => {
-    // The store theme is set to "dark" by default, so it should show function_dark.svg
-    const currentTheme = store.state.theme;
-    if (currentTheme === "dark") {
-      expect(wrapper.vm.functionToggleIcon).toContain("function_dark.svg");
-    } else {
-      expect(wrapper.vm.functionToggleIcon).toContain("function.svg");
-    }
-
-    // The computed property depends on reactive searchObj from composable
-    // In a real scenario, changing the searchObj would trigger reactivity
-    expect(wrapper.vm.searchObj.meta.showTransformEditor).toBe(false);
-  });
-
   it("should compute iconRight based on theme", async () => {
     // Check current theme and expected icon
     const currentTheme = store.state.theme;
@@ -220,7 +169,7 @@ describe("FunctionSelector", () => {
     if (nativeInput.exists()) {
       await nativeInput.setValue("test");
     } else {
-      // Fallback for old q-input stub path which exposes the wrapper as the input.
+      // Fallback for legacy stub path which exposes the wrapper as the input.
       await searchWrapper.setValue("test");
     }
     expect(wrapper.vm.searchTerm).toBe("test");

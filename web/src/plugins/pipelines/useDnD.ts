@@ -15,16 +15,11 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-import { b64EncodeUnicode, getUUID } from "@/utils/zincutils";
-import { useVueFlow,MarkerType  } from "@vue-flow/core";
-import { watch, reactive ,computed , ref} from "vue";
-const functionImage = getImageURL("images/pipeline/function.svg");
-const streamImage = getImageURL("images/pipeline/stream.svg");
-const streamOutputImage = getImageURL("images/pipeline/outputStream.svg");
-const streamRouteImage = getImageURL("images/pipeline/route.svg");
-const conditionImage = getImageURL("images/pipeline/condition.svg");
-const queryImage = getImageURL("images/pipeline/query.svg");
-import { getImageURL } from "@/utils/zincutils";
+import { getUUID } from "@/utils/zincutils";
+import { useVueFlow } from "@vue-flow/core";
+import { watch, reactive } from "vue";
+import { detectCycle } from "@/composables/flow/detectCycle";
+import { makeEdge } from "@/composables/flow/makeEdge";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 
@@ -51,11 +46,9 @@ const defaultPipelineObj = {
 };
 
 const defaultObject = {
-  pipelineDirectionTopBottom: false,
   dirtyFlag: false,
   isEditPipeline: false,
   isEditNode: false,
-  nodesChange:false,
   edgesChange:false,
   draggedNode:<any> null,
   isDragOver: false,
@@ -70,10 +63,17 @@ const defaultObject = {
     type:"",
   },
   dialog: dialogObj,
-  nodeTypes: [],
+  nodeTypes: [] as Array<{ label: string; icon: string; isSectionHeader: boolean; subtype?: string; io_type?: string; tooltip?: string }>,
   currentSelectedPipeline: defaultPipelineObj,
   pipelineWithoutChange: defaultPipelineObj,
   functions: {},
+  // Edge to create when the staged node's config is saved (hover-`+` add-after).
+  pendingEdge: <any>null,
+  // Step picker (searchable "add next step" dialog) — hover-`+` on a node opens
+  // it with the source node id; picking a type calls addNodeAfter.
+  stepPicker: { show: false, source: "" },
+  pipelineNameError: false,
+  pipelineNameErrorMessage: "",
   previousNodeOptions:<any>[],
   userSelectedNode:<any>{},
   userClickedNode : <any>{},
@@ -90,7 +90,7 @@ const pipelineObj = reactive(Object.assign({}, defaultObject));
 export { pipelineObj };
 export default function useDragAndDrop() {
 
-  const { screenToFlowCoordinate, onNodesInitialized, updateNode, addEdges  } =
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode } =
     useVueFlow();
 
     watch(
@@ -202,12 +202,11 @@ export default function useDragAndDrop() {
 
   }
 
-  function onNodeChange(changes:any) {
+  // VueFlow @node-change handler — node state is driven by v-model, so this is
+  // an intentional no-op (kept because the template binds to it).
+  function onNodeChange() {}
 
-    // console.log("Node change", changes);
-  }
-
-  function onNodesChange(changes:any) {
+  function onNodesChange() {
     hasInputNodeFn();
 
   }
@@ -247,26 +246,8 @@ export default function useDragAndDrop() {
     });
     return;
     }
-    // Add new connection (edge) to edges array
-    const newEdge = {
-      id: `e${connection.source}-${connection.target}`,
-      source: connection.source,
-      target: connection.target,
-      
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        width: 20,  // Increase arrow width
-        height: 20, // Increase arrow height
-
-      },
-      type: 'custom',      
-      style:{
-        strokeWidth: 2,
-      },
-      animated:true,
-
-
-    };
+    // Add new connection (edge) to edges array (shared edge factory)
+    const newEdge = makeEdge(connection.source, connection.target);
 
     pipelineObj.currentSelectedPipeline.edges = [
       ...pipelineObj.currentSelectedPipeline.edges,
@@ -274,53 +255,11 @@ export default function useDragAndDrop() {
     ]; // Update edges state
   }
 
-  const detectCycle = (edges:any, newConnection:any) => {
-    // Step 1: Build the adjacency list from the current edges
-    const graph = <any> {};
-    edges.forEach((edge:any) => {
-        if (!graph[edge.sourceNode.id]) graph[edge.sourceNode.id] = [];
-        graph[edge.sourceNode.id].push(edge.targetNode.id);
-    });
+  // detectCycle is shared with the workflow canvas (composables/flow). It
+  // normalizes edge endpoints, so it accepts both plain source/target and
+  // VueFlow's runtime-enriched sourceNode/targetNode.
 
-    // Add the new connection to the adjacency list
-    if (!graph[newConnection.source]) graph[newConnection.source] = [];
-    graph[newConnection.source].push(newConnection.target);
-
-    // Step 2: Define the DFS function to detect cycles
-    const dfs = (node:any, visited:any, recStack:any) => {
-        if (!visited.has(node)) {
-            // Mark the node as visited and add to recursion stack
-            visited.add(node);
-            recStack.add(node);
-
-            // Traverse all neighbors (adjacent nodes)
-            const neighbors = graph[node] || [];
-            for (let neighbor of neighbors) {
-                if (!visited.has(neighbor) && dfs(neighbor, visited, recStack)) {
-                    return true; // Cycle found
-                } else if (recStack.has(neighbor)) {
-                    return true; // Cycle found in recursion stack
-                }
-            }
-        }
-
-        // Remove the node from the recursion stack after exploration
-        recStack.delete(node);
-        return false;
-    };
-
-    // Step 3: Run DFS from the source node of the new connection
-    const visited = new Set();
-    const recStack = new Set();
-
-    if (dfs(newConnection.source, visited, recStack)) {
-        return true; // Cycle detected
-    }
-
-    return false; // No cycle detected
-};
-
-  function validateConnection({ source, target, sourceHandle, targetHandle }:any) {
+  function validateConnection({ source, target }:any) {
     // Example validation rules
     const sourceNode = pipelineObj.currentSelectedPipeline.nodes.find(
       (node:any) => node.id === source,
@@ -343,98 +282,13 @@ export default function useDragAndDrop() {
   }
 
   function addNode(newNode:any) {  
-    
-
-    if(pipelineObj.isEditNode){
-      if(pipelineObj.userSelectedNode == null){
-        pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter((edge:any) => edge.targetNode.id !== pipelineObj.currentSelectedNodeData.id);
-      }
-    }
-    if(pipelineObj.userClickedNode && pipelineObj.currentSelectedNodeData.id && !pipelineObj.userSelectedNode?.id ){
-
-
-
-      const newEdge = {
-        id: `e${pipelineObj.userClickedNode}-${pipelineObj.currentSelectedNodeData.id}`,
-        source:  pipelineObj.userClickedNode,
-        target:pipelineObj.currentSelectedNodeData.id,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 20,  // Increase arrow width
-          height: 20, // Increase arrow height
-        },
-        type: 'custom',
-        
-        style:{
-          strokeWidth: 2,
-        },
-        animated:true,
-
-
-      };
-      pipelineObj.currentSelectedPipeline.edges = [
-        ...pipelineObj.currentSelectedPipeline.edges,
-        newEdge,
-      ];
-      pipelineObj.userClickedNode = {};
-      pipelineObj.userSelectedNode = {};
-    }
-    if(pipelineObj.currentSelectedNodeData.id && pipelineObj.userSelectedNode?.id){
-      const newEdge = {
-        id: `e${pipelineObj.userSelectedNode.id}-${pipelineObj.currentSelectedNodeData.id}`,
-        source:  pipelineObj.userSelectedNode.id,
-        target:pipelineObj.currentSelectedNodeData.id,
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            width: 20,  // Increase arrow width
-            height: 20, // Increase arrow height
-          },
-        type: 'custom',
-        
-        style:{
-          strokeWidth: 2,
-        },
-        animated:true,
-
-
-
-      };
-
-
-      
-
-      const isCycle = detectCycle(pipelineObj.currentSelectedPipeline.edges, newEdge);
-      if(isCycle){
-        toast({
-          variant: "warning",
-          message: "Adding this edge will create a cycle in the pipeline",
-        });
-      return;
-      }
-      const targetEdgeIfExist = pipelineObj.currentSelectedPipeline.edges.find((previousEdge:any) => previousEdge.targetNode.id === pipelineObj.currentSelectedNodeData.id);
-
-        // If targetEdgeIfExist is found, filter it out from the edges array
-
-      if (targetEdgeIfExist) {
-        pipelineObj.currentSelectedPipeline.edges = pipelineObj.currentSelectedPipeline.edges.filter(
-          (edge:any) => edge.targetNode.id !== targetEdgeIfExist.targetNode.id
-        );
-      }
-      // Add the new edge to the edges array
-      pipelineObj.currentSelectedPipeline.edges = [
-        ...pipelineObj.currentSelectedPipeline.edges,
-        newEdge,
-      ];
-      // Update edges state
-
-
-    }
+    // (Legacy userClickedNode/userSelectedNode auto-edge wiring removed — it
+    // fired with an empty {} source and created bogus edges. Programmatic
+    // "add step after" now wires a single pendingEdge below.)
 
     if(pipelineObj.isEditPipeline == true ){
       pipelineObj.dirtyFlag = true;
-      pipelineObj.nodesChange = true;
     }
-    pipelineObj.previousNodeOptions.push(pipelineObj.currentSelectedNodeData); 
     let currentSelectedNode = pipelineObj.currentSelectedNodeData;
     if (pipelineObj.isEditNode == true && currentSelectedNode.id != "") {
       if (currentSelectedNode) {
@@ -454,6 +308,21 @@ export default function useDragAndDrop() {
           ...pipelineObj.currentSelectedPipeline.nodes,
           currentSelectedNode,
         ];
+        // Hover-`+` "add step after": wire source -> this new node.
+        if (pipelineObj.pendingEdge?.source && currentSelectedNode.id) {
+          const edge = makeEdge(pipelineObj.pendingEdge.source, currentSelectedNode.id);
+          if (detectCycle(pipelineObj.currentSelectedPipeline.edges, edge)) {
+            toast({
+              variant: "warning",
+              message: "Adding this edge will create a cycle in the pipeline",
+            });
+          } else {
+            pipelineObj.currentSelectedPipeline.edges = [
+              ...pipelineObj.currentSelectedPipeline.edges,
+              edge,
+            ];
+          }
+        }
       }
     }
 
@@ -461,9 +330,7 @@ export default function useDragAndDrop() {
 
     
     pipelineObj.isEditNode = false;
-    // pipelineObj.currentSelectedNodeData = dialogObj;
-    pipelineObj.userClickedNode = {};
-    pipelineObj.userSelectedNode = {};
+    pipelineObj.pendingEdge = null;
     //here we will be adding a default output node when it is a realtime pipeline and user drags teh input node
     if(pipelineObj.currentSelectedNodeData.type == 'input' && pipelineObj.currentSelectedNodeData.data.node_type == 'stream' && pipelineObj.currentSelectedPipeline.nodes.length === 1){
       const position = {x:pipelineObj.currentSelectedNodeData.position.x, y:pipelineObj.currentSelectedNodeData.position.y+200};
@@ -478,32 +345,61 @@ export default function useDragAndDrop() {
         data: {...pipelineObj.currentSelectedNodeData.data,label: nodeId},
       };
       pipelineObj.currentSelectedPipeline.nodes.push(outputNode);
-      const newEdge = {
-        id: `e${pipelineObj.currentSelectedNodeData.id}-${outputNode.id}`,
-        source: pipelineObj.currentSelectedNodeData.id,
-        target: outputNode.id,
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 20,  // Increase arrow width
-          height: 20, // Increase arrow height
-        },
-        type: 'custom',
-        
-        style:{
-          strokeWidth: 2,
-        },
-        animated:true,
-      };
+      const newEdge = makeEdge(
+        pipelineObj.currentSelectedNodeData.id,
+        outputNode.id,
+      );
       pipelineObj.currentSelectedPipeline.edges = [
         ...pipelineObj.currentSelectedPipeline.edges,
         newEdge,
       ];
     }
-        if(newNode.hasOwnProperty('meta') && newNode.meta.hasOwnProperty('append_data')){
+        if(Object.prototype.hasOwnProperty.call(newNode, 'meta') && Object.prototype.hasOwnProperty.call(newNode.meta, 'append_data')){
           pipelineObj.currentSelectedNodeData.meta = newNode.meta;
           delete newNode.meta;
           delete pipelineObj.currentSelectedNodeData.data.meta;
     }
+  }
+
+  // Hover-`+` opens the step picker anchored to this source node.
+  function openStepPicker(sourceId: string) {
+    pipelineObj.stepPicker = { show: true, source: sourceId };
+  }
+  function closeStepPicker() {
+    pipelineObj.stepPicker = { show: false, source: "" };
+  }
+
+  // Hover-`+` "add step after": stage a new node below `sourceId` and open its
+  // config modal. The node + the source->node edge are committed on Save
+  // (addNode reads pendingEdge); discarded on Cancel (resetDialog clears it).
+  function addNodeAfter(
+    sourceId: string,
+    item: { subtype: string; io_type: string },
+  ) {
+    const src = pipelineObj.currentSelectedPipeline.nodes.find(
+      (n: any) => n.id === sourceId,
+    );
+    if (!src || !item) return;
+    // Offset siblings on the same source so they don't overlap (fan-out).
+    const children = pipelineObj.currentSelectedPipeline.edges.filter(
+      (e: any) => (e.source ?? e.sourceNode?.id) === sourceId,
+    );
+    const position = {
+      x: (src.position?.x ?? 0) + children.length * 280,
+      y: (src.position?.y ?? 0) + 160,
+    };
+    const id = getUUID();
+    pipelineObj.currentSelectedNodeData = {
+      id,
+      type: item.io_type,
+      io_type: item.io_type,
+      position,
+      data: { label: id, node_type: item.subtype },
+    };
+    pipelineObj.pendingEdge = { source: sourceId };
+    pipelineObj.isEditNode = false;
+    pipelineObj.dialog.name = item.subtype;
+    pipelineObj.dialog.show = true;
   }
 
   function editNode(updatedNode:any) {
@@ -535,11 +431,6 @@ export default function useDragAndDrop() {
   function deletePipelineNode(nodeId:any) {
     pipelineObj.currentSelectedPipeline.nodes =
       pipelineObj.currentSelectedPipeline.nodes.filter(
-        (node:any) => node.id !== nodeId,
-      );
-
-      pipelineObj.previousNodeOptions =
-      pipelineObj.previousNodeOptions.filter(
         (node:any) => node.id !== nodeId,
       );
 
@@ -576,7 +467,7 @@ export default function useDragAndDrop() {
   const getInputNodeStream = () => {
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
     const inputNode = nodes.find((node: any) => node.io_type === "input");
-    if(inputNode?.data.hasOwnProperty('node_type') &&  inputNode.data.node_type === 'stream'){
+    if(Object.prototype.hasOwnProperty.call(inputNode?.data, 'node_type') &&  inputNode.data.node_type === 'stream'){
       return inputNode?.data?.stream_name?.value || inputNode.data.stream_name || "";
     }
     else {
@@ -607,6 +498,9 @@ export default function useDragAndDrop() {
     onConnect,
     validateConnection,
     addNode,
+    addNodeAfter,
+    openStepPicker,
+    closeStepPicker,
     editNode,
     deletePipelineNode,
     resetPipelineData,

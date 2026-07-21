@@ -44,7 +44,7 @@ Usage:
     <!-- Load more button and info -->
     <div
       v-if="shouldShowLoadMore"
-      class="pt-2 [border-top:1px_solid_var(--o2-border-color)] mt-2 flex items-center gap-3"
+      class="pt-2 [border-top:1px_solid_var(--color-card-glass-border)] mt-2 flex items-center gap-3"
     >
       <OButton
         :data-test="`load-more-btn-${fieldKey}`"
@@ -55,7 +55,7 @@ Usage:
         <OIcon name="expand-more" size="xs" class="mr-1" />
         {{ t('logs.chunkedContent.loadMore', { loaded: chunkInfo.loadedSizeKB, total: chunkInfo.totalSizeKB }) }}
       </OButton>
-      <span class="text-sm font-medium text-(--q-primary)">
+      <span class="text-sm font-medium text-theme-accent">
         {{ t('logs.chunkedContent.showingChunk', { current: chunkInfo.currentChunk, total: chunkInfo.totalChunks }) }}
       </span>
     </div>

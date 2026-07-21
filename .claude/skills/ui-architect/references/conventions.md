@@ -12,13 +12,37 @@ screen on the same rhythm: `gap-2` = 0.5rem, `gap-4` = 1rem, `gap-5` = 1.25rem,
 ### Listing Pages (OTable, Lists, Grids)
 
 A listing/table page is **full-bleed**, not a padded card: root `flex flex-col
-h-full p-0`, the `AppPageHeader` owns the padding (`shrink-0 px-4 border-b`), and
+h-full p-0`, the `OPageHeader` owns the padding — it **bakes in `px-page-edge`
+itself**, so the consumer adds only `shrink-0 border-b` (never a `px-*`), and
 the table wrapper runs flush (`card-container flex-1 min-h-0 overflow-hidden`
 around `<OTable :frame="false">`). **Reserve `p-6`/`gap-6` for form/detail
 views** — a page inset breaks the flush table. The full skeleton, the mandatory
 search · refresh · column-toggle toolbar, and the empty-state contract are in
 [§ Page anatomy & the listing-page recipe](#page-anatomy--the-listing-page-recipe)
 and [references/page-recipes.md](page-recipes.md).
+
+### Cards & stacked-panel pages — consistency over invention
+
+- **Never invent spacing.** Padding/margins/gaps are not a per-page decision:
+  a new panel copies the **exact** spacing classes of the sibling family it
+  joins (same header inset, same `gap-*`, same card classes), so the pages read
+  as one surface. If your panel "needed" a padding value no sibling uses,
+  that's the smell — go read the sibling, don't tune by eye.
+- **`card-container` styles nothing.** It's a bare marker class with no CSS
+  behind it — a card that relies on it alone renders as floating text (no
+  background, no border). Every card must carry explicit surface classes, e.g.
+  `bg-card-glass-bg rounded-default border border-border-default` (the AI
+  Observability panel family) or `bg-surface-base border border-border-default
+  rounded-default` (synthetics). Copy the class string from the sibling family
+  verbatim.
+- **A fixed set of stacked panels must not make the page scroll.** When a page
+  is N cards tall (dashboards, signal panels), give it the full-height split:
+  body `flex flex-col` (no `overflow-auto`), each card
+  `flex flex-col flex-1 min-h-0 overflow-hidden`, and each `OTable` in
+  fill-height mode with `class="flex-1 min-h-0"`. Rows scroll **inside** the
+  table; the pagination bar stays pinned to the card; the page itself never
+  scrolls. Empty states fill the card without forcing overflow (OTableEmpty's
+  `min-h-75` floor applies only to non-fill-height tables).
 
 ### Dialog Spacing (`ODialog`)
 
@@ -36,7 +60,7 @@ and [references/page-recipes.md](page-recipes.md).
 ### Drawer Spacing (`ODrawer`)
 
 - **Detail (read-only) section** at the top: group facts in token-backed cards —
-  `class="flex flex-col gap-1.5 p-3 rounded-md bg-surface-subtle"` per card
+  `class="flex flex-col gap-1.5 p-3 rounded-surface bg-surface-subtle"` per card
   (label + value). Only distinct groups get a background; don't shade every line.
 - **Separate detail from the edit form** with a divider on the detail wrapper:
   `class="… mb-8 pb-8 border-b border-border-default"`.
@@ -78,9 +102,7 @@ patching it from outside. Banned on an O2 component:
 | --- | --- | --- |
 | `style="color: #fff; padding: 10px"` | hardcoded colors/px, bypasses tokens | use `variant` / `size` / component design |
 | `class="tw:px-2 tw:text-sm"` (`tw:` prefix) | prefix removed — `tw:*` doesn't resolve | use component `variant`/`size` props |
-| `class="q-pa-md text-weight-bold"` (Quasar) | Quasar utilities not available | use component `variant`/`size` props |
 | `<style scoped>` targeting its class | invisible fork of the design system | move the intent into a `variant` |
-| `class="q-ml-sm"` / `q-mr-sm` for spacing | Quasar spacing leak | bare `gap-*` on the parent container |
 
 Decision flow for any visual that differs from the default:
 1. Expressible via `variant` / `size`? → use the prop.
@@ -108,8 +130,8 @@ it's what makes action rows look identical everywhere:
 
 - Cancel is **always** `variant="outline"` — never `secondary` or
   `ghost-primary`. Save/Submit/OK is **always** `variant="primary"`.
-- Both use `size="sm-action"`. Space them with `gap-2` on the parent — never
-  `q-ml-*`/`q-mr-*` on the button, never a `<q-space />` between them.
+- Both use `size="sm-action"`. Space them with `gap-2` on the parent — use
+  `gap-*` on the parent container instead of per-child margins or spacer elements.
 - Other actions in the same row (Delete, Reject) keep their own `variant`
   (e.g. `destructive`) but match `size="sm-action"` for alignment.
 - When the button row lives in an `ODialog`/`ODrawer` footer, prefer the
@@ -177,11 +199,12 @@ differently on every screen.
 Lay out a whole page from a recipe, not from scratch — full recipes in
 [references/page-recipes.md](page-recipes.md). The essentials:
 
-- **Every page** = `AppPageHeader` on top (primary New/Add action in `#actions`).
+- **Every page** = `OPageHeader` on top (primary New/Add action in `#actions`).
 - **A listing/table page is full-bleed**, laid out as a full-height flex column
-  where the **header carries the padding** and the **table runs flush** to the
-  content edges — root `flex flex-col h-full p-0`, header
-  `shrink-0 px-4 border-b border-border-default`, table wrapper
+  where the **header carries the padding** (baked into `OPageHeader` as
+  `px-page-edge`) and the **table runs flush** to the content edges — root
+  `flex flex-col h-full p-0`, header
+  `shrink-0 border-b border-border-default` (no `px-*` — the header self-insets), table wrapper
   `card-container flex-1 min-h-0 overflow-hidden` around `<OTable :frame="false">`.
   **Not** a `gap-6 p-6` padded container (that's for form/detail views).
 - **A listing/table page always carries three toolbar affordances** on its
@@ -212,8 +235,7 @@ Lay out a whole page from a recipe, not from scratch — full recipes in
 ### Tables → `OTable`
 
 **What.** All tabular data uses `OTable`
-(`@/lib/core/Table/OTable.vue`). Legacy `q-table` is fully retired (zero usages
-left) — never reintroduce one.
+(`@/lib/core/Table/OTable.vue`) — never hand-build a `<table>`.
 
 **How.** Columns are `OTableColumnDef[]` (`:columns` + `:data`); reuse the shared
 width constants (`COL.*`, `TABLE_INDEX_COL_SIZE`) and the prebuilt cell renderers
@@ -229,7 +251,7 @@ prop/slot/emit list and the cell renderers are in
 [references/core-controls-table.md](core-controls-table.md).
 
 **Why.** One table component means one behavior for sort, resize, pin, empty,
-loading, and dark mode — a hand-built `<table>` or a fresh `q-table` re-answers all
+loading, and dark mode — a hand-built `<table>` re-answers all
 of that inconsistently and re-implements pagination you'd then have to retest.
 
 ### Where code goes (project layering)
@@ -323,7 +345,7 @@ Rules of thumb:
   `primary` / `secondary` / `neutralButtonLabel` footer API instead of a manual
   button row — while still honoring the cancel=`outline` / save=`primary`
   standard (see [§ Working with O2 components](#working-with-o2-components)).
-- Never use `q-dialog` / `q-drawer` — retired.
+- Use `ODialog` / `ODrawer` for these.
 
 **Why.** Users learn a spatial grammar: a small ask is a centered modal, a
 working surface is a side drawer, a big task gets its own page. Mixing those up

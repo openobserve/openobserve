@@ -1,8 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Unit tests for the CreateReport Zod schema — restores the Quasar BEFORE
-// validation baseline (the :rules from
-// complete-quasar-validation-inventory-BEFORE.md §5) as Zod constraints, with the
+// Unit tests for the CreateReport Zod schema — restores the previous
+// validation baseline (the field validation rules from the pre-migration
+// inventory §5) as Zod constraints, with the
 // conditional rules (cron / custom / !cached / scheduleLater timezone + date/time)
 // in superRefine.
 
@@ -16,7 +16,7 @@ import { makeCreateReportSchema } from "./CreateReport.schema";
 // Deterministic mocks for the resource-name + cron helpers (the schema imports
 // these from zincutils; control them per-test for the cron branches).
 vi.mock("@/utils/zincutils", () => ({
-  isValidResourceName: (val: string) => /^[^:#?&%'"\/\s]+$/.test(val),
+  isValidResourceName: (val: string) => /^[^:#?&%'"/\s]+$/.test(val),
   getCronIntervalDifferenceInSeconds: vi.fn(() => 3600),
   isAboveMinRefreshInterval: vi.fn(() => true),
 }));

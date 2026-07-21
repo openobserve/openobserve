@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="h-full flex flex-col rounded-lg overflow-hidden"
+    class="h-full flex flex-col rounded-default overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
     >
       <div
-        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-subtle rounded-t-lg"
+        class="flex flex-nowrap items-center w-full min-h-7 py-1 px-2 border-b border-border-default rounded-t-default"
         :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           :title="props.data.title"
-          class="whitespace-nowrap overflow-hidden text-ellipsis text-[0.8125rem] font-medium text-(--color-text-primary) tracking-[0.02em]"
+          class="whitespace-nowrap overflow-hidden text-ellipsis text-compact font-medium text-text-heading tracking-[0.02em]"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
@@ -401,9 +401,7 @@ import { addPanel } from "@/utils/commons";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
 import {
-  getFunctionErrorMessage,
   getUUID,
   processQueryMetadataErrors,
 } from "@/utils/zincutils";
@@ -449,7 +447,6 @@ export default defineComponent({
     "height",
     "variablesData",
     "dashboardId",
-    "metaData",
     "forceLoad",
     "searchType",
     "folderId",
@@ -471,7 +468,6 @@ export default defineComponent({
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,
-    RelativeTime,
     PanelErrorButtons,
     OButton,
     OIcon,
@@ -750,7 +746,7 @@ export default defineComponent({
       dismiss();
     };
 
-    const deletePanelDialog = async (data: any) => {
+    const deletePanelDialog = async () => {
       emit("onDeletePanel", props.data.id);
     };
 
@@ -1010,7 +1006,6 @@ export default defineComponent({
         this.createAlertFromPanel();
       } else if (evt == "Refresh") {
         this.onRefreshPanel(true);
-      } else {
       }
     },
     createAlertFromPanel() {

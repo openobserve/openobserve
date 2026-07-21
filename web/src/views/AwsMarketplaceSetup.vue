@@ -15,14 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="aws-marketplace-setup min-h-screen bg-(--q-background)">
-    <div class="flex relative-position tw-px-3 tw-pt-2">
+  <div class="aws-marketplace-setup min-h-screen bg-surface-base">
+    <div class="flex relative-position px-3 pt-2">
       <img
         data-test="aws-marketplace-setup-logo"
         class="h-10"
         loading="lazy"
         :src="
-          store?.state?.theme === 'dark'
+          isDark
             ? getImageURL('images/common/openobserve_latest_dark_2.svg')
             : getImageURL('images/common/openobserve_latest_light_2.svg')
         "
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="state === 'no_token'" class="text-center">
         <OIcon name="warning" style="width: 80px; height: 80px;" />
         <h5 class="mt-3">No Marketplace Token Found</h5>
-        <p class="text-gray-400">
+        <p class="text-text-secondary">
           Please start the registration process from AWS Marketplace.
         </p>
         <OButton
@@ -61,16 +61,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'select_org'" class="text-center">
         <OIcon name="cloud" style="width: 60px; height: 60px;" />
         <h4 class="mt-3">Complete AWS Marketplace Setup</h4>
-        <p class="text-gray-400 mb-4">
+        <p class="text-text-secondary mb-4">
           Link your AWS Marketplace subscription to an organization
         </p>
 
         <div class="max-w-100 mx-auto">
           <!-- Create New Org -->
-          <OCard class="rounded-lg transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
+          <OCard class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)] mb-4">
             <OCardSection role="body">
               <div class="text-xl font-semibold">Create New Organization</div>
-              <p class="text-gray-400">
+              <p class="text-text-secondary">
                 Create a new organization with AWS Marketplace billing
               </p>
               <OForm
@@ -102,11 +102,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Link to Existing Org (only show orgs without billing) -->
           <OCard
             v-if="eligibleOrganizations.length > 0"
-            class="rounded-lg transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+            class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
           >
             <OCardSection role="body">
               <div class="text-xl font-semibold">Link to Existing Organization</div>
-              <p class="text-gray-400">
+              <p class="text-text-secondary">
                 Link AWS billing to an existing organization
               </p>
               <OForm
@@ -116,9 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @submit="linkToExistingOrg"
                 v-slot="{ isSubmitting }"
               >
+                <!-- label-key/value-key map the fields; SelectOptionInput's required `label` doesn't apply -->
                 <OFormSelect
                   name="selectedOrg"
-                  :options="eligibleOrganizations"
+                  :options="eligibleOrganizations as any[]"
                   label-key="name"
                   value-key="identifier"
                   label="Select Organization"
@@ -142,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'processing'" class="text-center">
         <OSpinner variant="dots" size="xl" />
         <h5 class="mt-3">Setting up your subscription...</h5>
-        <p class="text-gray-400">Please wait while we configure your account.</p>
+        <p class="text-text-secondary">Please wait while we configure your account.</p>
       </div>
 
       <!-- Pending Activation State -->
@@ -151,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex justify-center">
           <OSpinner size="xl" />
         </div>
-        <p class="text-gray-400 mt-4">
+        <p class="text-text-secondary mt-4">
           Please wait while we confirm activation with AWS and set up your account.
         </p>
       </div>
@@ -160,7 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'success'" class="text-center">
         <OIcon name="check-circle" style="width: 80px; height: 80px;" />
         <h4 class="mt-3">Subscription Activated!</h4>
-        <p class="text-gray-400">
+        <p class="text-text-secondary">
           Your AWS Marketplace subscription is now active.
         </p>
         <OButton
@@ -175,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="state === 'payment_failed'" class="text-center">
         <OIcon name="error" style="width: 80px; height: 80px;" />
         <h5 class="mt-3">Payment Failed</h5>
-        <p class="text-gray-400">
+        <p class="text-text-secondary">
           There was an issue with your AWS Marketplace payment. Please check
           your AWS account or contact AWS support.
         </p>
@@ -197,6 +198,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
 import awsMarketplace from "@/services/awsMarketplace";
@@ -234,6 +236,7 @@ export default defineComponent({
 },
   setup() {
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const { t } = useI18n();
 
@@ -418,6 +421,7 @@ export default defineComponent({
 
     return {
       store,
+      isDark,
       state,
       errorMessage,
       eligibleOrganizations,

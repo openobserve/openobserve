@@ -17,22 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col h-full p-0">
 
-    <PageLayout
+    <OPageLayout bleed
       v-if="!showDestinationEditor && !showImportDestination"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+      :title="t('alert_destinations.header')"
+      title-data-test="alert-destinations-list-title"
+      icon="location-on"
+      subtitle="Where triggered alerts are delivered"
     >
-      <template #header>
-      <AppPageHeader
-        :title="t('alert_destinations.header')"
-        title-data-test="alert-destinations-list-title"
-        icon="location-on"
-        subtitle="Where triggered alerts are delivered"
-      >
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
-            @update:model-value="(v) => { activeTab = v; }"
+            @update:model-value="(v) => { activeTab = v as 'all' | 'prebuilt' | 'custom'; }"
             data-test="destination-list-tabs"
           >
             <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
@@ -62,9 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="editDestination(null)"
           >{{ t(`alert_destinations.add`) }}</OButton>
         </template>
-      </AppPageHeader>
-      </template>
-      <div class="card-container flex-1 min-h-0">
+      <div class="bg-card-glass-bg flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
           :data="visibleRows"
@@ -82,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-alert-destinations"
+          show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
         >
@@ -107,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <span class="o2-table-footer-title">
+            <span class="text-xs font-normal">
               {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
             </span>
             <OButton
@@ -155,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex-shrink-0"
               />
             </div>
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-secondary">—</span>
           </template>
 
           <template #cell-type="{ row }">
@@ -223,8 +217,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </div>
-    </PageLayout>
-    <div v-else-if="showDestinationEditor && !showImportDestination">
+    </OPageLayout>
+    <div v-else-if="showDestinationEditor && !showImportDestination" class="flex-1 min-h-0">
       <AddDestination
         :is-alerts="true"
         :destination="editingDestination"
@@ -290,18 +284,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue';
 import OTag from '@/lib/core/Badge/OTag.vue';
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
@@ -318,13 +310,11 @@ export default defineComponent({
     OButton,
     OTooltip,
     OSearchInput,
-    OCheckbox,
     OTag,
     OTable,
     OToggleGroup,
     OToggleGroupItem,
-    AppPageHeader,
-    PageLayout,
+    OPageLayout,
   },
   setup() {
     const store = useStore();
@@ -336,13 +326,6 @@ export default defineComponent({
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("alert_destinations.name"),
@@ -496,10 +479,7 @@ export default defineComponent({
               destination.type === "action",
           );
           resultTotal.value = res.data.length;
-          destinations.value = res.data.map((data: any, index: number) => ({
-            ...data,
-            "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-          }));
+          destinations.value = res.data;
           updateRoute();
         })
         .catch((err) => {
@@ -640,7 +620,6 @@ export default defineComponent({
     const exportDestination = (row: any) => {
       const findDestination: any = getDestinationByName(row.name);
       const destinationByName = { ...findDestination };
-      if (destinationByName.hasOwnProperty("#")) delete destinationByName["#"];
       const destinationJson = JSON.stringify(destinationByName, null, 2);
       const blob = new Blob([destinationJson], { type: "application/json" });
       const url = URL.createObjectURL(blob);

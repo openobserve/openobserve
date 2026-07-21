@@ -369,6 +369,8 @@ export interface AlertFormData {
     operator: string;
     frequency_type: string;
     cron?: string;
+    timezone?: string;
+    frequency?: number | string;
   };
   is_real_time: boolean | string;
   query_condition: {
@@ -467,10 +469,11 @@ export const validateInputs = (
   // Validate cron expression if frequency type is cron
   if (input.trigger_condition.frequency_type === "cron") {
     try {
+      // `utc` is a cron-parser v4 option; v5 types only accept `tz` — cast keeps runtime unchanged
       CronExpressionParser.parse(input.trigger_condition.cron!, {
         currentDate: new Date(),
         utc: true,
-      });
+      } as Parameters<typeof CronExpressionParser.parse>[1]);
     } catch (err) {
       console.log(err);
       notify &&
@@ -625,11 +628,11 @@ export const saveAlertJson = async (
   } = context;
 
   let jsonPayload = JSON.parse(json);
-  let destinationsList = [];
+  let destinationsList: string[] = [];
   props.destinations.forEach((destination: any) => {
     destinationsList.push(destination.name);
   });
-  let streamList = [];
+  let streamList: string[] = [];
 
   if (!streams.value[jsonPayload.stream_type]) {
     try {

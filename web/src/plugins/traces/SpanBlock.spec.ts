@@ -166,7 +166,6 @@ describe("SpanBlock", () => {
           store: mockStore,
         },
         stubs: {
-          "q-resize-observer": true,
         },
       },
     });
@@ -274,7 +273,6 @@ describe("SpanBlock", () => {
             store: mockStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -446,8 +444,6 @@ describe("SpanBlock", () => {
     });
 
     it("should update durationStyle when spanBlockWidth changes via onResize", async () => {
-      const beforeStyle = { ...wrapper.vm.durationStyle };
-
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", {
         configurable: true,
@@ -578,7 +574,7 @@ describe("SpanBlock", () => {
         global: {
           plugins: [i18n, router],
           provide: { store: mockStore },
-          stubs: { "q-resize-observer": true },
+          stubs: {},
         },
       });
 

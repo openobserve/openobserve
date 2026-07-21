@@ -54,14 +54,6 @@ describe("Security Component", () => {
           store,
         },
         stubs: {
-          'q-splitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-          },
-          'q-input': {
-            template: '<input data-test="security-list-search-input" />'
-          },
-          'q-tabs': true,
-          'q-route-tab': true,
           'router-view': true
         }
       },
@@ -93,12 +85,6 @@ describe("Security Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true
           }
         },
@@ -163,12 +149,6 @@ describe("Security Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true
           }
         },
@@ -188,12 +168,6 @@ describe("Security Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
-            },
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true
           }
         },
@@ -399,10 +373,6 @@ describe("Security Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'q-splitter': true,
-              'q-input': true,
-              'q-tabs': true,
-              'q-route-tab': true,
               'router-view': true
             }
           }
@@ -417,15 +387,11 @@ describe("Security Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'q-splitter': true,
-            'q-input': true,
-            'q-tabs': true,
-            'q-route-tab': true,
             'router-view': true
           }
         }
       });
-      
+
       expect(testWrapper.props('currOrgIdentifier')).toBe("");
       testWrapper.unmount();
     });
@@ -433,7 +399,6 @@ describe("Security Component", () => {
 
   describe("Reactive Properties", () => {
     it("should have reactive tabs property", async () => {
-      const initialTabs = wrapper.vm.tabs;
       wrapper.vm.tabs = "test-value";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.tabs).toBe("test-value");

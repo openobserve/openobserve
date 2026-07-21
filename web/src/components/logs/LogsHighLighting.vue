@@ -39,8 +39,10 @@ Usage Examples:
 </template>
 
 <script setup lang="ts">
-import { computed, withDefaults } from "vue";
+// withDefaults is a compiler macro; importing it conflicts with the macro declaration
+import { computed } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 
 /**
@@ -62,6 +64,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const store = useStore();
+  const { isDark } = useTheme();
 const { colorizeJson } = useLogsHighlighter();
 
 /**
@@ -71,7 +74,7 @@ const { colorizeJson } = useLogsHighlighter();
 const colorizedJson = computed((): string => {
   return colorizeJson(
     props.data,
-    store.state.theme === "dark",
+    isDark.value,
     props.showBraces,
     props.showQuotes,
     props.queryString,
@@ -80,6 +83,3 @@ const colorizedJson = computed((): string => {
 });
 </script>
 
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>

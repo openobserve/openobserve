@@ -322,13 +322,10 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // CLI command presets (AddAiToolset) — every preset shares ONE colour, so this
-  // is a "named-colour" group: a fallback-only entry centralises the chip colour
-  // in the registry (R5) without enumerating each preset (the list is data-driven
-  // via CLI_PRESETS). The `value` is passed for semantics but always resolves to
-  // the fallback. shape:pill + size:md keep it pixel-identical to the old manual
-  // `variant="primary-soft"` chip. (If presets ever need per-preset colours, add
-  // them under `values`.)
+  // CLI command presets (AddAiToolset) — every preset shares ONE colour via a
+  // fallback-only entry (the list is data-driven via CLI_PRESETS). The `value` is
+  // passed for semantics but always resolves to the fallback. Add per-preset
+  // colours under `values` if ever needed.
   cliPreset: {
     mode: "plain",
     shape: "pill",
@@ -338,9 +335,8 @@ export const BADGE_GROUPS = {
   },
 
   // Count chip — numeric count/total badges, keyed by colour INTENT (the number
-  // itself is the slot). Centralises count-badge styling per the type-drives-
-  // styling rule. pill + sm; the leading `dot` (where present) stays a per-call
-  // decorative prop. Reusable across count badges.
+  // itself is the slot). pill + sm; the leading `dot` (where present) stays a
+  // per-call decorative prop.
   countChip: {
     mode: "plain",
     shape: "pill",
@@ -545,8 +541,7 @@ export const BADGE_GROUPS = {
 
   // Neutral field/value tag — plain chips that just display a field or value name
   // (CrossLinkManager fields, PipelinesDestinationList type/format, …). `soft` =
-  // the lighter default-soft variant; bare (fallback) = solid default. pill + md =
-  // matches a bare <OTag> (the manual default these replaced). Reusable.
+  // the lighter default-soft variant; bare (fallback) = solid default. pill + md.
   fieldTag: {
     mode: "plain",
     shape: "pill",
@@ -578,10 +573,8 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // Report-row markers (ReportList) — report format + preview flag.
-  // png→primary-outline, preview→default-outline. pill + md; label is the slot.
   // Alert template origin — prebuilt vs custom. i18n labels via labelKey so the
-  // component needs no slot (was dimensionKey/fieldTag + hardcoded t() slots).
+  // component needs no slot.
   templateOrigin: {
     mode: "plain",
     shape: "pill",
@@ -630,8 +623,7 @@ export const BADGE_GROUPS = {
   },
 
   // Service-account kind (ServiceAccountsList) — system vs system-managed.
-  // system→primary-outline (sm), managed→default-outline (md) — per-value size
-  // preserves the two badges' original sizes. pill.
+  // system→primary-outline (sm), managed→default-outline (md). pill.
   serviceAccountKind: {
     mode: "plain",
     shape: "pill",
@@ -643,8 +635,8 @@ export const BADGE_GROUPS = {
   },
 
   // Dashboard variable SCOPE (VariableSettings) — global vs tabs vs panels.
-  // global→primary-soft, tabs/panels→primary-outline. pill + md to match the old
-  // manual chips; the count/label is the slot (e.g. "3 Tabs").
+  // global→primary-soft, tabs/panels→primary-outline. pill; the count/label is
+  // the slot (e.g. "3 Tabs").
   variableScope: {
     mode: "plain",
     shape: "pill",
@@ -682,9 +674,7 @@ export const BADGE_GROUPS = {
 
   // Field-name chips (ImportSemanticGroups dialogs) — decorative chips listing
   // field names. `highlight` = a group's member fields (primary), `muted` = the
-  // "current/old" side of a compare (light grey). Replaces dead
-  // `color="primary"/text-color/color="grey-4"` props that OTag silently ignored
-  // (so these had been rendering default). pill + sm.
+  // "current/old" side of a compare (light grey). pill + sm.
   fieldNameChip: {
     mode: "plain",
     shape: "pill",
@@ -697,8 +687,7 @@ export const BADGE_GROUPS = {
   },
 
   // Normalize state (ImportSemanticGroups) — boolean → colour + label.
-  // true → primary "Normalized", false → default "Not Normalized". SOLID + pill +
-  // md to match the old manual v-if/v-else chips (zero change).
+  // true → primary "Normalized", false → default "Not Normalized". SOLID + pill + md.
   normalizeState: {
     mode: "plain",
     shape: "pill",
@@ -712,8 +701,7 @@ export const BADGE_GROUPS = {
 
   // Field diff status (ImportSemanticGroups modification compare) — a proposed
   // field is either NEW (success) or already EXISTING (default). Plain colour
-  // only; the leading field name + trailing "add" icon stay as slots. SOLID +
-  // pill + sm = 1:1 with the old manual chips.
+  // only; the leading field name + trailing "add" icon stay as slots. SOLID + pill + sm.
   fieldDiffStatus: {
     mode: "plain",
     shape: "pill",
@@ -727,9 +715,8 @@ export const BADGE_GROUPS = {
 
   // Import diff summary categories (ImportSemanticGroups + …Drawer) — the diff
   // CATEGORY drives the colour (new→green, modified→amber, unchanged→grey); the
-  // count + label are the slot. A real value→colour family (not a pure count), so
-  // it's typed per R5/R2. SOLID + pill + md = 1:1 with the old manual chips; the
-  // count text sizing stays per-call (`.summary-chip` font-size on the list page).
+  // count + label are the slot. SOLID + pill + md; the count text sizing stays
+  // per-call (`.summary-chip` font-size on the list page).
   diffCategory: {
     mode: "plain",
     shape: "pill",
@@ -743,9 +730,7 @@ export const BADGE_GROUPS = {
   },
 
   // "Default" template marker (AlertsDestinationList) — fixed neutral flag.
-  // Named-colour group (R5). SOLID `default` + pill + md to match the old manual
-  // chip (no size prop → md; its `text-xs` class was redundant since md is
-  // already text-xs). Label stays an i18n slot at the call site.
+  // SOLID `default` + pill + md. Label stays an i18n slot at the call site.
   templateDefaultFlag: {
     mode: "plain",
     shape: "pill",
@@ -758,7 +743,7 @@ export const BADGE_GROUPS = {
 
   // "Active version" marker in scorer / score-config version lists — dot +
   // success. i18n label lives in the registry (labelKey) so the component needs
-  // no slot or per-instance :label. Was booleanState value="enabled" + t() slot.
+  // no slot or per-instance :label.
   activeVersionFlag: {
     mode: "dot",
     shape: "pill",
@@ -772,7 +757,7 @@ export const BADGE_GROUPS = {
   },
 
   // Default LLM-provider marker (LlmProvidersSettings) — dot + success, i18n
-  // label via labelKey. Was booleanState value="yes" + :label="t()".
+  // label via labelKey.
   providerDefaultFlag: {
     mode: "dot",
     shape: "pill",
@@ -782,10 +767,8 @@ export const BADGE_GROUPS = {
     fallback: { variant: "success-soft" },
   },
 
-  // Readonly marker (AddDestination) — single fixed neutral flag. Named-colour
-  // group (R5): centralises the colour so the badge isn't a manual `variant`.
-  // SOLID `default` + pill + sm to match the old manual chip exactly. Label stays
-  // an i18n slot at the call site. Reusable for any "readonly" marker.
+  // Readonly marker (AddDestination) — single fixed neutral flag. SOLID `default`
+  // + pill + sm. Label stays an i18n slot at the call site.
   readonlyFlag: {
     mode: "plain",
     shape: "pill",
@@ -798,8 +781,7 @@ export const BADGE_GROUPS = {
 
   // Destination ORIGIN — prebuilt vs custom (AlertsDestinationList). Colour is the
   // prebuilt/custom distinction (NOT the specific type — that's `destinationType`);
-  // the type NAME is passed as the slot label. SOLID variants + pill to match main
-  // exactly (the OBadge default these replaced was solid `primary`/`default`, pill).
+  // the type NAME is passed as the slot label. SOLID variants + pill.
   destinationKind: {
     mode: "plain",
     shape: "pill",
@@ -877,10 +859,10 @@ export const BADGE_GROUPS = {
 
   // ── Tracing ───────────────────────────────────────────────────────────────
 
-  // Span / trace status — dot. Mirrors SpanStatusPill / TraceStatusCell.
+  // Span / trace status — dot.
   spanStatus: {
     mode: "dot",
-    shape: "rounded",
+    shape: "pill",
     values: {
       ok: { variant: "success-soft", label: "OK" },
       success: { variant: "success-soft" },
@@ -922,7 +904,7 @@ export const BADGE_GROUPS = {
 
   // ── Online evals ────────────────────────────────────────────────────────
 
-  // Scorer type — plain. Mirrors scorerTypeBadgeVariant().
+  // Scorer type — plain.
   scorerType: {
     mode: "plain",
     shape: "pill",
@@ -935,7 +917,7 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // Eval data type — plain. Mirrors dataTypeBadgeVariant().
+  // Eval data type — plain.
   evalDataType: {
     mode: "plain",
     shape: "pill",
@@ -948,8 +930,7 @@ export const BADGE_GROUPS = {
 
   // Threshold-declaration flag (Score Config detail → Healthy threshold section).
   // Muted, its own group so the label mapping stays scoped and never leaks into
-  // the shared `fieldTag` chips. Uses the default sm/pill sizing so it reads as a
-  // normal status chip, consistent with the sibling `evalDataType`/`evalStatus`.
+  // the shared `fieldTag` chips.
   thresholdFlag: {
     mode: "plain",
     shape: "pill",
@@ -959,12 +940,10 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // LLM observation type — plain, PILL. Mirrors the in-component map that used
-  // to live in TraceDetailsSidebar (getObservationTypeColor → getObservationTypeVariant):
-  // many distinct semantic colours collapse to SOLID success/primary/warning/error/
-  // default. Kept 1:1 (solid variants, pill shape) so colour & shape match `main`.
-  // Keys are normalised (no underscores). `getObservationTypeColor` still drives
-  // TraceDAG graph-node fills — that is not a badge and is intentionally untouched.
+  // LLM observation type — plain, PILL. Many distinct semantic colours collapse
+  // to SOLID success/primary/warning/error/default. Keys are normalised (no
+  // underscores). NOTE: `getObservationTypeColor` still drives TraceDAG graph-node
+  // fills — that is not a badge and is intentionally untouched.
   observationType: {
     mode: "plain",
     shape: "pill",
@@ -989,8 +968,8 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
-  // Enrichment URL-job status — dot, SOLID variants. Mirrors the inline map in
-  // EnrichmentTableList (completed→success, failed→error, processing→primary).
+  // Enrichment URL-job status — dot, SOLID variants (completed→success,
+  // failed→error, processing→primary).
   enrichmentJobStatus: {
     mode: "dot",
     shape: "pill",
@@ -1002,9 +981,8 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
-  // Backfill job status — plain (no dot), SOLID variants. Mirrors getStatusColor()
-  // in BackfillJobDetails. `deletionfailed` is the deletion-overlay state the
-  // caller passes when deletion_status.failed is set.
+  // Backfill job status — plain (no dot), SOLID variants. `deletionfailed` is the
+  // deletion-overlay state the caller passes when deletion_status.failed is set.
   backfillJobStatus: {
     mode: "plain",
     shape: "pill",
@@ -1020,7 +998,7 @@ export const BADGE_GROUPS = {
   },
 
   // Model source (TestModelMatchDialog) — plain. org → primary, meta_org →
-  // default-outline, anything else (built-in) → default. Mirrors sourceColor().
+  // default-outline, anything else (built-in) → default.
   modelSource: {
     mode: "plain",
     shape: "pill",
@@ -1031,7 +1009,7 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
-  // Evaluation verdict — icon. Mirrors TraceEvaluationsView verdict styling.
+  // Evaluation verdict — icon.
   evaluationVerdict: {
     mode: "icon",
     shape: "pill",
@@ -1045,8 +1023,7 @@ export const BADGE_GROUPS = {
 
   // ── Anomaly detection ─────────────────────────────────────────────────────
 
-  // Anomaly-detection job status — dot. Mirrors statusColor() in
-  // AnomalyDetectionList (softened from solid for table density).
+  // Anomaly-detection job status — dot (soft variants for table density).
   anomalyStatus: {
     mode: "dot",
     shape: "pill",
@@ -1062,7 +1039,7 @@ export const BADGE_GROUPS = {
 
   // ── Misc lifecycle ────────────────────────────────────────────────────────
 
-  // Backfill / async deletion job status — dot. Mirrors getDeletionStatusColor().
+  // Backfill / async deletion job status — dot.
   deletionStatus: {
     mode: "dot",
     shape: "pill",
@@ -1086,7 +1063,7 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // RUM frustration EVENT type — plain. Mirrors FrustrationEventBadge config.
+  // RUM frustration EVENT type — plain.
   // (Frustration SEVERITY is count-derived → bucket the count yourself, then
   //  use the `severity` group; it can't be a value→variant entry.)
   frustrationEventType: {
@@ -1114,8 +1091,7 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // Alert run state (alert history) — icon, PILL (status badge). Icons mirror
-  // the original status chip (✓ ok, ⊘ skipped, ✕ failed, ⏲ pending, 🔔 completed).
+  // Alert run state (alert history) — icon, PILL (status badge).
   alertState: {
     mode: "icon",
     shape: "pill",
@@ -1123,18 +1099,16 @@ export const BADGE_GROUPS = {
       firing: { variant: "error-soft", icon: "error-outline" },
       error: { variant: "error-soft", icon: "error-outline" },
       anomaly: { variant: "error-soft", icon: "error-outline" },
-      // `completed` = a finished/OK run → GREEN (matches the pre-migration
-      // AlertHistory badge + AlertHistorySummary.getStateColorClass). It is NOT
-      // a firing state for the badge (the timeline aggregates it under firing
-      // separately, but the per-row badge reads as Ok).
+      // `completed` = a finished/OK run → GREEN. It is NOT a firing state for the
+      // badge (the timeline aggregates it under firing separately, but the per-row
+      // badge reads as Ok).
       completed: { variant: "success-soft", icon: "check-circle-outline" },
       ok: { variant: "success-soft", icon: "check-circle-outline", label: "Ok" },
       success: { variant: "success-soft", icon: "check-circle-outline" },
       normal: { variant: "success-soft", icon: "check-circle-outline" },
       // A non-firing/passed evaluation. The histogram counts these as "Ok", so
-      // the badge shows "Ok" too (matches the alert-history summary).
-      // Key MUST be normalised (no separators) so "condition_not_satisfied",
-      // "Condition Not Satisfied", etc. all resolve here.
+      // the badge shows "Ok" too. Key MUST be normalised (no separators) so
+      // "condition_not_satisfied", "Condition Not Satisfied", etc. all resolve here.
       conditionnotsatisfied: { variant: "success-soft", icon: "check-circle-outline", label: "Ok" },
       skipped: { variant: "warning-soft", icon: "block" },
       flapping: { variant: "warning-soft", icon: "bolt", label: "Flapping" },
@@ -1145,7 +1119,7 @@ export const BADGE_GROUPS = {
   },
 
   // Recent-event result (overview) — plain. Failed/Firing run hot (red), Error
-  // is the milder amber, matching the original overview event badges.
+  // is the milder amber.
   eventStatus: {
     mode: "plain",
     shape: "pill",
@@ -1212,7 +1186,7 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // Online-eval RUN status (per-record) — dot, PILL. 999px in source.
+  // Online-eval RUN status (per-record) — dot, PILL.
   evalRunStatus: {
     mode: "dot",
     shape: "pill",
@@ -1228,9 +1202,7 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // Quality-config health — dot.
-  // LLM session outcome (derived from error_count) — dot + soft colour, mirrors
-  // the old manual statusBadgeClass/statusDotClass in SessionsList.
+  // LLM session outcome (derived from error_count) — dot + soft colour.
   sessionStatus: {
     mode: "dot",
     shape: "pill",
@@ -1272,7 +1244,7 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // RUM event type — plain. Mirrors EventTypeBadge getEventTypeClass.
+  // RUM event type — plain.
   rumEventType: {
     mode: "plain",
     shape: "rounded",

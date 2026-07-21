@@ -29,11 +29,10 @@
  * d3-scale-chromatic so this module stays dependency-free.
  *
  * Position 0 is the "low" end, position 1 is the "high" end. ColorBrewer
- * publishes Spectral warm-first (dark red -> purple); a heatmap needs the
- * opposite, because the eye reads hot as "more". Listing it red-first made an
- * almost-empty bucket the loudest thing on the chart: a histogram's high-`le`
- * rows, which hold near-zero counts, came out as a solid dark-red slab while
- * the busy low buckets sank into blue.
+ * publishes Spectral warm-first (dark red -> purple); this ramp is listed
+ * cool-first because a heatmap reads hot as "more" — otherwise a histogram's
+ * near-empty high-`le` rows would dominate as a dark-red slab while the busy
+ * low buckets sink into blue.
  */
 export const SPECTRAL_STOPS: string[] = [
   "#5e4fa2",

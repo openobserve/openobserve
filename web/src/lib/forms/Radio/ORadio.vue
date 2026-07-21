@@ -22,7 +22,7 @@ defineOptions({ inheritAttrs: false });
 // tests target the actual interactive element via [data-test="…"] without
 // relying on element-tag/class selectors. Mirrors OInput / OFile patterns.
 // Also forward `data-test-value` so consumers that render N radios from a
-// list can target each option by its value (audit pattern shared with OSelect).
+// list can target each option by its value.
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 const parentDataTestValue = computed(() => $attrs["data-test-value"] as string | undefined);
@@ -55,12 +55,6 @@ const dotSize: Record<"xs" | "sm" | "md", string> = {
   xs: "size-1",
   sm: "size-1.5",
   md: "size-2",
-};
-
-const labelSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "text-xs",
-  sm: "text-xs",
-  md: "text-sm",
 };
 
 const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
@@ -117,8 +111,8 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
     <span
       v-if="$slots.label || props.label"
       :class="[
-        'o-input-label text-sm font-semibold select-none leading-tight',
-        props.disabled && 'o-input-label--disabled',
+        'o-input-label text-compact select-none leading-tight',
+        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ props.label }}</slot>

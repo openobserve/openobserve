@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0 px-2.5 bg-(--q-background)">
-    <!-- Top Header Bar -->
-    <AppPageHeader
-      title="Upload Source Maps"
-      :back="{ onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
-      class="px-4 border-b border-border-default"
-    />
-
+  <OPageLayout
+    class="bg-surface-base"
+    title="Upload Source Maps"
+    :back="{ label: 'Source Maps', onClick: navigateBack, dataTest: 'add-alert-back-btn' }"
+    bleed
+  >
     <OForm
       id="upload-source-maps-form"
       class="contents"
@@ -32,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
-      <div class="flex-1 overflow-y-auto card-container mb-[0.675rem] p-6" style="height: calc(100vh - 172px); overflow: auto">
+      <div class="flex-1 overflow-y-auto bg-card-glass-bg mb-[0.675rem] p-6 overflow-auto" style="height: calc(100vh - 172px)">
         <div class="max-w-300 mx-auto">
           <!-- Input Fields -->
           <div class="grid grid-cols-1 gap-4 mb-6">
@@ -65,15 +63,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- File Upload Area (form-owned `file` field, schema-validated) -->
           <div class="mb-6">
-            <div class="text-sm font-medium text-weight-medium mb-2">Source Map ZIP File *</div>
+            <div class="text-sm font-medium font-medium mb-2">Source Map ZIP File *</div>
             <SourceMapDropzone name="file" />
           </div>
         </div>
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar shrink-0 card-container flex items-center justify-end gap-3 py-3 pr-3 border-t border-[var(--o2-border-color)]"
-        style="position: sticky; z-index: 2">
+      <div class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky"
+        style="z-index: 2">
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"
           variant="outline"
@@ -91,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >Upload</OButton>
       </div>
     </OForm>
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -101,11 +99,10 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import sourcemapsService from "@/services/sourcemaps";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import SourceMapDropzone from "./SourceMapDropzone.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeUploadSourceMapsSchema,
@@ -126,7 +123,8 @@ const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
   service: (route.query.service as string) || "",
   version: (route.query.version as string) || "",
   environment: (route.query.environment as string) || "",
-  file: null,
+  // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
+  file: null as unknown as File,
 }));
 
 // Navigate back to source maps list

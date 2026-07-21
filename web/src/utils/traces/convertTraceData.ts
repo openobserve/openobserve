@@ -311,8 +311,8 @@ export const convertServiceGraphToTree = (
   // A row's visual height is the LARGER of its node symbol and its TWO-LINE label
   // (a bold name line + a smaller "N req" line). Both must fit inside the pitch
   // (with a breathing gap) or rows collide. The two-line label is the real
-  // driver here — budgeting a single line (as before) let the "req" line overlap
-  // the next node. So size everything against the pitch as a whole.
+  // driver here — budgeting only a single line lets the "req" line overlap the
+  // next node, so size everything against the pitch as a whole.
   const ROW_GAP = 6; // min clear space between adjacent rows
   const avail = Math.max(10, pitch - ROW_GAP);
   // Two-line label total height ≈ nameFont*1.35 + reqFont*1.35, with req ≈ 0.83×
@@ -616,6 +616,9 @@ export const convertServiceGraphToTree = (
         // to extremes (the "erratic" feel), and wheel zoom centers on the cursor
         // so you can focus an area. The +/- buttons drive the same zoom.
         roam: true,
+        // Nodes + labels track zoom 1:1 (tree default 0.4 barely grew them);
+        // matches the graph view so both feel the same when focusing in.
+        nodeScaleRatio: 1,
         scaleLimit: { min: 0.4, max: 4 },
         selectedMode: "single",
         label: {
@@ -1615,24 +1618,8 @@ export const convertServiceGraphToNetwork = (
 
   const edges = Array.from(edgeMap.entries()).map(
     ([edgeKey, edge]: [string, any]) => {
-      const errorRate =
-        edge.total_requests > 0
-          ? (edge.failed_requests / edge.total_requests) * 100
-          : 0;
-
       // Get the assigned curvature for this edge
       const curveness = edgeCurvature.get(edgeKey) || 0;
-
-      // Format latency values
-      const formatLatency = (ns: number) => {
-        if (!ns || ns === 0) return "N/A";
-        const ms = ns / 1000000;
-        return ms >= 1000 ? (ms / 1000).toFixed(2) + "s" : ms.toFixed(2) + "ms";
-      };
-
-      const p50 = formatLatency(edge.p50_latency_ns || 0);
-      const p95 = formatLatency(edge.p95_latency_ns || 0);
-      const p99 = formatLatency(edge.p99_latency_ns || 0);
 
       const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
@@ -1746,6 +1733,11 @@ export const convertServiceGraphToNetwork = (
         links: edges,
         // Pan + bounded wheel-zoom (scaleLimit below tames the extremes).
         roam: true,
+        // Nodes + labels scale 1:1 with zoom (default 0.6 makes them grow
+        // sub-linearly, so zooming in spread the layout but barely enlarged the
+        // nodes — they looked static). 1.0 = "focus in and everything gets
+        // bigger", the expected map-like behaviour; bounded by scaleLimit.
+        nodeScaleRatio: 1,
         draggable: false,
         focusNodeAdjacency: true,
         selectedMode: "single", // Enable single node selection

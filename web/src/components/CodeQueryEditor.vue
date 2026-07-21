@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="relative w-full h-full flex flex-col" v-bind="$attrs">
     <div
       data-test="query-editor"
-      class="logs-query-editor flex-1 min-h-0 bg-(--o2-card-bg)"
+      class="logs-query-editor flex-1 min-h-0 bg-card-glass-bg"
       ref="editorRef"
       :id="editorId"
     />
@@ -27,12 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showAiIcon && !disableAi"
       variant="sidebar-toggle"
       size="icon-toolbar"
-      class="absolute! top-2 right-2 z-10 bg-(--o2-bg-primary) border border-(--o2-border-color) transition-all duration-200 hover:bg-(--color-button-outline-hover-bg) hover:border-[var(--o2-color-primary)]"
-      :class="nlpMode ? 'bg-[var(--o2-color-primary-light)] border-[var(--o2-color-primary)]' : ''"
+      class="absolute! top-2 right-2 z-10 bg-card-glass-bg border border-card-glass-border transition-all duration-200 hover:bg-button-outline-hover-bg hover:border-accent"
+      :class="nlpMode ? 'bg-primary-100 border-accent' : ''"
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
-      <OIcon size="md">
+      <!-- name="" satisfies the required prop; empty name renders only the slot -->
+      <OIcon name="" size="md">
         <img :src="aiIcon" alt="AI" class="w-4.5 h-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
@@ -56,6 +57,8 @@ import {
   computed,
 } from "vue";
 
+import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
+
 // Lazy load Monaco Editor - only loaded when this component is rendered
 // This reduces initial bundle size by ~3.1MB
 let monaco: any = null;
@@ -75,6 +78,7 @@ const loadMonaco = async () => {
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
 
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { debounce } from "lodash-es";
 import searchState from "@/composables/useLogs/searchState";
 import { useNLQuery } from "@/composables/useNLQuery";
@@ -82,6 +86,7 @@ import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
 import { getImageURL } from "@/utils/zincutils";
 import { isAuthError } from "@/utils/authErrors";
+import { getFontMono } from "@/utils/fonts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -177,10 +182,10 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
     const editorRef: any = ref();
-    // editor object is used to interact with the monaco editor instance
     let editorObj: any = null;
     // Emits the editor's content immediately instead of waiting out the change
     // debounce. Assigned when the editor is created; see `commitModelChange`.
@@ -336,16 +341,16 @@ export default defineComponent({
           `match_all_raw_ignore_case('${_keyword}')`,
       },
       {
-        label: (_keyword: string) =>
+        label: () =>
           `re_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
-        insertText: (_keyword: string) => `re_match(fieldname, '')`,
+        insertText: () => `re_match(fieldname, '')`,
       },
       {
-        label: (_keyword: string) =>
+        label: () =>
           `re_not_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
-        insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
+        insertText: () => `re_not_match(fieldname, '')`,
       },
       {
         label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
@@ -362,11 +367,11 @@ export default defineComponent({
     ];
 
     watch(
-      () => store.state.theme,
+      () => isDark.value,
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
+          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );
@@ -401,13 +406,13 @@ export default defineComponent({
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
+      // Only emit when not already in NLP mode; if already set, do nothing.
       if (!props.nlpMode) {
         if (isNL) {
           emit("nlpModeDetected", true);
         } else {
           emit("nlpModeDetected", false);
         }
-      } else {
       }
     }, 500);
 
@@ -427,7 +432,6 @@ export default defineComponent({
       const currentLanguage = props.language?.toLowerCase() || "sql";
 
       try {
-        // Get organization ID from store
         const orgId = store.state.selectedOrganization?.identifier || "default";
 
         // Create language-appropriate prompt
@@ -649,7 +653,11 @@ export default defineComponent({
       editorObj = monaco.editor.create(editorElement as HTMLElement, {
         value: props.query?.trim(),
         language: props.language,
-        theme: store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
+        // Monaco paints its own text and ignores the CSS cascade — without this it
+        // falls back to its built-in Menlo/Monaco/Courier New stack, which differs
+        // per OS and from the rest of the app.
+        fontFamily: getFontMono(),
+        theme: isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         showFoldingControls: enableCodeFolding.value ? "always" : "never",
         folding: enableCodeFolding.value,
         wordWrap: "on",
@@ -877,11 +885,11 @@ export default defineComponent({
     );
 
     watch(
-      () => store.state.theme,
+      () => isDark.value,
       () => {
         if (!monaco) return;
         monaco.editor.setTheme(
-          store.state.theme == "dark" ? "myCustomDarkTheme" : "myCustomTheme",
+          isDark.value ? "myCustomDarkTheme" : "myCustomTheme",
         );
       },
     );
@@ -889,7 +897,7 @@ export default defineComponent({
     // update readonly when prop value changes
     watch(
       () => props.query,
-      (newQuery, oldQuery) => {
+      () => {
         if (!editorObj) return;
 
         const currentValue = editorObj?.getValue();
@@ -924,7 +932,10 @@ export default defineComponent({
       provider.value = monaco.languages.registerCompletionItemProvider(
         props.language,
         {
-          provideCompletionItems: function (model, position) {
+          provideCompletionItems: function (
+            model: MonacoEditor.editor.ITextModel,
+            position: MonacoEditor.Position,
+          ) {
             // find out if we are completing a property in the 'dependencies' object.
             var textUntilPosition = model.getValueInRange({
               startLineNumber: 1,
@@ -1042,7 +1053,7 @@ export default defineComponent({
         };
       });
 
-      const decorationIds = editorObj.deltaDecorations([], decorations);
+      editorObj.deltaDecorations([], decorations);
     };
 
     function addErrorDiagnostics(ranges: any) {
@@ -1174,7 +1185,7 @@ export default defineComponent({
 
     // Computed property for AI icon based on theme
     const aiIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
@@ -1209,216 +1220,42 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.monaco-editor,
-.monaco-diff-editor .synthetic-focus,
-.monaco-editor,
-.monaco-diff-editor [tabindex="0"]:focus,
-.monaco-editor,
-.monaco-diff-editor [tabindex="-1"]:focus,
-.monaco-editor,
-.monaco-diff-editor button:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="button"]:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="checkbox"]:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="search"]:focus,
-.monaco-editor,
-.monaco-diff-editor input[type="text"]:focus,
-.monaco-editor,
-.monaco-diff-editor select:focus,
-.monaco-editor,
-.monaco-diff-editor textarea:focus {
-  outline-width: 0px;
-}
+<style scoped>
+/* keep(lib-override:monaco) — every rule below targets Monaco's own generated DOM
+   (.monaco-editor, .suggest-widget, and decoration classes injected via the
+   decorations API). These nodes are created by the library at runtime and never
+   carry the scoped data-v attribute, so they are unreachable from utilities and
+   must stay as :deep() CSS. */
 
-.logs-query-editor .monaco-editor,
-.logs-query-editor .monaco-editor .monaco-editor {
-  padding: 0px 0px 0px 0px !important;
+.logs-query-editor :deep(.monaco-editor),
+.logs-query-editor :deep(.monaco-editor .monaco-editor) {
+  padding: 0 !important;
   --vscode-focusBorder: transparent !important;
 }
 
-.logs-query-editor .monaco-editor .editor-widget .suggest-widget,
-.logs-query-editor .monaco-editor .monaco-editor .editor-widget .suggest-widget {
+/* Neutralise monaco's stray focus outline / focus-border on the mount, the real
+   inner editor, the overflow guard and the hidden focus textarea. The last three
+   are monaco-generated DOM. */
+.logs-query-editor,
+.logs-query-editor :deep(.monaco-editor),
+.logs-query-editor :deep(.overflow-guard),
+.logs-query-editor :deep(.inputarea) {
+  outline: none !important;
+  --vscode-focusBorder: transparent !important;
+}
+
+.logs-query-editor :deep(.monaco-editor .editor-widget .suggest-widget),
+.logs-query-editor :deep(.monaco-editor .monaco-editor .editor-widget .suggest-widget) {
   z-index: 9999;
   display: flex !important;
   visibility: visible !important;
 }
 
-.generate-sql-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
-  box-shadow: 0 0.375rem 1.25rem 0 rgba(139, 92, 246, 0.4) !important;
-  transform: translateY(-0.0625rem) !important;
-}
-
-.generate-sql-button:active:not(.disabled):not([disabled]):not(:disabled) {
-  transform: translateY(0) !important;
-  box-shadow: 0 0.125rem 0.625rem 0 rgba(139, 92, 246, 0.3) !important;
-}
-
-/* Fade transition for button appearance */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* Streaming preview card - O2 AI Assistant message style with purple border */
-.streaming-preview-card {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 56.25rem; /* 900px - matches O2 AI Assistant max-width */
-  max-width: calc(100% - 2rem);
-  max-height: 31.25rem;
-  background: var(--o2-card-bg);
-  border-radius: 0.5rem; /* 8px - matches O2 message border-radius */
-  border: 2px solid #8b5cf6; /* O2 AI Assistant purple border */
-  padding: 0.75rem; /* 12px - matches O2 message padding */
-  z-index: 99;
-  overflow: hidden;
-}
-
-/* Light mode shadow - matches O2 AI Assistant with purple glow */
-.light-mode .streaming-preview-card {
-  box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.2);
-}
-
-/* Dark mode shadow - matches O2 AI Assistant with purple glow */
-.dark-mode .streaming-preview-card {
-  box-shadow: 0 0.25rem 1rem 0 rgba(139, 92, 246, 0.3);
-}
-
-/* Streaming preview content - O2 AI Assistant text-block style */
-.streaming-preview-content {
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
-    Arial, sans-serif;
-  font-size: 0.875rem;
-  line-height: 1.6; /* Better readability for text content */
-  color: var(--o2-text-primary);
-  margin: 0;
-  padding: 1rem;
-  overflow-y: auto;
-  max-height: 30rem;
-  max-width: 100%;
-}
-
-/* Generating text with dynamic message */
-.generating-text {
-  font-size: 0.9375rem; /* 15px */
-  font-weight: 500;
-  color: var(--o2-text-primary);
-}
-
-/* Animated dots - ellipsis animation using pseudo-element */
-.animated-dots::after {
-  content: "";
-  animation: ellipsis 1.5s infinite;
-  display: inline-block;
-  width: 1.5em;
-  text-align: left;
-  font-size: inherit;
-  font-weight: inherit;
-  font-family: inherit;
-  color: inherit;
-  line-height: inherit;
-}
-
-@keyframes ellipsis {
-  0% {
-    content: "";
-  }
-  25% {
-    content: ".";
-  }
-  50% {
-    content: "..";
-  }
-  75%,
-  100% {
-    content: "...";
-  }
-}
-
-/* Code blocks within streaming preview */
-.streaming-preview-content :deep(pre),
-.streaming-preview-content :deep(code) {
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Courier New", monospace;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  line-height: 1.4;
-  padding: 0.5rem;
-  margin: 0.25rem 0;
-  border-radius: 0.25rem;
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-/* Lists within streaming preview */
-.streaming-preview-content :deep(ol) {
-  list-style-type: decimal;
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-
-.streaming-preview-content :deep(ul) {
-  list-style-type: disc;
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-
-.streaming-preview-content :deep(li) {
-  margin: 0.25em 0;
-}
-
-/* Paragraphs within streaming preview */
-.streaming-preview-content :deep(p) {
-  margin: 0.5em 0;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  word-break: break-word;
-  max-width: 100%;
-}
-
-/* Slide up transition for streaming preview - centered */
-.slide-up-enter-active,
-.slide-up-leave-active {
-  transition: all 0.3s ease;
-}
-
-.slide-up-enter-from {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.95);
-}
-
-.slide-up-leave-to {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.98);
-}
-
-@keyframes typing-cursor {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.85;
-  }
-}
-
-
-.highlight-error {
-  background-color: rgba(255, 0, 0, 0.1);
+/* Error decoration — class name is handed to monaco.deltaDecorations(), so the
+   element only ever exists inside Monaco's view-lines. */
+.logs-query-editor :deep(.highlight-error) {
+  background-color: color-mix(in srgb, var(--color-status-negative) 10%, transparent);
   text-decoration: underline;
-  text-decoration-color: red;
+  text-decoration-color: var(--color-status-negative);
 }
 </style>

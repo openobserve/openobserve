@@ -18,21 +18,21 @@ limitations under the License. -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="flex gap-3 py-3 px-4 rounded border-l-[3px] border-solid border-(--q-positive) bg-[rgba(76,175,80,0.08)] dark:bg-[rgba(76,175,80,0.12)]"
+      class="flex gap-3 py-3 px-4 rounded-default border-l-[3px] border-solid border-status-positive bg-[rgba(76,175,80,0.08)] dark:bg-[rgba(76,175,80,0.12)]"
     >
-      <div class="shrink-0 pt-[2px] text-(--q-positive)">
+      <div class="shrink-0 pt-0.5 text-status-positive">
         <OIcon name="check-circle" size="md" />
       </div>
       <div class="flex-1 min-w-0">
-        <div data-test="test-success-message" class="text-[13px] font-medium leading-[1.4] mb-1">
+        <div data-test="test-success-message" class="text-compact font-medium leading-[1.4] mb-1">
           {{ t('alerts.testSuccessMessage') }}
         </div>
-        <div data-test="test-success-timestamp" class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
+        <div data-test="test-success-timestamp" class="text-2xs text-text-secondary flex items-center gap-2 flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
+          <span v-if="result.responseTime" class="font-mono text-text-secondary">
             {{ result.responseTime }}ms
           </span>
         </div>
@@ -43,27 +43,27 @@ limitations under the License. -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="flex gap-3 py-3 px-4 rounded border-l-[3px] border-solid border-(--q-negative) bg-[rgba(244,67,54,0.08)] dark:bg-[rgba(244,67,54,0.12)]"
+      class="flex gap-3 py-3 px-4 rounded-default border-l-[3px] border-solid border-status-negative bg-[rgba(244,67,54,0.08)] dark:bg-[rgba(244,67,54,0.12)]"
     >
-      <div class="shrink-0 pt-[2px] text-(--q-negative)">
+      <div class="shrink-0 pt-0.5 text-status-negative">
         <OIcon name="error" size="md" />
       </div>
       <div class="flex-1 min-w-0">
-        <div data-test="test-failure-message" class="text-[13px] font-medium leading-[1.4] mb-1">
+        <div data-test="test-failure-message" class="text-compact font-medium leading-[1.4] mb-1">
           {{ getFailureMessage(result) }}
         </div>
-        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
+        <div v-if="result.timestamp" data-test="test-failure-timestamp" class="text-2xs text-text-secondary flex items-center gap-2 flex-wrap">
           {{ formatTimestamp(result.timestamp) }}
           <OTag v-if="result.statusCode" type="httpStatus" :value="httpStatusBucket(result.statusCode)">
             {{ result.statusCode }}
           </OTag>
-          <span v-if="result.responseTime" class="font-['Monaco','Consolas','Courier_New',monospace] text-(--q-text-secondary)">
+          <span v-if="result.responseTime" class="font-mono text-text-secondary">
             {{ result.responseTime }}ms
           </span>
         </div>
 
         <!-- Suggested Fix -->
-        <div v-if="getSuggestedFix(result)" class="result-suggestion flex items-start gap-2 mt-2 p-2 bg-[rgba(255,193,7,0.1)] dark:bg-[rgba(255,193,7,0.15)] rounded-[3px] text-[11px] text-(--q-text) leading-[1.4]">
+        <div v-if="getSuggestedFix(result)" class="result-suggestion flex items-start gap-2 mt-2 p-2 bg-[rgba(255,193,7,0.1)] dark:bg-[rgba(255,193,7,0.15)] rounded-default text-2xs text-text-secondary leading-[1.4]">
           <OIcon name="lightbulb" size="sm" />
           <span>{{ getSuggestedFix(result) }}</span>
         </div>
@@ -76,7 +76,7 @@ limitations under the License. -->
           class="mt-2 bg-transparent"
         >
           <template #trigger>
-            <div class="flex items-center text-(--q-text-secondary) text-[11px]">
+            <div class="flex items-center text-text-secondary text-2xs">
               <OIcon name="info" size="xs" class="mr-1" />
               <span class="text-xs">{{ t('alerts.viewDetails') }}</span>
             </div>
@@ -84,18 +84,18 @@ limitations under the License. -->
 
           <div data-test="test-failure-details" class="pt-2">
             <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
-              <div class="text-[10px] font-semibold uppercase tracking-[0.5px] text-(--q-text-secondary) mb-1">{{ t('alerts.error') }}</div>
-              <div class="text-[11px] text-(--q-text) leading-[1.5] break-words">{{ result.error }}</div>
+              <div class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1">{{ t('alerts.error') }}</div>
+              <div class="text-2xs text-text-body leading-[1.5] break-words">{{ result.error }}</div>
             </div>
 
             <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
-              <div class="text-[10px] font-semibold uppercase tracking-[0.5px] text-(--q-text-secondary) mb-1">{{ t('alerts.httpStatus') }}</div>
-              <div class="text-[11px] text-(--q-text) leading-[1.5] break-words">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
+              <div class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1">{{ t('alerts.httpStatus') }}</div>
+              <div class="text-2xs text-text-body leading-[1.5] break-words">{{ result.statusCode }} {{ getStatusText(result.statusCode) }}</div>
             </div>
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
-              <div class="text-[10px] font-semibold uppercase tracking-[0.5px] text-(--q-text-secondary) mb-1">{{ t('alerts.responseBody') }}</div>
-              <pre class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-[3px] p-2 font-['Monaco','Consolas','Courier_New',monospace] text-[10px] leading-[1.5] max-h-[150px] overflow-y-auto m-0 whitespace-pre text-(--q-text)">{{ formatResponseBody(result.responseBody) }}</pre>
+              <div class="text-3xs font-semibold uppercase tracking-[0.5px] text-text-secondary mb-1">{{ t('alerts.responseBody') }}</div>
+              <pre class="bg-[rgba(0,0,0,0.05)] dark:bg-[rgba(255,255,255,0.05)] border border-[rgba(0,0,0,0.1)] dark:border-[rgba(255,255,255,0.1)] rounded-default p-2 font-mono text-3xs leading-[1.5] max-h-37.5 overflow-y-auto m-0 whitespace-pre text-text-body">{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>
@@ -119,16 +119,16 @@ limitations under the License. -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="flex gap-3 py-3 px-4 rounded border-l-[3px] border-solid border-(--q-primary) bg-[rgba(33,150,243,0.08)] dark:bg-[rgba(33,150,243,0.12)]"
+      class="flex gap-3 py-3 px-4 rounded-default border-l-[3px] border-solid border-theme-accent bg-[rgba(33,150,243,0.08)] dark:bg-[rgba(33,150,243,0.12)]"
     >
-      <div class="shrink-0 pt-[2px] text-(--q-primary)">
+      <div class="shrink-0 pt-0.5 text-theme-accent">
         <OSpinner size="xs" />
       </div>
       <div class="flex-1 min-w-0">
-        <div class="text-[13px] font-medium leading-[1.4] mb-1">
+        <div class="text-compact font-medium leading-[1.4] mb-1">
           {{ t('alerts.testInProgress') }}
         </div>
-        <div class="text-[11px] text-(--q-text-secondary) flex items-center gap-2 flex-wrap">
+        <div class="text-2xs text-text-secondary flex items-center gap-2 flex-wrap">
           {{ t('alerts.sendingNotification') }}
         </div>
       </div>
@@ -138,10 +138,10 @@ limitations under the License. -->
     <div
       v-else
       data-test="test-result-idle"
-      class="flex items-center gap-2 py-[10px] px-3 rounded bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)]"
+      class="flex items-center gap-2 py-2.5 px-3 rounded-default bg-[rgba(0,0,0,0.02)] dark:bg-[rgba(255,255,255,0.02)] border border-[rgba(0,0,0,0.08)] dark:border-[rgba(255,255,255,0.08)]"
     >
       <OIcon name="info" size="sm" />
-      <span class="text-[11px] text-(--q-text-secondary) leading-[1.4]">
+      <span class="text-2xs text-text-secondary leading-[1.4]">
         {{ t('alerts.testIdleMessage') }}
       </span>
     </div>
@@ -149,10 +149,9 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
-import { formatTimestamp } from "@/utils/date";
+import { formatDate } from "@/utils/date";
 import type { TestResult } from '@/utils/prebuilt-templates/types';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -163,11 +162,12 @@ import { ref } from 'vue';
 
 // Define component props
 interface Props {
-  result?: TestResult | null;
+  // Backend test responses also include responseTime (ms); shared TestResult omits it.
+  result?: (TestResult & { responseTime?: number }) | null;
   isLoading?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   result: null,
   isLoading: false
 });
@@ -177,7 +177,7 @@ interface Emits {
   (e: 'retry'): void;
 }
 
-const emit = defineEmits<Emits>();
+defineEmits<Emits>();
 
 // Composables
 const { t } = useI18n();
@@ -189,7 +189,7 @@ function formatTimestamp(timestamp?: number | string): string {
   if (!timestamp) return '';
 
   const ts = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
-  return formatTimestamp(ts, "MMM DD, HH:mm:ss");
+  return formatDate(ts, "MMM DD, HH:mm:ss");
 }
 
 function getFailureMessage(result: TestResult): string {

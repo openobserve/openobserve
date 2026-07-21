@@ -21,17 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="enrichment-tables-list-page"
     class="flex flex-col h-full min-h-0"
   >
-    <div v-if="!showAddJSTransformDialog" class="flex flex-col h-full min-h-0">
-      <!-- Standard section header: title + actions only. Type filter + search
-           moved into the table's own toolbar below. -->
-      <AppPageHeader
-        :title="t('function.enrichmentTables')"
-        icon="dataset"
-        :subtitle="t('function.enrichmentTablesSubtitle')"
-        tabs-below
-        class="shrink-0 px-4"
-      >
-        <template #tabs>
+    <OPageLayout
+      v-if="!showAddJSTransformDialog"
+      :title="t('function.enrichmentTables')"
+      icon="dataset"
+      :subtitle="t('function.enrichmentTablesSubtitle')"
+      tabs-below
+      bleed
+    >
+        <template #header-tabs>
           <PipelineSectionTabs />
         </template>
         <template #actions>
@@ -44,9 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t(`function.addEnrichmentTable`) }}
           </OButton>
         </template>
-      </AppPageHeader>
       <div class="w-full flex-1 min-h-0 overflow-hidden">
-        <div class="card-container h-full">
+        <div class="bg-card-glass-bg h-full">
             <OTable
               ref="qTable"
               :frame="false"
@@ -60,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :page-size-options="perPageOptionsList"
               sorting="client"
               filter-mode="client"
+              show-index
               :show-global-filter="false"
               :default-columns="false"
               :enable-column-resize="true"
@@ -138,10 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click="showUrlJobsDialog(row)"
                     >
                       <OTag type="enrichmentType" value="url" />
-                      <span v-if="row.urlJobs.length > 1" class="text-text-primary"> ({{ row.urlJobs.length }})</span>
+                      <span v-if="row.urlJobs.length > 1" class="text-text-body"> ({{ row.urlJobs.length }})</span>
                     </span>
                     <span v-if="row.aggregateStatus === 'completed'">
-                      <OIcon name="check-circle" size="sm" class="text-(--o2-positive)">
+                      <OIcon name="check-circle" size="sm" class="text-status-positive">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
@@ -155,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OIcon>
                     </span>
                     <span v-else-if="row.aggregateStatus === 'processing'">
-                      <OIcon name="sync" size="sm" class="[animation:rotate_1s_linear_infinite]">
+                      <OIcon name="sync" size="sm" class="animate-spin">
                         <OTooltip>
                           <template #content>
                             <div style="max-width: 300px;">
@@ -269,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <template #bottom>
                 <div class="flex items-center justify-between w-full py-2">
-                  <div class="flex items-center o2-table-footer-title mr-4">
+                  <div class="flex items-center text-xs font-normal mr-4">
                     {{ resultTotal }} {{ t('function.enrichmentTables') }}
                   </div>
                   <OButton
@@ -287,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTable>
           </div>
         </div>
-    </div>
+    </OPageLayout>
     <div v-else>
       <add-enrichment-table
         v-model="formData"
@@ -317,6 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- URL Jobs Dialog -->
     <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
+      bleed
       v-model:open="showUrlJobsDialogState"
       size="lg"
     >
@@ -328,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ul class="flex flex-col divide-y divide-border">
             <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="flex items-center gap-2 p-4">
               <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-bold">Job {{ index + 1 }}</span>
+                <span class="text-sm font-bold">Job {{ (index as number) + 1 }}</span>
                 <span class="block text-xs text-muted-foreground">{{ job.url }}</span>
                 <span class="block text-xs text-muted-foreground mt-2">
                   <OTag
@@ -342,14 +341,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
                     Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
                   </span>
-                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="block text-xs text-red-500 mt-2">
+                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="block text-xs text-status-error-text mt-2">
                     Error: {{ job.error_message }}
                   </span>
                 </div>
               </li>
             </ul>
           </div>
-          <div v-else class="text-center p-3 text-gray-400">
+          <div v-else class="text-center p-3 text-text-muted">
             No URL jobs found
           </div>
       </div>
@@ -385,22 +384,21 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
-    AppPageHeader,
+    OPageLayout,
     PipelineSectionTabs,
     AddEnrichmentTable,
     OEmptyState,
@@ -412,7 +410,6 @@ export default defineComponent({
     ODrawer,
     OSearchInput,
     OTooltip,
-    OCheckbox,
     OIcon,
     OTag,
     ONumberCell,
@@ -423,7 +420,7 @@ export default defineComponent({
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
@@ -444,13 +441,12 @@ export default defineComponent({
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       { id: "name", header: t("common.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
       { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.type },
       { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "right" }, size: COL.count },
       { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
       { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
-      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "!text-center !justify-center", actionCount: 4 }, isAction: true },
+      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "center", actionCount: 4 }, isAction: true },
     ];
 
     const selectedEnrichmentTableIds = computed(() =>
@@ -563,8 +559,7 @@ export default defineComponent({
           const urlJobs = urlJobMap[data.name] || [];
 
           allTables.set(data.name, {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
-            id: data.name + counter,
+            id: data.name + counter++,
             name: data.name,
             doc_num: doc_num,
             storage_size: storage_size,
@@ -583,8 +578,7 @@ export default defineComponent({
           if (!allTables.has(tableName)) {
             // This is a URL job without a schema yet
             allTables.set(tableName, {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              id: tableName + counter,
+              id: tableName + counter++,
               name: tableName,
               doc_num: "",
               storage_size: "",
@@ -829,8 +823,7 @@ export default defineComponent({
               streamResponse.stats.doc_time_min &&
               streamResponse.stats.doc_time_max
             ) {
-              //reducing the doc_time_min by 1000000 to get the exact time range
-              //previously we were subtracting 60000000 which might confuse some users so we are using 1000000 (1sec)
+              //reducing the doc_time_min by 1000000 (1sec) to get the exact time range
               dateTime["from"] = streamResponse.stats.doc_time_min - 1000000;
               //adding 60000000(1min)
               dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
@@ -996,13 +989,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-</style>

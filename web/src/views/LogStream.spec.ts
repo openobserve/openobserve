@@ -170,7 +170,6 @@ describe("LogStream Component", () => {
   let wrapper: any;
   let mockUseStreams: any;
   let mockStreamService: any;
-  let dismissMock: any;
 
   beforeEach(async () => {
     // Reset mocks completely
@@ -225,9 +224,6 @@ describe("LogStream Component", () => {
 
     // Wait for component to settle
     await wrapper.vm.$nextTick();
-
-    // Setup notify mock
-    dismissMock = vi.fn();
   });
 
   afterEach(() => {
@@ -243,7 +239,7 @@ describe("LogStream Component", () => {
     });
 
     it("should display correct title", () => {
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
       expect(title.text()).toBe("Streams");
@@ -663,8 +659,6 @@ describe("LogStream Component", () => {
     });
 
     it("should handle pagination updates correctly", async () => {
-      const originalTotal = wrapper.vm.totalCount;
-
       wrapper.vm.pageSize = 50;
       wrapper.vm.currentPage = 2;
 

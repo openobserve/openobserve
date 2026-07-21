@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <transition name="slide-fade">
       <div
         v-if="show"
-        class="charts-wrapper py-0! min-h-[8.5rem] h-[10rem] overflow-hidden will-change-[transform,opacity]"
+        class="charts-wrapper py-0! min-h-[8.5rem] h-40 overflow-hidden will-change-[transform,opacity]"
       >
         <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]">
           <RenderDashboardCharts
@@ -71,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   ref,
-  watch,
   onMounted,
   onBeforeUnmount,
   computed,
@@ -117,9 +116,9 @@ const emit = defineEmits<{
 }>();
 
 const { showErrorNotification } = useNotifications();
-const store = useStore();
+useStore();
 const { searchObj, tracesParser } = useTraces();
-const { t } = useI18n();
+useI18n();
 
 
 // Read filter and timeRange directly from the shared composable rather than via props.
@@ -133,7 +132,6 @@ const effectiveTimeRange = computed<TimeRange>(() => ({
   endTime: searchObj.data.datetime.endTime,
 }));
 
-const autoRefreshEnabled = ref(false);
 const autoRefreshIntervalId = ref<number | null>(null);
 const error = ref<string | null>(null);
 const dashboardChartsRef = ref<any>(null);
@@ -147,10 +145,16 @@ const currentTimeObj = ref({
 const dashboardData = ref(null);
 
 // Unified Analysis Dashboard state
+interface AnalysisFilter {
+  start: number;
+  end: number;
+  timeStart?: number;
+  timeEnd?: number;
+}
 const showAnalysisDashboard = ref(false);
-const analysisDurationFilter = ref({ start: 0, end: 0 });
-const analysisRateFilter = ref({ start: 0, end: 0 });
-const analysisErrorFilter = ref({ start: 0, end: 0 });
+const analysisDurationFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
+const analysisRateFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
+const analysisErrorFilter = ref<AnalysisFilter | undefined>({ start: 0, end: 0 });
 const defaultAnalysisTab = ref<"duration" | "volume" | "error">("volume");
 // Store the original time range before selection for baseline comparison
 const originalTimeRangeBeforeSelection = ref<TimeRange | null>(null);
@@ -165,15 +169,27 @@ const streamFields = computed(() => {
     return props.streamFields;
   }
 
-  // Prefer user-defined schema if available
-  if (searchObj.data.stream.userDefinedSchema?.length > 0) {
-    return searchObj.data.stream.userDefinedSchema;
+  // Prefer user-defined schema if available.
+  // Set dynamically on shared stream state; not part of useTraces defaults.
+  const userDefinedSchema = searchObj.data.stream.userDefinedSchema;
+  if (userDefinedSchema?.length > 0) {
+    return userDefinedSchema;
   }
 
   return searchObj.data.stream.selectedStreamFields || [];
 });
 
-const rangeFilters = computed(() => searchObj.meta.metricsRangeFilters);
+// Runtime entries carry timeStart/timeEnd (set below); the useTraces Map generic omits them.
+type MetricsRangeFilter = {
+  panelTitle: string;
+  start: number | null;
+  end: number | null;
+  timeStart?: number | null;
+  timeEnd?: number | null;
+};
+const rangeFilters = computed(
+  () => searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>,
+);
 
 // Check if ANY RED panel has a time-based brush selection
 // This controls the visibility of the "Analyze Dimensions" button
@@ -261,7 +277,7 @@ const loadDashboard = async () => {
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
-    convertedDashboard.tabs[0].panels.forEach((panel, index) => {
+    convertedDashboard.tabs[0].panels.forEach((panel: { title?: string; queries: { query: string }[] }, index: number) => {
       // Build WHERE clause based on filters
       let whereClause = "";
 
@@ -334,8 +350,9 @@ const loadDashboard = async () => {
     updateLayout();
   } catch (err: any) {
     console.error("Error loading dashboard:", err);
-    error.value = err.message || "Failed to load metrics dashboard";
-    showErrorNotification(error.value);
+    const message: string = err.message || "Failed to load metrics dashboard";
+    error.value = message;
+    showErrorNotification(message);
   }
 };
 
@@ -350,11 +367,11 @@ const refreshDashboard = () => {
 };
 
 const createRangeFilter = (
-  data,
-  start = null,
-  end = null,
-  timeStart = null,
-  timeEnd = null,
+  data: { id?: string; title?: string } | undefined,
+  start: number | null = null,
+  end: number | null = null,
+  timeStart: number | null = null,
+  timeEnd: number | null = null,
 ) => {
   const panelId = data?.id;
   const panelTitle = data?.title || "Chart";
@@ -366,13 +383,16 @@ const createRangeFilter = (
       panelTitle === "Rate" ||
       panelTitle === "Errors")
   ) {
-    searchObj.meta.metricsRangeFilters.set(panelId, {
-      panelTitle,
-      start: start ? Math.floor(start) : null,
-      end: end ? Math.floor(end) : null,
-      timeStart: timeStart ? Math.floor(timeStart) : null,
-      timeEnd: timeEnd ? Math.floor(timeEnd) : null,
-    });
+    (searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>).set(
+      panelId,
+      {
+        panelTitle,
+        start: start ? Math.floor(start) : null,
+        end: end ? Math.floor(end) : null,
+        timeStart: timeStart ? Math.floor(timeStart) : null,
+        timeEnd: timeEnd ? Math.floor(timeEnd) : null,
+      },
+    );
     // Increment version to trigger reactivity
     rangeFiltersVersion.value++;
 
@@ -461,23 +481,6 @@ const onDataZoom = async ({
   }
 };
 
-const removeRangeFilter = (panelId: string) => {
-  searchObj.meta.metricsRangeFilters.delete(panelId);
-  // Increment version to trigger reactivity
-  rangeFiltersVersion.value++;
-
-  // Emit updated filters to parent to update Query Editor
-  emitFiltersToQueryEditor();
-};
-
-const formatTimestamp = (timestamp: number) => {
-  const date = new Date(timestamp);
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
-};
-
 const handleChartContextMenu = (event: any) => {
   // Extract field name from series name
   // For traces metrics, the panel titles are "Rate", "Errors", "Duration"
@@ -497,81 +500,6 @@ const handleChartContextMenu = (event: any) => {
 
 const hideContextMenu = () => {
   contextMenuVisible.value = false;
-};
-
-const openAnalysisDashboard = () => {
-  // Get the current duration range from existing filters
-  let durationStart = null;
-  let durationEnd = null;
-
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Duration") {
-      durationStart = filter.start;
-      durationEnd = filter.end;
-    }
-  });
-
-  // Set the duration filter for analysis
-  analysisDurationFilter.value = {
-    start: durationStart || 0,
-    end: durationEnd || Number.MAX_SAFE_INTEGER,
-  };
-
-  showAnalysisDashboard.value = true;
-};
-
-const openVolumeAnalysisDashboard = () => {
-  // Get the current rate range from existing filters
-  let rateStart = null;
-  let rateEnd = null;
-  let timeStart = null;
-  let timeEnd = null;
-
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Rate") {
-      rateStart = filter.start;
-      rateEnd = filter.end;
-      timeStart = filter.timeStart;
-      timeEnd = filter.timeEnd;
-    }
-  });
-
-  // Set the rate filter for analysis
-  analysisRateFilter.value = {
-    start: rateStart || 0,
-    end: rateEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: timeStart || undefined,
-    timeEnd: timeEnd || undefined,
-  };
-
-  showVolumeAnalysisDashboard.value = true;
-};
-
-const openErrorAnalysisDashboard = () => {
-  // Get the current error range from existing filters
-  let errorStart = null;
-  let errorEnd = null;
-  let timeStart = null;
-  let timeEnd = null;
-
-  rangeFilters.value.forEach((filter) => {
-    if (filter.panelTitle === "Errors") {
-      errorStart = filter.start;
-      errorEnd = filter.end;
-      timeStart = filter.timeStart;
-      timeEnd = filter.timeEnd;
-    }
-  });
-
-  // Set the error filter for analysis
-  analysisErrorFilter.value = {
-    start: errorStart || 0,
-    end: errorEnd || Number.MAX_SAFE_INTEGER,
-    timeStart: timeStart || undefined,
-    timeEnd: timeEnd || undefined,
-  };
-
-  showErrorAnalysisDashboard.value = true;
 };
 
 // Unified function to open analysis dashboard with all filters populated
@@ -673,26 +601,6 @@ const handleContextMenuSelect = (selection: {
   hideContextMenu();
 };
 
-const toggleAutoRefresh = () => {
-  autoRefreshEnabled.value = !autoRefreshEnabled.value;
-
-  if (autoRefreshEnabled.value) {
-    startAutoRefresh();
-  } else {
-    stopAutoRefresh();
-  }
-};
-
-const startAutoRefresh = () => {
-  if (autoRefreshIntervalId.value !== null) {
-    stopAutoRefresh();
-  }
-
-  autoRefreshIntervalId.value = window.setInterval(() => {
-    refreshDashboard();
-  }, 30000); // 30 seconds
-};
-
 const stopAutoRefresh = () => {
   if (autoRefreshIntervalId.value !== null) {
     clearInterval(autoRefreshIntervalId.value);
@@ -720,16 +628,25 @@ defineExpose({
 });
 </script>
 
-<style>
-.traces-metrics-dashboard .card-container {
-  box-shadow: none;
+<style scoped>
+/* keep(lib-override:render-dashboard-charts): RenderDashboardCharts renders its
+   own DOM (reached via :deep). Tighten the side padding AND collapse the top
+   padding/margin it adds for full dashboards (container pt-2 + inner .displayDiv
+   mt-2 = 1rem). In this compact traces view the charts live in a fixed h-40
+   (10rem) overflow-hidden wrapper, so that extra 1rem pushes the plot past the
+   clip line and cuts off the x-axis. Zeroing it restores the main-branch fit. */
+.charts-wrapper :deep(.render-dashboard-charts-container) {
+  padding-left: 0.2rem;
+  padding-right: 0.2rem;
+  padding-top: 0;
 }
 
-.traces-metrics-dashboard .card-container :first-child {
-  padding: 0 0.0625rem !important;
+.charts-wrapper :deep(.displayDiv) {
+  margin-top: 0;
 }
 
-/* Slide fade transition */
+/* keep(complex-state): slide-fade-* drive the <transition name="slide-fade">
+   reveal (enter/leave phases) — Tailwind can't express transition-group state. */
 .slide-fade-enter-active,
 .slide-fade-leave-active {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -737,31 +654,25 @@ defineExpose({
 
 .slide-fade-enter-from {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-0.625rem);
   max-height: 0;
 }
 
 .slide-fade-enter-to {
   opacity: 1;
   transform: translateY(0);
-  max-height: 500px;
+  max-height: 31.25rem;
 }
 
 .slide-fade-leave-from {
   opacity: 1;
   transform: translateY(0);
-  max-height: 500px;
+  max-height: 31.25rem;
 }
 
 .slide-fade-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(-0.625rem);
   max-height: 0;
 }
-
-.charts-wrapper .render-dashboard-charts-container {
-  padding-left: 0.2rem;
-  padding-right: 0.2rem;
-}
-
 </style>

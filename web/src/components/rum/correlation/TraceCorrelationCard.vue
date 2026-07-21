@@ -15,18 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="mt-3 border border-solid border-(--o2-border-color) rounded">
-    <div class="text-base text-(--o2-text-color) font-bold ml-1 mb-2">Distributed Trace</div>
+  <div class="mt-3 border border-solid border-card-glass-border rounded-default">
+    <div class="text-base text-text-heading font-bold ml-1 mb-2">Distributed Trace</div>
 
     <template v-if="isLoading">
       <div class="p-3 text-center">
         <OSpinner size="sm" />
-        <div class="mt-2 text-gray-400">Loading trace data...</div>
+        <div class="mt-2 text-text-muted">Loading trace data...</div>
       </div>
     </template>
 
     <template v-else-if="!traceId">
-      <div class="p-3 text-center text-gray-400">
+      <div class="p-3 text-center text-text-muted">
         <OIcon name="info" size="md" class="mb-2" />
         <div>No trace information available for this event</div>
       </div>
@@ -34,13 +34,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <!-- Trace ID Section -->
-      <div class="bg-(--o2-card-bg) p-3">
+      <div class="bg-card-glass-bg p-3">
         <div class="flex items-center mb-3">
-          <div class="w-1/4 text-gray-400">Trace ID:</div>
+          <div class="w-1/4 text-text-label">Trace ID:</div>
           <div class="w-3/4 flex items-center flex-nowrap">
             <code
               data-test="trace-correlation-card-trace-id-text"
-              class="font-mono text-sm py-1 px-2 bg-(--color-surface-accent) rounded text-(--o2-text-color)"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-default text-text-body"
             >{{ formatTraceId(traceId) }}</code>
             <OButton
               icon-left="content-copy"
@@ -55,27 +55,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="flex items-center mb-3" v-if="spanId">
-          <div class="w-1/4 text-gray-400">Span ID:</div>
+          <div class="w-1/4 text-text-label">Span ID:</div>
           <div class="w-3/4">
             <code
               data-test="trace-correlation-card-span-id-text"
-              class="font-mono text-sm py-1 px-2 bg-(--color-surface-accent) rounded text-(--o2-text-color)"
+              class="font-mono text-sm py-1 px-2 bg-surface-accent rounded-default text-text-body"
             >{{ formatSpanId(spanId) }}</code>
           </div>
         </div>
 
         <!-- Span Hierarchy -->
         <div v-if="hasBackendTrace" class="mb-3">
-          <div class="text-gray-400 mb-1">Span Hierarchy:</div>
+          <div class="text-text-label mb-1">Span Hierarchy:</div>
           <div class="ml-3">
             <div class="flex items-center py-1 text-sm">
               <OIcon name="circle" size="xs" class="mr-1" />
-              <span class="text-gray-500">Application Span</span>
+              <span class="text-text-secondary">Application Span</span>
             </div>
             <div class="flex items-center py-1 text-sm ml-3">
               <OIcon name="arrow-right" size="sm" class="mr-1" />
               <OIcon name="circle" size="xs" class="mr-1" />
-              <span class="text-gray-500"
+              <span class="text-text-secondary"
                 >Browser SDK Span ({{ formatSpanId(spanId) }})</span
               >
             </div>
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="mr-1"
               />
-              <span class="text-gray-500"
+              <span class="text-text-secondary"
                 >Backend Spans ({{ backendSpanCount }})</span
               >
             </div>
@@ -95,10 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Performance Breakdown -->
         <div v-if="performanceData" class="mb-3">
-          <div class="text-gray-400 mb-1">Performance Breakdown:</div>
-          <div class="p-2 bg-(--color-surface-accent) rounded text-sm">
+          <div class="text-text-label mb-1">Performance Breakdown:</div>
+          <div class="p-2 bg-surface-accent rounded-default text-sm">
             <div class="flex items-center mb-1">
-              <div class="w-5/12 text-gray-500">Total Duration:</div>
+              <div class="w-5/12 text-text-label">Total Duration:</div>
               <div class="w-7/12 font-bold">
                 {{ performanceData.total_duration_ms }}ms
               </div>
@@ -107,10 +107,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center mb-1"
               v-if="performanceData.browser_duration_ms"
             >
-              <div class="w-5/12 text-gray-500">Browser:</div>
+              <div class="w-5/12 text-text-label">Browser:</div>
               <div class="w-7/12">
                 {{ performanceData.browser_duration_ms }}ms
-                <span class="text-gray-400"
+                <span class="text-text-secondary"
                   >({{
                     calculatePercentage(
                       performanceData.browser_duration_ms,
@@ -124,10 +124,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center mb-1"
               v-if="performanceData.network_latency_ms"
             >
-              <div class="w-5/12 text-gray-500">Network:</div>
+              <div class="w-5/12 text-text-label">Network:</div>
               <div class="w-7/12">
                 {{ performanceData.network_latency_ms }}ms
-                <span class="text-gray-400"
+                <span class="text-text-secondary"
                   >({{
                     calculatePercentage(
                       performanceData.network_latency_ms,
@@ -141,10 +141,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center mb-1"
               v-if="performanceData.backend_duration_ms"
             >
-              <div class="w-5/12 text-gray-500">Backend:</div>
+              <div class="w-5/12 text-text-label">Backend:</div>
               <div class="w-7/12">
                 {{ performanceData.backend_duration_ms }}ms
-                <span class="text-gray-400"
+                <span class="text-text-secondary"
                   >({{
                     calculatePercentage(
                       performanceData.backend_duration_ms,
@@ -184,11 +184,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Missing trace notice -->
         <div
           v-if="!hasBackendTrace && traceId"
-          class="mt-3 p-2 bg-(--color-surface-accent) rounded"
+          class="mt-3 p-2 bg-surface-accent rounded-default"
         >
           <div class="flex items-center">
             <OIcon name="info" size="sm" class="mr-2" />
-            <div class="text-gray-500 text-xs">
+            <div class="text-text-secondary text-xs">
               Backend trace data not yet available. Trace data may take up to 30
               seconds to be ingested.
             </div>
@@ -202,7 +202,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useRouter } from "vue-router";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -236,8 +235,6 @@ const props = defineProps({
   },
 });
 
-const router = useRouter();
-
 const HALF_HOUR_US = 1800000000;
 
 const correlationRange = computed(() =>
@@ -250,7 +247,6 @@ const correlationRange = computed(() =>
 );
 
 const {
-  correlationData,
   isLoading,
   hasBackendTrace,
   fetchCorrelation,

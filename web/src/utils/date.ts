@@ -220,6 +220,7 @@ export const getConsumableRelativeTime = (period: string) => {
       endTime: endTimeStamp.getTime() * 1000,
     };
   }
+  return undefined;
 };
 
 export const getRelativePeriod = (period: string) => {
@@ -327,7 +328,7 @@ export const formatToTimeCompact = (us: number): string =>
  * subtractRelativeTime(new Date(), { days: 7 })     // 7 days ago
  */
 export function subtractRelativeTime(
-  endDate: Date,
+  endDate: Date | number,
   period: Record<string, number>,
 ): Date {
   return sub(endDate, period);
@@ -337,19 +338,11 @@ export function subtractRelativeTime(
 // Legacy / specific helpers
 // ---------------------------------------------------------------------------
 
-/** The format every caller used before this took a parameter. */
+/** Default timestamp format. */
 export const DATE_TIMESTAMP_FORMAT = "YYYY-MM-DDTHH:mm:ssZ";
 
 /**
  * Render a microsecond timestamp as a local-time string.
- *
- * THE one implementation. It previously existed six times over — here, in
- * formatters.ts, and inline in four components — and the copies had quietly
- * drifted: three different output formats behind the same name (the ISO-ish
- * default, `DD-MM-YYYY` in schema.vue, `YYYY-MM-DD HH:mm:ss` in AlertList.vue).
- * That is worse than duplication, because a reader has every reason to assume
- * they agree. The format is a parameter now, so the callers that wanted a
- * different one say so instead of reimplementing the function to get it.
  *
  * Local time is deliberate: these render "created at" / "last triggered at"
  * columns, which a user reads in their own timezone. The tests pin TZ=UTC for

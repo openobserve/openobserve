@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="currentRouteName === 'pipelines'"
   >
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
       <OTable
         :frame="false"
         :key="activeTab"
@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         :default-columns="false"
+        show-index
         table-id="pipelines-pipeline-list"
         v-model:selected-ids="selectedPipelineIds"
         :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
@@ -217,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div class="flex flex-col">
                   <div>View Error</div>
-                  <div class="text-xs text-gray-500">
+                  <div class="text-xs text-text-secondary">
                     {{
                       new Date(
                         row.last_error.last_error_timestamp / 1000,
@@ -230,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #expansion="{ row }">
+        <template #expansion="{ row }: { row: PipelineRow }">
           <div
             v-if="row?.sql_query"
             data-test="scheduled-pipeline-expanded-content"
@@ -244,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-start justify-center">
               <div
                 data-test="scheduled-pipeline-expanded-sql"
-                class="w-full overflow-y-auto p-2.5 border border-[#ddd] border-l-[3px] border-l-[#7a54a2] h-full max-h-[200px] whitespace-normal bg-[#e8e8e8] text-black"
+                class="w-full overflow-y-auto p-2.5 border border-border-default border-l-[3px] border-l-accent h-full max-h-50 whitespace-normal bg-surface-subtle text-text-body"
               >
                 <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
               </div>
@@ -273,7 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center justify-between w-full py-1"
           >
             <div
-              class="flex items-center o2-table-footer-title mr-4"
+              class="flex items-center text-xs font-normal mr-4"
             >
               {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
             </div>
@@ -376,16 +377,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="closeErrorDialog"
   >
     <template #header-left>
-      <OIcon name="error" size="md" class="text-[#ef4444]" />
+      <OIcon name="error" size="md" class="text-status-error-text" />
     </template>
 
     <div v-if="errorDialog.data" class="pipeline-error-content px-6 py-5 max-h-[60vh] overflow-y-auto">
       <!-- Error Summary -->
       <div v-if="errorDialog.data.last_error.error_summary" class="mb-4">
-        <div class="section-label mb-2 text-[13px] font-semibold tracking-[0.02em] opacity-80">
+        <div class="section-label mb-2 text-compact font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
-        <div class="error-summary-box p-4 rounded-lg font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word bg-[rgba(239,68,68,0.08)] border border-[rgba(239,68,68,0.2)] text-[#dc2626]">
+        <div class="error-summary-box p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
           {{ errorDialog.data.last_error.error_summary }}
         </div>
       </div>
@@ -397,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Object.keys(errorDialog.data.last_error.node_errors).length > 0
         "
       >
-        <div class="section-label mb-3 text-[13px] font-semibold tracking-[0.02em] opacity-80">
+        <div class="section-label mb-3 text-compact font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.node_errors") }}
         </div>
         <div class="node-errors-container flex flex-col gap-3">
@@ -405,22 +406,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(nodeError, nodeId) in errorDialog.data.last_error
               .node_errors"
             :key="nodeId"
-            class="node-error-item p-4 rounded-lg bg-[rgba(0,0,0,0.02)] border border-[rgba(0,0,0,0.08)] transition-all hover:bg-[rgba(0,0,0,0.04)]"
+            class="node-error-item p-4 rounded-default bg-surface-subtle border border-border-default transition-all hover:bg-interactive-hover-bg"
           >
             <div class="node-error-header flex items-center justify-between mb-2.5">
               <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>
-              <span class="node-type text-xs px-2.5 py-1 rounded-xl bg-[rgba(99,102,241,0.1)] text-[#6366f1] font-medium">{{ nodeError.node_type }}</span>
+              <span class="node-type text-xs px-2.5 py-1 rounded-default bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium">{{ nodeError.node_type }}</span>
             </div>
+            <!-- The API field is `errors`, not `error_messages` — this block
+                 read a key the response never carries, so the dialog listed
+                 node names with no messages under them. `errors` also arrives
+                 in two shapes (legacy strings / [message, payload] tuples),
+                 which normalizeNodeErrorMessages reconciles. -->
             <div
-              v-if="
-                nodeError.error_messages && nodeError.error_messages.length > 0
-              "
+              v-if="nodeErrorMessages(nodeError).length > 0"
               class="node-error-messages flex flex-col gap-2"
             >
               <div
-                v-for="(msg, idx) in nodeError.error_messages"
+                v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message p-3 rounded-md bg-[rgba(239,68,68,0.06)] border-l-[3px] border-l-[#ef4444] font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-[#991b1b]"
+                class="error-message p-3 rounded-default bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text"
               >
                 {{ msg }}
               </div>
@@ -433,6 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -441,7 +446,6 @@ import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 
-import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -465,11 +469,16 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const router = useRouter();
 
+// Row original data rendered by the pipelines table. Only the fields read in the
+// expansion slot are declared here; scheduled rows carry the derived SQL query.
+interface PipelineRow {
+  sql_query?: string;
+}
 
 const filterQuery = ref("");
 
@@ -478,7 +487,6 @@ const showCreatePipeline = ref(false);
 const pipelines = ref([]);
 
 const store = useStore();
-const isEnabled = ref(false);
 
 const shouldStartfromNow = ref(true);
 const resumePipelineDialogMeta: any = ref({
@@ -525,6 +533,12 @@ const errorDialog = ref({
   data: null as any,
 });
 
+// Node errors ship as either plain strings (rows written before the NodeErrors
+// shape change) or [message, payload] tuples (rows written after). The backend
+// read path is untyped passthrough, so both reach the UI as-is.
+const nodeErrorMessages = (nodeError: any): string[] =>
+  normalizeNodeErrorMessages(nodeError?.errors);
+
 const backfillDialog = ref({
   show: false,
   pipelineId: "",
@@ -548,11 +562,7 @@ const updateActiveTab = () => {
   }
 
   filteredPipelines.value = pipelines.value
-    .filter((pipeline: any) => pipeline.source.source_type === activeTab.value)
-    .map((pipeline: any, index) => ({
-      ...pipeline,
-      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-    }));
+    .filter((pipeline: any) => pipeline.source.source_type === activeTab.value);
 
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
@@ -580,7 +590,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
       newState,
       from_now,
     )
-    .then(async (response) => {
+    .then(async () => {
       row.enabled = newState;
       const message = row.enabled
         ? `${row.name} state resumed successfully`
@@ -605,14 +615,6 @@ const togglePipelineState = (row: any, from_now: boolean) => {
 
 
 const getColumnsForActiveTab = (tab: any) => {
-  const hashColumn = {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  };
   const nameColumn = {
     id: "name",
     header: t("common.name"),
@@ -704,7 +706,6 @@ const getColumnsForActiveTab = (tab: any) => {
 
   if (tab === "all") {
     return [
-      hashColumn,
       nameColumn,
       typeColumn,
       streamNameColumn,
@@ -717,7 +718,6 @@ const getColumnsForActiveTab = (tab: any) => {
   }
   if (tab === "realtime") {
     return [
-      hashColumn,
       nameColumn,
       streamNameColumn,
       streamTypeColumn,
@@ -725,7 +725,6 @@ const getColumnsForActiveTab = (tab: any) => {
     ];
   }
   return [
-    hashColumn,
     nameColumn,
     scheduledStreamTypeColumn,
     frequencyColumn,
@@ -768,7 +767,7 @@ const getPipelines = async () => {
     );
     pipelines.value = [];
     // resultTotal.value = response.data.list.length;
-    pipelines.value = response.data.list.map((pipeline: any, index: any) => {
+    pipelines.value = response.data.list.map((pipeline: any) => {
       const updatedEdges = pipeline.edges.map((edge: any) => ({
         ...edge,
         markerEnd: {
@@ -809,7 +808,6 @@ const getPipelines = async () => {
       pipeline.edges = updatedEdges;
       return {
         ...pipeline,
-        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
       };
     });
   } catch (error) {
@@ -1163,7 +1161,7 @@ const openBackfillDialog = (pipeline: any) => {
   };
 };
 
-const onBackfillSuccess = (jobId: string) => {
+const onBackfillSuccess = () => {
   // Navigate to backfill jobs page after successful creation
   goToBackfillJobs();
 };

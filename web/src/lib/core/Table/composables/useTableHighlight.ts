@@ -81,11 +81,16 @@ export function useTableHighlight(props: {
       props.ftsKeys?.length &&
       isFTSColumn(columnId, cellValue, props.ftsKeys)
     ) {
-      // Full semantic + keyword highlighting
+      // Full semantic + keyword highlighting. Semantic colours are applied by
+      // CLASS (`log-ip`, `log-url`, … — see assets/styles/log-highlighting.css,
+      // which carries the light/dark token values); `processTextWithHighlights`
+      // reads its `colors` argument only from `getSingleSemanticColor`, which no
+      // production caller uses. It is threaded through purely for API compat —
+      // do not reintroduce a literal colour map here.
       return processTextWithHighlights(
         cellValue,
         props.highlightText,
-        colors ?? getDefaultColors(),
+        colors,
         false,
       );
     }
@@ -149,18 +154,5 @@ export function useTableHighlight(props: {
     getHighlightSegments,
     isFTSColumn,
     processTextWithHighlights,
-  };
-}
-
-function getDefaultColors(): Record<string, string> {
-  return {
-    ip: "#3b82f6",
-    url: "#22c55e",
-    email: "#a855f7",
-    timestamp: "#f59e0b",
-    path: "#06b6d4",
-    numberValue: "#ef4444",
-    stringValue: "#6b7280",
-    uuid: "#ec4899",
   };
 }

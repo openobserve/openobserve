@@ -43,15 +43,11 @@ const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
 const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
-const Alerts = () => import("@/views/AppAlerts.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
-const Settings = () => import("@/components/settings/index.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
-const AssociatedStreamFunction = () =>
-  import("@/components/functions/AssociatedStreamFunction.vue");
 const EnrichmentTableList = () =>
   import("@/components/functions/EnrichmentTableList.vue");
 const RealUserMonitoring = () => import("@/views/RUM/RealUserMonitoring.vue");
@@ -96,7 +92,7 @@ const useRoutes = () => {
     {
       path: "/logout",
       beforeEnter(to: any, from: any, next: any) {
-        // Clear backend auth cookies before redirecting to login (#10900)
+        // Clear backend auth cookies before redirecting to login
         invalidateLoginData();
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);

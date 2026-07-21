@@ -150,27 +150,6 @@ describe("ErrorViewer.vue", () => {
     message: "Test error message",
   };
 
-  const mockEventsData = [
-    {
-      error_id: "test-error-id-123",
-      type: "error",
-      error_type: "TypeError",
-      timestamp: 1640995200000000,
-    },
-    {
-      error_id: "test-error-id-123",
-      type: "action",
-      action_type: "click",
-      timestamp: 1640995199000000,
-    },
-    {
-      error_id: "test-error-id-123",
-      type: "view",
-      view_loading_type: "route_change",
-      timestamp: 1640995198000000,
-    },
-  ];
-
   beforeEach(() => {
     vi.clearAllMocks();
     store = createMockStore();
@@ -243,7 +222,7 @@ describe("ErrorViewer.vue", () => {
       const container = wrapper.find('[data-test="error-viewer-container"]');
       expect(container.exists()).toBe(true);
       // Check that the container has the expected layout class
-      expect(container.classes()).toContain("card-container");
+      expect(container.classes()).toContain("bg-card-glass-bg");
     });
   });
 

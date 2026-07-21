@@ -125,16 +125,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   // Number of correlated log streams available
   const logStreamsCount = computed(() => props.logStreams.length);
 
-  // REMOVED: getDefaultSemanticPatterns() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-
-  // REMOVED: loadSemanticPatterns() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-
-  // REMOVED: getSemanticToFieldMapping() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-  // The /_correlate API (or fallback) provides the correct field names for each stream
-
   /**
    * Build SQL queries for ALL correlated log streams.
    * Each stream gets its own independent query using its exact field names from StreamInfo.filters.
@@ -144,7 +134,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
    * Since each stream has its own field names, we CANNOT use a SQL UNION — the column sets may differ.
    * Instead, independent queries are sent to _search_multi_stream which executes them in parallel.
    */
-  const buildSQLQueries = (limit: number = 100): string[] => {
+  const buildSQLQueries = (): string[] => {
     const queries: string[] = [];
 
     for (const streamInfo of props.logStreams) {
@@ -283,7 +273,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             searchResults.value = [];
             totalHits.value = 0;
           },
-          complete: (_data: any) => {
+          complete: () => {
             // Sort merged results from all streams by _timestamp descending
             // _search_multi_stream streams results per-query as they complete,
             // so hits arrive in arbitrary order and need a final global sort
@@ -292,8 +282,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             loading.value = false;
             currentTraceId = null;
           },
-          reset: (_data: any, response: any) => {
-          },
+          reset: () => {},
         }
       );
     } catch (e: any) {

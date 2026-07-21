@@ -62,9 +62,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <div v-else class="flex items-center gap-1">
             <input
-              :class="store.state.theme === 'dark' ? 'bg-gray-800' : ''"
               v-model="editTabObj.data.name"
-              class="flex-1 border border-(--q-primary) rounded p-1 outline-none min-w-0 focus:border-(--q-secondary)"
+              class="flex-1 border border-theme-accent rounded-default p-1 outline-none min-w-0 focus:border-section-accent-secondary bg-input-bg"
               data-test="dashboard-tab-settings-tab-name-edit"
             />
             <OButton
@@ -297,7 +296,6 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        // emit refresh to rerender
         emit("refresh");
 
         showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
@@ -313,7 +311,6 @@ export default defineComponent({
             error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"),
           );
         }
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
@@ -342,7 +339,6 @@ export default defineComponent({
             editTabObj.data,
           );
 
-          // emit refresh to rerender
           emit("refresh");
           await getDashboardData();
 
@@ -364,14 +360,12 @@ export default defineComponent({
           );
         }
 
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
     };
 
     const cancelEdit = () => {
-      // reset edit mode
       editTabId.value = null;
       editTabObj.data = {};
     };
@@ -384,7 +378,6 @@ export default defineComponent({
     const deleteItem = async (tabId: any) => {
       tabIdToBeDeleted.value = tabId;
       await nextTick();
-      // call cancelEdit to reset edit mode
       cancelEdit();
       deletePopupVisible.value = true;
     };
@@ -400,7 +393,6 @@ export default defineComponent({
         );
         await getDashboardData();
 
-        // emit event
         emit("refresh");
 
         tabIdToBeDeleted.value = null;

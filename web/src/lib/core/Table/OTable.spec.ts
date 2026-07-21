@@ -18,7 +18,6 @@ const i18n = createI18n({
 });
 
 // Register i18n globally so every mount gets it
-const originalPlugins = [...config.global.plugins];
 beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
@@ -352,10 +351,6 @@ describe("OTable", () => {
           selection: "multiple",
         },
       });
-      // Find first row's checkbox
-      const checkbox = wrapper.find(
-        '[data-test="o2-table-select-0"] input[type="checkbox"]',
-      );
       // The checkbox might be a nested component; trigger the row click
       const row = wrapper.find('[data-test="o2-table-row-0"]');
       await row.trigger("click");
@@ -862,7 +857,7 @@ describe("OTable", () => {
     it("applies custom cell styles via getCellStyle callback", () => {
       const getCellStyle = vi.fn(({ columnId, value }) => {
         if (columnId === "status" && value === "Active") {
-          return { backgroundColor: "var(--color-success-bg)" };
+          return { backgroundColor: "var(--color-status-success-bg)" };
         }
         return {};
       });

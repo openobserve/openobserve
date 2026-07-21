@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     search-data-test="language-list-search-input"
   >
     <div class="w-full h-full">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <div class="overflow-auto h-full pt-0.5">
           <router-view
             :title="tabs"
@@ -44,7 +44,6 @@ import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";

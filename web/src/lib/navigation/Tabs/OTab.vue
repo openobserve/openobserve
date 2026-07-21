@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OTabProps, OTabSlots } from './OTab.types'
-import { computed, inject, useAttrs, type ComputedRef } from 'vue'
+import { computed, inject, type ComputedRef } from 'vue'
 import { TABS_CONTEXT_KEY } from './OTabs.types'
 import type { TabsContext } from './OTabs.types'
 import { TabsTrigger } from 'reka-ui'
@@ -18,21 +18,6 @@ const props = withDefaults(defineProps<OTabProps>(), {
 })
 
 defineSlots<OTabSlots>()
-
-const $attrs = useAttrs()
-const parentDataTest = computed(() => $attrs['data-test'] as string | undefined)
-
-/**
- * Attrs forwarded to the outer <span> wrapper — everything except data-test.
- * data-test must only land on the inner <TabsTrigger> (the actual clickable
- * button) to avoid a strict-mode locator violation in Playwright (two elements
- * matching the same selector).
- */
-const spanAttrs = computed(() => {
-   
-  const { 'data-test': _dt, ...rest } = $attrs
-  return rest
-})
 
 const context = inject<ComputedRef<TabsContext>>(TABS_CONTEXT_KEY)
 
@@ -78,8 +63,17 @@ const baseClasses = computed<string>(() => [
   isVertical.value
     ? 'flex justify-start'
     : 'inline-flex justify-center',
-  'px-2 font-normal text-sm whitespace-nowrap',
-  isVertical.value ? 'rounded-lg' : 'rounded-t-md',
+  // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
+  // rail container insets it (px-1.5) to give the pill breathing room from the
+  // rail edges. With that 6px container inset + the tab's own 2px active border
+  // + this pl-1, the label lands on the page-edge grid line (12px) while the
+  // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
+  // their own padding override.
+  isVertical.value
+    ? 'pl-1 pr-2'
+    : 'px-2',
+  'font-normal text-sm whitespace-nowrap',
+  isVertical.value ? 'rounded-default' : 'rounded-t-default',
   'outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150',
   'select-none',
   'ring-offset-1 ring-offset-surface-base',
@@ -123,7 +117,7 @@ const heightClasses = computed<string>(() => {
   if (isVertical.value) {
     return isDense.value ? 'py-1.5' : 'py-2'
   }
-  return isDense.value ? 'h-[32px]' : 'h-[40px]'
+  return isDense.value ? 'h-8' : 'h-10'
 })
 </script>
 

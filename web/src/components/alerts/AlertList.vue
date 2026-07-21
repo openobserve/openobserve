@@ -21,15 +21,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-list-page"
     class="flex flex-col h-full"
   >
-    <PageLayout
+    <OPageLayout bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+      :title="t('alerts.header')"
+      :subtitle="t('alerts.subtitle')"
+      icon="shield-alert-outline"
     >
-      <!-- Row 1: standard header — title + actions only (Import/Add). The alert
-           type toggle, search and folder scope moved into the table toolbar. -->
-      <template #header>
-        <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
           <template #actions>
             <!-- Import button -->
             <OButton
@@ -65,15 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             >{{ t(`alerts.add`) }}</OButton>
           </template>
-        </AppPageHeader>
-      </template>
 
     <div
       data-test="alert-list-splitter"
       class="flex-1 flex min-h-0"
     >
       <!-- Left: FolderList -->
-      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+      <div class="shrink-0 h-full w-rail">
         <div class="h-full">
           <FolderList
             type="alerts"
@@ -83,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: Table -->
       <div class="flex-1 min-w-0 h-full">
-        <div class="h-full card-container">
+        <div class="h-full bg-card-glass-bg">
               <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
               <OTable
                 :frame="false"
@@ -111,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-2 w-full">
                     <OToggleGroup
                       :model-value="activeTab"
-                      @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
+                      @update:model-value="(v) => { activeTab = v as string; filterAlertsByTab(); }"
                     >
                       <OToggleGroupItem value="all" size="sm" data-test="tab-all">
                         <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -189,26 +184,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="row.is_real_time === 'anomaly'"
                       name="query-stats"
                       size="sm"
-                      class="text-blue-600 shrink-0"
+                      class="text-status-info-text shrink-0"
                     />
                     <OIcon
                       v-else-if="row.is_real_time"
                       name="bolt"
                       size="sm"
-                      class="text-orange-500 shrink-0"
+                      class="text-status-warning-text shrink-0"
                     />
                     <OIcon
                       v-else
                       name="schedule"
                       size="sm"
-                      class="text-gray-400 shrink-0"
+                      class="text-icon-color shrink-0"
                     />
                     <span class="truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
                     v-if="row.name"
                     :content="row.name"
-                    content-class="max-w-[400px] whitespace-normal break-words text-xs"
+                    content-class="max-w-100 whitespace-normal break-words text-xs"
                   />
                 </template>
 
@@ -258,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :content="row.last_error"
                     />
                   </span>
-                  <span v-else class="text-text-primary">—</span>
+                  <span v-else class="text-text-body">—</span>
                 </template>
 
                 <template #cell-period="{ row }">
@@ -428,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           Re-train
                         </ODropdownItem>
                       </template>
-                      <!-- Regular alerts: existing Trigger Alert item -->
+                      <!-- Regular alerts: Trigger Alert item -->
                       <ODropdownItem
                         v-else
                         :data-test="`alert-list-${row.name}-trigger-alert`"
@@ -477,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #bottom>
                   <div class="flex w-full justify-between items-center h-12 gap-1">
                     <div
-                      class="o2-table-footer-title flex items-center min-w-25"
+                      class="text-xs font-normal flex items-center min-w-25"
                     >
                       <template v-if="selectedAlerts.length > 0">{{ selectedAlerts.length }} of {{ resultTotal }} selected</template>
                       <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
@@ -529,7 +524,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    </PageLayout>
+    </OPageLayout>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
         v-model="formData"
@@ -649,17 +644,14 @@ import {
   ref,
   onBeforeMount,
   onActivated,
-  onDeactivated,
   onBeforeUnmount,
-  onUnmounted,
   watch,
   defineAsyncComponent,
   onMounted,
   computed,
   reactive,
 } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -676,44 +668,37 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
-import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
 import {
   getImageURL,
   getUUID,
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
-import { getFoldersListByType } from "@/utils/commons";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
-import type { Alert, AlertListItem } from "@/ts/interfaces/index";
+import type { Alert } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import { toRaw } from "vue";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
 import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
 import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -724,16 +709,13 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
-    AppPageHeader,
-    OSeparator,
+    OPageLayout,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
-    DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
     OToggleGroup,
@@ -742,7 +724,6 @@ export default defineComponent({
     OTooltip,
     SelectFolderDropDown,
     AlertHistoryDrawer,
-    O2AIContextAddBtn,
     OButton,
     OIcon,
     ODialog,
@@ -890,39 +871,11 @@ export default defineComponent({
       showAlertDetailsDrawer.value = true;
     };
 
-    // Handle ESC key and click outside to close drawer
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && showAlertDetailsDrawer.value) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!showAlertDetailsDrawer.value) return;
-
-      const target = event.target as HTMLElement;
-
-      // Check if clicked element is the backdrop or outside drawer content
-      if (
-        target.classList.contains("q-drawer__backdrop") ||
-        target.classList.contains("q-layout__shadow")
-      ) {
-        showAlertDetailsDrawer.value = false;
-        return;
-      }
-
-      // Check if the click is outside the drawer content
-      const drawerElement = document.querySelector(
-        ".alert-details-drawer .q-drawer__content",
-      );
-      if (drawerElement && !drawerElement.contains(target)) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
+    // ESC and click-outside dismissal are handled by ODrawer itself (reka-ui
+    // DismissableLayer → @escape-key-down / @interact-outside), which also knows
+    // to ignore clicks inside portaled dropdowns opened from within the drawer.
 
     onMounted(() => {
-      document.addEventListener("keydown", handleKeyDown);
-      document.addEventListener("click", handleClickOutside, true);
       window.addEventListener("resize", onWindowResize);
     });
 
@@ -952,11 +905,6 @@ export default defineComponent({
     );
 
     const filteredResults: Ref<any[]> = ref([]);
-
-    onBeforeUnmount(() => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("click", handleClickOutside, true);
-    });
 
     const activeFolderToMove = ref("default");
 
@@ -1158,10 +1106,7 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
     // Normalizes an anomaly-detection item returned by the merged alerts list API
     // (alert_type === "anomaly_detection") into the standard alert row shape.
-    const normalizeAnomalyToAlertRow = (
-      anomaly: any,
-      counter: number,
-    ): any => ({
+    const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
@@ -1218,23 +1163,19 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
 
     const getAlertsByFolderId = async (store: any, folderId: any) => {
-      try {
-        //this is the condition where we are fetching the alerts from the server
-        // assigning it to the allAlertsListByFolderId in the store
-        if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
-          await getAlertsFn(store, folderId);
-        } else {
-          //this is the condition where we are assigning the alerts to the filteredResults so whenever
-          // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-          allAlerts.value =
-            store.state.organizationData.allAlertsListByFolderId[folderId];
-          // Data is served synchronously from cache — clear the loading flag
-          // (it starts true to avoid the empty-state flash) so the table renders
-          // the cached rows instead of staying stuck on the skeleton.
-          loading.value = false;
-        }
-      } catch (error) {
-        throw error;
+      //this is the condition where we are fetching the alerts from the server
+      // assigning it to the allAlertsListByFolderId in the store
+      if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
+        await getAlertsFn(store, folderId);
+      } else {
+        //this is the condition where we are assigning the alerts to the filteredResults so whenever
+        // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
+        allAlerts.value =
+          store.state.organizationData.allAlertsListByFolderId[folderId];
+        // Data is served synchronously from cache — clear the loading flag
+        // (it starts true to avoid the empty-state flash) so the table renders
+        // the cached rows instead of staying stuck on the skeleton.
+        loading.value = false;
       }
     };
     const getAlertsFn = async (
@@ -2044,7 +1985,7 @@ export default defineComponent({
       );
       const alertToBeExported = res.data;
 
-      if (alertToBeExported.hasOwnProperty("id")) {
+      if (Object.prototype.hasOwnProperty.call(alertToBeExported, "id")) {
         delete alertToBeExported.id;
       }
 
@@ -2337,7 +2278,7 @@ export default defineComponent({
       });
     });
 
-    const openMenu = (event: Event, row: any) => {
+    const openMenu = (event: Event, _row?: unknown) => {
       event.stopPropagation();
     };
 
@@ -2361,7 +2302,7 @@ export default defineComponent({
               alertId,
             );
             const data = res.data;
-            if (data.hasOwnProperty("id")) delete data.id;
+            if (Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
             return data;
           }),
         );
@@ -2778,14 +2719,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-@media (max-width: 1440px) {
-  .app-tabs-container .o2-tab {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-    min-width: auto !important;
-  }
-}
-
-</style>

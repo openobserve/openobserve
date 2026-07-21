@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import Group from "./Group.vue";
-import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
 
 // Mock AddCondition component
@@ -378,7 +377,7 @@ describe("Group.vue", () => {
 
         const addConditionItem = wrapper.find('[data-test="dashboard-add-group-add-condition"]');
         if (addConditionItem.exists()) {
-          // After q-item -> ODropdownItem migration, click on the data-test
+          // After the ODropdownItem migration, click on the data-test
           // element directly (ODropdownItem's @select wires up to its click).
           await addConditionItem.trigger('click');
           expect(wrapper.emitted('add-condition')).toBeTruthy();
@@ -409,7 +408,7 @@ describe("Group.vue", () => {
 
         const addGroupItem = wrapper.find('[data-test="dashboard-add-group-add-group"]');
         if (addGroupItem.exists()) {
-          // After q-item -> ODropdownItem migration, click on the data-test
+          // After the ODropdownItem migration, click on the data-test
           // element directly (ODropdownItem's @select wires up to its click).
           await addGroupItem.trigger('click');
           expect(wrapper.emitted('add-group')).toBeTruthy();

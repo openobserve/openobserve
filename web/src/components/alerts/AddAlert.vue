@@ -24,9 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="flex flex-col h-full">
-      <AppPageHeader
-        class="alert-v3-topbar [container-type:inline-size] [container-name:topbar] shrink-0 px-4 border-b border-border-default"
+    <OPageLayout bleed>
+      <template #header>
+      <OPageHeader
+        class="alert-v3-topbar [container-type:inline-size] [container-name:topbar] shrink-0 border-b border-border-default"
         :back="{
           label: activeFolderName || t('alerts.header'),
           onClick: goBackToAlertsList,
@@ -68,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
             <span
               v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-              class="text-[11px] whitespace-nowrap text-text-secondary"
+              class="text-2xs whitespace-nowrap text-text-secondary"
             >
               {{ t('alerts.lastRun', { time: anomalyFormatTs(anomalyConfig.last_detection_run) }) }}
             </span>
@@ -85,14 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center gap-1.5 min-w-0"
           >
             <div class="flex items-center gap-1.5 shrink-0">
-              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-primary">*</span></div>
+              <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="text-text-body">*</span></div>
               <OFormInput
                 v-if="!isAnomalyMode"
                 ref="step1Ref"
                 name="name"
                 data-test="add-alert-name-input"
                 :placeholder="t('alerts.alertNamePlaceholder')"
-                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
+                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
               />
               <!-- Anomaly name binds the SAME `name` field as the alert name, not
                    `anomalyConfig.name`: a bare OInput has no field for the schema
@@ -106,46 +107,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 name="name"
                 data-test="add-anomaly-name-input"
                 :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="topbar-name-input text-sm h-[28px]! min-h-[28px]! min-w-[120px] max-w-[150px]"
+                class="topbar-name-input text-sm h-7! min-h-7! min-w-30 max-w-37.5 @max-[1300px]/topbar:min-w-25 @max-[850px]/topbar:min-w-22.5 @max-[680px]/topbar:min-w-17.5"
               />
             </div>
 
             <!-- Folder -->
             <div class="flex items-center gap-1.5 shrink-0">
-              <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
+              <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t('alerts.folder') }}</div>
               <InlineSelectFolderDropdown
-                :model-value="activeFolderId"
+                :model-value="(activeFolderId as string)"
                 type="alerts"
-                class="topbar-folder-select"
+                class="topbar-folder-select min-w-15 max-w-35"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
             </div>
           </div>
         </template>
-      </AppPageHeader>
+      </OPageHeader>
+      </template>
 
       <div class="flex flex-1 min-h-0">
 
       <!-- LEFT column wrapper (flex: 6.5) -->
-      <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
+      <div class="flex-[6.5] min-w-0 min-h-0 flex flex-col gap-2 py-2">
 
       <!-- Stream Name & Stream Type -->
-      <div class="card-container shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
-        <div class="flex items-center gap-0 py-[10px] px-3 border-b border-[#e6e6e6] dark:border-[var(--color-border-default)]">
-          <div class="w-[3px] h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
-          <span class="text-[13px] font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-primary">*</span></span>
+      <div class="bg-card-glass-bg shrink-0 stream-config-card [container-type:inline-size] [container-name:stream-config]">
+        <div class="flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
+          <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+          <span class="text-compact font-semibold tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="text-text-body">*</span></span>
         </div>
         <div class="flex items-center gap-4 px-3 py-2">
         <!-- Stream Type -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></div>
+          <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t("alerts.streamType") }} <span class="text-text-body">*</span></div>
           <OFormSelect
             ref="streamTypeRef"
             name="stream_type"
             data-test="add-alert-stream-type-select-dropdown"
             :options="streamTypes"
             :searchable="false"
-            class="stream-type-select"
+            class="stream-type-select w-37.5! @max-[900px]/stream-config:w-27.5! @max-[600px]/stream-config:w-17.5!"
             :disabled="beingUpdated || anomalyEditMode"
             @update:model-value="onStreamTypeChange"
           />
@@ -153,14 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Name -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></div>
+          <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t("alerts.stream_name") }} <span class="text-text-body">*</span></div>
           <OFormSelect
             ref="streamNameRef"
             name="stream_name"
             data-test="add-alert-stream-name-select-dropdown"
             :options="indexOptions"
             :loading="isFetchingStreams"
-            class="stream-name-select"
+            class="stream-name-select w-40! @max-[900px]/stream-config:w-30! @max-[750px]/stream-config:w-27.5! @max-[600px]/stream-config:w-20!"
             :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
             @update:model-value="updateStreamFields($event)"
           />
@@ -169,13 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Alert Type -->
         <div class="flex items-center gap-1.5">
-          <div class="text-xs font-semibold whitespace-nowrap" :class="store.state.theme === 'dark' ? 'text-[rgba(255,255,255,0.7)]' : 'text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") }}</div>
+          <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t("alerts.alertType") }}</div>
           <OFormSelect
             data-test="add-alert-type-select-dropdown"
             name="is_real_time"
             :options="alertTypeOptions"
             :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select"
+            class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
             :searchable="false"
           />
         </div>
@@ -183,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- TIER 3: Configuration Tabs -->
-      <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 8px;">
+      <div class="alert-v3-tabs bg-card-glass-bg flex-1 min-h-0 flex flex-col mx-2">
         <!-- Tab Headers -->
         <OToggleGroup
           :model-value="activeTab"
@@ -260,12 +262,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :isAggregationEnabled="isAggregationEnabled"
               :destinations="formData.destinations"
               :formattedDestinations="getFormattedDestinations"
+              :workflows="formData.workflows"
               @update:trigger="updateTriggerCondition"
               @update:aggregation="updateAggregation"
               @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
               @update:promqlCondition="updatePromqlCondition"
               @update:destinations="updateDestinations"
               @refresh:destinations="refreshDestinations"
+              @update:workflows="updateWorkflows"
             />
             </div>
           </div>
@@ -331,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
             <AnomalyAlerting
               :config="anomalyConfig"
-              :destinations="destinations"
+              :destinations="(destinations as (SelectOption & { name: string })[])"
               @refresh:destinations="$emit('refresh:destinations')"
             />
           </div>
@@ -340,7 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Footer: Cancel / Save (left column, separate card) -->
       <div
-        class="card-container flex items-center justify-end px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
+        class="bg-card-glass-bg flex items-center justify-end px-3 py-2.5 shrink-0 gap-2 border-t border-border-default"
       >
         <OButton
           data-test="add-alert-cancel-btn"
@@ -362,25 +366,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
       <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
-      <div class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
+      <div class="flex flex-col gap-2 border-l border-border-default pt-2 pb-2 flex-[3.5] min-w-0 min-h-0 overflow-hidden">
         <!-- Preview Card -->
-        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
+        <div class="bg-card-glass-bg overflow-hidden flex flex-col flex-1 min-h-0">
           <div
-            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0 gap-2"
+            class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0 gap-2"
           >
             <span class="text-sm font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : t('alerts.preview') }}</span>
             <template v-if="!isAnomalyMode && activeEvaluationStatus">
               <div class="w-px h-4 bg-border-default" />
-              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--o2-positive)]' : 'text-[var(--o2-gray)]'" size="sm" />
-              <span class="text-xs font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'text-[var(--o2-positive)]' : 'text-[var(--o2-gray)]'">
+              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-gray'" size="sm" />
+              <span class="text-xs font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-gray'">
                 {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
               </span>
               <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
             </template>
           </div>
-          <div class="flex-1 min-h-0" style="overflow: hidden;">
+          <div class="flex-1 min-h-0 overflow-hidden">
             <template v-if="isAnomalyMode">
-              <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" style="height: 100%" />
+              <!-- editor-height is QueryEditor's own API for this; a class cannot
+                   win against the inline height its rootStyle always sets. -->
+              <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" editor-height="100%" />
             </template>
             <template v-else>
               <div v-if="!formData.stream_name" class="flex flex-col items-center justify-center h-full gap-2">
@@ -389,10 +395,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t('alerts.previewEmptyState') }}
                 </span>
               </div>
-              <preview-alert
+              <preview-alert class="w-full h-full"
                 v-else
                 ref="previewAlertRef"
-                style="width: 100%; height: 100%;"
                 :formData="formData"
                 :query="previewQuery"
                 :selectedTab="formData.query_condition.type || 'custom'"
@@ -406,23 +411,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Summary Card -->
-        <div class="card-container overflow-hidden flex flex-col" style="flex: 1; min-height: 0;">
+        <div class="bg-card-glass-bg overflow-hidden flex flex-col flex-1 min-h-0">
           <div
-            class="flex items-center px-3 py-[0.625rem] select-none border-b border-border-default shrink-0"
+            class="flex items-center px-3 py-2.5 select-none border-b border-border-default shrink-0"
           >
             <span class="text-sm font-medium">{{ t('alerts.summary.title') }}</span>
           </div>
-          <div class="flex-1 min-h-0" style="overflow: auto;">
-            <AnomalySummary
+          <div class="flex-1 min-h-0 overflow-auto">
+            <AnomalySummary class="h-full overflow-auto"
               v-if="isAnomalyMode"
-              style="height: 100%; overflow: auto;"
               :config="anomalyConfig"
               :destinations="destinations"
               :wizard-step="3"
             />
-            <alert-summary
+            <alert-summary class="h-full"
               v-else
-              style="height: 100%;"
               :formData="formData"
               :destinations="destinations"
               :previewQuery="previewQuery"
@@ -433,10 +436,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       </div>
-      </div>
+    </OPageLayout>
   </OForm>
 
   <ODrawer data-test="add-alert-json-editor-drawer"
+    bleed
     v-model:open="showJsonEditorDialog"
     size="lg"
     :title="t('alerts.editJson')"
@@ -456,6 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, watch, provide } from "vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
@@ -477,12 +482,12 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -512,6 +517,7 @@ export default defineComponent({
   ],
   components: {
     OIcon,
+    OPageLayout,
     JsonEditor,
     QueryConfig,
     AlertSettings,
@@ -531,11 +537,10 @@ export default defineComponent({
     ODrawer,
     OTag,
     OTooltip,
-    OInput,
     OForm,
     OFormInput,
     OFormSelect,
-    AppPageHeader,
+    OPageHeader,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
@@ -631,85 +636,49 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Compact rows: float the validation message so it never resizes the row.
-   A class passed to OInput/OSelect lands on the ROOT wrapper — the flex-col
-   holding the control AND its message — so an in-flow message would grow these
-   fixed-height rows, escape the card, and be painted over by the next card.
-   Out of flow, the row keeps its height and the message renders under the
-   control, above the neighbouring card.
-
-   `top:100%` resolves against the wrapper, so a wrapper whose height understates
-   the control it contains would tuck the message UNDER that control. The
-   topbar's h-[28px] genuinely compresses its input, so it anchors correctly; the
-   selects had to drop their (inert) clamp for the same to hold — see below.
+<style scoped>
+/* keep(lib-override:o2-form): float each control's validation message out of
+   flow. A class passed to OInput/OFormSelect lands on the ROOT wrapper — the
+   flex-col holding the control AND its message — so an in-flow message would
+   grow these fixed-height topbar rows, escape the card, and be painted over by
+   the next card. `top:100%` resolves against the wrapper; the topbar input's
+   h-7 clamp genuinely compresses it, so it anchors correctly, while the three
+   selects deliberately carry NO h-7 clamp (it only ever shrank the wrapper box,
+   never the 2.125rem trigger, which mis-anchored the floating message).
    pointer-events:none so the floating text can't swallow clicks on the tab bar
-   it overlaps. */
+   it overlaps. `:deep` because [role="alert"] renders inside the child
+   component. All widths and container-query steps are template utilities. */
 .topbar-name-input,
 .stream-type-select,
 .stream-name-select {
   position: relative;
 }
 
-.topbar-name-input [role="alert"],
-.stream-type-select [role="alert"],
-.stream-name-select [role="alert"] {
+.topbar-name-input :deep([role="alert"]),
+.stream-type-select :deep([role="alert"]),
+.stream-name-select :deep([role="alert"]) {
   position: absolute;
   top: 100%;
   left: 0;
-  margin-top: 2px;
+  margin-top: 0.125rem;
   white-space: nowrap;
   pointer-events: none;
   z-index: 10;
 }
+</style>
 
-@container topbar (max-width: 1300px) {
-  .topbar-name-input  { min-width: 100px; }
-}
-
-/* Compact — AI chat open or narrow viewport */
-@container topbar (max-width: 850px) {
-  .topbar-name-input  { min-width: 90px; }
-}
-
-/* Minimum — very narrow */
-@container topbar (max-width: 680px) {
-  .topbar-name-input  { min-width: 70px; }
-}
-
-.topbar-folder-select {
-  min-width: 60px;
-  max-width: 140px;
-}
-.topbar-folder-select .q-field__control { padding: 0; }
-.topbar-folder-select .q-field__native {
-  font-size: 1.25rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-/* No h-[28px] clamp on these three: it only ever shrank the wrapper BOX, never
-   the trigger (which keeps its 34px design-system height and simply overflowed),
-   so it ate the row's bottom padding and mis-anchored the floating message. */
-.stream-type-select { width: 150px; }
-.stream-name-select { width: 160px; }
-.alert-type-select  { min-width: 110px; }
-
-@container stream-config (max-width: 900px) {
-  .stream-type-select { width: 110px; }
-  .stream-name-select { width: 120px; }
-  .alert-type-select  { min-width: 95px; }
-}
-
-@container stream-config (max-width: 750px) {
-  .stream-type-select { width: 110px; }
-  .stream-name-select { width: 110px; }
-  .alert-type-select  { min-width: 85px; }
-}
-
-@container stream-config (max-width: 600px) {
-  .stream-type-select { width: 70px; }
-  .stream-name-select { width: 80px; }
-  .alert-type-select  { min-width: 75px; }
+<style scoped>
+/* keep(complex-state): `.alert-field-highlight` is a transient state class that
+   AlertFocusManager (utils/alerts/focusManager.ts) adds/removes at RUNTIME via
+   classList on refs registered from useAlertForm — no template ever writes it,
+   so it cannot become a template utility. AddAlert is the alert-form root and
+   owns every registered field's DOM (incl. the QueryConfig subtree, which
+   instantiates its own focusManager), so one `:deep()` here covers them all.
+   `!important` is preserved: it must beat the field components' own border
+   utilities, exactly as the previous global rule did. */
+:deep(.alert-field-highlight) {
+  border: 0.125rem solid var(--color-accent) !important;
+  border-radius: 0.25rem;
+  transition: border 0.3s ease;
 }
 </style>

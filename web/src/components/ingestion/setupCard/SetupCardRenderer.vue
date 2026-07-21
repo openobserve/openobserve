@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
@@ -64,10 +65,15 @@ const props = defineProps<{
   logoUrlDark?: string;
 }>();
 
+const emit = defineEmits<{
+  /** A step's action button was clicked; carries RichCardStepAction.id. */
+  (e: "step-action", actionId: string): void;
+}>();
+
 const store = useStore();
 const router = useRouter();
 const { getStreams } = useStreams();
-const isDark = computed(() => store.state?.theme === "dark");
+const { isDark } = useTheme();
 
 // The detected stream type drives the status copy + the "View …" destination.
 // traces / logs land in their explorers; metrics (which fan out into many
@@ -132,7 +138,7 @@ const viewData = async () => {
     stream: watchedStream.value,
     period: "15m",
     refresh: "0",
-    query: b64EncodeUnicode(props.content.detect.filter),
+    query: b64EncodeUnicode(props.content.detect.filter) ?? "",
   };
   if (isLogsStream.value) {
     query.stream_type = "logs";
@@ -262,8 +268,22 @@ const currentVariantNote = (step: RichCardStep) =>
 
 // ── step completion / active-step model ─────────────────────────────────────
 const copied = ref<Record<string, boolean>>({});
-const isStepDone = (step: RichCardStep) =>
-  step.completeOn === "copy" ? !!copied.value[step.id] : detected.value;
+// Steps whose action button has been triggered (completeOn: "action") — the
+// cloud-console flows have nothing to copy and nothing to detect, so the click
+// itself is the completion signal.
+const actioned = ref<Record<string, boolean>>({});
+const isStepDone = (step: RichCardStep) => {
+  if (step.completeOn === "copy") return !!copied.value[step.id];
+  if (step.completeOn === "action") return !!actioned.value[step.id];
+  return detected.value;
+};
+
+const onStepAction = (step: RichCardStep, index: number) => {
+  if (step.completeOn === "action")
+    actioned.value = { ...actioned.value, [step.id]: true };
+  emit("step-action", step.action!.id);
+  scrollToStep(index + 1);
+};
 
 // First not-done step is "active"; -1 once everything is done. OStepper's
 // model is 1-based step numbers (0 = none active, i.e. all done).
@@ -320,6 +340,31 @@ const inlineMd = (s: string) =>
     .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
     .replace(/`([^`]+)`/g, "<code>$1</code>");
 
+// Step notes additionally support in-card jump links: `[label](#advanced)` and
+// `[label](#troubleshooting)` render as anchors that OPEN the target accordion
+// and scroll to it — the sections sit below the detection status bar, so a
+// plain "see X below" leaves the user hunting. The href is a literal "#" and
+// the target comes from a fixed alternation, so authored content can't inject a
+// URL here (inlineMd has already escaped everything else).
+const JUMP_LINK_RE = /\[([^\]]+)\]\(#(advanced|troubleshooting)\)/g;
+const noteMd = (s: string) =>
+  inlineMd(s).replace(
+    JUMP_LINK_RE,
+    (_m, label, target) =>
+      `<a href="#" class="note-jump" data-jump="${target}">${label}</a>`,
+  );
+
+// Delegated so the anchors rendered by v-html above stay clickable.
+const onNoteClick = (e: MouseEvent) => {
+  const el = (e.target as HTMLElement)?.closest?.("[data-jump]") as
+    | HTMLElement
+    | null;
+  if (!el) return;
+  e.preventDefault();
+  if (el.dataset.jump === "advanced") openAdvanced();
+  else if (el.dataset.jump === "troubleshooting") openTroubleshooting();
+};
+
 const chipIcon = (kind: StepChipKind) =>
   ({ terminal: "", editor: "code", run: "play-arrow", traces: "timeline" })[
     kind
@@ -337,18 +382,28 @@ const hasInstallerAccordion = computed(
   () => !!(extras.value.installs?.length || extras.value.envVars?.length),
 );
 
-// "See All Troubleshooting" (from the fix box) opens the Troubleshooting
-// accordion (controlled via v-model) and scrolls it into view.
-const troubleshootingOpen = ref(false);
-const troubleshootingRef = ref<any>(null);
-const openTroubleshooting = () => {
-  troubleshootingOpen.value = true;
+// Open a bottom accordion (controlled via v-model) and scroll it into view —
+// used by the fix box's "See All Troubleshooting" and by step-note jump links.
+const scrollIntoViewSoon = (target: { $el?: HTMLElement } | null) =>
   nextTick(() =>
-    troubleshootingRef.value?.$el?.scrollIntoView({
+    target?.$el?.scrollIntoView({
       behavior: prefersReducedMotion() ? "auto" : "smooth",
       block: "start",
     }),
   );
+
+const troubleshootingOpen = ref(false);
+const troubleshootingRef = ref<any>(null);
+const openTroubleshooting = () => {
+  troubleshootingOpen.value = true;
+  scrollIntoViewSoon(troubleshootingRef.value);
+};
+
+const advancedOpen = ref(false);
+const advancedRef = ref<any>(null);
+const openAdvanced = () => {
+  advancedOpen.value = true;
+  scrollIntoViewSoon(advancedRef.value);
 };
 
 // ── confetti (canvas burst on connect) ───────────────────────────────────────
@@ -584,12 +639,44 @@ function fireConfetti() {
               </template>
             </OCodeBlock>
 
-            <p v-if="currentVariantNote(step)" class="step-note">
-              <OIcon name="info-outline" size="sm" /> {{ currentVariantNote(step) }}
+            <p
+              v-if="currentVariantNote(step)"
+              class="step-note"
+              @click="onNoteClick"
+            >
+              <OIcon name="info-outline" size="sm" />
+              <span v-html="noteMd(currentVariantNote(step) || '')"></span>
             </p>
-            <p v-if="step.note" class="step-note">
-              <OIcon name="info-outline" size="sm" /> {{ step.note }}
+            <p v-if="step.note" class="step-note" @click="onNoteClick">
+              <OIcon name="info-outline" size="sm" />
+              <span v-html="noteMd(step.note)"></span>
             </p>
+
+            <!-- Page-supplied controls for this step (region pickers, service
+                 checkboxes …). Lets a page own the interaction while inheriting
+                 the card's hero, stepper and chrome instead of rebuilding them. -->
+            <div
+              v-if="$slots[`step-${step.id}`]"
+              class="step-slot"
+              :data-test="`ai-step-slot-${step.id}`"
+            >
+              <slot :name="`step-${step.id}`" :step="step" />
+            </div>
+
+            <!-- Action button — for steps performed in a cloud console rather
+                 than by copying a command. -->
+            <div v-if="step.action" class="step-action">
+              <OButton
+                :variant="step.action.variant || 'primary'"
+                size="sm-action"
+                :icon-left="step.action.icon"
+                :disabled="step.action.disabled"
+                :data-test="`ai-step-action-${step.action.id}`"
+                @click="onStepAction(step, i)"
+              >
+                {{ step.action.label }}
+              </OButton>
+            </div>
 
             <div v-if="step.pills?.length" class="pill-list mt-2">
               <OTag
@@ -720,9 +807,39 @@ function fireConfetti() {
 
       <!-- Supplementary accordions (shared OCollapsible) -->
       <div
-        v-if="hasInstallerAccordion || extras.troubleshooting?.length"
+        v-if="hasInstallerAccordion || extras.advanced || extras.troubleshooting?.length"
         class="c-more"
       >
+        <!-- Alternative manual path (e.g. the raw Helm sequence) — collapsed, so
+             the stepped primary path above stays the obvious default. -->
+        <OCollapsible
+          v-if="extras.advanced"
+          ref="advancedRef"
+          v-model="advancedOpen"
+          :label="extras.advanced.label"
+          icon="settings"
+          class="acc-item"
+          data-test="ai-advanced-accordion"
+        >
+          <div class="acc-body">
+            <p
+              v-if="extras.advanced.description"
+              class="step-desc"
+              v-html="inlineMd(extras.advanced.description)"
+            ></p>
+            <OCodeBlock
+              :lang="extras.advanced.code.lang"
+              :chrome="extras.advanced.code.filename ? 'editor' : 'terminal'"
+              :filename="extras.advanced.code.filename"
+              :code="subStream(extras.advanced.code.raw) || ''"
+              :code-masked="subStream(extras.advanced.code.masked)"
+              data-test="ai-advanced-code"
+              reveal-tooltip="Reveal Token"
+              hide-tooltip="Hide Token"
+            />
+          </div>
+        </OCollapsible>
+
         <OCollapsible
           v-if="hasInstallerAccordion"
           label="What The Installer Does"
@@ -789,6 +906,18 @@ function fireConfetti() {
           rel="noopener noreferrer"
           >{{ content.provider.name }} →</a
         >
+        <!-- Secondary guides (e.g. GCP's Google Workspace page) — real anchors,
+             beside the primary doc link rather than buried in an accordion. -->
+        <template v-for="l in content.docLinks" :key="l.url">
+          <span class="pv-foot-sep" aria-hidden="true">·</span>
+          <a
+            :href="safeHttpUrl(l.url)"
+            target="_blank"
+            rel="noopener noreferrer"
+            :data-test="`ai-doc-link-${l.label.toLowerCase().replace(/\s+/g, '-')}`"
+            >{{ l.label }} →</a
+          >
+        </template>
         <span v-if="content.slackUrl" class="ml-auto"
           >Stuck?
           <a
@@ -806,90 +935,76 @@ function fireConfetti() {
 </template>
 
 <style scoped lang="scss">
-/* Design tokens scoped to this card (light + dark), ported from the prototype. */
-.dirC-demo {
-  /* Accent follows the app theme color (--q-primary), not a fixed brand hue.
-     Soft tints are translucent so they read on both light + dark panels. */
-  --clay: var(--q-primary, #3f7994);
-  --clay-bright: var(--q-primary, #3f7994);
-  --clay-soft: color-mix(in srgb, var(--q-primary, #3f7994) 16%, transparent);
-  --clay-soft-2: color-mix(in srgb, var(--q-primary, #3f7994) 8%, transparent);
-  --ok: #16a34a;
-  --ok-soft: #e6f4ec;
-  --warn: #f59e0b;
-  --warn-soft: #fdf3e2;
-  --warn-ink: #b8740c;
+/* keep(complex-state): the statusbar/fixbox state machine (idle→checking→
+   connected/stalled) plus its radar keyframes and OStepper/OCollapsible :deep()
+   content styling — not expressible as template utilities. */
 
-  --panel: #ffffff;
-  --panel-2: #fafbfc;
-  --border: #e6e9ef;
-  --border-2: #eef1f5;
-  --text-1: #1f2a37;
-  --text-2: #586575;
-  --text-3: #8b95a4;
-  --primary: #2b7de9;
-  --primary-ink: #1a6fe0;
-  --track: #eef1f5;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+/* The card's local aliases are thin names over the GLOBAL semantic tokens, so a
+   change to a semantic value propagates here too. They resolve per-theme on their
+   own — no local .dark overrides. (.dark stays on the root only for the
+   monochrome-glyph invert rule below.) */
+.dirC-demo {
+  /* Accent follows the app theme color (--color-theme-accent), not a fixed brand hue.
+     Soft tints are translucent so they read on both light + dark panels. */
+  --clay: var(--color-theme-accent);
+  --clay-bright: var(--color-theme-accent);
+  --clay-soft: color-mix(in srgb, var(--color-theme-accent) 16%, transparent);
+  --clay-soft-2: color-mix(in srgb, var(--color-theme-accent) 8%, transparent);
+
+  --ok: var(--color-status-positive);
+  --ok-soft: var(--color-status-success-bg);
+  /* --color-warning is amber in both themes; --color-warning-surface is an
+     alpha tint, so it reads over the light panel and the dark one alike. */
+  --warn: var(--color-warning);
+  --warn-soft: var(--color-warning-surface);
+  --warn-ink: var(--color-warning);
+
+  --panel: var(--color-surface-base);
+  --border: var(--color-border-default);
+  --text-1: var(--color-text-heading);
+  --text-2: var(--color-text-secondary);
+  --text-3: var(--color-text-label);
+  --primary-ink: var(--color-text-link);
+  --track: var(--color-surface-subtle);
 
   color: var(--text-1);
-  font-size: 14px;
-
-  &.dark {
-    /* clay* inherit the theme-derived values from the base block above */
-    --ok: #3ec574;
-    --ok-soft: #14271c;
-    --warn: #f5b53d;
-    --warn-soft: #2a2113;
-    --warn-ink: #f5b53d;
-
-    --panel: #161b22;
-    --panel-2: #1a2029;
-    --border: #242b35;
-    --border-2: #1f262f;
-    --text-1: #e7ecf2;
-    --text-2: #9aa6b3;
-    --text-3: #67727f;
-    --primary: #3b8ef0;
-    --primary-ink: #59a2f5;
-    --track: #232b35;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  }
+  font-size: var(--text-sm);
 }
 
 /* ---- layout ---- */
 .dirC {
-  max-width: 980px;
+  max-width: 61.25rem;
   /* Left-align the reading column (not centered) so it sits against the panel's
      left edge, consistent across AI integrations and data-source cards. */
   margin: 0;
-  padding: 4px 4px 0;
+  padding: 0.25rem 0.25rem 0;
 }
 
 /* ---- logo tile ---- */
 .ds-mono {
-  width: 26px;
-  height: 26px;
+  width: 1.625rem;
+  height: 1.625rem;
   flex: none;
-  border-radius: 7px;
+  border-radius: var(--radius-default);
   display: grid;
   place-items: center;
   font-weight: 800;
-  font-size: 12px;
-  color: #fff;
-  letter-spacing: -0.3px;
+  font-size: var(--text-xs);
+  /* The tile is filled with the theme accent, so the monogram is always knocked out. */
+  color: var(--color-white);
+  letter-spacing: -0.02em;
   background: var(--clay-bright);
 }
 .ds-mono.xl {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  font-size: 21px;
+  width: 2.875rem;
+  height: 2.875rem;
+  border-radius: var(--radius-surface);
+  font-size: var(--text-xl);
 }
 .ds-mono.logo {
   background: var(--panel);
   border: 1px solid var(--border);
-  padding: 8px;
+  padding: 0.5rem;
 }
 .ds-mono.logo img {
   width: 100%;
@@ -900,46 +1015,46 @@ function fireConfetti() {
 
 /* ---- hero — its own header band: [logo + name] row, then tagline + chips ---- */
 .c-hero {
-  padding: 6px 0 18px;
+  padding: 0.375rem 0 1.125rem;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 22px;
+  margin-bottom: 1.375rem;
 }
 .c-hero-head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 0.875rem;
 }
 .c-h1 {
   font-weight: 800;
-  font-size: 24px;
-  letter-spacing: -0.5px;
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
   margin: 0;
   line-height: 1.1;
 }
 .c-sub {
   color: var(--text-2);
-  font-size: 14px;
-  margin: 10px 0 0;
+  font-size: var(--text-sm);
+  margin: 0.625rem 0 0;
 }
 /* Hero meta chips are now <OTag> (lib) — just lay them out. */
 .pv-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   flex-wrap: wrap;
-  margin-top: 11px;
+  margin-top: 0.6875rem;
 }
 
 /* ---- stream-name config input ---- */
 /* Left-aligned field with breathing room before the steps (no divider). */
 .c-config {
-  margin-bottom: 28px;
+  margin-bottom: 1.75rem;
 }
 .c-config :deep(label) {
-  margin-bottom: 2px;
+  margin-bottom: 0.125rem;
 }
-/* Keep the hint on one line — it overflows the 280px field into the empty space
-   to its right rather than wrapping (the input box itself stays md width). */
+/* Keep the hint on one line — it overflows the field into the empty space to its
+   right rather than wrapping (the input box itself stays md width). */
 .c-config :deep(.text-input-hint) {
   white-space: nowrap;
 }
@@ -948,12 +1063,12 @@ function fireConfetti() {
 .step-inputs {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 1rem;
   align-items: flex-start;
-  margin: 4px 0 14px;
+  margin: 0.25rem 0 0.875rem;
 }
 .step-inputs :deep(label) {
-  margin-bottom: 2px;
+  margin-bottom: 0.125rem;
 }
 
 /* ---- steps (lib OStepper in expanded mode) — only the per-step body content
@@ -965,32 +1080,40 @@ function fireConfetti() {
    in the badge's #icon slot) keeps a monospace style. */
 .step-tag-glyph {
   font-weight: 800;
-  font-size: 11px;
+  font-size: var(--text-2xs);
 }
 .step-desc {
   color: var(--text-2);
-  font-size: 13px;
-  margin: 0 0 10px;
+  font-size: var(--text-compact);
+  margin: 0 0 0.625rem;
   line-height: 1.45;
 }
 .step-note {
   display: flex;
   align-items: flex-start;
-  gap: 7px;
+  gap: 0.4375rem;
   color: var(--text-3);
-  font-size: 12.5px;
+  font-size: var(--text-xs);
   line-height: 1.5;
-  margin: 10px 0 0;
+  margin: 0.625rem 0 0;
+}
+
+/* ---- page-supplied step content + action button ---- */
+.step-slot {
+  margin: 0.25rem 0 0.875rem;
+}
+.step-action {
+  margin-top: 0.875rem;
 }
 
 /* ---- variant toggle (shared OToggleGroup) — only spacing + icon sizing here;
    the toggle's own visuals come from the design system. ---- */
 .variant-tabs {
-  margin: 0 0 14px;
+  margin: 0 0 0.875rem;
 }
 .variant-icon {
-  width: 14px;
-  height: 14px;
+  width: 0.875rem;
+  height: 0.875rem;
   object-fit: contain;
   flex: none;
 }
@@ -1003,23 +1126,33 @@ function fireConfetti() {
   flex: none;
   margin-top: 1px;
 }
+/* In-card jump link (see noteMd) — same treatment as the footer's doc link. */
+.step-note :deep(a.note-jump) {
+  color: var(--primary-ink);
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.step-note :deep(a.note-jump:hover) {
+  text-decoration: underline;
+}
 .step-content-pad :deep(code),
 .step-desc :deep(code) {
-  font-size: 12px;
+  font-size: var(--text-xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 6px;
-  border-radius: 5px;
+  padding: 1px 0.375rem;
+  border-radius: var(--radius-default);
 }
 
 /* ---- status bar ---- */
 .statusbar {
   display: flex;
   align-items: center;
-  gap: 13px;
-  margin-top: 14px;
-  padding: 13px 18px;
-  border-radius: 12px;
+  gap: 0.8125rem;
+  margin-top: 0.875rem;
+  padding: 0.8125rem 1.125rem;
+  border-radius: var(--radius-surface);
   border: 1px solid var(--border);
   background: var(--panel);
   transition: all 0.3s;
@@ -1037,9 +1170,9 @@ function fireConfetti() {
   background: var(--warn-soft);
 }
 .sb-dot {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
+  width: 0.6875rem;
+  height: 0.6875rem;
+  border-radius: var(--radius-full);
   flex: none;
   position: relative;
 }
@@ -1052,9 +1185,9 @@ function fireConfetti() {
 .statusbar.checking .sb-dot::after {
   content: "";
   position: absolute;
-  inset: -5px;
-  border-radius: 50%;
-  border: 2px solid var(--clay-bright);
+  inset: -0.3125rem;
+  border-radius: var(--radius-full);
+  border: 0.125rem solid var(--clay-bright);
   animation: dirc-radar 1.6s ease-out infinite;
 }
 .statusbar.connected .sb-dot {
@@ -1065,7 +1198,7 @@ function fireConfetti() {
 }
 .sb-txt {
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: var(--text-compact);
   flex: 1;
 }
 .statusbar.checking .sb-txt {
@@ -1080,25 +1213,25 @@ function fireConfetti() {
 .sb-txt .sb-sub {
   font-weight: 600;
   color: var(--text-3);
-  font-size: 12px;
-  margin-left: 8px;
+  font-size: var(--text-xs);
+  margin-left: 0.5rem;
 }
 /* Status-bar actions use the shared <OButton variant="secondary"> component. */
 
 /* ---- fix box ---- */
 .fixbox {
   border: 1px solid color-mix(in srgb, var(--warn) 38%, var(--border));
-  border-radius: 12px;
+  border-radius: var(--radius-surface);
   background: var(--warn-soft);
-  padding: 15px 16px;
+  padding: 0.9375rem 1rem;
   animation: dirc-rise 0.35s ease;
 }
 .fixbox-h {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 0.5625rem;
   font-weight: 800;
-  font-size: 14px;
+  font-size: var(--text-sm);
   color: var(--warn-ink);
 }
 .fixbox-h :deep(svg) {
@@ -1107,46 +1240,62 @@ function fireConfetti() {
 }
 .fixbox-p {
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--text-compact);
   line-height: 1.55;
-  margin: 9px 0 12px;
+  margin: 0.5625rem 0 0.75rem;
 }
 .fixbox-actions {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-top: 13px;
+  gap: 0.875rem;
+  margin-top: 0.8125rem;
 }
 /* ---- accordions (OCollapsible) ---- */
+/* These sit at the very bottom of a long card, after the detection status bar.
+   OCollapsible's default trigger is borderless and background-less, which reads
+   as stray body text down there — give each one the same bordered panel as
+   .statusbar / .fixbox so it registers as a real, clickable section. */
 .c-more {
-  margin-top: 14px;
+  margin-top: 0.875rem;
+}
+.acc-item {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--panel);
+  overflow: hidden;
 }
 .acc-item + .acc-item {
-  margin-top: 8px;
+  margin-top: 0.5rem;
+}
+/* Roomier hit area than the component's default px-2 py-2 inside a panel. */
+.acc-item :deep(button) {
+  padding: 0.8125rem 1rem;
+  border-radius: 0;
 }
 .acc-body {
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--text-compact);
   line-height: 1.6;
+  padding: 0 1rem 1rem;
 }
 .acc-body :deep(code) {
-  font-size: 11.5px;
+  font-size: var(--text-2xs);
   background: var(--track);
   color: var(--text-1);
-  padding: 1px 5px;
-  border-radius: 4px;
+  padding: 1px 0.3125rem;
+  border-radius: var(--radius-default);
 }
 
 /* ---- pills (now <OTag>) — just lay them out ---- */
 .pill-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 0.375rem;
 }
 
 /* ---- troubleshooting ---- */
 .ts-row {
-  padding: 11px 0;
+  padding: 0.6875rem 0;
   border-bottom: 1px dashed var(--border);
 }
 .ts-row:last-child {
@@ -1155,9 +1304,9 @@ function fireConfetti() {
 .ts-q {
   display: flex;
   align-items: flex-start;
-  gap: 9px;
+  gap: 0.5625rem;
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: var(--text-compact);
   color: var(--text-1);
 }
 .ts-q :deep(svg) {
@@ -1167,20 +1316,20 @@ function fireConfetti() {
 }
 .ts-a {
   color: var(--text-2);
-  font-size: 13px;
+  font-size: var(--text-compact);
   line-height: 1.55;
-  margin: 6px 0 0 23px;
+  margin: 0.375rem 0 0 1.4375rem;
 }
 
 /* ---- footer ---- */
 .pv-foot {
-  margin-top: 16px;
-  padding-top: 14px;
+  margin-top: 1rem;
+  padding-top: 0.875rem;
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 0.5rem;
+  font-size: var(--text-compact);
   color: var(--text-2);
 }
 .pv-foot a {
@@ -1190,6 +1339,10 @@ function fireConfetti() {
 }
 .pv-foot a:hover {
   text-decoration: underline;
+}
+.pv-foot-sep {
+  color: var(--text-3);
+  margin: 0 0.125rem;
 }
 
 /* ---- confetti overlay ---- */
@@ -1213,7 +1366,7 @@ function fireConfetti() {
 @keyframes dirc-rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(0.5rem);
   }
 }
 

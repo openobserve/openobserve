@@ -16,21 +16,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="event-detail-drawer"
+    bleed
     :open="open"
     size="xl"
     @update:open="emit('update:open', $event)"
   >
     <template #header>
-      <div class="px-1 py-[0.625rem] w-full">
+      <div class="px-1 py-2.5 w-full">
         <div class="flex items-center flex-nowrap w-full">
         <div class="flex flex-col w-full">
           <!-- Event Header -->
-          <div class="flex items-center justify-between mb-[0.625rem]">
+          <div class="flex items-center justify-between mb-2.5">
               <div
                 class="flex items-center w-full"
               >
                 <div
-                  class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase mr-1.5"
+                  class="px-1.5 py-0.5 rounded-default text-3xs font-semibold uppercase mr-1.5"
                   :class="getEventTypeClass(event.type)"
                 >
                   {{ event.type }}
@@ -93,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Tabs Navigation -->
-    <div class="flex pt-2 px-2">
+    <div class="flex pt-2 px-page-edge">
       <div class="w-full">
         <OTabs v-model="activeTab" align="left" dense>
           <OTab
@@ -137,10 +138,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 v-if="rawEvent?.error_type"
-                class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
+                class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-25 font-medium text-text-secondary shrink-0"
                 >
                   Error Type:
                 </div>
@@ -150,10 +151,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="rawEvent?.error_message"
-                class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
+                class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-25 font-medium text-text-secondary shrink-0"
                 >
                   Message:
                 </div>
@@ -163,20 +164,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="rawEvent?.error_handling"
-                class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
+                class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-25 font-medium text-text-secondary shrink-0"
                 >
                   Handling:
                 </div>
                 <div class="flex-1 break-words">
                   <span
-                    class="px-1 py-0.5 rounded text-[10px]"
+                    class="px-1 py-0.5 rounded-default text-3xs"
                     :class="
                       rawEvent.error_handling === 'unhandled'
-                        ? 'text-red-6 border border-solid border-red-6'
-                        : 'text-gray-500'
+                        ? 'text-status-error-text border border-solid border-status-negative'
+                        : 'text-text-secondary'
                     "
                   >
                     {{ rawEvent.error_handling }}
@@ -188,13 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-25 font-medium text-text-secondary shrink-0"
                 >
                   Error ID:
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-[10px] px-1 py-0.5 bg-(--color-surface-accent) rounded"
+                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default"
                   >
                     {{ formatId(rawEvent.error_id) }}
                   </code>
@@ -213,10 +214,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div
                 v-if="rawEvent?.view_loading_type"
-                class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
+                class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-25 font-medium text-text-secondary shrink-0"
                 >
                   Loading Type:
                 </div>
@@ -226,10 +227,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="rawEvent?.view_url"
-                class="flex py-1 px-1.5 border-b border-solid border-[var(--o2-border-color)] text-xs"
+                class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-25 font-medium text-text-secondary shrink-0"
                 >
                   URL:
                 </div>
@@ -245,13 +246,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex py-1 px-1.5 text-xs"
               >
                 <div
-                  class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+                  class="w-25 font-medium text-text-secondary shrink-0"
                 >
                   View ID:
                 </div>
                 <div class="flex-1 break-words">
                   <code
-                    class="font-mono text-[10px] px-1 py-0.5 bg-(--color-surface-accent) rounded"
+                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default"
                   >
                     {{ formatId(rawEvent.view_id) }}
                   </code>
@@ -274,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isLoadingRelatedResources">
               <div class="mt-2 p-2 text-center">
                 <OSpinner size="xs" />
-                <div class="mt-1 text-gray-400 text-xs">
+                <div class="mt-1 text-text-secondary text-xs">
                   Loading related events...
                 </div>
               </div>
@@ -287,14 +288,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="p-1.5 mb-1 bg-(--color-surface-accent) rounded cursor-pointer hover:bg-[#e0e0e0] transition-colors"
+                  class="p-1.5 mb-1 bg-surface-accent rounded-default cursor-pointer hover:bg-interactive-hover-bg transition-colors"
                   data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
                   <div class="flex items-center mb-0.5">
                     <div
-                      class="px-1 py-0.5 rounded text-[10px] font-semibold uppercase mr-1.5"
+                      class="px-1 py-0.5 rounded-default text-3xs font-semibold uppercase mr-1.5"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -303,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
                       <span
-                        class="mr-1 font-bold text-[10px] text-[var(--o2-primary-btn-bg)]"
+                        class="mr-1 font-bold text-3xs text-button-primary"
                       >
                         {{ item.resource_method || "GET" }}
                       </span>
@@ -352,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="flex items-center text-gray-400 text-[10px]">
+                  <div class="flex items-center text-text-secondary text-3xs">
                     <OIcon name="schedule" size="xs" class="mr-1" />
                     <span class="mr-2">{{
                       formatTimestamp(item.date)
@@ -407,12 +408,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-for="resource in networkResources"
               :key="resource.resource_id"
-              class="p-2 mb-2 bg-(--color-surface-accent) rounded"
+              class="p-2 mb-2 bg-surface-accent rounded-default"
               data-test="network-resource-item"
             >
               <div class="flex items-center mb-1">
                 <span
-                  class="px-1.5 py-0.5 rounded text-[10px] font-bold mr-2 bg-blue-100 text-blue-700"
+                  class="px-1.5 py-0.5 rounded-default text-3xs font-bold mr-2 bg-badge-blue-soft-bg text-badge-blue-soft-text"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>
@@ -421,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
               </div>
               <div
-                class="flex items-center gap-x-3 text-[10px] text-gray-400"
+                class="flex items-center gap-x-3 text-3xs text-text-secondary"
               >
                 <div class="flex items-center">
                   <OIcon name="access-time" size="xs" class="mr-1" />
@@ -445,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <div
           v-else
-          class="text-center py-8 text-gray-400 text-sm"
+          class="text-center py-8 text-text-muted text-sm"
           data-test="network-empty-state"
         >
           No network requests found for this event
@@ -454,7 +455,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Console Tab -->
       <OTabPanel name="console" padding="sm" data-test="console-tab">
-        <div class="text-center py-8 text-gray-400 text-sm">
+        <div class="text-center py-8 text-text-muted text-sm">
           Console logs coming soon
         </div>
       </OTabPanel>
@@ -465,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         padding="sm"
         data-test="performance-tab"
       >
-        <div class="text-center py-8 text-gray-400 text-sm">
+        <div class="text-center py-8 text-text-muted text-sm">
           Performance metrics coming soon
         </div>
       </OTabPanel>
@@ -484,7 +485,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
         <div
-          class="p-2 rounded overflow-x-auto font-mono text-[10px]"
+          class="p-2 rounded-default overflow-x-auto font-mono text-3xs"
           data-test="raw-event-json"
         >
           <div>
@@ -494,7 +495,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="key"
               class="ml-4"
             >
-              <span :class="store.state.theme === 'dark' ? 'dark' : ''">
+              <span>
                 <LogsHighLighting
                   :data="{ [key]: rawEvent[key] }"
                   :show-braces="false"
@@ -524,7 +525,6 @@ import searchService from "@/services/search";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import EventDetailsSection from "./common/EventDetailsSection.vue";
-import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -578,7 +578,6 @@ const {
   formatId,
   getStatusIcon,
   getStatusColorClass,
-  formatResourceDuration,
   getEventTypeClass,
 } = useEventFormatters();
 
@@ -593,52 +592,6 @@ const copyAttributesToClipboard = () => {
 const networkResources = computed(() => {
   return relatedResources.value.filter((item) => item.type === "resource");
 });
-
-// Computed fields for different event types
-const errorFields = computed(() => [
-  {
-    key: "error_type",
-    label: "Error Type",
-    value: props.rawEvent?.error_type,
-  },
-  {
-    key: "error_message",
-    label: "Message",
-    value: props.rawEvent?.error_message,
-  },
-  {
-    key: "error_handling",
-    label: "Handling",
-    value: props.rawEvent?.error_handling,
-    slot: true,
-  },
-  {
-    key: "error_id",
-    label: "Error ID",
-    value: props.rawEvent?.error_id,
-    slot: true,
-  },
-]);
-
-const viewFields = computed(() => [
-  {
-    key: "view_loading_type",
-    label: "Loading Type",
-    value: props.rawEvent?.view_loading_type?.replace("_", " "),
-    valueClass: "capitalize",
-  },
-  {
-    key: "view_url",
-    label: "URL",
-    value: props.rawEvent?.view_url,
-  },
-  {
-    key: "view_id",
-    label: "View ID",
-    value: props.rawEvent?.view_id,
-    slot: true,
-  },
-]);
 
 const actionFields = computed(() => [
   {
@@ -768,6 +721,3 @@ defineExpose({
 });
 </script>
 
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>

@@ -43,7 +43,7 @@ watch(
       const windowUs = 5 * 60 * 1_000_000
       const start = props.scheduledTs - windowUs
       const end = props.scheduledTs + windowUs
-      const rows = await executeQuery(buildRunDetailSql(props.monitorId, props.runId), start, end, 'logs')
+      const rows = await executeQuery(buildRunDetailSql(props.monitorId, props.runId, ''), start, end, 'logs')
       executions.value = rows.map(mapRunLocationResult)
       initExpanded()
     } catch (e: any) {
@@ -122,10 +122,10 @@ function worstStatus(statuses: RunStatus[]): RunStatus {
 
 const STATUS_COLOR: Record<RunStatus | 'pending', string> = {
   passed:  'text-[var(--color-success-500)]',
-  warning: 'text-amber-500',
+  warning: 'text-(--color-orange-500)',
   failed:  'text-[var(--color-error-500)]',
   error:   'text-[var(--color-warning-500)]',
-  pending: 'text-gray-400',
+  pending: 'text-text-muted',
 }
 
 function statusDot(s: RunStatus) {
@@ -168,11 +168,11 @@ function failedAtStep(steps: StepResult[]): string {
     <!-- Loading skeleton -->
     <div v-if="loading" class="flex flex-col gap-2 p-4">
       <div class="flex gap-3 items-center py-2">
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-24 rounded" />
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-16 rounded" />
-        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-40 rounded" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-24 rounded-default" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-16 rounded-default" />
+        <div class="bg-[var(--color-border-default)] animate-pulse h-4 w-40 rounded-default" />
       </div>
-      <div class="bg-[var(--color-border-default)] animate-pulse h-24 w-full rounded" />
+      <div class="bg-[var(--color-border-default)] animate-pulse h-24 w-full rounded-default" />
     </div>
 
     <!-- Query error -->
@@ -193,7 +193,7 @@ function failedAtStep(steps: StepResult[]): string {
       <!-- Warning banner for warning runs -->
       <div
         v-if="locationGroups.some(g => g.status === 'warning') && locationGroups.every(g => g.status !== 'failed' && g.status !== 'error')"
-        class="flex items-center gap-2 px-4 py-2 text-xs text-amber-600 bg-amber-500/10 border-b border-amber-500/20"
+        class="flex items-center gap-2 px-4 py-2 text-xs text-(--color-orange-600) bg-(--color-orange-500)/10 border-b border-(--color-orange-500)/20"
       >
         <OIcon name="warning" size="xs" />
         {{ t('synthetics.runRowExpansion.flakyWarning') }}
@@ -235,15 +235,15 @@ function failedAtStep(steps: StepResult[]): string {
           <div v-if="expandedLocations.has(group.location)" class="px-4 pb-3">
 
             <!-- Execution summary table -->
-            <div class="rounded border border-border-default overflow-hidden mb-3">
+            <div class="rounded-default border border-border-default overflow-hidden mb-3">
               <table class="w-full text-xs">
                 <thead>
                   <tr class="bg-surface-panel border-b border-border-default">
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.runRowExpansion.browserHeader') }}</th>
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.runRowExpansion.deviceHeader') }}</th>
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.results.status') }}</th>
-                    <th class="px-3 py-2 text-right font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.results.duration') }}</th>
-                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-[0.62rem]">{{ t('synthetics.runRowExpansion.failedAtHeader') }}</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs">{{ t('synthetics.runRowExpansion.browserHeader') }}</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs">{{ t('synthetics.runRowExpansion.deviceHeader') }}</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs">{{ t('synthetics.results.status') }}</th>
+                    <th class="px-3 py-2 text-right font-semibold text-text-muted uppercase tracking-wide text-3xs">{{ t('synthetics.results.duration') }}</th>
+                    <th class="px-3 py-2 text-left font-semibold text-text-muted uppercase tracking-wide text-3xs">{{ t('synthetics.runRowExpansion.failedAtHeader') }}</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-border-default">
@@ -268,7 +268,7 @@ function failedAtStep(steps: StepResult[]): string {
                       </span>
                     </td>
                     <td class="px-3 py-2 text-right tabular-nums text-text-secondary">{{ fmtDuration(ex.durationMs) }}</td>
-                    <td class="px-3 py-2 text-text-muted font-mono truncate max-w-[12rem]">
+                    <td class="px-3 py-2 text-text-muted font-mono truncate max-w-48">
                       {{ ex.status !== 'passed' ? failedAtStep(ex.steps) : '—' }}
                     </td>
                   </tr>

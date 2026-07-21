@@ -17,13 +17,13 @@
 <template>
   <div>
     <div
-      v-for="(,index) in dashboardPanelData.data.config.mark_line"
+      v-for="(_, index) in dashboardPanelData.data.config.mark_line"
       :key="index"
     >
       <div
-        class="flex justify-between pb-3 mb-3 border-b border-gray-500"
+        class="flex justify-between pb-3 mb-3 border-b border-border-default"
       >
-        <div style="width: 90%" class="flex flex-col gap-2">
+        <div class="w-[90%] flex flex-col gap-2">
           <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"

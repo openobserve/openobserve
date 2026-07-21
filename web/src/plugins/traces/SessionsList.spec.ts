@@ -264,14 +264,7 @@ async function mountComponent(props = defaultProps) {
   const wrapper = mount(SessionsList, {
     props,
     global: {
-      stubs: {
-        QSelect: { template: '<div class="q-select-stub"><slot /></div>' },
-        QPagination: { template: '<div class="q-pagination-stub" />' },
-        QIcon: { template: '<span class="q-icon-stub"><slot /></span>' },
-        QTooltip: { template: '<div class="q-tooltip-stub"><slot /></div>' },
-        QSpinnerHourglass: { template: '<div class="q-spinner-stub" />' },
-        QSkeleton: { template: '<div class="q-skeleton-stub" />' },
-      },
+      stubs: {},
     },
   });
   await flushPromises();
@@ -354,7 +347,10 @@ describe("SessionsList — loading state", () => {
 });
 
 describe("SessionsList — sessions table", () => {
-  it("fetches stream sessions with no agent filter by default", async () => {
+  it("should fetch stream sessions with no agent filter when in stream mode", async () => {
+    // Default scope is "agent" now — opt into stream mode via the persisted
+    // preference, the same path a returning user takes.
+    localStorage.setItem("sessionsList_filterMode", "stream");
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
@@ -368,7 +364,8 @@ describe("SessionsList — sessions table", () => {
     );
   });
 
-  it("does not load agents while refreshing in stream mode", async () => {
+  it("should not load agents while refreshing when in stream mode", async () => {
+    localStorage.setItem("sessionsList_filterMode", "stream");
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 

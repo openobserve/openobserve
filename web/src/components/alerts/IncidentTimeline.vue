@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="min-h-[400px] flex flex-col h-full">
+  <div class="min-h-100 flex flex-col h-full">
 
     <!-- Loading -->
     <div v-if="loading" class="flex justify-center items-center py-12">
@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Empty state -->
     <div
       v-else-if="events.length === 0"
-      class="flex flex-col items-center justify-center py-16 text-gray-500"
+      class="flex flex-col items-center justify-center py-16 text-text-muted"
     >
-      <OIcon name="forum" class="mb-3 opacity-40" style="width: 56px; height: 56px;" />
+      <OIcon name="forum" class="mb-3 opacity-40 size-14!" />
       <div class="text-base font-medium mb-1">No activity yet</div>
-      <div class="text-sm text-gray-400">Events and comments will appear here</div>
+      <div class="text-sm text-text-muted">Events and comments will appear here</div>
     </div>
 
     <!-- Activity Feed with Timeline -->
@@ -54,12 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="relative">
         <!-- Vertical Timeline Line -->
         <div
-          class="absolute left-3 top-0 bottom-0 w-0.5"
-          :style="{
-            backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#e5e7eb',
-            marginTop: '12px',
-            marginBottom: '12px'
-          }"
+          class="absolute left-3 top-0 bottom-0 w-0.5 bg-border-default my-3"
         ></div>
 
         <!-- Events -->
@@ -77,11 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- User Avatar -->
                   <div
                     v-if="getUserId(event) !== 'System'"
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
-                    :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
-                      border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
-                    }"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
                   >
                     <OIcon
                       name="person"
@@ -92,11 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- System Event Icon -->
                   <div
                     v-else
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
-                    :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#2d333b' : '#f6f8fa',
-                      border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
-                    }"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-subtle border border-border-default"
                   >
                     <OIcon
                       :name="getEventIcon(event)"
@@ -113,23 +100,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <template v-if="getUserId(event) !== 'System'">
                       <span
                         class="font-semibold text-sm"
-                        :class="store.state.theme === 'dark' ? 'text-gray-100' : 'text-gray-900'"
+                        :class="'text-text-body'"
                       >
                         {{ getUserId(event) }}
                       </span>
                       <span
                         v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-                        :style="{
-                          backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                          border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                          color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                        }"
+                        class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                        :style="badgeStyle(getEventBadgeColor(event))"
                       >
                         {{ getEventBadgeText(event) }}
                       </span>
                       <span class="text-sm"
-                        :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                        :class="'text-text-body'"
                         v-html="DOMPurify.sanitize(getInlineEventText(event))"
                       ></span>
                     </template>
@@ -138,59 +121,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- AI events: "AI SRE" badge first, then message text -->
                       <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete' || event.type === 'ai_analysis_failed'">
                         <span
-                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-                          :style="{
-                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                          }"
+                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                          :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           AI SRE
                           <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
                         </span>
                         <span class="text-sm"
-                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                          :class="'text-text-body'"
                           v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- For Alert events, show badge first -->
                       <template v-else-if="event.type === 'Alert'">
                         <span
-                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-                          :style="{
-                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                          }"
+                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                          :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           {{ getEventBadgeText(event) }}
                         </span>
                         <span class="text-sm"
-                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                          :class="'text-text-body'"
                           v-html="DOMPurify.sanitize(getInlineEventText(event))"
                         ></span>
                       </template>
                       <!-- All other system events: text then badge (except severity changes) -->
                       <template v-else>
                         <span class="text-sm"
-                          :class="store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-700'"
+                          :class="'text-text-body'"
                           v-html="getInlineEventText(event)"
                         ></span>
                         <span
                           v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                          class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
-                          :style="{
-                            backgroundColor: store.state.theme === 'dark' ? getEventBadgeColor(event) + '30' : getEventBadgeColor(event) + '15',
-                            border: `1px solid ${getEventBadgeColor(event)}${store.state.theme === 'dark' ? '50' : '30'}`,
-                            color: store.state.theme === 'dark' ? '#ffffff' : getEventBadgeColor(event)
-                          }"
+                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                          :style="badgeStyle(getEventBadgeColor(event))"
                         >
                           {{ getEventBadgeText(event) }}
                         </span>
                       </template>
                     </template>
                     <span class="text-xs"
-                      :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                      :class="'text-text-secondary'"
                     >
                       {{ formatRelativeTime(event.timestamp) }}
                     </span>
@@ -205,11 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Avatar -->
                 <div class="flex-shrink-0">
                   <div
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative"
-                    :style="{
-                      backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
-                      border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
-                    }"
+                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
                   >
                     <OIcon
                       name="person"
@@ -223,25 +190,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex-1 min-w-0">
                   <!-- Comment Box -->
                   <div
-                    class="rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                    :style="store.state.theme === 'dark'
-                      ? { backgroundColor: '#181a1b', border: '1px solid #3f4447' }
-                      : { backgroundColor: '#ffffff', border: '1px solid #d1d5db' }"
+                    class="rounded-default overflow-hidden hover:shadow-md transition-shadow bg-surface-base border border-border-default"
                   >
                     <!-- Header -->
                     <div
-                      class="px-4 py-2 flex items-center gap-2 border-b"
-                      :style="store.state.theme === 'dark'
-                        ? { backgroundColor: '#0f1011', borderBottomColor: '#3f4447' }
-                        : { backgroundColor: '#f9fafb', borderBottomColor: '#e5e7eb' }"
+                      class="px-4 py-2 flex items-center gap-2 border-b bg-surface-subtle border-b-border-default"
                     >
                       <span class="font-semibold text-sm"
-                        :class="store.state.theme === 'dark' ? 'text-gray-100' : 'text-gray-900'"
+                        :class="'text-text-body'"
                       >
                         {{ getUserId(event) }}
                       </span>
                       <span class="text-xs"
-                        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                        :class="'text-text-secondary'"
                       >
                         commented {{ formatRelativeTime(event.timestamp) }}
                       </span>
@@ -250,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Comment Body -->
                     <div class="px-4 py-3">
                       <div class="text-sm whitespace-pre-wrap break-words leading-relaxed"
-                        :class="store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800'"
+                        :class="'text-text-body'"
                       >
                         {{ event.data?.comment || '' }}
                       </div>
@@ -271,11 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Current User Avatar -->
         <div class="flex-shrink-0 pt-1">
           <div
-            class="w-6 h-6 rounded-full flex items-center justify-center"
-            :style="{
-              backgroundColor: store.state.theme === 'dark' ? '#181a1b' : '#ffffff',
-              border: store.state.theme === 'dark' ? '1px solid #444c56' : '1px solid #d0d7de'
-            }"
+            class="w-6 h-6 rounded-full flex items-center justify-center bg-surface-base border border-border-default"
           >
             <OIcon
               name="person"
@@ -292,7 +249,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="textarea"
             placeholder="Write a comment..."
             :rows="3"
-            class="comment-input"
             @keydown.ctrl.enter.prevent="submitComment"
             @keydown.meta.enter.prevent="submitComment"
             data-test="incident-timeline-comment-input"
@@ -318,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, onMounted, watch, nextTick } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { formatToDateOnly } from "@/utils/date";
 import incidentsService from "@/services/incidents";
 import DOMPurify from "dompurify";
@@ -338,6 +295,7 @@ interface Props {
 const props = defineProps<Props>();
 
 const store = useStore();
+const { isDark } = useTheme();
 
 const events = ref<any[]>([]);
 const loading = ref(false);
@@ -407,41 +365,20 @@ const getCurrentUserId = (): string => {
   return store.state.userInfo?.email?.split("@")[0] || "User";
 };
 
-// Get initials from username
-const getInitials = (username: string): string => {
-  if (!username || username === "System") return "S";
-
-  // Handle email addresses
-  if (username.includes("@")) {
-    username = username.split("@")[0];
-  }
-
-  const parts = username.split(/[\s_.-]+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return username.substring(0, 2).toUpperCase();
-};
-
-// Get current user initials
-const getCurrentUserInitials = (): string => {
-  return getInitials(getCurrentUserId());
-};
-
 // Get avatar color based on username
 const getAvatarColor = (username: string): string => {
   const colors = [
-    "#EF4444", // red
-    "#F59E0B", // amber
-        "#8B5CF6", // purple
+    "var(--color-error-500)", // red
+    "var(--color-amber-500)", // amber
+        "var(--color-ai-accent)", // purple
 
-    "#3B82F6", // blue
-        "#10B981", // green
-    "#EC4899", // pink
-    "#06B6D4", // cyan
-    "#F97316", // orange
-    "#14B8A6", // teal
-    "#6366F1", // indigo
+    "var(--color-blue-500)", // blue
+        "var(--color-success-500)", // green
+    "var(--color-purple-500)", // pink
+    "var(--color-cyan-500)", // cyan
+    "var(--color-orange-500)", // orange
+    "var(--color-teal-500)", // teal
+    "var(--color-indigo-500)", // indigo
   ];
 
   const firstChar = username.charAt(0).toUpperCase();
@@ -470,24 +407,37 @@ const getEventIcon = (event: any): string => {
   }
 };
 
-// Get event badge color
+// Event badge color — resolves to a design token (var()) per event type.
+// Semantic reuse: error/warning/success/info map to status primitives; AI +
+// dimension events use the shared AI accent; the rest use categorical hues.
 const getEventBadgeColor = (event: any): string => {
   switch (event.type) {
-    case "Created": return "#6366F1"; // indigo
-    case "Alert": return "#F59E0B"; // amber
+    case "Created": return "var(--color-indigo-500)";
+    case "Alert": return "var(--color-amber-500)";
     case "SeverityUpgrade":
-    case "SeverityOverride": return "#EF4444"; // red
-    case "Acknowledged": return "#3B82F6"; // blue
-    case "Resolved": return "#059669"; // darker green
-    case "Reopened": return "#F97316"; // orange
-    case "DimensionsUpgraded": return "#8B5CF6"; // purple
-    case "TitleChanged": return "#6366F1"; // indigo
-    case "AssignmentChanged": return "#06B6D4"; // cyan
+    case "SeverityOverride": return "var(--color-error-500)";
+    case "Acknowledged": return "var(--color-blue-500)";
+    case "Resolved": return "var(--color-success-600)";
+    case "Reopened": return "var(--color-orange-500)";
+    case "DimensionsUpgraded": return "var(--color-ai-accent)";
+    case "TitleChanged": return "var(--color-indigo-500)";
+    case "AssignmentChanged": return "var(--color-cyan-500)";
     case "ai_analysis_begin":
-    case "ai_analysis_complete": return "#8B5CF6"; // purple
-    case "ai_analysis_failed": return "#EF4444"; // red
-    default: return "#6B7280"; // gray
+    case "ai_analysis_complete": return "var(--color-ai-accent)";
+    case "ai_analysis_failed": return "var(--color-error-500)";
+    default: return "var(--color-grey-500)";
   }
+};
+
+// Build the badge inline style from an event color token. Tint strengths are
+// theme-conditional (denser bg/border + white text in dark) via color-mix, so
+// the token stays the single color source. (Theme read migrates in the D19/D20 sweep.)
+const badgeStyle = (c: string) => {
+  return {
+    backgroundColor: `color-mix(in srgb, ${c} ${isDark.value ? "19%" : "8%"}, transparent)`,
+    border: `1px solid color-mix(in srgb, ${c} ${isDark.value ? "31%" : "19%"}, transparent)`,
+    color: isDark.value ? "var(--color-grey-0)" : c,
+  };
 };
 
 // Get event badge text
@@ -513,12 +463,12 @@ const getEventBadgeText = (event: any): string => {
 // Get severity color based on priority level
 const getSeverityColor = (severity: string): string => {
   switch (severity) {
-    case "P1": return "#EF4444"; // red
-    case "P2": return "#F97316"; // orange
-    case "P3": return "#F59E0B"; // amber
-    case "P4": return "#3B82F6"; // blue
-    case "P5": return "#6B7280"; // gray
-    default: return "#6B7280"; // gray
+    case "P1": return "var(--color-error-500)"; // red
+    case "P2": return "var(--color-orange-500)"; // orange
+    case "P3": return "var(--color-amber-500)"; // amber
+    case "P4": return "var(--color-blue-500)"; // blue
+    case "P5": return "var(--color-grey-500)"; // gray
+    default: return "var(--color-grey-500)"; // gray
   }
 };
 
@@ -526,8 +476,7 @@ const getSeverityColor = (severity: string): string => {
 const getInlineEventText = (event: any): string => {
   const data = event.data;
   const eventColor = getEventBadgeColor(event);
-  const isDark = store.state.theme === 'dark';
-  const opacity = isDark ? '50' : '40';
+  const opacity = isDark.value ? '50' : '40';
   // Escape user-controlled strings before embedding in HTML (XSS prevention)
   const esc = (s: string) => String(s)
     .replace(/&/g, '&amp;')
@@ -536,7 +485,7 @@ const getInlineEventText = (event: any): string => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
   const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
-  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: ${getSeverityColor(severity)}${opacity}; color: ${isDark ? '#ffffff' : getSeverityColor(severity)}; border: 1px solid ${getSeverityColor(severity)}${isDark ? '60' : '40'};">${esc(severity)}</span>`;
+  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? '31%' : '25%'}, transparent); color: ${isDark.value ? 'var(--color-grey-0)' : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? '38%' : '25%'}, transparent);">${esc(severity)}</span>`;
   const isSystemEvent = getUserId(event) === 'System';
 
   switch (event.type) {
@@ -646,12 +595,3 @@ defineExpose({
   fetchEvents
 });
 </script>
-
-<style>
-.comment-input :deep(textarea) {
-  font-size: 14px;
-  line-height: 1.5;
-  padding-right: 50px !important;
-  resize: none;
-}
-</style>

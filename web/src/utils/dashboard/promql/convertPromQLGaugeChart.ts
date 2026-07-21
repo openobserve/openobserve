@@ -21,6 +21,7 @@ import {
 import { applyAggregation } from "./shared/dataProcessor";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { getSeriesColor } from "../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 
 /**
  * Converter for gauge charts
@@ -34,7 +35,6 @@ export class GaugeConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any,
   ) {
     const config = panelSchema.config || {};
     const series: any[] = [];
@@ -141,7 +141,7 @@ export class GaugeConverter implements PromQLChartConverter {
         show: true,
         trigger: "item",
         textStyle: {
-          color: store.state.theme === "dark" ? "#fff" : "#000",
+          color: chartColor("--color-tooltip-text"),
           fontSize: 12,
         },
         extraCssText: TOOLTIP_SCROLL_STYLE,

@@ -15,15 +15,12 @@
 
 // @ts-ignore
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
-import { config } from "@vue/test-utils";
-import { inject } from "vue";
 
 import { setupServer } from "msw/node";
 
 import "../../__mocks__/index";
 
 import { restHandlers } from "./handlers";
-import store from "./store";
 
 // Wire the badge registry's i18n resolver for tests WITHOUT pulling in vue-i18n
 // (some specs mock it). Resolve OTag `labelKey`s against the raw English JSON so
@@ -111,9 +108,7 @@ console.warn = (...args) => {
   // Filter out specific Vue warnings that are expected in test environment
   const message = args[0];
   if (typeof message === 'string') {
-    if (message.includes('Failed setting prop "prefix" on <q-input-stub>') ||
-        message.includes('Cannot set property prefix of [object Element]') ||
-        message.includes('Failed setting prop "prefix" on <q-select-stub>: value undefined is invalid') ||
+    if (message.includes('Cannot set property prefix of [object Element]') ||
         message.includes('onBeforeUnmount is called when there is no active component instance') ||
         // Suppress inject warnings that occur when testing composables outside component context
         // This is expected when testing composables directly with mocked dependencies
@@ -246,7 +241,7 @@ beforeAll(() => {
   server.listen();
 
   // Handle unhandled promise rejections to prevent CI/CD failures
-  process.on('unhandledRejection', (reason: any, promise) => {
+  process.on('unhandledRejection', (reason: any) => {
     // Suppress expected error messages from tests that intentionally test error scenarios
     const reasonStr = String(reason?.message || reason);
 

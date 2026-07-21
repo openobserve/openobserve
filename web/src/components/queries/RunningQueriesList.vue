@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      show-index
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="settings-query-management"
@@ -127,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     <ODrawer
+      bleed
       v-model:open="showListSchemaDialog"
       size="lg"
       data-test="list-schema-dialog"
@@ -138,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { ref, type Ref, defineComponent, computed } from "vue";
+import { ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
@@ -149,16 +151,15 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getDuration, durationFormatter } from "@/utils/zincutils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, OEmptyState, OButton, OTooltip, OToggleGroup, OToggleGroupItem, ODrawer, OSpinner, OTable, OUserCell, OTag },
+  components: { QueryList, OEmptyState, OButton, OTooltip, OToggleGroup, OToggleGroupItem, ODrawer, OTable, OUserCell, OTag },
   props: {
     rows: {
       type: Array,
@@ -212,7 +213,6 @@ export default defineComponent({
     };
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       {
         id: "user_id",
         header: t("user.email"),
@@ -356,8 +356,8 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Deep override for empty-state image spacing — must stay in CSS */
+<style scoped>
+/* keep(lib-override): empty-state image spacing (child EmptyState DOM) */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
 }

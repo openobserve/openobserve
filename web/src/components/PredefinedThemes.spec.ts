@@ -49,6 +49,10 @@ vi.mock("@/composables/usePredefinedThemes", () => ({
 // Mock theme utility
 vi.mock("@/utils/theme", () => ({
   applyThemeColors: vi.fn(),
+  // Pass-through: run the mode switch synchronously (no view transition in tests)
+  switchThemeMode: vi.fn((_mode: string, applyChanges: () => void) =>
+    applyChanges(),
+  ),
   hexToRgba: vi.fn((hex: string, opacity: number) => {
     return `rgba(0, 0, 0, ${opacity / 10})`;
   }),
@@ -181,28 +185,6 @@ const createWrapper = (props = {}, options = {}) => {
         },
         OColor: {
           template: '<div data-test-stub="o-color"></div>',
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-        },
-        // Legacy stubs kept for safety (no longer rendered, harmless)
-        QCard: {
-          template: '<div data-test-stub="q-card"><slot></slot></div>',
-        },
-        QCardSection: {
-          template: '<div data-test-stub="q-card-section"><slot></slot></div>',
-        },
-        QBtn: {
-          template:
-            '<button data-test-stub="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot></slot></button>',
-        },
-        QIcon: {
-          template: '<i data-test-stub="OIcon"></i>',
-        },
-        QTooltip: {
-          template: '<div data-test-stub="q-tooltip"><slot></slot></div>',
-        },
-        QColor: {
-          template: '<div data-test-stub="q-color"></div>',
           props: ["modelValue"],
           emits: ["update:modelValue"],
         },
@@ -359,7 +341,6 @@ describe("PredefinedThemes", () => {
 
     it("renders theme row buttons for each predefined theme in light mode", () => {
       const wrapper = createWrapper();
-      const vm = wrapper.vm as any;
 
       // Each predefined theme should have a row button in the active (light) mode
       const pulseSlug = themeNameSlug("O2 Pulse");
@@ -1353,7 +1334,7 @@ describe("PredefinedThemes", () => {
       expect(true).toBe(true);
     });
 
-    it("triggers applyThemeForMode when body class changes to body--dark", async () => {
+    it("triggers applyThemeForMode when html class changes to dark", async () => {
       const { applyThemeForMode } = await import("@/utils/themeManager");
       const wrapper = createWrapper();
       // Wait for onMounted to set up the observer
@@ -1363,7 +1344,7 @@ describe("PredefinedThemes", () => {
       vi.clearAllMocks();
 
       // Simulate the body class toggle (the MutationObserver watches this)
-      document.body.classList.add("body--dark");
+      document.documentElement.classList.add("dark");
       // MutationObserver fires asynchronously in a microtask
       await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -1371,7 +1352,7 @@ describe("PredefinedThemes", () => {
       expect(applyThemeForMode).toHaveBeenCalledWith("dark", expect.anything());
 
       // Cleanup
-      document.body.classList.remove("body--dark");
+      document.documentElement.classList.remove("dark");
       wrapper.unmount();
     });
 
@@ -1385,14 +1366,14 @@ describe("PredefinedThemes", () => {
       vi.clearAllMocks();
 
       // Trigger the MutationObserver
-      document.body.classList.add("body--dark");
+      document.documentElement.classList.add("dark");
       await new Promise((resolve) => setTimeout(resolve, 0));
 
       // With hasTempColors=true the observer returns early — no call
       expect(applyThemeForMode).not.toHaveBeenCalled();
 
       // Cleanup
-      document.body.classList.remove("body--dark");
+      document.documentElement.classList.remove("dark");
       wrapper.unmount();
     });
   });

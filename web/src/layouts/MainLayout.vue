@@ -16,19 +16,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'w-full', 'transition-[width]', 'duration-300', 'ease-[ease]', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
   >
     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
-        class="bg-[var(--o2-primary-btn-bg)] text-[var(--o2-primary-btn-text)] text-center"
+        class="bg-button-primary text-button-primary-foreground text-center"
       >
         <WebinarBanner variant="header" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
-      <Header
+      <AppHeader
         :store="store"
         :router="router"
         :config="config"
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="flex flex-col min-h-0 bg-[var(--color-surface-chrome-deeper)] pr-2 pb-2"
+          class="flex flex-col min-h-0 bg-surface-chrome-deeper pr-2 pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -79,10 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
+          <!-- Content card — all pages render inside this. The border stays present in both
+               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
-            :class="store.state.theme === 'dark' ? 'border border-border-default' : ''"
+            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-surface overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
               v-if="isLoading"
@@ -101,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="store.state.isAiChatEnabled && isLoading"
           class="o2-sidebar o2-sidebar-right overflow-y-auto sticky top-[var(--navbar-height,2.25rem)] self-start shrink-0"
           :class="[
-            store.state.theme == 'dark'
+            isDark
               ? 'dark-mode-chat-container'
               : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
@@ -151,7 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
-import Header from "../components/Header.vue";
+import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import AppHeader from "../components/Header.vue";
 import { useI18n } from "vue-i18n";
 import {
   useLocalCurrentUser,
@@ -176,6 +178,7 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
@@ -202,8 +205,6 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useShortcut } from "@/lib/vue-shortcut-manager";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -219,7 +220,7 @@ export default defineComponent({
   name: "MainLayout",
   mixins: [mainLayoutMixin],
   components: {
-    Header,
+    AppHeader,
     WebinarBanner,
     "keep-alive": KeepAlive,
     ONavbar,
@@ -294,6 +295,7 @@ export default defineComponent({
   },
   setup() {
     const store: any = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
     const { t } = useI18n();
     const miniMode = ref(false);
@@ -318,7 +320,8 @@ export default defineComponent({
       autoSend: boolean;
       id: number;
     } | null>(null);
-    let customOrganization = router.currentRoute.value.query.hasOwnProperty(
+    let customOrganization = Object.prototype.hasOwnProperty.call(
+      router.currentRoute.value.query,
       "org_identifier",
     )
       ? router.currentRoute.value.query.org_identifier
@@ -338,6 +341,18 @@ export default defineComponent({
         store.state.zoConfig.incidents_enabled
       );
     });
+
+    // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
+    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`
+    // (enterprise `O2_WORKFLOWS_ENABLED`). Reactive so the menu picks it up
+    // regardless of whether the config response arrived before or after mount.
+    // `=== true`, not truthy: /config is fetched without await, so the flag is
+    // briefly undefined and the entry must stay hidden rather than flash in.
+    const isWorkflowsEnabled = computed(
+      () =>
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig?.workflows_enabled === true,
+    );
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
     // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
@@ -360,7 +375,10 @@ export default defineComponent({
       );
     });
 
-    const orgOptions = ref([{ label: Number, value: String }]);
+    // Real entries carry `identifier`; the placeholder literal only sets label/value.
+    const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>(
+      [{ label: Number, value: String }],
+    );
     let slackURL = "https://short.openobserve.ai/community";
     if (
       config.isEnterprise == "true" &&
@@ -371,7 +389,7 @@ export default defineComponent({
 
     let user = store.state.userInfo;
 
-    var linksList = ref([
+    var linksList = ref<NavItem[]>([
       {
         title: t("menu.home"),
         icon: "home",
@@ -544,7 +562,7 @@ export default defineComponent({
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
       if (
-        !store.state.zoConfig.hasOwnProperty("version") ||
+        !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
         store.state.zoConfig.version == ""
       ) {
         getConfig();
@@ -604,6 +622,42 @@ export default defineComponent({
         }
       }
     };
+
+    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    const updateWorkflowsMenu = () => {
+      const existingIndex = linksList.value.findIndex(
+        (link) => link.name === "workflows",
+      );
+
+      if (isWorkflowsEnabled.value) {
+        if (existingIndex !== -1) return;
+
+        const actionIndex = linksList.value.findIndex(
+          (link) => link.name === "actionScripts",
+        );
+        const alertIndex = linksList.value.findIndex(
+          (link) => link.name === "alertList",
+        );
+        const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+        if (anchor === -1) return;
+
+        linksList.value.splice(anchor + 1, 0, {
+          title: t("menu.workflows"),
+          icon: "schema",
+          link: "/workflows",
+          name: "workflows",
+        });
+      } else if (existingIndex !== -1) {
+        // The entry must be REMOVED, not just skipped: the menu is rebuilt on
+        // org switch and `workflows_enabled` can differ per deployment, so an
+        // add-only guard would leave a stale entry behind.
+        linksList.value.splice(existingIndex, 1);
+      }
+    };
+
+    // If `/config` resolves after this component mounted (or the flag flips),
+    // keep the menu in sync — same contract as the other flag-driven entries.
+    watch(isWorkflowsEnabled, () => updateWorkflowsMenu(), { immediate: false });
     const splitterModel = ref(100);
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
@@ -677,6 +731,7 @@ export default defineComponent({
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateWorkflowsMenu();
       updateSyntheticMenu();
       updateAIObservabilityMenu();
 
@@ -762,7 +817,8 @@ export default defineComponent({
       //     });
       // } else {
       if (
-        store.state.zoConfig.hasOwnProperty(
+        Object.prototype.hasOwnProperty.call(
+          store.state.zoConfig,
           "restricted_routes_on_empty_data",
         ) &&
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
@@ -806,7 +862,8 @@ export default defineComponent({
 
     const setSelectedOrganization = async () => {
       try {
-        customOrganization = router.currentRoute.value.query.hasOwnProperty(
+        customOrganization = Object.prototype.hasOwnProperty.call(
+          router.currentRoute.value.query,
           "org_identifier",
         )
           ? router.currentRoute.value.query.org_identifier
@@ -872,11 +929,11 @@ export default defineComponent({
                   user_email: store.state.userInfo.email,
                   ingest_threshold: data.ingest_threshold,
                   search_threshold: data.search_threshold,
-                  subscription_type: data.hasOwnProperty("CustomerBillingObj")
+                  subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                     ? data.CustomerBillingObj.subscription_type
                     : "",
                   status: data.status,
-                  note: data.hasOwnProperty("CustomerBillingObj")
+                  note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                     ? data.CustomerBillingObj.note
                     : "",
                 };
@@ -948,11 +1005,11 @@ export default defineComponent({
             user_email: store.state.userInfo.email,
             ingest_threshold: data.ingest_threshold,
             search_threshold: data.search_threshold,
-            subscription_type: data.hasOwnProperty("CustomerBillingObj")
+            subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
               ? data.CustomerBillingObj.subscription_type
               : "",
             status: data.status,
-            note: data.hasOwnProperty("CustomerBillingObj")
+            note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
               ? data.CustomerBillingObj.note
               : "",
           };
@@ -1192,7 +1249,7 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      if (store.state.theme === "dark") {
+      if (isDark.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
@@ -1270,6 +1327,7 @@ export default defineComponent({
     useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
 
     return {
+      isDark,
       t,
       router,
       store,
@@ -1373,10 +1431,16 @@ export default defineComponent({
 });
 </script>
 
-
-<style>
-/* Print mode — hide header + sidebar, show body overflow */
-.printMode body {
-  overflow: auto !important;
+<style scoped>
+/* keep(print): This layout's root is the ONLY writer of `.printMode` (store.state.printMode,
+   above), so the rule can only ever fire on descendants of that root — but
+   `.hideOnPrintMode` is placed by other components (VariableAdHocValueSelector,
+   pipeline/PipelineEditor, Dashboards/ViewDashboard) that render through
+   <router-view> and so do not carry this scope id. :deep() pierces to them while
+   keeping the ancestor condition scoped to the owner. */
+.printMode :deep(.hideOnPrintMode) {
+  display: none;
 }
 </style>
+
+

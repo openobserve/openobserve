@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { http, HttpResponse } from "msw";
-import actionScriptsMockData from "@/test/unit/mockData/actionScripts";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -210,7 +209,7 @@ describe("ActionScripts", () => {
 
   describe("Header section", () => {
     it("should display page title", () => {
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { computed, provide } from 'vue'
+import { computed } from 'vue'
 import OTabPanel from './OTabPanel.vue'
 import { TAB_PANELS_CONTEXT_KEY } from './OTabPanels.types'
 import type { TabPanelsContext } from './OTabPanels.types'
@@ -164,13 +164,5 @@ describe('OTabPanel', () => {
   it('adds h-full when stretch is true', () => {
     const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', stretch: true })
     expect(wrapper.find('[role="tabpanel"]').classes()).toContain('h-full')
-  })
-
-  // --- No default padding (legacy check) ---
-
-  it('does not add q-tab-panel class', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    const panel = wrapper.find('[role="tabpanel"]')
-    expect(panel.classes()).not.toContain('q-tab-panel')
   })
 })

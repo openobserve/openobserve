@@ -25,7 +25,7 @@ vi.hoisted(() => {
   // SearchBar.vue uses defineAsyncComponent as a free variable (not imported from vue).
   // In JSDOM globalThis properties act as free variables, so inject it here before module eval.
   // Use the same data-test that the spec's vi.mock("@/components/CodeQueryEditor.vue") provides.
-  (globalThis as any).defineAsyncComponent = (_loader: any) => ({
+  (globalThis as any).defineAsyncComponent = () => ({
     name: "AsyncCodeQueryEditor",
     template: '<div data-test="code-editor-stub"></div>',
     props: ["query", "keywords", "functions", "editor-id"],
@@ -126,7 +126,7 @@ describe("SearchBar (logstream/explore)", () => {
     it("should render download logs button", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      // OButton replaces q-btn; download button is identified by its title attribute
+      // The download button is identified by its title attribute
       expect(wrapper.find('button[data-o2-btn]').exists()).toBe(true);
     });
 
@@ -148,7 +148,6 @@ describe("SearchBar (logstream/explore)", () => {
       const wrapper = mountComp({ ...defaultQueryData, streamType: "enrichment_tables" });
       await flushPromises();
       // v-show hides the element but it still renders in DOM, just hidden
-      const dateTimeContainer = wrapper.find(".float-left");
       // The container should exist but be hidden
       expect(wrapper.exists()).toBe(true);
     });

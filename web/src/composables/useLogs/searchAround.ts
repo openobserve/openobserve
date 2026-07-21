@@ -17,7 +17,6 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import { logsErrorMessage } from "@/utils/common";
-import useLogs from "@/composables/useLogs";
 import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
@@ -79,7 +78,7 @@ export const useSearchAround = () => {
         const parsedSQL = fnParsedSQL(query);
         parsedSQL.where = null;
         sqlContext.push(
-          b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')),
+          b64EncodeUnicode(fnUnparsedSQL(parsedSQL).replace(/`/g, '"')) ?? "",
         );
       } else {
         const parseQuery = [query];
@@ -127,13 +126,13 @@ export const useSearchAround = () => {
             "[FIELD_LIST]",
             `'${streamName}' as _stream_name` + queryFieldList,
           );
-          sqlContext.push(b64EncodeUnicode(finalQuery));
+          sqlContext.push(b64EncodeUnicode(finalQuery) ?? "");
         });
       }
 
       let queryFunction = "";
       if (shouldAddFunctionToSearch()) {
-        queryFunction = b64EncodeUnicode(searchObj.data.tempFunctionContent);
+        queryFunction = b64EncodeUnicode(searchObj.data.tempFunctionContent) ?? "";
       }
 
       let actionId = "";
@@ -193,11 +192,9 @@ export const useSearchAround = () => {
           } else {
             searchObj.data.queryResults = res.data;
           }
-          //extract fields from query response
           await extractFields();
           generateHistogramSkeleton();
           generateHistogramData();
-          //update grid columns
           updateGridColumns();
           await filterHitsColumns();
 
@@ -214,7 +211,7 @@ export const useSearchAround = () => {
 
           if (error.response !== undefined) {
             searchObj.data.errorMsg = error.response.data.error;
-            searchObj.data.errorDetail = error.response.data.error_detail;
+            searchObj.data.errorDetail = error.response.data.error_detail ?? "";
             if (
               Object.prototype.hasOwnProperty.call(
                 error.response.data,

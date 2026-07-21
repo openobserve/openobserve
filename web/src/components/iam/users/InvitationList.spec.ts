@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import i18n from '@/locales';
 import store from '@/test/unit/helpers/store';
@@ -120,7 +120,7 @@ async function mountInvitationList(props = {}) {
         QTablePagination: {
           props: ['scope', 'resultTotal', 'perPageOptions', 'position'],
           emits: ['update:changeRecordPerPage'],
-          template: '<div data-test="q-table-pagination-stub" />',
+          template: '<div data-test="table-pagination-stub" />',
         },
         ODialog: ODialogStub,
       },
@@ -189,11 +189,7 @@ describe('InvitationList - fetchPendingInvitations', () => {
     expect((wrapper.vm as any).resultTotal).toBe(2);
   });
 
-  it('adds row numbers to each invitation', async () => {
-    const wrapper = await mountInvitationList();
-    expect((wrapper.vm as any).invitations[0]['#']).toBe('01');
-    expect((wrapper.vm as any).invitations[1]['#']).toBe('02');
-  });
+  // Row numbering moved to OTable's built-in show-index (no '#' data field).
 
   it('formats the expiry for each invitation', async () => {
     const wrapper = await mountInvitationList();

@@ -1,8 +1,8 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="w-full h-full flex flex-col px-3 bg-surface-panel border-r border-border-default">
-    <div class="flex items-center justify-between shrink-0 my-3">
+  <div class="w-full h-full flex flex-col bg-surface-panel border-r border-border-default">
+    <div class="flex items-center justify-between shrink-0 my-3 px-page-edge">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
         variant="outline"
@@ -35,6 +35,7 @@
     >
       <!-- Stream selectors -->
       <template #before-list>
+        <div class="px-page-edge">
           <OSelect
             v-if="dashboardPanelDataPageKey !== 'metrics'"
             :model-value="currentStreamType"
@@ -46,10 +47,8 @@
             :disabled="dashboardPanelDataPageKey === 'logs'"
             @update:model-value="onStreamTypeChange"
           />
-          <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. It used to be an
-               icon per type (a hash for Counter, bars for Histogram, a speedometer
-               for Gauge…) with no way to tell which was which. The `badge` renders
-               inline beside the name and costs no row height. -->
+          <!-- Metric type as a LETTER (C/G/H/S/O), not a glyph. The `badge`
+               renders inline beside the name and costs no row height. -->
           <OSelect
             :model-value="currentStream"
             :label="t('dashboard.selectIndex')"
@@ -61,17 +60,18 @@
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            :title="currentStream"
+            :title="currentStream ?? undefined"
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
           />
+        </div>
       </template>
 
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="h-7! w-full flex justify-between items-center rounded font-semibold pl-2 pr-1 text-xs cursor-default select-none bg-(--o2-section-header-bg) text-(--o2-text-secondary)"
+          class="h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs cursor-default select-none bg-section-header-bg text-text-secondary"
           :title="row.groupName"
         >
           <div class="flex-1 min-w-0">{{ row.groupName }}</div>
@@ -79,7 +79,7 @@
       </template>
 
       <!-- Field row -->
-      <template #field-row="{ row, index, draggable, isDragEnabled }">
+      <template #field-row="{ row, draggable, isDragEnabled }">
         <OFieldRow>
           <OIcon
             v-if="draggable"
@@ -100,7 +100,7 @@
           <template #actions>
             <!-- Standard chart actions -->
             <div
-              v-if="showStandardActions(row, index)"
+              v-if="showStandardActions(row)"
               class="flex items-center gap-0.5"
             >
               <OButton
@@ -174,7 +174,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -182,7 +184,7 @@
 
         <!-- Geomap actions -->
         <div
-          v-if="showGeomapActions(row, index)"
+          v-if="showGeomapActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -238,7 +240,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -246,7 +250,7 @@
 
         <!-- Maps actions -->
         <div
-          v-if="showMapsActions(row, index)"
+          v-if="showMapsActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -279,7 +283,9 @@
             variant="ghost-neutral"
             size="chip"
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -287,7 +293,7 @@
 
         <!-- Sankey actions -->
         <div
-          v-if="showSankeyActions(row, index)"
+          v-if="showSankeyActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -343,7 +349,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -358,11 +366,11 @@
           <div
             v-for="i in 6"
             :key="i"
-            class="flex items-center gap-2 py-[0.25rem]"
+            class="flex items-center gap-2 py-1"
           >
             <OSkeleton
               type="rect"
-              class="w-[0.875rem] h-[0.875rem] rounded-sm flex-shrink-0"
+              class="w-3.5 h-3.5 rounded-default flex-shrink-0"
             />
             <OSkeleton type="text" class="flex-1" />
           </div>
@@ -375,7 +383,7 @@
           class="text-center py-[0.725rem] flex items-center justify-center"
         >
           <OIcon name="info" size="xs" />
-          <span class="pl-[0.375rem]">{{ t("search.noFieldFound") }}</span>
+          <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
         </div>
       </template>
 
@@ -436,8 +444,8 @@
 import { computed, ref, watch, onMounted, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import {
   applyPromqlSeed,
@@ -452,6 +460,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
@@ -470,7 +479,7 @@ const dashboardPanelDataPageKey: string = inject(
 
 const store = useStore();
 const { t } = useI18n();
-const { getStreams, getStream } = useStreams();
+const { getStreams } = useStreams();
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
 const emit = defineEmits<{ collapse: [] }>();
@@ -509,33 +518,25 @@ const hideAllFieldsSelection = computed(() => props.hideAllFieldsSelection ?? fa
 
 /**
  * The badge is the type's INITIAL — `C`ounter, `G`auge, `H`istogram, `S`ummary,
- * `O`ther — not the whole word: it sits beside metric names that are already
- * long, and a full word pushed them into truncation. A letter is still learnable
- * in a way the old per-type icons (a hash, bars, a speedometer) were not.
+ * `O`ther — not the whole word, which pushed already-long metric names into
+ * truncation.
  */
 const initialOf = (label: string) => label.charAt(0).toUpperCase();
 
 /**
  * Stream name -> type-filter BUCKET id (`counter`, `gauge`, …), not its label.
- *
- * The bucket id is what both the label and the colour are keyed on, so it is
- * what gets carried around. Mapping to the label here and recovering the id
- * later with `label.toLowerCase()` worked only for as long as every label stayed
- * the capitalized spelling of its id — the day one reads "Gauge (native)", or is
- * translated, the lookup misses and the badge silently turns grey. Deriving the
- * label from the id is safe; deriving the id from the label is not.
+ * The bucket id keys both the label and the colour, so it is what gets carried
+ * around. Deriving the label from the id is safe; deriving the id from the label
+ * is not — a translated or decorated label misses the lookup and turns grey.
  */
 const metricTypeBuckets = computed<Record<string, string>>(() => {
   if (currentStreamType.value !== "metrics") return {};
   const streams = (dashboardPanelData.meta.stream.streamResults ?? []) as any[];
 
   // `buildTypeFilterBuckets`, not `buildMetricCards`: a badge needs one word per
-  // stream, and building the whole rule set — every variant, expression, legend
-  // and unit for every metric in the org — to get it was a heavy pass on a list
-  // that can run to thousands. This one runs the family model and the card-kind
-  // dispatch and stops. It also answers for the metadata-only family bases that
-  // `buildMetricCards` suppresses but the dropdown still lists, so the declared-
-  // type fallback that used to patch those up is gone.
+  // stream, and building the whole rule set for every metric would be a heavy
+  // pass on a list that can run to thousands. It also answers for the metadata-
+  // only family bases that `buildMetricCards` suppresses but the dropdown lists.
   return buildTypeFilterBuckets(streams);
 });
 
@@ -553,7 +554,7 @@ const currentStream = computed(
       ?.fields?.stream,
 );
 
-function onStreamTypeChange(val: string) {
+function onStreamTypeChange(val: SelectModelValue) {
   const fields =
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
       .fields;
@@ -561,7 +562,7 @@ function onStreamTypeChange(val: string) {
   fields.stream_type = val;
 }
 
-function onStreamChange(val: string) {
+function onStreamChange(val: SelectModelValue) {
   dashboardPanelData.data.queries[
     dashboardPanelData.layout.currentQueryIndex
   ].fields.stream = val;
@@ -665,7 +666,7 @@ watch(
   { immediate: true },
 );
 
-const isDarkTheme = computed(() => store.state.theme === "dark");
+const { isDark } = useTheme();
 
 const streamOptions = computed(() =>
   (filteredStreams.value as any[]).map((s) => {
@@ -675,29 +676,19 @@ const streamOptions = computed(() =>
     const type = bucket ? (BADGE_LABELS[bucket] ?? "Other") : undefined;
     return {
       ...s,
-      // The chip is the initial; hovering it spells the type out. `C` alone is
-      // compact but ambiguous (Counter? Count?) — the title is what resolves it.
+      // The chip is the initial; hovering it (the title) spells the type out.
       badge: type ? initialOf(type) : undefined,
       badgeTitle: type,
       // Colour-coded from the SAME palette the Metrics Explorer badges use —
       // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey —
-      // so a type looks the same wherever you meet it. A badge that classifies
-      // must be colour-coded to be worth anything; the default green-on-every-row
-      // outline carried no information at all.
+      // so a type looks the same wherever you meet it.
       badgeStyle: bucket
-        ? getBadgeStyle(bucket, isDarkTheme.value)
+        ? getBadgeStyle(bucket, isDark.value)
         : undefined,
     };
   }),
 );
 
-// ── Stream fields ──────────────────────────────────────────────────────
-
-const getStreamFields = useLoading(
-  async (fieldName: string, streamType: string) => {
-    return await getStream(fieldName, streamType, true);
-  },
-);
 
 // ── Query stream tracking ──────────────────────────────────────────────
 
@@ -833,7 +824,8 @@ watch(
 
             if (isAutoSeededQuery(slot?.query, metricName, streams, seedOpts)) {
               applyPromqlSeed(dashboardPanelData, streamName, {
-                previousStream: metricName,
+                // callee uses `?? `, so null and undefined behave identically
+                previousStream: metricName ?? undefined,
               });
             }
           }
@@ -933,7 +925,7 @@ const flattenGroupedFields = computed(() => {
     });
 
     if (
-      group.settings.hasOwnProperty("defined_schema_fields") &&
+      Object.prototype.hasOwnProperty.call(group.settings, "defined_schema_fields") &&
       group.settings.defined_schema_fields.length > 0
     ) {
       flattenedFields.push({
@@ -947,7 +939,7 @@ const flattenGroupedFields = computed(() => {
       for (const field of group.schema) {
         if (
           store.state.zoConfig.user_defined_schemas_enabled &&
-          group.settings.hasOwnProperty("defined_schema_fields") &&
+          Object.prototype.hasOwnProperty.call(group.settings, "defined_schema_fields") &&
           group.settings.defined_schema_fields.length > 0
         ) {
           if (group.settings.defined_schema_fields.includes(field.name)) {
@@ -1028,7 +1020,7 @@ const customFieldNames = computed(() => {
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────
 
-function isRowDragEnabled(row: FieldItem, _index: number): boolean {
+function isRowDragEnabled(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   const currentQuery =
@@ -1039,29 +1031,23 @@ function isRowDragEnabled(row: FieldItem, _index: number): boolean {
   return true;
 }
 
-function onDragStart(row: FieldItem, _event: DragEvent) {
+function onDragStart(row: FieldItem) {
   dashboardPanelData.meta.dragAndDrop.dragging = true;
   dashboardPanelData.meta.dragAndDrop.dragElement = row;
   dashboardPanelData.meta.dragAndDrop.dragSource = "fieldList";
   dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
 }
 
-function onDragEnd(_row: FieldItem, _event: DragEvent) {
+function onDragEnd() {
   cleanupDraggingFields();
 }
 
 // ── Sort ───────────────────────────────────────────────────────────────
 
-// We intentionally return 0 (no-op) here.
-//
-// `flattenGroupedFields` already produces the correct order:
-//   [customQueryFields…, vrlFunctionFields…, group_A_header, A_fields…, group_B_header, B_fields…]
-//
-// A naive sort that says "group headers come first" (the previous logic)
-// hoists every group header to the very top of the flat array — which is
-// what caused both stream headers (`_anomalies`, `default`) to stack at
-// the top with all fields jammed underneath the *second* group. Returning
-// 0 preserves the natural section-by-section order from flattenGroupedFields.
+// Intentional no-op: `flattenGroupedFields` already emits rows in section order
+// (query/vrl fields, then each group header followed by its fields). A real sort
+// that hoisted group headers first stacked every header at the top with the
+// fields jammed under the wrong group, so preserve the given order.
 function sortFieldsFn(_a: FieldItem, _b: FieldItem): number {
   return 0;
 }
@@ -1074,7 +1060,7 @@ function onSearchChange(value: string) {
 
 // ── Action visibility helpers ──────────────────────────────────────────
 
-function showStandardActions(row: FieldItem, _index: number): boolean {
+function showStandardActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1098,7 +1084,7 @@ function showStandardActions(row: FieldItem, _index: number): boolean {
   return true;
 }
 
-function showGeomapActions(row: FieldItem, _index: number): boolean {
+function showGeomapActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1112,7 +1098,7 @@ function showGeomapActions(row: FieldItem, _index: number): boolean {
   return dashboardPanelData.data.type === "geomap";
 }
 
-function showMapsActions(row: FieldItem, _index: number): boolean {
+function showMapsActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1126,7 +1112,7 @@ function showMapsActions(row: FieldItem, _index: number): boolean {
   return dashboardPanelData.data.type === "maps";
 }
 
-function showSankeyActions(row: FieldItem, _index: number): boolean {
+function showSankeyActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;

@@ -66,8 +66,8 @@ class PromqlRendererImpl implements PromqlRenderer {
     operation: PromqlStep,
     innerExpr: string
   ): string {
-    // A panel saved before the scalar-math steps were renamed still carries the
-    // old id, so resolve it before anything looks it up or switches on it.
+    // A panel may persist an old scalar-math step id, so resolve it before
+    // anything looks it up or switches on it.
     const id = normalizeStepId(operation.id);
     const def = this.operations.get(id);
     if (!def) return innerExpr;
@@ -163,7 +163,6 @@ class PromqlRendererImpl implements PromqlRenderer {
     }
 
     // Handle functions with parameters
-    const paramStr = params.map((p) => (typeof p === "string" ? p : p)).join(", ");
 
     // Functions like clamp that have params before the expression
     if (

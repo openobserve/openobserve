@@ -68,6 +68,12 @@ vi.mock("@/plugins/pipelines/useDnD", () => ({
 vi.mock("@vue-flow/core", () => ({
   MarkerType: { ArrowClosed: "arrowclosed" },
   VueFlow: { name: "VueFlow", template: "<div />" },
+  Handle: { name: "Handle", template: "<div />" },
+  Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
+  BaseEdge: { name: "BaseEdge", template: "<path />" },
+  getBezierPath: () => ["M0 0", 0, 0],
+  useVueFlow: () => ({}),
+  Panel: { name: "Panel", template: "<div><slot /></div>" },
 }));
 
 // Mock URL and document anchor element for export tests
@@ -85,7 +91,7 @@ document.createElement = (tag: string) => {
 };
 
 // Stubs for migrated ODialog (Pipeline Error Dialog) and ODrawer (Create Pipeline Drawer)
-// These replace the old q-dialog usages and allow us to assert prop forwarding
+// These replace the old dialog usages and allow us to assert prop forwarding
 // and drive button clicks via emits instead of relying on component internals.
 const ODialogStub = {
   name: "ODialog",

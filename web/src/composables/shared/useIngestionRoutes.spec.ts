@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import useIngestionRoutes from "./useIngestionRoutes";
 
 vi.mock("@/aws-exports", () => ({
@@ -38,6 +38,7 @@ vi.mock("@/components/ingestion/recommended/AzureConfig.vue", () => ({ default: 
 vi.mock("@/components/ingestion/logs/FileBeat.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/traces/OpenTelemetry.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/PrometheusConfig.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/metrics/NightingaleConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/OtelCollector.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/TelegrafConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/CloudWatchMetrics.vue", () => ({ default: {} }));
@@ -217,6 +218,7 @@ describe("useIngestionRoutes", () => {
       
       expect(metricRouteNames).toContain("prometheus");
       expect(metricRouteNames).toContain("vmagent");
+      expect(metricRouteNames).toContain("nightingale");
       expect(metricRouteNames).toContain("otelCollector");
       expect(metricRouteNames).toContain("telegraf");
       expect(metricRouteNames).toContain("cloudwatchMetrics");

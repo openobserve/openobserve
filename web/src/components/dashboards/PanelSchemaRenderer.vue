@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    style="width: 100%; height: 100%"
+  <div class="w-full h-full"
     @mouseleave="hidePopupsAndOverlays"
     @mouseenter="showPopupsAndOverlays"
   >
-    <div
+    <div class="h-full relative"
       ref="chartPanelRef"
-      style="height: 100%; position: relative"
       :class="chartPanelClass"
     >
       <div
@@ -70,13 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="flex flex-col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="flex flex-col column w-full h-full flex-1"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
-            style="width: 100%; height: 100%"
-            class="flex flex-col"
+            class="flex flex-col w-full h-full"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -84,13 +80,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="flex flex-col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="flex flex-col column w-full h-full flex-1"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
-            style="width: 100%; height: 100%"
-            class="flex flex-col"
+            class="flex flex-col w-full h-full"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -100,8 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
-          style="width: 100%; height: 100%"
-          class="flex flex-col"
+          class="flex flex-col w-full h-full"
           @error="errorDetail = $event"
         />
         <ChartRenderer
@@ -119,22 +112,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="metricItems.length && !noData && !loading"
-        style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
+        class="absolute inset-0 pointer-events-none z-8"
         data-test="dashboard-metric-copy-overlay"
       >
-        <div
+        <div class="absolute pointer-events-auto"
           v-for="m in metricItems"
           :key="m.idx"
-          style="position: absolute; pointer-events: auto"
           :style="metricZoneStyle(m)"
           @mouseenter="hoveredMetricIdx = m.idx"
           @mouseleave="hoveredMetricIdx = null"
         >
-          <OButton
+          <OButton class="absolute"
             v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
             variant="ghost"
             size="icon-xs-sq"
-            style="position: absolute"
             :style="m.iconStyle"
             @click="copyMetricItem(m)"
             data-test="dashboard-metric-copy-btn"
@@ -171,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">
+        <div class="h-4/5 w-full">
           {{
             errorDetail?.code?.toString().startsWith("4")
               ? errorDetail.message
@@ -192,8 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
       <div
-        class="flex"
-        style="position: absolute; top: 0px; width: 100%; z-index: 999"
+        class="flex absolute top-0 w-full z-999"
+       
       >
         <LoadingProgress
           :loading="loading"
@@ -202,11 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded border border-(--o2-border) shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
-        :class="{
-          'group/menu bg-[#2c2c2c] border-[#404040] shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
-          'bg-white': store.state.theme !== 'dark',
-        }"
+        class="absolute z-9999999 min-w-50 py-1 px-0 hidden whitespace-nowrap top-0 left-0 rounded-default border border-dropdown-border bg-dropdown-bg shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -218,12 +205,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator
             v-if="
               drilldown._isCrossLink &&
-              index > 0 &&
-              !drilldownArray[index - 1]._isCrossLink
+              Number(index) > 0 &&
+              !drilldownArray[Number(index) - 1]._isCrossLink
             "
           />
           <div
-            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-[#333] hover:bg-[#f5f5f5] active:bg-(--o2-border) group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
+            class="flex items-center py-2 px-4 cursor-pointer transition-colors duration-200 text-sm text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
@@ -237,34 +224,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
       <div
-        style="
-          border: 1px solid gray;
-          border-radius: 4px;
-          padding: 3px;
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          display: none;
-          max-width: 200px;
-          white-space: normal;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-(--o2-bg-card-dark,#1a1a1a)' : 'bg-white'"
+        class="border border-border-default rounded-default p-0.75 absolute top-0 left-0 hidden max-w-50 whitespace-normal [word-wrap:break-word] [overflow-wrap:break-word] z-9999999 bg-surface-base"
         ref="annotationPopupRef"
       >
         <div
-          class="px-2 py-1"
-          style="
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            position: relative;
-            word-break: break-word;
-          "
+          class="px-2 py-1 flex flex-row items-center relative break-words"
         >
-          <span style="word-break: break-word">{{
+          <span class="break-words">{{
             selectedAnnotationData.text
           }}</span>
         </div>
@@ -305,6 +271,8 @@ import {
   onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
 import { useI18n } from "vue-i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
@@ -367,7 +335,6 @@ const AlertContextMenu = defineAsyncComponent(() => {
 });
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
@@ -390,7 +357,6 @@ export default defineComponent({
     LoadingProgress,
     OButton,
     OIcon,
-    OTooltip,
     OEmptyState,
   },
   props: {
@@ -517,6 +483,7 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const route = useRoute();
     const router = useRouter();
@@ -536,11 +503,6 @@ export default defineComponent({
     // - PreviewAlert.vue (no page key) - doesn't need it
     // - PanelContainer.vue (no page key) - doesn't need it
     // - PreviewPromqlQuery.vue (no page key) - doesn't need it
-    //
-    // To avoid breaking these other contexts, we:
-    // 1. Inject with null default to detect if page key was explicitly provided
-    // 2. Only call useDashboardPanelData if a page key exists
-    // 3. Return empty array [] if no hiddenQueries (no filtering applied)
     // ============================================================================
 
     const dashboardPanelDataPageKey: any = inject(
@@ -563,7 +525,6 @@ export default defineComponent({
       return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
     });
 
-    // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const chartRendererRef: any = ref(null); // holds the ref to the ChartRenderer component
@@ -667,8 +628,7 @@ export default defineComponent({
         left: `${Math.max(0, width - COPY_BTN_PX - 2)}px`,
         top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
-        backgroundColor:
-          store?.state?.theme === "dark" ? "#27272a" : "#ffffff",
+        backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
         boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
@@ -705,7 +665,6 @@ export default defineComponent({
       searchResponse,
       is_ui_histogram,
       shouldRefreshWithoutCache,
-      showLegendsButton,
       regionClusterParams,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
@@ -785,7 +744,7 @@ export default defineComponent({
       return filtered;
     });
 
-    // E2: Also filter panelSchema.queries in sync with filteredData
+    // Also filter panelSchema.queries in sync with filteredData
     // to keep data[i] aligned with queries[i] in convertMultiSQLData
     const filteredPanelSchema = computed(() => {
       if (
@@ -950,7 +909,6 @@ export default defineComponent({
     onMounted(async () => {
       // fetch all panels
       await fetchAllPanels();
-      panelsList.value = panelsList.value;
     });
 
     // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -1032,7 +990,7 @@ export default defineComponent({
             // 2. localStorage saved color
             // 3. Org settings color
             // 4. Default theme color from store
-            const _themeMode = store.state.theme === "dark" ? "dark" : "light";
+            const _themeMode = isDark.value ? "dark" : "light";
             const primaryColor: string =
               (_themeMode === "dark"
                 ? store.state.tempThemeColors?.dark
@@ -1390,7 +1348,7 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
-    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+    let resizeTimeout: number | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
@@ -1716,10 +1674,6 @@ export default defineComponent({
         };
       },
       logDataAsJSON: (title: string) => {
-        const chartData =
-          panelSchema.value?.queryType === "promql"
-            ? filteredData.value
-            : data.value;
         console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
         console.groupEnd();
       },
@@ -1737,12 +1691,8 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-// When the panel is too short to comfortably fit the icon, hide it and show
-// just the centered "No Data" message. Kept as scoped CSS because this is a
-// container query targeting a deep descendant rendered by OEmptyState — it
-// cannot be expressed as an inline Tailwind utility. The container itself and
-// its min-height/padding overrides are applied inline on the OEmptyState above.
+<style scoped>
+/* keep(lib-override:o2-empty-state): container query hides OEmptyState's internally-rendered icon when the panel is too short — targets a deep descendant of the lib component, not expressible as a utility on this template */
 @container (max-height: 5rem) {
   .noData :deep(.o2-empty-state__inline-icon) {
     display: none;

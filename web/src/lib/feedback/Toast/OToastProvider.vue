@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed } from "vue"
 import { ToastProvider, ToastViewport } from "reka-ui"
 import { useToast } from "./useToast"
 import { toastRecords } from "./useToast"

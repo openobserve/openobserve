@@ -14,12 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { flushPromises, shallowMount, mount } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { defineComponent, ref, h } from "vue";
-import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
-import MainLayout from "@/layouts/MainLayout.vue";
-import router from "@/test/unit/helpers/router";
 import * as cookies from "@/utils/cookies";
 
 // ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
@@ -774,7 +770,6 @@ describe("MainLayout Methods and Functions", () => {
         
         if (!existingLink) {
           // Simulate creating and appending link
-          const link = { rel: "prefetch", href: "/web/assets/editor.api.v1.js" };
           isLoaded = true;
         }
         
@@ -987,12 +982,12 @@ describe("MainLayout Methods and Functions", () => {
           label: data.name,
           id: data.id,
           identifier: data.identifier,
-          subscription_type: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.subscription_type 
+          subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.subscription_type
             : "",
           status: data.status,
-          note: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.note 
+          note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.note
             : ""
         }));
       };
@@ -1027,12 +1022,12 @@ describe("MainLayout Methods and Functions", () => {
           label: data.name,
           id: data.id,
           identifier: data.identifier,
-          subscription_type: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.subscription_type 
+          subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.subscription_type
             : "",
           status: data.status,
-          note: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.note 
+          note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.note
             : ""
         }));
       };
@@ -1421,7 +1416,7 @@ describe("MainLayout Methods and Functions", () => {
       expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
     });
 
-    it("does NOT forward any q-dialog-specific props (migration removed maximized/full-height)", () => {
+    it("does NOT forward any legacy dialog-specific props (migration removed maximized/full-height)", () => {
       const wrapper = mount(Host);
       const dialog = wrapper.findComponent(ODialogStub);
 

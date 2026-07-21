@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, DOMWrapper, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import CipherKeys from "./CipherKeys.vue";
 import i18n from "@/locales";
@@ -61,7 +61,7 @@ vi.mock("@/components/cipherkeys/AddCipherKey.vue", () => ({
 vi.mock("@/components/shared/grid/Pagination.vue", () => ({
   default: {
     name: "QTablePagination",
-    template: "<div data-test='q-table-pagination'></div>",
+    template: "<div data-test='table-pagination'></div>",
     props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
     emits: ["update:changeRecordPerPage"],
   },
@@ -136,56 +136,6 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-                QTable: {
-          template: `<div data-test-stub='q-table'>
-            <slot name='top'></slot>
-            <slot name='header'></slot>
-            <div v-if='rows && rows.length > 0'>
-              <div v-for='(row, index) in rows' :key='row["#"] || index' class='table-row'>
-                <span>{{ row.name }}</span>
-              </div>
-            </div>
-            <div v-else class='no-data'>No data</div>
-            <slot name='no-data' v-if='!rows || rows.length === 0'></slot>
-            <slot name='bottom'></slot>
-          </div>`,
-          props: ["rows", "columns", "pagination", "filter", "filterMethod"],
-          data() {
-            return {
-              mockScope: { pagination: { page: 1, rowsPerPage: 20 } },
-              mockCols: [
-                { name: "name", label: "Name" },
-                { name: "actions", label: "Actions" },
-              ],
-            };
-          },
-          methods: {
-            setPagination: vi.fn(),
-          },
-        },
-        QBtn: {
-          template: `<button 
-            data-test-stub='q-btn' 
-            :data-test='$attrs["data-test"]'
-            @click='$emit("click", $event)'
-            :disabled='disable'
-          >
-            <slot></slot>
-            {{ label }}
-          </button>`,
-          props: ["label", "disable", "icon", "color", "class", "padding"],
-          emits: ["click"],
-        },
-        QInput: {
-          template: `<input
-            data-test-stub='q-input'
-            :value='modelValue'
-            @input='$emit("update:modelValue", $event.target.value)'
-            :placeholder='placeholder'
-          />`,
-          props: ["modelValue", "placeholder", "filled", "dense", "clearable"],
-          emits: ["update:modelValue"],
-        },
         OInput: {
           template: `<input
             data-test-stub='o-input'
@@ -196,28 +146,12 @@ const createWrapper = (props = {}, options = {}) => {
           props: ["modelValue", "placeholder", "class"],
           emits: ["update:modelValue"],
         },
-        QIcon: {
-          template: "<span data-test-stub='OIcon'></span>",
-          props: ["name"],
-        },
-        QTh: {
-          template: "<th data-test-stub='q-th'><slot></slot></th>",
-          props: ["props", "class", "style"],
-        },
-        QTr: {
-          template: "<tr data-test-stub='q-tr'><slot></slot></tr>",
-          props: ["props"],
-        },
-        QTd: {
-          template: "<td data-test-stub='q-td'><slot></slot></td>",
-          props: ["props"],
-        },
         AddCipherKey: {
           template: "<div data-test-stub='add-cipher-key'></div>",
           emits: ["cancel:hideform"],
         },
         QTablePagination: {
-          template: "<div data-test-stub='q-table-pagination'></div>",
+          template: "<div data-test-stub='table-pagination'></div>",
           props: ["scope", "pageTitle", "resultTotal", "perPageOptions", "position"],
           emits: ["update:changeRecordPerPage"],
         },
@@ -302,7 +236,7 @@ describe("CipherKeys", () => {
 
     it("should render cipher keys list title", () => {
       const wrapper = createWrapper();
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });
@@ -322,7 +256,6 @@ describe("CipherKeys", () => {
       
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({
-        "#": 1,
         name: "test-key-1",
         store_type: "env",
         mechanism_type: "aes",
@@ -336,7 +269,7 @@ describe("CipherKeys", () => {
         response: { data: { message: "Server error" } },
       });
 
-      const wrapper = createWrapper();
+      createWrapper();
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -359,7 +292,7 @@ describe("CipherKeys", () => {
         response: { data: { message: "Forbidden" } },
       });
 
-      const wrapper = createWrapper();
+      createWrapper();
       await nextTick();
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -607,40 +540,36 @@ describe("CipherKeys", () => {
     it("should have correct table columns configuration", () => {
       const wrapper = createWrapper();
 
-      expect(wrapper.vm.columns).toHaveLength(5);
+      expect(wrapper.vm.columns).toHaveLength(4);
 
-      // Column 0: #
-      expect(wrapper.vm.columns[0].id).toBe("#");
-      expect(wrapper.vm.columns[0].accessorKey).toBe("#");
-      expect(wrapper.vm.columns[0].size).toBe(44);
+      // Row numbering moved to OTable's built-in show-index (no '#' column).
+
+      // Column 0: name
+      expect(wrapper.vm.columns[0].id).toBe("name");
+      expect(wrapper.vm.columns[0].accessorKey).toBe("name");
+      expect(wrapper.vm.columns[0].sortable).toBe(true);
       expect(wrapper.vm.columns[0].meta.align).toBe("left");
 
-      // Column 1: name
-      expect(wrapper.vm.columns[1].id).toBe("name");
-      expect(wrapper.vm.columns[1].accessorKey).toBe("name");
+      // Column 1: store_type
+      expect(wrapper.vm.columns[1].id).toBe("store_type");
+      expect(wrapper.vm.columns[1].accessorKey).toBe("store_type");
       expect(wrapper.vm.columns[1].sortable).toBe(true);
+      expect(wrapper.vm.columns[1].size).toBe(180);
       expect(wrapper.vm.columns[1].meta.align).toBe("left");
 
-      // Column 2: store_type
-      expect(wrapper.vm.columns[2].id).toBe("store_type");
-      expect(wrapper.vm.columns[2].accessorKey).toBe("store_type");
+      // Column 2: mechanism_type
+      expect(wrapper.vm.columns[2].id).toBe("mechanism_type");
+      expect(wrapper.vm.columns[2].accessorKey).toBe("mechanism_type");
       expect(wrapper.vm.columns[2].sortable).toBe(true);
       expect(wrapper.vm.columns[2].size).toBe(180);
       expect(wrapper.vm.columns[2].meta.align).toBe("left");
 
-      // Column 3: mechanism_type
-      expect(wrapper.vm.columns[3].id).toBe("mechanism_type");
-      expect(wrapper.vm.columns[3].accessorKey).toBe("mechanism_type");
-      expect(wrapper.vm.columns[3].sortable).toBe(true);
-      expect(wrapper.vm.columns[3].size).toBe(180);
-      expect(wrapper.vm.columns[3].meta.align).toBe("left");
-
-      // Column 4: actions
-      expect(wrapper.vm.columns[4].id).toBe("actions");
-      expect(wrapper.vm.columns[4].isAction).toBe(true);
-      expect(wrapper.vm.columns[4].pinned).toBe("right");
-      expect(wrapper.vm.columns[4].size).toBe(100);
-      expect(wrapper.vm.columns[4].meta.align).toBe("center");
+      // Column 3: actions
+      expect(wrapper.vm.columns[3].id).toBe("actions");
+      expect(wrapper.vm.columns[3].isAction).toBe(true);
+      expect(wrapper.vm.columns[3].pinned).toBe("right");
+      expect(wrapper.vm.columns[3].size).toBe(100);
+      expect(wrapper.vm.columns[3].meta.align).toBe("center");
     });
   });
 
@@ -679,9 +608,9 @@ describe("CipherKeys", () => {
     });
 
     it("should render action buttons with proper data-test attributes", async () => {
-      const wrapper = createWrapper();
+      createWrapper();
       await nextTick();
-      
+
       // These would be rendered in the actual table slots
       const testRow = { name: "test-key-1" };
       const editTestAttr = `cipherkey-list-${testRow.name}-update`;

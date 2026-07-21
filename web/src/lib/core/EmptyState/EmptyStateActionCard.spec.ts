@@ -53,9 +53,9 @@ describe("EmptyStateActionCard", () => {
 
   it("renders the icon inside the tile wrapper with correct classes", () => {
     const wrapper = mountCard();
-    const tileSpan = wrapper.find("button span.rounded-lg");
+    const tileSpan = wrapper.find("button span.rounded-default");
     expect(tileSpan.exists()).toBe(true);
-    expect(tileSpan.classes()).toContain("rounded-lg");
+    expect(tileSpan.classes()).toContain("rounded-default");
     expect(tileSpan.classes()).toContain("bg-tabs-active-bg");
   });
 
@@ -118,11 +118,12 @@ describe("EmptyStateActionCard", () => {
     expect(btn.classes()).toContain("group");
     expect(btn.classes()).toContain("flex");
     expect(btn.classes()).toContain("items-center");
-    expect(btn.classes()).toContain("rounded-xl");
+    expect(btn.classes()).toContain("rounded-default");
     expect(btn.classes()).toContain("border");
     expect(btn.classes()).toContain("border-border-default");
     expect(btn.classes()).toContain("bg-surface-base");
-    expect(btn.classes()).toContain("shadow-sm");
+    // Base state has no shadow; the lift only appears on hover (hover:shadow-md).
+    expect(btn.classes()).toContain("hover:shadow-md");
     expect(btn.classes()).toContain("text-left");
     expect(btn.classes()).toContain("cursor-pointer");
   });

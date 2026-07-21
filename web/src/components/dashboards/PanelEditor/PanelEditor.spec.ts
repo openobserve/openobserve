@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import PanelEditor from "./PanelEditor.vue";
@@ -272,14 +272,6 @@ const ODialogStub = {
 const mountGlobal = {
   plugins: [i18n],
   stubs: {
-    QSeparator: true,
-    QSplitter: {
-      template:
-        '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-    },
-    QIcon: true,
-    QBtn: true,
-    QTooltip: true,
     // OSplitter slots must render so nested ODialogs (e.g. the custom-chart
     // selector inside the splitter's #before slot) appear in the DOM.
     OSplitter: {

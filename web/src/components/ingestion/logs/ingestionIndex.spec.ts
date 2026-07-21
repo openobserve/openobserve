@@ -17,7 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { nextTick, ref } from "vue";
+import { nextTick } from "vue";
 import { createRouter, createMemoryHistory } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -63,15 +63,6 @@ describe("IngestLogs Index Component", () => {
 
   const mockProps = {
     currOrgIdentifier: "test-org"
-  };
-
-  const mockRouter = {
-    currentRoute: {
-      value: {
-        name: "curl"
-      }
-    },
-    push: vi.fn()
   };
 
   beforeEach(() => {
@@ -361,9 +352,6 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
             "router-view": true
           }
         }
@@ -379,9 +367,6 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
             "router-view": true
           }
         }

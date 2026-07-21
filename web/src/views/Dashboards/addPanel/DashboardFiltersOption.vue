@@ -8,8 +8,7 @@
           ].customQuery && dashboardPanelData.data.queryType == 'sql'
         )
       "
-      style="display: flex; flex-direction: row"
-      class="pl-3"
+      class="pl-3 flex flex-row"
     >
       <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
       <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
@@ -45,13 +44,11 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import Group from "./Group.vue";
-import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "DashboardFiltersOption",
   components: {
     Group,
-    AddCondition,
   },
   props: ["dashboardData"],
 

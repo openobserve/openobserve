@@ -94,8 +94,9 @@ const useAiChat = () => {
 
         let body = '';
         if (contextToUse) {
-            // Extract agent_type from context if present (for SRE agent routing)
-            const { agent_type, ...contextWithoutAgentType } = contextToUse;
+            // Strip agent_type from context (for SRE agent routing)
+            const contextWithoutAgentType = { ...contextToUse };
+            delete contextWithoutAgentType.agent_type;
 
             // Add user's timezone to context for time display formatting
             const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;

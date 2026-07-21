@@ -32,18 +32,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filter mode toggle + selection count -->
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar flex items-center justify-between px-2 py-1 border-b border-(--o2-border-color)"
+      class="filter-mode-bar flex items-center justify-between px-2 py-1 border-b border-card-glass-border"
       data-test="field-values-panel-filter-mode-bar"
     >
       <div class="flex items-center gap-1 ">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count text-3! text-[0.625rem] font-medium text-[var(--o2-primary-color)]"
+          class="selection-count text-3! text-3xs font-medium text-accent"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  text-3! text-[0.625rem] text-[var(--o2-text-secondary)]">Select to filter</span>
+        <span v-else class="selection-hint  text-3! text-3xs text-text-secondary">Select to filter</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle flex border border-[var(--o2-border-color)] rounded overflow-hidden"
+        class="filter-mode-toggle flex border border-card-glass-border rounded-default overflow-hidden"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
@@ -69,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <OIcon class="h-2.5! w-2.5! m-0.5!">
+          <!-- name="" → OIcon renders the slotted custom SVG -->
+          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
             <EqualIcon />
           </OIcon>
         </OButton>
@@ -82,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <OIcon class="h-2.5! w-2.5! m-0.5!">
+          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
             <NotEqualIcon />
           </OIcon>
         </OButton>
@@ -94,13 +95,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Loading state (only shown when there are no interim cached results) -->
       <div
         v-show="fieldValues?.isLoading && !displayValues.length"
-        class="relative pl-3 py-1"
-        style="height: 3.75rem"
+        class="relative pl-3 py-1 h-15"
       >
+        <!-- scrim off: this box is empty while loading, so there is nothing to
+             dim — and the scrim is 70% of surface-base (white), which on this
+             panel's grey surface just reads as a white block. -->
         <OInnerLoading
-          :showing="fieldValues?.isLoading && !displayValues.length"
+          :showing="!!fieldValues?.isLoading && !displayValues.length"
           label="Fetching values..."
           size="xs"
+          :scrim="false"
           data-test="field-values-panel-loading-indicator"
         />
       </div>
@@ -155,23 +159,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               class="flex flex-row flex-wrap justify-between min-w-0 pl-1"
-              :style="
-                showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
-              "
+              :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
             >
               <div
                 :title="value.key"
-                class="truncate pr-1 text-field-list-label-text text-3!"
-                style="width: calc(100% - 3.125rem)"
+                class="truncate pr-1 text-field-list-label-text text-3! w-[calc(100%-3.125rem)]"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="truncate text-right pr-0 text-3!"
-                style="display: contents"
-                :style="showMultiSelect ? 'width: 3.125rem' : ''"
+                class="truncate text-right pr-0 text-3! contents"
+                :class="showMultiSelect ? 'w-[3.125rem]' : ''"
               >
                 {{ formatLargeNumber(value.count) }}
               </div>
@@ -184,10 +184,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- View more values / loading more indicator -->
     <div
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="w-full flex justify-center border-t border-(--o2-border-color) pt-1 px-1"
+      class="w-full flex justify-center border-t border-card-glass-border pt-1 px-1"
     >
       <button
-        class="inline-flex items-center gap-1 bg-transparent border-0 text-(--o2-primary-color) text-[0.6875rem] font-[inherit] py-0.5 px-1 cursor-pointer rounded-[0.1875rem] transition-opacity duration-150 hover:opacity-80 hover:bg-(--color-interactive-hover-bg) disabled:opacity-50 disabled:cursor-default"
+        class="inline-flex items-center gap-1 bg-transparent border-0 text-accent text-2xs font-[inherit] py-0.5 px-1 cursor-pointer rounded-default transition-opacity duration-150 hover:opacity-80 hover:bg-interactive-hover-bg disabled:opacity-50 disabled:cursor-default"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
@@ -212,6 +212,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 
 interface FieldValues {
   isLoading: boolean;
@@ -319,7 +320,13 @@ const displayValues = computed(() => {
   // No API values — fall back to synthetic entries for each selected value so
   // they remain visible and removable (count: null signals no data available).
   if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
-    return selectedValues.value.map((v) => ({ key: v, count: null as unknown as number, synthetic: true }));
+    return selectedValues.value.map(
+      (v): { key: string; count: number; label?: string; synthetic: boolean } => ({
+        key: v,
+        count: null as unknown as number,
+        synthetic: true,
+      }),
+    );
   }
 
   return [];
@@ -390,7 +397,9 @@ watch(
  * Immediately emits the updated selection with the current filter mode,
  * or emits remove-field-filter when all values are unchecked.
  */
-const handleUserCheckboxChange = (newValues: string[]) => {
+const handleUserCheckboxChange = (value: CheckboxModelValue) => {
+  // Array (group) mode: OCheckbox emits the current selection as primitives.
+  const newValues = Array.isArray(value) ? value.map(String) : [];
   selectedValues.value = newValues;
   if (newValues.length === 0) {
     emit("remove-field-filter", props.fieldName);
@@ -440,16 +449,6 @@ watch(
     }
   },
 );
-
-/**
- * Returns the colour token for a value's checkbox.
- * Excluded values (!=) render red ("negative") to visually distinguish them
- * from included values (=) which render the default blue ("primary").
- */
-const checkboxColor = (key: string): string => {
-  if (props.activeExcludeValues?.includes(key)) return "negative";
-  return "primary";
-};
 
 /**
  * Resets the panel to match the current active filter state.

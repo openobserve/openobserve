@@ -5,7 +5,7 @@ import type {
   DateRangeCalendarProps,
   DateRangeCalendarEmits,
 } from "./ODateRangeCalendar.types";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import {
   RangeCalendarRoot,
   RangeCalendarGrid,
@@ -47,12 +47,19 @@ function fromIso(s: string) {
 // Internal calendar state. We do NOT commit to parent until both ends are
 // picked, so the parent's startDate/endDate stay valid (avoiding "[object
 // Object]" display artifacts from formatters that assume both are non-empty).
-const internalStart = ref<DateValue | undefined>(undefined);
-const internalEnd = ref<DateValue | undefined>(undefined);
+// Casts: ref() deep-unwraps DateValue's class type structurally, breaking DateValue params
+const internalStart = ref<DateValue | undefined>(undefined) as Ref<
+  DateValue | undefined
+>;
+const internalEnd = ref<DateValue | undefined>(undefined) as Ref<
+  DateValue | undefined
+>;
 // Tracks the hovered cell while awaiting the second click — used to render
 // the dashed preview range only between start and hover (not all valid-to-pick
 // cells, which is what reka-ui's data-highlighted alone would give us).
-const hoverDate = ref<DateValue | undefined>(undefined);
+const hoverDate = ref<DateValue | undefined>(undefined) as Ref<
+  DateValue | undefined
+>;
 
 // Resync internal state when parent provides new dates (initial load, external
 // changes, or after a committed range round-trip).
@@ -158,7 +165,7 @@ function handleRangeChange(value: DateRange | undefined) {
         class="flex items-center justify-between mb-3"
       >
         <RangeCalendarPrev
-          class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
+          class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
           data-test="daterangecalendar-prev"
         >
           <svg
@@ -180,7 +187,7 @@ function handleRangeChange(value: DateRange | undefined) {
           data-test="daterangecalendar-heading"
         />
         <RangeCalendarNext
-          class="flex items-center justify-center size-7 rounded transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
+          class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
           data-test="daterangecalendar-next"
         >
           <svg
@@ -227,7 +234,7 @@ function handleRangeChange(value: DateRange | undefined) {
                 :data-test="`daterangecalendar-cell-${d.toString()}`"
                 :data-preview="isCellInPreview(d) ? '' : undefined"
                 @mouseenter="handleCellMouseEnter(d)"
-                class="flex items-center justify-center size-8 rounded text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-unavailable:pointer-events-none data-disabled:text-datepicker-day-disabled-text data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
+                class="flex items-center justify-center size-8 rounded-default text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-unavailable:pointer-events-none data-disabled:text-datepicker-day-disabled-text data-disabled:cursor-not-allowed data-disabled:pointer-events-none data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
                 >{{ d.day }}</RangeCalendarCellTrigger
               >
             </RangeCalendarCell>
@@ -238,26 +245,21 @@ function handleRangeChange(value: DateRange | undefined) {
   </RangeCalendarRoot>
 </template>
 
-<style>
-/*
-  While awaiting the second click, reka-ui flags every still-pickable cell
-  with [data-highlighted] (start → max-date), which would visually wash out
-  the whole future calendar. Strip that styling in awaiting mode and rely on
-  our own [data-preview] flag, which we set only on cells between start and
-  the user's current hover position.
-
-  The :not([data-selected]) guards keep the chosen start cell (which carries
-  BOTH data-selected and data-highlighted) from being affected — it should
-  continue to show the solid "selected" background.
-*/
-.o-range-cal--awaiting [data-highlighted]:not([data-selected]) {
+<style scoped>
+/* keep(lib-override:reka-ui): while awaiting the second click, reka flags every
+   still-pickable cell with [data-highlighted] (start → max-date), washing out
+   the future calendar. Strip that and paint only our own [data-preview] cells
+   (set between start and hover). The :not([data-selected]) guards keep the
+   chosen start cell's solid background. Targets reka-generated cell DOM state,
+   so the selectors need :deep. */
+.o-range-cal--awaiting :deep([data-highlighted]:not([data-selected])) {
   background-color: transparent;
   color: inherit;
 }
-.o-range-cal--awaiting [data-preview]:not([data-selected]) {
+.o-range-cal--awaiting :deep([data-preview]:not([data-selected])) {
   background-color: var(--color-datepicker-day-range-bg);
   color: var(--color-datepicker-day-range-text);
   outline: 1px dashed currentColor;
-  outline-offset: -2px;
+  outline-offset: -0.125rem;
 }
 </style>

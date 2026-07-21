@@ -15,16 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + icon + subtitle, matching the Users page. -->
-    <AppPageHeader
+  <OPageLayout
       :title="t('invitation.pendingInvitations')"
       :subtitle="t('iam.invitationList.subtitle')"
-      icon="mail"
-      class="shrink-0 px-4 border-b border-border-default"
-    />
+      icon="mail" bleed>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           :data="invitations"
           :columns="columns"
@@ -37,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-invitations-list"
@@ -74,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-role="{ row }">
             <OTag v-if="row.role" type="userRole" :value="row.role" />
-            <span v-else class="text-text-primary">—</span>
+            <span v-else class="text-text-muted">—</span>
           </template>
           <template #cell-inviter_id="{ row }">
             <OUserCell :value="row.inviter_id" />
@@ -108,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #bottom>
-            <span class="o2-table-footer-title">
+            <span class="text-xs font-normal">
               {{ resultTotal }} {{ t('invitation.pendingInvitations') }}
             </span>
           </template>
@@ -139,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <p>{{ t('invitation.confirmRejectMsg', { org: selectedInvitation?.org_name }) }}</p>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -157,18 +154,31 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+
+// Pending invitation row shape returned by GET /api/invites, enriched locally
+// with the row index (`#`) and a formatted `expiry` label.
+interface PendingInvitation {
+  "#": string | number;
+  token: string;
+  org_id: string;
+  org_name: string;
+  role: string;
+  inviter_id: string;
+  expires_at: number;
+  expiry: string;
+}
 
 export default defineComponent({
   name: "InvitationList",
   components: {
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     OButton,
     OTooltip,
@@ -189,22 +199,13 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const { t } = useI18n();
-    const invitations = ref([]);
+    const invitations = ref<PendingInvitation[]>([]);
     const filterQuery = ref("");
     const confirmAccept = ref(false);
     const confirmReject = ref(false);
-    const selectedInvitation = ref(null);
+    const selectedInvitation = ref<PendingInvitation | null>(null);
 
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        minSize: 40,
-        maxSize: 64,
-        meta: { align: "center", compactPadding: true },
-      },
       {
         id: "org_name",
         header: t("invitation.organizationName"),
@@ -275,19 +276,18 @@ export default defineComponent({
       try {
         const response = await usersService.getPendingInvites();
 
-        let counter = 1;
         invitations.value = response.data.data.map((invitation: any) => ({
-          "#": counter <= 9 ? `0${counter++}` : counter++,
           ...invitation,
           expiry: formatExpiry(invitation.expires_at),
         }));
         resultTotal.value = response.data.data.length;
         dismiss();
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
           message:
-            error.response?.data?.message ||
+            e.response?.data?.message ||
             t("iam.invitationList.failedLoadPending"),
           variant: "error",
         });
@@ -328,7 +328,8 @@ export default defineComponent({
     };
 
     const confirmAcceptInvitation = async () => {
-      if (!selectedInvitation.value) return;
+      const selected = selectedInvitation.value;
+      if (!selected) return;
       confirmAccept.value = false;
 
       const dismiss = toast({
@@ -339,9 +340,9 @@ export default defineComponent({
 
       try {
         await organizationsService.process_subscription(
-          selectedInvitation.value.token,
+          selected.token,
           "confirm",
-          selectedInvitation.value.org_id,
+          selected.org_id,
         );
 
         // Refresh the organizations list in the store
@@ -356,8 +357,8 @@ export default defineComponent({
 
         // Set the selected organization and redirect
         const orgData = {
-          identifier: selectedInvitation.value.org_id,
-          name: selectedInvitation.value.org_name,
+          identifier: selected.org_id,
+          name: selected.org_name,
         };
 
         store.dispatch("setSelectedOrganization", orgData);
@@ -366,17 +367,19 @@ export default defineComponent({
           organization: orgData,
         });
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
           message:
-            error.response?.data?.message || t("iam.invitationList.failedAccept"),
+            e.response?.data?.message || t("iam.invitationList.failedAccept"),
           variant: "error",
         });
       }
     };
 
     const confirmRejectInvitation = async () => {
-      if (!selectedInvitation.value) return;
+      const selected = selectedInvitation.value;
+      if (!selected) return;
       confirmReject.value = false;
 
       const dismiss = toast({
@@ -387,7 +390,7 @@ export default defineComponent({
 
       try {
         await organizationsService.decline_subscription(
-          selectedInvitation.value.token,
+          selected.token,
         );
         dismiss();
         toast({
@@ -397,7 +400,7 @@ export default defineComponent({
 
         // Remove from list
         invitations.value = invitations.value.filter(
-          (inv: any) => inv.token !== selectedInvitation.value.token,
+          (inv) => inv.token !== selected.token,
         );
 
         // If no more invitations, emit to parent
@@ -405,10 +408,11 @@ export default defineComponent({
           emit("invitations-processed", { accepted: false, hasMore: false });
         }
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         dismiss();
         toast({
           message:
-            error.response?.data?.message || t("iam.invitationList.failedReject"),
+            e.response?.data?.message || t("iam.invitationList.failedReject"),
           variant: "error",
         });
       }

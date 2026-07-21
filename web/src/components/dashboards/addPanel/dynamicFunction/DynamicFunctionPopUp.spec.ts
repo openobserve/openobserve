@@ -614,9 +614,6 @@ describe("DynamicFunctionPopUp", () => {
     it("should initialize havingConditions when undefined", async () => {
       wrapper = createWrapper({ allowAggregation: true });
 
-      // havingConditions may or may not be defined initially
-      const wasUndefined = wrapper.vm.fields.havingConditions === undefined;
-
       await wrapper.vm.toggleHavingFilter();
       await flushPromises();
 

@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount } from "@vue/test-utils";
 import FieldExpansion from "@/components/common/FieldExpansion.vue";
 
 vi.mock("vue-i18n", () => ({
@@ -80,14 +80,14 @@ function createWrapper(props = {}) {
         OCollapsible: {
           name: "OCollapsible",
           template:
-            '<div class="q-expansion-item-stub"><slot name="trigger" /><slot /></div>',
+            '<div class="o-expansion-item-stub"><slot name="trigger" /><slot /></div>',
           props: ["modelValue", "label", "dense", "hideExpandIcon"],
           emits: ["before-show", "before-hide", "update:modelValue"],
         },
         OButton: {
           name: "OButton",
           template:
-            '<button class="q-btn-stub" v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
+            '<button v-bind="$attrs" @click="$emit(\'click\', $event)"><slot /></button>',
           emits: ["click"],
         },
         OIcon: {
@@ -115,7 +115,7 @@ describe("FieldExpansion", () => {
 
     it("renders the QExpansionItem stub", () => {
       const wrapper = createWrapper();
-      expect(wrapper.find(".q-expansion-item-stub").exists()).toBe(true);
+      expect(wrapper.find(".o-expansion-item-stub").exists()).toBe(true);
     });
 
     it("renders the field label header element", () => {
