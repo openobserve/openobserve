@@ -21,8 +21,7 @@ use infra::{
     table::org_users::{self, OrgUserPut},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-
-use crate::service::db::org_users as db_org_users;
+use openobserve_core::service::db::org_users as db_org_users;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {

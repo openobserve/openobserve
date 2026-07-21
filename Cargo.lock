@@ -6751,6 +6751,7 @@ dependencies = [
  "sqlparser",
  "sqlx",
  "strum 0.28.0",
+ "super_cluster_queue",
  "svix-ksuid",
  "tantivy",
  "tantivy-fst",
@@ -10574,6 +10575,25 @@ name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
+
+[[package]]
+name = "super_cluster_queue"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "async-recursion",
+ "bytes",
+ "config",
+ "infra",
+ "log",
+ "o2_enterprise",
+ "openobserve-core",
+ "serde",
+ "serde_json",
+ "svix-ksuid",
+ "tokio",
+]
 
 [[package]]
 name = "svix-ksuid"
