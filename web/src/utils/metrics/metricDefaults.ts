@@ -154,10 +154,10 @@ export const MIN_STEP_SECONDS = 15;
  * Card kinds. A card kind — not the declared metric type — drives a card's
  * query, badge, type-filter bucket, variant list and telemetry.
  *
- * `expHistogramFallback` is an addition to the PRD's enumeration: an
- * ExponentialHistogram `_bucket` card needs a preview query (the count line)
- * but must expose only that one variant, so it can be neither `other` (no
- * query at all) nor `counterRate` (full counter variant list).
+ * `expHistogramFallback`: an ExponentialHistogram `_bucket` card needs a
+ * preview query (the count line) but must expose only that one variant, so it
+ * can be neither `other` (no query at all) nor `counterRate` (full counter
+ * variant list).
  */
 export const CARD_KIND = {
   COUNTER_RATE: "counterRate",
@@ -382,7 +382,7 @@ function pickTypeEvidence(ownType: string, familyType: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Rule set A — type resolution (PRD 6.1)                                      */
+/* Rule set A — type resolution                                                */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -464,7 +464,7 @@ export function resolveCardKind(
 }
 
 /* -------------------------------------------------------------------------- */
-/* PromQL construction (PRD 7.4)                                               */
+/* PromQL construction                                                         */
 /* -------------------------------------------------------------------------- */
 
 /** The four matchers PromQL defines. */
@@ -670,7 +670,7 @@ function withNanGuard(selector: string): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Rate window (PRD 6.4)                                                       */
+/* Rate window                                                                 */
 /* -------------------------------------------------------------------------- */
 
 /** Serializes whole seconds as a PromQL duration, e.g. 3660 -> "1h1m". */
@@ -753,12 +753,8 @@ export function computeRateWindow(
  * (usePanelVariableSubstitution: `max(interval + scrape, 4 * scrape)`, where
  * `interval` is the range over the PANEL's pixel width), every PromQL query goes
  * through the substitution on its way to the backend, and the PromQL builder's
- * own `rate()` operation defaults to exactly this token. Baking a literal `[4m]`
- * into a seeded panel meant the window stopped tracking the range the moment the
- * user changed it — a rate over a 4-minute window sampled every 30 minutes on a
- * 7-day view — and it disagreed with what the builder produces when the same
- * user adds `rate()` by hand. Hand over the variable and let the panel resolve
- * it, which is what a panel is for.
+ * own `rate()` operation defaults to exactly this token. Hand over the variable
+ * and let the panel resolve it against its own range and width.
  */
 export const PANEL_RATE_WINDOW = "$__rate_interval";
 
@@ -768,7 +764,7 @@ const DEFAULT_RATE_WINDOW = formatPromDuration(
 );
 
 /* -------------------------------------------------------------------------- */
-/* Rule set B — unit inference (PRD 7.0 - 7.3)                                 */
+/* Rule set B — unit inference                                                 */
 /* -------------------------------------------------------------------------- */
 
 function lookupSegment(segment: string | undefined): UnitRule | null {
@@ -834,9 +830,9 @@ export function toO2Unit(canonicalUnit: string): O2Unit {
 }
 
 /**
- * Resolves the unit for a card, honouring the PRD 7.0 precedence:
- * declared unit (normalized) beats name inference; a counter's observation unit
- * is then converted through the rated mapping.
+ * Resolves the unit for a card: declared unit (normalized) beats name
+ * inference; a counter's observation unit is then converted through the rated
+ * mapping.
  */
 function resolveUnit(
   metricName: string,
@@ -866,7 +862,7 @@ function resolveUnit(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Rule set A — query templates and variants (PRD 6.2, 6.3)                    */
+/* Rule set A — query templates and variants                                   */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -1128,11 +1124,6 @@ function buildVariants(
           // CELLS: `rate(X_bucket)` is observations per second, whatever the
           // observation happens to be. The `le` axis keeps the observation unit
           // and rides separately on `bucketUnit`.
-          //
-          // Without this the cells inherited the card's unit — so every cell of a
-          // `*_seconds_bucket` heatmap was formatted as a duration ("0.42 s") when
-          // it is a rate ("0.42 c/s"). Wrong by a dimension, on the chart's whole
-          // colour scale and every tooltip.
           unit: "count-per-sec",
         },
         {
@@ -1333,11 +1324,6 @@ function buildVariants(
           // for every such metric — true, and useless. What carries information
           // is how MANY of them there are: `count(kube_pod_container_info)` is
           // the number of containers, and its shape over time is what you want.
-          //
-          // This card previously had no preview at all, which rendered as a grey
-          // box: every `*_info` metric in a Kubernetes org (`go_info`,
-          // `kube_node_info`, `coredns_build_info`, …) looked like a chart that
-          // had failed to load.
           queries: [
             q(
               `count(${sel})`,
@@ -1391,7 +1377,7 @@ const FOOTER_LABEL = {
  * @param {string|undefined} declaredUnit metrics_meta.unit (may be "")
  * @param {{
  *   streamNames?: Set<string>,   // feeds the `_sum` sibling check
- *   familyType?: string,         // the family's declared type (5.1 family model)
+ *   familyType?: string,         // the family's declared type
  *   filters?: Array<{label: string, value: string, operator?: string}>,
  *   rateWindow?: string,         // PromQL duration; defaults to the 4m floor
  *   labels?: string[],           // the stream's label names, when known
@@ -1524,10 +1510,8 @@ export function resolveVariant(
     queries,
     chartType: variant.chartType ?? defaults.chartType,
     unit: variant.unit ?? defaults.unit,
-    // The card footer must name the function actually IN EFFECT. Falling back to
-    // the card-kind default left an overridden card still reading "sum(rate)"
-    // after the user switched to avg(rate) — so the change looked like it had
-    // never applied at all.
+    // The card footer must name the function actually IN EFFECT, not the
+    // card-kind default.
     footerLabel: variant.footerLabel ?? defaults.footerLabel,
   };
 }

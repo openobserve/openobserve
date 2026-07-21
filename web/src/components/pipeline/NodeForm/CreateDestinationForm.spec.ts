@@ -78,15 +78,7 @@ describe("CreateDestinationForm", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          "q-stepper": false,
-          "q-step": false,
-          "q-input": false,
-          "q-select": false,
-          "q-btn": false,
           "OIcon": false,
-          "q-card": false,
-          "q-card-section": false,
-          "q-toggle": false,
         },
       },
     });

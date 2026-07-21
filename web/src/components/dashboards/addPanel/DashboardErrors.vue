@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div>
       <div
         data-test="dashboard-errors-expand-bar"
-        class="flex items-center gap-2 px-2 py-2 cursor-pointer overflow-hidden hover:bg-[#eaeaeaa5]"
-        :style="{ backgroundColor: store.state.theme === 'dark' ? 'var(--o2-header-menu-bg)' : 'var(--color-primary-100)' }"
+        class="flex items-center gap-2 px-2 py-2 cursor-pointer overflow-hidden bg-section-header-bg hover:bg-surface-subtle-hover"
         @click="onDropDownClick"
       >
         <OIcon
@@ -29,15 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           class="mr-1"
         />
-        <span class="text-sm font-semibold text-red-500">
+        <span class="text-sm font-semibold text-status-error-text">
           Errors ({{ props.errors.errors.length }})
         </span>
       </div>
     </div>
     <div
-      class="flex"
+      class="flex overflow-hidden"
       :style="!showErrors ? 'height: 0px;' : 'height: auto;'"
-      style="overflow: hidden"
     >
       <div class="flex flex-col">
         <div data-test="dashboard-error">
@@ -48,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
-              style="color: red"
-              class="py-1"
+              class="text-status-error-text py-1"
+             
               data-test="dashboard-errors-list-item"
             >
               {{ item }}
@@ -64,7 +62,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -79,7 +76,6 @@ export default defineComponent({
   setup(props) {
     const showErrors = ref(false);
     const { t } = useI18n();
-    const store = useStore();
 
     const onDropDownClick = () => {
       showErrors.value = !showErrors.value;
@@ -102,7 +98,6 @@ export default defineComponent({
     return {
       props,
       t,
-      store,
       onDropDownClick,
       showErrors,
     };

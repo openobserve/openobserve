@@ -271,7 +271,7 @@ export default defineComponent({
     // Method to open color picker directly
     const openColorPicker = () => {
       // This method is called when the colorize icon is clicked
-      // The color picker should open automatically due to q-popup-proxy
+      // The color picker should open automatically via its popup proxy
     };
 
     return {

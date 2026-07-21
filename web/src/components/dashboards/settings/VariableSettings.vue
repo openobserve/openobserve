@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="full-height">
-    <div v-if="isAddVariable" class="flex flex-col full-height">
+  <div class="h-full max-h-full overflow-hidden">
+    <div v-if="isAddVariable" class="flex flex-col h-full max-h-full overflow-hidden">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="flex flex-col full-height">
+    <div v-else class="flex flex-col h-full max-h-full overflow-hidden">
       <DashboardHeader :title="t('dashboard.variableSettingsPage.variables')">
         <template #right>
           <div class="flex gap-2">
@@ -35,14 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="sm"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
-              >{{ t('dashboard.showDependencies') }}</OButton
+            >{{ t('dashboard.showDependencies') }}</OButton
             >
             <OButton
               variant="primary"
               size="sm"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
-              >{{ t("dashboard.newVariable") }}</OButton
+            >{{ t("dashboard.newVariable") }}</OButton
             >
           </div>
         </template>
@@ -175,10 +175,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="confirmDeleteDialog"
         />
         <ODialog data-test="variable-settings-dependencies-graph-dialog" v-model:open="showVariablesDependenciesGraphPopUp" :width="60" :title="t('dashboard.variableSettingsPage.variablesDependencyGraph')">
-          <div style="height: 60vh">
+          <div class="h-[60vh]">
             <VariablesDependenciesGraph
               :variablesList="dashboardVariablesList"
-              :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+              :class="'bg-surface-base'"
               @closePopUp="
                 () => (showVariablesDependenciesGraphPopUp = false)
               "
@@ -308,7 +308,7 @@ export default defineComponent({
       },
     ];
 
-    // Zero-padded position label ("01", "02", …) matching the previous design.
+    // Zero-padded position label ("01", "02", …).
     const formatIndex = (variable: any) => {
       const index = dashboardVariablesList.value.indexOf(variable);
       return index < 9 ? `0${index + 1}` : `${index + 1}`;

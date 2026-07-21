@@ -17,26 +17,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="catalogContainerRef"
-    class="services-catalog h-full! flex flex-col bg-[var(--o2-card-bg-solid)] card-container px-[0.625rem] relative overflow-hidden"
+    class="services-catalog h-full! flex flex-col bg-card-glass-bg px-2.5 relative overflow-hidden"
   >
     <!-- Toolbar: stream selector (width-matched to the rail below) + search
          (width-matched to the table below) + status pills. The stream selector
          sits exactly above the 230px left rail; the search + pills group starts
          exactly at the table's left edge (no gap between the two columns), so
          the toolbar columns line up with the body columns. -->
-    <div class="flex items-center py-[0.625rem]">
+    <div class="flex items-center py-2.5">
       <!-- Stream selector — same 230px width as the left rail below it. -->
       <div
         data-test="services-catalog-stream-selector"
-        class="flex-shrink-0"
-        :style="{ width: '230px' }"
+        class="flex-shrink-0 w-rail"
       >
         <OSelect
           :model-value="streamFilter"
           :options="availableStreams.map((s) => ({ label: s, value: s }))"
           labelKey="label"
           valueKey="value"
-          class="w-full rounded"
+          class="w-full rounded-default"
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
@@ -69,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-if="statusCounts.critical > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-critical)_12%,transparent)] text-[var(--o2-service-health-critical)]"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-critical)_12%,transparent)] text-service-health-critical"
             data-test="services-catalog-pill-critical"
           >
             <span>{{ statusCounts.critical }}</span>
@@ -84,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.warning > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-warning)_12%,transparent)] text-[var(--o2-service-health-warning)]"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-warning)_12%,transparent)] text-service-health-warning"
             data-test="services-catalog-pill-warning"
           >
             <span>{{ statusCounts.warning }}</span>
@@ -99,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <template v-if="statusCounts.degraded > 0">
           <div
-            class="inline-flex items-center gap-[0.375rem] px-[0.625rem] py-[0.25rem] rounded text-[0.75rem] font-medium bg-[color-mix(in_srgb,var(--o2-service-health-degraded)_12%,transparent)] text-[var(--o2-service-health-degraded)]"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-default text-xs font-medium bg-[color-mix(in_srgb,var(--color-service-health-degraded)_12%,transparent)] text-service-health-degraded"
             data-test="services-catalog-pill-degraded"
           >
             <span>{{ statusCounts.degraded }}</span>
@@ -116,68 +115,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Status legend -->
       <!-- <div
-        class="ml-auto flex items-center gap-3 px-[0.625rem] py-[0.325rem] rounded border border-[var(--o2-border-color)]"
+        class="ml-auto flex items-center gap-3 px-2.5 py-[0.325rem] rounded-default border border-card-glass-border"
         data-test="services-catalog-status-legend"
       >
         <span
-          class="text-[0.7rem] font-bold text-[var(--o2-text-4)] whitespace-nowrap"
+          class="text-2xs font-bold text-text-heading whitespace-nowrap"
         >
           {{ t("traces.servicesCatalog.legend.title") }}
         </span>
-        <div class="flex items-center gap-[0.875rem]">
+        <div class="flex items-center gap-3.5">
           <div
-            class="flex items-center gap-[0.375rem]"
+            class="flex items-center gap-1.5"
             data-test="services-catalog-legend-healthy"
           >
             <span class="sc-legend-dot sc-legend-dot--healthy" />
             <span
-              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.healthy") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
+              class="text-3xs opacity-55 text-text-label"
               >&lt;&nbsp;1%</span
             >
           </div>
           <div
-            class="flex items-center gap-[0.375rem]"
+            class="flex items-center gap-1.5"
             data-test="services-catalog-legend-degraded"
           >
             <span class="sc-legend-dot sc-legend-dot--degraded" />
             <span
-              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.degraded") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
+              class="text-3xs opacity-55 text-text-label"
               >1&nbsp;–&nbsp;5%</span
             >
           </div>
           <div
-            class="flex items-center gap-[0.375rem]"
+            class="flex items-center gap-1.5"
             data-test="services-catalog-legend-warning"
           >
             <span class="sc-legend-dot sc-legend-dot--warning" />
             <span
-              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.warning") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
+              class="text-3xs opacity-55 text-text-label"
               >5&nbsp;–&nbsp;10%</span
             >
           </div>
           <div
-            class="flex items-center gap-[0.375rem]"
+            class="flex items-center gap-1.5"
             data-test="services-catalog-legend-critical"
           >
             <span class="sc-legend-dot sc-legend-dot--critical" />
             <span
-              class="text-[0.7rem] font-semibold text-[var(--o2-text-2)]"
+              class="text-2xs font-semibold text-text-secondary"
               >{{ t("traces.servicesCatalog.status.critical") }}</span
             >
             <span
-              class="text-[0.65rem] opacity-55 text-[var(--o2-text-4)]"
+              class="text-3xs opacity-55 text-text-label"
               >&gt;&nbsp;10%</span
             >
           </div>
@@ -216,8 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            rails. The stream selector lives in the top toolbar alongside the
            search. -->
       <div
-        class="shrink-0 h-full bg-surface-panel border-r border-border-default flex flex-col gap-2 py-2 px-1"
-        :style="{ width: '230px' }"
+        class="w-rail shrink-0 h-full bg-surface-panel border-r border-border-default flex flex-col gap-2 py-2 px-1.5"
       >
         <!-- Entity-type filter: All / Services / Datastores / Queues /
              External / RPC. A vertical nav rail — same OTabs pattern as the
@@ -239,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="cat in visibleTypeFilters"
               :key="cat"
               :name="cat"
-              class="min-h-[1.75rem]"
+              class="min-h-7"
               :data-test="`services-catalog-type-${cat}`"
             >
               <div
@@ -257,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        plain total to its left. Hover explains it. -->
                   <span
                     v-if="categoryUnhealthyCounts[cat] > 0"
-                    class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-[0.25rem] rounded-full text-[0.65rem] font-semibold leading-none text-white"
+                    class="inline-flex items-center justify-center min-w-[1.05rem] h-[1.05rem] px-1 rounded-full text-3xs font-semibold leading-none text-white"
                     :style="{ backgroundColor: tabStatusColorVar(cat) }"
                     :data-test="`services-catalog-type-unhealthy-${cat}`"
                   >
@@ -298,7 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            + records-per-page + pager) all match. OTable owns pagination, so we
            feed it the full sorted list and it paginates internally. -->
       <div v-else class="flex-1 min-w-0 h-full">
-        <div class="h-full card-container">
+        <div class="h-full bg-card-glass-bg">
           <OTable
             ref="oTableRef"
             :data="sortedServices"
@@ -834,17 +832,16 @@ const categoryUnhealthyCounts = computed<Record<TypeFilter, number>>(() => {
   return counts;
 });
 
-// Tailwind text-color class for a tab's worst status; empty when healthy.
 // CSS color (var reference) for a tab's worst-status badge fill; empty when
 // healthy. Used as the filled-circle background for the unhealthy count.
 function tabStatusColorVar(filter: TypeFilter): string {
   switch (categoryWorstStatus.value[filter]) {
     case "critical":
-      return "var(--o2-service-health-critical)";
+      return "var(--color-service-health-critical)";
     case "warning":
-      return "var(--o2-service-health-warning)";
+      return "var(--color-service-health-warning)";
     case "degraded":
-      return "var(--o2-service-health-degraded)";
+      return "var(--color-service-health-degraded)";
     default:
       return "";
   }
@@ -902,6 +899,20 @@ function deriveStatus(
   if (errorRate > 5) return "warning";
   if (errorRate > 1) return "degraded";
   return "healthy";
+}
+
+function statusBadgeClass(status: string): string {
+  if (status === "critical") return "text-service-health-critical";
+  if (status === "warning") return "text-service-health-warning";
+  if (status === "degraded") return "text-service-health-degraded";
+  return "text-service-health-healthy";
+}
+
+function errorRateClass(rate: number): string {
+  if (rate > 10) return "text-service-health-critical font-medium";
+  if (rate > 5) return "text-service-health-degraded";
+  if (rate > 1) return "text-service-health-warning";
+  return "";
 }
 
 function formatPercent(value: number): string {
@@ -1144,22 +1155,24 @@ onUnmounted(() => {
 });
 </script>
 
-<style>
-/* Vertical entity-type rail — same treatment as the Dashboards folder list so
-   the active row shows the app's standard left-rail tint + primary text, and
-   rows read calm (left-aligned, rounded, weight 500). */
-.catalog-type-filter .o-tabs {
+<style scoped>
+/* keep(lib-override:o-tabs): the vertical entity-type rail restyles OTabs' own
+   .o-tabs / .o-tabs--vertical / .o-tab DOM (rendered by the OTabs/OTab library
+   components) so the active row matches the Dashboards folder-list rail —
+   reachable only via :deep. */
+.catalog-type-filter :deep(.o-tabs) {
   height: auto !important;
   max-height: none !important;
 }
 
-.catalog-type-filter .o-tabs--vertical {
+.catalog-type-filter :deep(.o-tabs--vertical) {
   margin: 0;
 }
 
-.catalog-type-filter .o-tabs--vertical .o-tab {
+/* Horizontal padding intentionally omitted — OTab's vertical variant derives it
+   from --spacing-page-edge so this rail lines up with the page header. */
+.catalog-type-filter :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
-  padding: 0 0.5rem;
   border-radius: 0.5rem;
   font-weight: 500;
   width: 100%;

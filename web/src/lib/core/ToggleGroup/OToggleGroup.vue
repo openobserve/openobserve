@@ -4,8 +4,17 @@ import type {
   ToggleGroupEmits,
   ToggleGroupSlots,
 } from "./OToggleGroup.types";
-import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
-import { computed } from "vue";
+import { ToggleGroupAnimatedKey } from "./OToggleGroup.types";
+import { ToggleGroupRoot } from "reka-ui";
+import {
+  computed,
+  provide,
+  ref,
+  watch,
+  nextTick,
+  onMounted,
+  onBeforeUnmount,
+} from "vue";
 
 const props = withDefaults(defineProps<ToggleGroupProps>(), {
   type: "single",
@@ -29,6 +38,108 @@ const hasLabel = computed(
   () => Boolean(slots.label) || props.label !== undefined,
 );
 
+// Sliding-selection indicator ------------------------------------------------
+// On by default for every single-select group (one active item to track). A
+// multiple-select group has no single active item, so it keeps per-item fills.
+const animate = computed(() => props.type === "single");
+
+// Tell descendant items to defer their active fill to the shared indicator.
+provide(ToggleGroupAnimatedKey, animate);
+
+const indicatorRef = ref<HTMLElement | null>(null);
+// Runtime, per-render geometry of the active item — inherently pixel values from
+// layout, so they live in an inline :style binding (there is no token/utility that
+// can express "wherever the active item currently sits"). Mirrors the OToast
+// progress-bar precedent for genuinely runtime style longhands.
+const indicatorStyle = ref<Record<string, string>>({});
+const indicatorVisible = ref(false);
+// True once the indicator holds a real, laid-out position. Until then (and after
+// any reveal) the next placement snaps rather than slides.
+const hasValidPosition = ref(false);
+// Drives whether the transition is present in the *after-change* style: only a
+// genuine selection change turns it on, so mount/reveal/reflow snap into place.
+const transitionOn = ref(false);
+
+let resizeObserver: ResizeObserver | null = null;
+
+/**
+ * Place the indicator over the active item.
+ * @param animated slide to the new position (a real selection change) vs. snap
+ *   instantly (mount, reveal, or reflow — never animate those).
+ */
+const measure = (animated: boolean) => {
+  const indicator = indicatorRef.value;
+  const track = indicator?.parentElement;
+  if (!indicator || !track) return;
+
+  const active = track.querySelector<HTMLElement>('[data-state="on"]');
+  // Skip while the group (or an ancestor) is hidden / not laid out — e.g. a tab
+  // panel that isn't the visible one. Measuring here would store a bogus
+  // 0-position, and revealing later would slide the pill in from the corner
+  // (the "random animation" bug). Keep the last valid position instead.
+  if (!active || active.offsetParent === null) return;
+
+  // Position relative to the track's padding box (where an absolute left:0/top:0
+  // child originates), subtracting the track border so the bordered variant lines
+  // up as exactly as the borderless one.
+  const trackRect = track.getBoundingClientRect();
+  const activeRect = active.getBoundingClientRect();
+  if (activeRect.width === 0) return; // laid out but zero-sized → not ready yet
+  const trackStyle = getComputedStyle(track);
+  const borderLeft = parseFloat(trackStyle.borderLeftWidth) || 0;
+  const borderTop = parseFloat(trackStyle.borderTopWidth) || 0;
+  const x = activeRect.left - trackRect.left - borderLeft;
+  const y = activeRect.top - trackRect.top - borderTop;
+
+  // Transition only when asked AND we already had a valid position (i.e. the group
+  // was already visible). The very first placement always snaps. Setting the flag
+  // and the style in the same tick means the transition property and the transform
+  // update together, so `false` reliably suppresses the slide.
+  transitionOn.value = animated && hasValidPosition.value;
+  hasValidPosition.value = true;
+  indicatorVisible.value = true;
+  indicatorStyle.value = {
+    width: `${activeRect.width}px`,
+    height: `${activeRect.height}px`,
+    transform: `translate(${x}px, ${y}px)`,
+  };
+};
+
+// Slide when the selection changes …
+watch(
+  () => props.modelValue,
+  async () => {
+    if (!animate.value) return;
+    await nextTick();
+    measure(true);
+  },
+);
+
+onMounted(async () => {
+  if (!animate.value) return;
+  await nextTick();
+  measure(false);
+  // … but only snap when item sizes/visibility change (responsive icon-only mode,
+  // items shown/hidden, the group being revealed) — these are not user selections.
+  const track = indicatorRef.value?.parentElement;
+  if (track && typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(() => measure(false));
+    resizeObserver.observe(track);
+  }
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+
+const indicatorClasses = computed(() => [
+  "pointer-events-none absolute left-0 top-0 rounded-default bg-toggle-item-active-bg",
+  transitionOn.value &&
+    "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",
+  indicatorVisible.value ? "opacity-100" : "opacity-0",
+]);
+
 // Wrapper layout depends on label position: top stacks vertically, left/right
 // sits inline. When there is no label, render only the ToggleGroupRoot.
 const wrapperClasses = computed(() => {
@@ -51,8 +162,8 @@ const wrapperClasses = computed(() => {
   <div v-if="hasLabel" :class="wrapperClasses">
     <span
       :class="[
-        'o-input-label text-sm font-medium select-none leading-tight',
-        disabled && 'o-input-label--disabled',
+        'o-input-label text-compact select-none leading-tight',
+        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ label }}</slot>
@@ -65,9 +176,9 @@ const wrapperClasses = computed(() => {
       :orientation="orientation"
       :data-variant="variant"
       :class="[
-        'inline-flex items-stretch',
+        'relative inline-flex items-stretch',
         orientation === 'vertical' ? 'flex-col' : 'flex-row',
-        'bg-[var(--color-toggle-track-bg)] rounded-lg p-0.5',
+        'bg-toggle-track-bg rounded-default p-0.5',
       ]"
       @update:model-value="
         (v) => {
@@ -76,6 +187,14 @@ const wrapperClasses = computed(() => {
         }
       "
     >
+      <!-- Sliding active-selection indicator (opt-in via animatedSelection) -->
+      <div
+        v-if="animate"
+        ref="indicatorRef"
+        aria-hidden="true"
+        :class="indicatorClasses"
+        :style="indicatorStyle"
+      />
       <slot />
     </ToggleGroupRoot>
   </div>
@@ -88,9 +207,9 @@ const wrapperClasses = computed(() => {
     :orientation="orientation"
     :data-variant="variant"
     :class="[
-      'inline-flex items-stretch',
+      'relative inline-flex items-stretch',
       orientation === 'vertical' ? 'flex-col' : 'flex-row',
-      'bg-[var(--color-toggle-track-bg)] rounded-lg p-0.5',
+      'bg-toggle-track-bg rounded-default p-0.5',
       'border border-toggle-border',
     ]"
     @update:model-value="
@@ -100,6 +219,14 @@ const wrapperClasses = computed(() => {
       }
     "
   >
+    <!-- Sliding active-selection indicator (opt-in via animatedSelection) -->
+    <div
+      v-if="animate"
+      ref="indicatorRef"
+      aria-hidden="true"
+      :class="indicatorClasses"
+      :style="indicatorStyle"
+    />
     <slot />
   </ToggleGroupRoot>
 </template>

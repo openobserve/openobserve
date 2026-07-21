@@ -1416,7 +1416,7 @@ describe("MainLayout Methods and Functions", () => {
       expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
     });
 
-    it("does NOT forward any q-dialog-specific props (migration removed maximized/full-height)", () => {
+    it("does NOT forward any legacy dialog-specific props (migration removed maximized/full-height)", () => {
       const wrapper = mount(Host);
       const dialog = wrapper.findComponent(ODialogStub);
 

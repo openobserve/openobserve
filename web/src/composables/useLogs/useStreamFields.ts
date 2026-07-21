@@ -86,10 +86,9 @@ export const useStreamFields = () => {
     try {
       const hits = searchObj.data.queryResults.hits;
 
-      // [NEW] Background capture into IndexedDB — must be placed BEFORE the
-      // loop below because that loop contains an early `return` when it
-      // encounters excluded fields (pre-existing behaviour), which would
-      // prevent this code from running if placed after.
+      // Background capture into IndexedDB — must run BEFORE the loop below,
+      // which has an early `return` on excluded fields that would otherwise
+      // prevent this from running.
       if (hits?.length > 0) {
         const schemaFields = (
           searchObj.data.stream.selectedStreamFields ?? []

@@ -54,7 +54,6 @@ export const classicColorPaletteDarkTheme = [
   "#fef08a", // amber
 ];
 
-// Update the getColorPalette function to handle string theme values
 export const getColorPalette = (theme: string) => {
   return theme === "dark"
     ? classicColorPaletteDarkTheme

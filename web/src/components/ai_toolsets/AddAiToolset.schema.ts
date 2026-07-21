@@ -8,30 +8,18 @@
 // active kind, but switching kind never reshapes the form data. Factory keeps
 // the messages i18n-driven (pass useI18n's `t`).
 //
-// Restores the BEFORE validation baseline for this form
-// ("4 blocks → 6 sub-rules"):
-//   • name : required + /^[a-zA-Z0-9_-]+$/ + max 256
-//   • kind : required
-//   • mcp.url      : required when kind === "mcp"   (superRefine)
-//   • cli.command  : required when kind === "cli"   (superRefine)
-//   • skill.content: required when kind === "skill" (superRefine)
-// The skill-content rule was an imperative @submit check in the BEFORE state;
-// its Monaco editor has no OForm* equivalent, but the VALUE is bridged into the
-// form via setFieldValue, so the rule now lives here like every other field.
-//
-// Validation TIMING is owned by OForm (submit-then-change via revalidateLogic);
-// this file only describes WHAT is valid.
+// Validation timing is owned by OForm (submit-then-change via revalidateLogic);
+// this file only describes what is valid.
 
 import { z } from "zod";
 
-// Name char rule from the BEFORE baseline: letters, digits, hyphen, underscore.
+// Name char rule: letters, digits, hyphen, underscore.
 export const aiToolsetNameRegex = /^[a-zA-Z0-9_-]+$/;
 
 // One row of a key/value secret list (mcp headers, cli env vars). All fields are
 // free-form and optional (a blank starter row is valid — only non-empty rows are
 // persisted on save). `visible` is the per-row password-visibility UI flag; it is
-// form-owned bookkeeping (like the playbook's row `uuid`) and excluded from the
-// saved payload.
+// form-owned bookkeeping excluded from the saved payload.
 export const secretRowSchema = z.object({
   key: z.string().optional(),
   value: z.string().optional(),
@@ -88,9 +76,9 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
       }),
     })
     .superRefine((val, ctx) => {
-      // mcp.url required when kind === "mcp". Bare empty check (NO trim) to match
-      // the BEFORE baseline's `!url` — main accepted a whitespace-only url. (Note
-      // main's asymmetry: skill.content below DOES trim; url/command do not.)
+      // mcp.url required when kind === "mcp". Bare empty check (NO trim): a
+      // whitespace-only url is accepted. (Note the asymmetry: skill.content below
+      // DOES trim; url/command do not.)
       if (val.kind === "mcp" && !String(val.mcp?.url ?? "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -98,9 +86,8 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
           message: t("aiToolset.mcpUrlRequired"),
         });
       }
-      // cli.command required when kind === "cli". Bare empty check (NO trim) to
-      // match the BEFORE baseline's `!command` — main accepted a whitespace-only
-      // command.
+      // cli.command required when kind === "cli". Bare empty check (NO trim): a
+      // whitespace-only command is accepted.
       if (val.kind === "cli" && !String(val.cli?.command ?? "")) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -108,9 +95,8 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
           message: t("aiToolset.cliCommandRequired"),
         });
       }
-      // skill.content required when kind === "skill" (BEFORE: imperative check in
-      // onSubmit that used `!content.trim()`). Trim is KEPT here to match main —
-      // unlike url/command above, main's skill check trimmed.
+      // skill.content required when kind === "skill". Trim IS applied here —
+      // unlike url/command above.
       if (val.kind === "skill" && !String(val.skill?.content ?? "").trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

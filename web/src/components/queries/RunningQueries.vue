@@ -15,27 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OPageLayout
     v-if="isMetaOrg"
-    class="rounded-md p-0 flex flex-col h-full"
+    :title="t('queries.runningQueries')"
+    icon="query-stats"
+    :subtitle="'Inspect and cancel running queries'"
+    bleed
   >
-    <div class="flex-none">
-      <div class="card-container">
-        <div
-          class="flex flex-col px-4 py-3 border-b-[1px]"
-          style="position: sticky; top: 0; z-index: 1000;"
-        >
-          <!-- Standard section header: title + actions only. Filters live in the
-               band below (directly above the table). -->
-          <AppPageHeader
-            :title="t('queries.runningQueries')"
-            icon="query-stats"
-            :subtitle="'Inspect and cancel running queries'"
-            class="-mx-4 px-4 border-b border-border-default mb-3"
-          />
+    <!-- Filters live in the sub-nav band directly above the table. -->
+    <template #subnav>
           <div
             data-test="running-queries-filter-container"
-            class="flex justify-start items-center gap-3"
+            class="flex justify-start items-center gap-3 px-page-edge py-2"
           >
             <OToggleGroup
               :model-value="selectedQueryTypeTab"
@@ -57,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="searchFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="p-0 w-[140px]"
+                class="p-0 w-35"
                 data-test="running-queries-search-fields-select"
                 @update:model-value="filterQuery = ''"
               />
@@ -69,25 +60,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('queries.search')"
               data-test="running-queries-search-input"
             />
-            <div v-else class="o2-select-input o2-input w-[250px]">
+            <div v-else class="o2-select-input o2-input w-62.5">
               <OSelect
                 v-model="filterQuery"
                 placeholder="Select option"
                 :options="otherFieldOptions"
                 labelKey="label"
                 valueKey="value"
-                class="no-border search-input w-[250px]"
+                class="no-border search-input w-62.5"
                 data-test="running-queries-search-input"
               />
             </div>
           </div>
-        </div>
-      </div>
-    </div>
+    </template>
 
     <div class="flex-1 min-h-0">
       <div class="w-full h-full">
-        <div class="card-container h-full">
+        <div class="bg-card-glass-bg h-full">
           <div
             v-show="selectedQueryTypeTab === 'all'"
             class="h-full"
@@ -137,6 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="deleteDialog.show = false"
     />
     <ODrawer
+      bleed
       v-model:open="showListSchemaDialog"
       size="xl"
       :show-close="false"
@@ -145,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </ODrawer>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -176,11 +166,11 @@ import { getDuration } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { AppPageHeader, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
+  components: { OPageLayout, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
 },
   setup() {
     const store = useStore();
@@ -286,9 +276,8 @@ export default defineComponent({
           {},
         );
 
-        return Object.values(result).map((user: any, index: number) => ({
+        return Object.values(result).map((user: any) => ({
           ...user,
-          "#": index + 1,
           duration: user.duration,
           queryRange: user.queryRange,
         }));
@@ -404,12 +393,6 @@ export default defineComponent({
     };
 
     const columns = ref<{ name: string; label: string; field: string; align?: string; sortable?: boolean }[]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
       {
         name: "user_id",
         field: "user_id",
@@ -705,10 +688,9 @@ export default defineComponent({
 
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
-      return rows.map((row, index) => {
+      return rows.map((row: any) => {
         return {
           ...row,
-          "#": index < 9 ? `0${index + 1}` : index + 1,
         };
       });
     });
@@ -718,7 +700,7 @@ export default defineComponent({
 
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
-      return rows.map((row: any, index) => {
+      return rows.map((row: any) => {
         const search_type = row?.search_type;
         var query_source = "-unknown-";
 
@@ -729,7 +711,6 @@ export default defineComponent({
         }
 
         return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
           user_id: row?.user_id,
           org_id: row?.org_id,
           duration: getDuration(row.created_at).durationInSeconds,

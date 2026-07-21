@@ -126,7 +126,7 @@ describe("SearchBar (logstream/explore)", () => {
     it("should render download logs button", async () => {
       const wrapper = mountComp();
       await flushPromises();
-      // OButton replaces q-btn; download button is identified by its title attribute
+      // The download button is identified by its title attribute
       expect(wrapper.find('button[data-o2-btn]').exists()).toBe(true);
     });
 

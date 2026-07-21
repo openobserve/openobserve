@@ -65,7 +65,7 @@ afterEach(() => {
 describe('AppRoles - rendering', () => {
   it('renders the section title', async () => {
     const wrapper = await mountAppRoles();
-    // Title now lives in the standard AppPageHeader (row 1).
+    // Title now lives in the standard OPageHeader (row 1).
     expect(wrapper.find('.app-page-header h1').text()).toContain('Roles');
   });
 
@@ -109,13 +109,7 @@ describe('AppRoles - setupRoles', () => {
     expect(rows[2]).toHaveProperty('role_name', 'Editor');
   });
 
-  it('formats row numbers with leading zeros for first 9', async () => {
-    const wrapper = await mountAppRoles();
-    const rows = (wrapper.vm as any).rows;
-    expect(rows[0]['#']).toBe('01');
-    expect(rows[1]['#']).toBe('02');
-    expect(rows[2]['#']).toBe('03');
-  });
+  // Row numbering moved to OTable's built-in show-index (no '#' data field).
 
   it('handles getRoles error gracefully', async () => {
     vi.mocked(getRoles).mockRejectedValueOnce(new Error('network error'));
@@ -413,11 +407,7 @@ describe('AppRoles - rows data', () => {
     expect((wrapper.vm as any).rows[0].role_name).toBe('Admin');
   });
 
-  it('includes row numbering in "#" field', async () => {
-    const wrapper = await mountAppRoles();
-    expect((wrapper.vm as any).rows[0]['#']).toBe('01');
-    expect((wrapper.vm as any).rows[1]['#']).toBe('02');
-  });
+  // Row numbering moved to OTable's built-in show-index (no '#' data field).
 });
 
 // 12. RoleTable integration
@@ -436,7 +426,7 @@ describe('AppRoles - RoleTable integration', () => {
 });
 
 // 13. ODialog/ODrawer Migration
-// After migration the q-dialog wrapper around AddRole was removed; AddRole
+// After migration the dialog wrapper around AddRole was removed; AddRole
 // now owns its own drawer/dialog and accepts v-model:open from the parent.
 // These tests verify the new contract.
 describe('AppRoles - ODialog/ODrawer Migration', () => {
@@ -539,11 +529,4 @@ describe('AppRoles - ODialog/ODrawer Migration', () => {
     expect(getRoles).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
   });
 
-  it('does not render AddRole inside a q-dialog wrapper (post-migration)', async () => {
-    const wrapper = await mountAppRolesWithAddRoleStub();
-    // The legacy template wrapped AddRole in <q-dialog>. After migration AddRole
-    // owns its own dialog, so no q-dialog wrapper should be rendered around it
-    // by the parent template.
-    expect(wrapper.find('.q-dialog').exists()).toBe(false);
-  });
 });

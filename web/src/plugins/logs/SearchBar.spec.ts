@@ -5020,14 +5020,14 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // ODialog migration contract tests
 //
-// SearchBar.vue was migrated from q-dialog/q-card markup to <ODialog> for three
+// SearchBar.vue was migrated to <ODialog> for three
 // confirmation/utility dialogs:
 //   1. confirmDialog            — v-model:open="confirmDialogVisible"
 //   2. confirmSavedViewDialog   — v-model:open="confirmSavedViewDialogVisible"
 //   3. customDownloadDialog     — v-model:open="customDownloadDialog"
 //
 // Each dialog now emits update:open / click:primary / click:secondary instead
-// of relying on internal q-btn clicks to close itself. This block asserts the
+// of relying on internal button clicks to close itself. This block asserts the
 // new contract using a lightweight harness component that mirrors SearchBar's
 // exact template binding for each dialog, plus an ODialogStub registered via
 // the `stubs` mounting option (mirroring the pattern in

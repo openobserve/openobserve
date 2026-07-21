@@ -19,6 +19,7 @@ import {
   TOOLTIP_SCROLL_STYLE,
 } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { chartColor } from "@/utils/chartTheme";
 import {
   deaccumulateHistogramSeries,
   HistogramSeriesInput,
@@ -40,20 +41,10 @@ export const PROMETHEUS_HISTOGRAM_MODE = "prometheus_histogram";
 /**
  * The X axis for a heatmap: every timestamp any query reported, ascending.
  *
- * Not `processedData[0].timestamps`. The cells come from ALL queries, so taking
- * the axis from the first one alone had two failure modes, and neither announced
- * itself:
- *
- *   - If the FIRST query returned no data, its `timestamps` is empty, so the axis
- *     was empty and the panel rendered blank — even when the other queries had
- *     plenty to show. Any panel whose first query is typo'd, or whose first metric
- *     is simply idle over the chosen range, looked like a total outage.
- *   - If two queries landed on different grids, query 1's samples were looked up
- *     against query 0's timestamps (`bucket.data[ts]`), missed, and read as 0.
- *
- * A union is the honest axis: it is exactly the first query's timestamps in the
- * ordinary single-query / shared-grid case, and it degrades to the truth rather
- * than to blankness otherwise.
+ * A union rather than `processedData[0].timestamps`: if the first query returned
+ * no data the axis would be empty (blank panel), and if two queries land on
+ * different grids, later samples get looked up against query 0's timestamps and
+ * read as 0. The union degrades to the truth instead of to blankness.
  */
 function buildTimeAxis(
   processedData: ProcessedPromQLData[],
@@ -213,18 +204,13 @@ export class HeatmapConverter implements PromQLChartConverter {
         extras.legends.push(seriesData.name);
 
         // The row is the series' position on the Y AXIS — which spans every
-        // query — not its position within its own query. Using the per-query
-        // index put query 2's series back on rows 0..n, on top of query 1's,
-        // and left the categories they should have occupied permanently blank.
-        // A two-query heatmap silently charted the wrong series against the
-        // wrong labels.
+        // query — not its position within its own query (per-query indices
+        // overlap when there are multiple queries).
         const rowIndex = seriesNames.length - 1;
 
         queryData.timestamps.forEach(([ts]) => {
-          // The column is this timestamp's slot on the SHARED axis. The
-          // per-query loop index only agreed with it while every query reported
-          // the identical grid; when one query started late or stepped
-          // differently, its samples were drawn in another query's columns.
+          // The column is this timestamp's slot on the SHARED axis, not the
+          // per-query loop index (which diverges when queries use different grids).
           const timeIndex = columnOfTs.get(String(ts));
           if (timeIndex === undefined) return;
 
@@ -307,14 +293,11 @@ export class HeatmapConverter implements PromQLChartConverter {
       tooltip: {
         position: "top",
         textStyle: {
-          color: store.state.theme === "dark" ? "#fff" : "#000",
+          color: chartColor("--color-tooltip-text"),
           fontSize: 12,
         },
         enterable: true,
-        backgroundColor:
-          store.state.theme === "dark"
-            ? "rgba(0,0,0,1)"
-            : "rgba(255,255,255,1)",
+        backgroundColor: chartColor("--color-tooltip-bg"),
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {
@@ -358,15 +341,10 @@ export class HeatmapConverter implements PromQLChartConverter {
     store: any,
     extras: any,
   ) {
-    // De-accumulate PER QUERY, then concatenate.
-    //
-    // Flattening every query's series into one list first was wrong: the bucket
-    // set is keyed on `le`, and `deaccumulateHistogramSeries` sorts by `le` and
-    // de-duplicates. Two histograms in one panel therefore had their buckets
-    // interleaved — a second histogram's `le="0.5"` was either discarded as a
-    // duplicate of the first's, or subtracted from it as though it were the next
-    // bucket up. Each query is its own cumulative histogram and must be
-    // de-accumulated on its own.
+    // De-accumulate PER QUERY, then concatenate. deaccumulateHistogramSeries
+    // sorts and de-duplicates by `le`, so flattening all queries first would
+    // interleave two histograms' buckets. Each query is its own cumulative
+    // histogram.
     const buckets = processedData.flatMap((queryData) => {
       const inputs: HistogramSeriesInput[] = (queryData.series ?? []).map(
         (seriesData) => ({
@@ -385,12 +363,9 @@ export class HeatmapConverter implements PromQLChartConverter {
     const bucketLabels: string[] = buckets.map((bucket) => {
       const base = formatBucketLabel(bucket.le, bucket.leValue, config);
 
-      // ECharts category axes need UNIQUE names, and there are two ways to collide:
-      // formatting can round two different bounds onto the same label, and — since
-      // each query is now de-accumulated separately — two histograms in one panel
-      // can carry the identical `le`. The old single-step fallback appended the raw
-      // `le`, which does not disambiguate the second case at all (both are "0.5")
-      // and still collides for a third series. Keep widening until it is unique.
+      // ECharts category axes need UNIQUE names, but two bounds can round to the
+      // same label and two histograms can carry the identical `le`. Keep widening
+      // until it is unique.
       let label = base;
       if (usedLabels.has(label)) label = `${base} (${bucket.le})`;
       for (let n = 2; usedLabels.has(label); n++) {
@@ -421,10 +396,8 @@ export class HeatmapConverter implements PromQLChartConverter {
       });
     });
 
-    // De-accumulated bucket counts are clamped at zero, so this resolves to the
-    // same [0, max] it always did. It goes through the shared helper anyway, so
-    // that the empty-data case (no cells at all) is handled in one place rather
-    // than by a `maxValue` that silently starts life as a legitimate value.
+    // De-accumulated counts are clamped at zero, so this resolves to [0, max];
+    // routed through the shared helper so the empty-data case is handled in one place.
     const visualMapRange = visualMapRangeOf(minValue, maxValue);
 
     const xAxisData = buildXAxisData(timestamps);
@@ -478,14 +451,11 @@ export class HeatmapConverter implements PromQLChartConverter {
       tooltip: {
         position: "top",
         textStyle: {
-          color: store.state.theme === "dark" ? "#fff" : "#000",
+          color: chartColor("--color-tooltip-text"),
           fontSize: 12,
         },
         enterable: true,
-        backgroundColor:
-          store.state.theme === "dark"
-            ? "rgba(0,0,0,1)"
-            : "rgba(255,255,255,1)",
+        backgroundColor: chartColor("--color-tooltip-bg"),
         extraCssText: TOOLTIP_SCROLL_STYLE,
         formatter: (params: any) => {
           try {

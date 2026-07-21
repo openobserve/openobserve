@@ -562,7 +562,7 @@ export const useVariablesManager = () => {
     variablesData.isInitialized = true;
   };
 
-  // ========== COMMIT MECHANISM (like __global in main branch) ==========
+  // ========== COMMIT MECHANISM ==========
   /**
    * Commits all live variable changes to committed state
    * This is triggered when user clicks the Dashboard Refresh button
@@ -836,7 +836,6 @@ export const useVariablesManager = () => {
 
   /**
    * Get COMMITTED variables for a panel (used by panels for queries)
-   * This is similar to how panels use currentVariablesDataRef.__global in main branch
    */
   const getCommittedVariablesForPanel = (
     panelId: string,

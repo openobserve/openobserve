@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <OCard
-    class="border border-border h-full flex flex-col transition-all duration-200 ease-in-out rounded-lg hover:-translate-y-0.5 hover:shadow-lg"
+    class="border border-border h-full flex flex-col transition-all duration-200 ease-in-out rounded-default hover:-translate-y-0.5 hover:shadow-lg"
   >
     <OCardSection class="p-4 pb-2 flex-1">
       <div class="flex items-start justify-between mb-2">
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(template, index) in integration.cloudFormationTemplates"
           :key="`cf-${index}`"
           @click="handleTemplateSelection(template)"
-          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded border border-border hover:bg-muted/50"
+          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-default border border-border hover:bg-muted/50"
           :data-test="`aws-${integration.id}-template-option-${index}`"
         >
           <div class="flex flex-col flex-1 min-w-0">
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(option, index) in integration.componentOptions"
           :key="`comp-${index}`"
           @click="handleComponentSelection(option)"
-          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded border border-border hover:bg-muted/50"
+          class="flex items-center gap-2 px-3 py-2 mb-2 cursor-pointer rounded-default border border-border hover:bg-muted/50"
           :data-test="`aws-${integration.id}-component-option-${index}`"
         >
           <div class="flex flex-col flex-1 min-w-0">

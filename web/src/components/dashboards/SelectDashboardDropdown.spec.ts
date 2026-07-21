@@ -200,7 +200,7 @@ describe("SelectDashboardDropdown", () => {
   });
 
   describe("ODrawer migration", () => {
-    it("should render ODrawer in place of q-dialog", () => {
+    it("should render ODrawer", () => {
       const wrapper = mountComponent({}, store);
       expect(wrapper.findComponent(ODialogStub).exists()).toBe(true);
     });

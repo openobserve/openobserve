@@ -131,7 +131,7 @@ const hasLabel = computed(
         props.disabled
           ? 'bg-transparent border-switch-disabled-border border-dashed'
           : isChecked
-            ? 'bg-[var(--color-primary-500)] border-switch-border'
+            ? 'bg-primary-500 border-switch-border'
             : 'bg-transparent border-switch-border-off',
         props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         'outline-none',
@@ -158,8 +158,8 @@ const hasLabel = computed(
       v-if="hasLabel || $slots.tooltip"
       :id="labelId"
       :class="[
-        'o-input-label text-sm font-semibold select-none leading-tight flex items-center gap-1',
-        disabled && 'o-input-label--disabled',
+        'o-input-label text-compact select-none leading-tight flex items-center gap-1',
+        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>

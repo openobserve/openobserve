@@ -22,7 +22,6 @@ import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
 // Severity-aware sort order for stacked histogram breakdown categories.
 // Lower index = bottom of stack (least severe), higher = top (most severe).
 // Categories not in this map fall back to alphabetical order at rank 100.
-// Defined at module scope so it is allocated once, not on every generateHistogramData call.
 const SEVERITY_ORDER: Record<string, number> = {
   trace: 0, debug: 1, info: 2, success: 3,
   pending: 4, cancelled: 5,
@@ -153,6 +152,7 @@ export const useHistogram = () => {
       const xData: number[] = [];
       const yData: number[] = [];
 
+      let hasAggregationFlag = false;
       const parsedSQL: any = fnParsedSQL();
       if (
         searchObj.meta.sqlMode &&
@@ -168,10 +168,10 @@ export const useHistogram = () => {
         ) &&
         searchObj.data.queryResults.aggs
       ) {
-        // NEW: read the breakdown field returned by the backend.
+        // Read the breakdown field returned by the backend.
         // When present, the histogram is rendered as a stacked bar chart grouped
         // by this field (e.g. "severity"). When absent, falls through to the
-        // original flat single-series path below.
+        // flat single-series path below.
         const breakdownField: string | null =
           searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
@@ -184,7 +184,7 @@ export const useHistogram = () => {
           );
 
         if (hasBreakdown) {
-          // --- NEW: Stacked breakdown path ---
+          // --- Stacked breakdown path ---
           // Uses a composite key "timestamp|||category" so that the same
           // (timestamp, category) pair from different pages is merged correctly.
           const breakdownMap = new Map<
@@ -194,9 +194,8 @@ export const useHistogram = () => {
 
           // Collect every timestamp we know about — including zero-filled
           // skeleton entries that have no breakdown — so the x-axis matches
-          // the full query range from the first render (same behaviour as
-          // the flat path). Without this the chart would appear to grow
-          // outward from the center as partitions stream in.
+          // the full query range from the first render. Without this the chart
+          // would appear to grow outward from the center as partitions stream in.
           const timestampSet = new Set<string>();
 
           // Seed from previously accumulated pages
@@ -284,8 +283,8 @@ export const useHistogram = () => {
           searchObj.data.histogram = {
             xData,
             yData,
-            breakdownField,       // NEW: field name used for grouping
-            breakdownSeries: seriesMap, // NEW: Map<category, counts[]> for stacked chart
+            breakdownField,       // field name used for grouping
+            breakdownSeries: seriesMap, // Map<category, counts[]> for stacked chart
             chartParams: {
               title: getHistogramTitle(),
               unparsed_x_data,
@@ -296,10 +295,7 @@ export const useHistogram = () => {
             errorDetail: "",
           };
         } else {
-          // --- EXISTING: Single-series (flat) path ---
-          // Original logic moved here unchanged; previously this was the only path.
-          // num_records was originally declared at the top of the function but is
-          // only used here, so it is now scoped to this block.
+          // --- Single-series (flat) path ---
           histogramMappedData = new Map(
             histogramResults.value.map((item: any) => [
               item.zo_sql_key,
@@ -316,7 +312,7 @@ export const useHistogram = () => {
             }
           });
 
-          let num_records = 0; // moved from top of function — only needed in this path
+          let num_records = 0;
           const mergedData: any = Array.from(histogramMappedData.values());
           mergedData.forEach(
             (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {

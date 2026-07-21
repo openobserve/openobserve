@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
+    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'w-full', 'transition-[width]', 'duration-300', 'ease-[ease]', 'min-h-screen', 'h-screen', 'flex', 'flex-col']"
   >
     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
-        class="bg-[var(--o2-primary-btn-bg)] text-[var(--o2-primary-btn-text)] text-center"
+        class="bg-button-primary text-button-primary-foreground text-center"
       >
         <WebinarBanner variant="header" />
       </div>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="flex flex-col min-h-0 bg-[var(--color-surface-chrome-deeper)] pr-2 pb-2"
+          class="flex flex-col min-h-0 bg-surface-chrome-deeper pr-2 pb-2"
           :style="{
             width:
               store.state.isAiChatEnabled && !store.state.isAiChatExpanded
@@ -79,10 +79,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : '100%',
           }"
         >
-          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
+          <!-- Content card — all pages render inside this. The border stays present in both
+               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
-            :class="store.state.theme === 'dark' ? 'border border-border-default' : ''"
+            class="flex-1 flex flex-col min-h-0 bg-surface-base rounded-surface overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
               v-if="isLoading"
@@ -101,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="store.state.isAiChatEnabled && isLoading"
           class="o2-sidebar o2-sidebar-right overflow-y-auto sticky top-[var(--navbar-height,2.25rem)] self-start shrink-0"
           :class="[
-            store.state.theme == 'dark'
+            isDark
               ? 'dark-mode-chat-container'
               : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
@@ -177,6 +178,7 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
@@ -293,6 +295,7 @@ export default defineComponent({
   },
   setup() {
     const store: any = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
     const { t } = useI18n();
     const miniMode = ref(false);
@@ -337,6 +340,11 @@ export default defineComponent({
         (config.isEnterprise == "true" || config.isCloud == "true") &&
         store.state.zoConfig.incidents_enabled
       );
+    });
+
+    // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
+    const isWorkflowsEnabled = computed(() => {
+      return config.isEnterprise == "true" || config.isCloud == "true";
     });
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
@@ -607,6 +615,32 @@ export default defineComponent({
         }
       }
     };
+
+    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    const updateWorkflowsMenu = () => {
+      if (!isWorkflowsEnabled.value) return;
+
+      const workflowExists = linksList.value.some(
+        (link) => link.name === "workflows",
+      );
+      if (workflowExists) return;
+
+      const actionIndex = linksList.value.findIndex(
+        (link) => link.name === "actionScripts",
+      );
+      const alertIndex = linksList.value.findIndex(
+        (link) => link.name === "alertList",
+      );
+      const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+      if (anchor === -1) return;
+
+      linksList.value.splice(anchor + 1, 0, {
+        title: t("menu.workflows"),
+        icon: "schema",
+        link: "/workflows",
+        name: "workflows",
+      });
+    };
     const splitterModel = ref(100);
     const selectedLanguage: any =
       langList.find((l) => l.code == getLocale()) || langList[0];
@@ -680,6 +714,7 @@ export default defineComponent({
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
+      updateWorkflowsMenu();
       updateSyntheticMenu();
       updateAIObservabilityMenu();
 
@@ -1197,7 +1232,7 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      if (store.state.theme === "dark") {
+      if (isDark.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
@@ -1275,6 +1310,7 @@ export default defineComponent({
     useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
 
     return {
+      isDark,
       t,
       router,
       store,
@@ -1378,10 +1414,16 @@ export default defineComponent({
 });
 </script>
 
-
-<style>
-/* Print mode — hide header + sidebar, show body overflow */
-.printMode body {
-  overflow: auto !important;
+<style scoped>
+/* keep(print): This layout's root is the ONLY writer of `.printMode` (store.state.printMode,
+   above), so the rule can only ever fire on descendants of that root — but
+   `.hideOnPrintMode` is placed by other components (VariableAdHocValueSelector,
+   pipeline/PipelineEditor, Dashboards/ViewDashboard) that render through
+   <router-view> and so do not carry this scope id. :deep() pierces to them while
+   keeping the ancestor condition scoped to the owner. */
+.printMode :deep(.hideOnPrintMode) {
+  display: none;
 }
 </style>
+
+

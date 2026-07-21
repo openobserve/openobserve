@@ -1,26 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for ScorerFormPage.vue (online-evals scorer create/edit
-// page, llm_judge + remote variants). This native-`<form>` page shipped with
-// `*` markers but NO client-side validation — the migration to OForm + Zod ADDS
-// the missing validation (online-evals-migration.md row 33).
+// page, llm_judge + remote variants).
 //
-// The component OWNS <OForm> via the Rule-③ owner pattern: it creates the form
-// with `useOForm` and reads it reactively through `form.useStore` — a SINGLE
-// source of truth, NO mirror ref, NO `v-model`, NO `store.subscribe` sync. That
-// read view (`formValues`) drives the parent-side conditionals a parent can't get
-// from form context: the `scorerType`/`authType` `v-if` sections, the previews,
-// the live Scorer Test panel + schema-preview dialog, and the duplicate-field
-// highlight; programmatic writes (`handleScoreConfigSelection`, version-pinning)
-// go through `form.setFieldValue`. Every rendered control is form-owned (`name=` +
-// a schema entry below) so validation stays schema-driven; the two repeatable-row
-// arrays (extraMetadataFields / customHeaders) are form-owned `z.array`
-// field-arrays (START-HERE ① — arrays are TanStack-owned), rendered from the form
-// store with index `:key`s and add/remove via `form.setFieldValue`.
-//
-// Validation TIMING is owned by OForm (submit-then-change); this file only
+// Validation timing is owned by OForm (submit-then-change); this file only
 // describes WHAT is valid. The @submit payload carries RAW values, so the
-// component trims/coerces at save just as the old `v-model.trim`/`.number` did.
+// component trims/coerces at save.
 
 import { z } from "zod";
 
@@ -54,13 +39,12 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // Discriminator — seeded once, drives the conditional requireds below.
       scorerType: z.enum(["llm_judge", "remote"]).default("llm_judge"),
       description: z.string().optional().default(""),
-      // Optional — matches main + the backend contract. A scorer with no score
-      // config is a valid server-side entity (`produces_score_config_id:
-      // Option<String>` with #[serde(default)]), and it was creatable on main
-      // (the `*` marker was cosmetic, never enforced). The @submit handler maps
-      // an empty selection to `null`. Do NOT make this `requiredText`: that
-      // made scorers without a score config uncreatable, and blocked editing
-      // legacy scorers that already have none (the field is locked in edit).
+      // Optional — a scorer with no score config is a valid server-side entity
+      // (`produces_score_config_id: Option<String>` with #[serde(default)]). The
+      // @submit handler maps an empty selection to `null`. Do NOT make this
+      // `requiredText`: that would make scorers without a score config uncreatable
+      // and block editing legacy scorers that already have none (the field is
+      // locked in edit).
       producesScoreConfigId: z.string().optional().default(""),
       // Internal version-pinning state — not a rendered control; optional.
       producesScoreConfigVersion: z.string().optional().default(""),
@@ -69,11 +53,9 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
       // ── LLM judge ───────────────────────────────────────────────────────
       providerId: z.string().optional().default(""),
       model: z.string().optional().default(""),
-      // Template is intentionally NOT required, matching pre-migration
-      // (origin/main) behavior: main had no template validation, so legacy
-      // scorers may exist with an empty template. Requiring it here would block
-      // re-saving those records on edit — so it stays optional (create seeds a
-      // default template; edit preserves whatever was stored).
+      // Intentionally NOT required: legacy scorers may exist with an empty
+      // template, and requiring it here would block re-saving those on edit
+      // (create seeds a default template; edit preserves whatever was stored).
       template: z.string().optional().default(""),
       includeReasoning: z.boolean().optional().default(true),
       extraMetadataFields: z.array(extraMetadataFieldSchema).default([]),
@@ -161,8 +143,7 @@ export const makeScorerFormSchema = (t: (_key: string) => string) =>
         }
       }
 
-      // Extra-metadata field names must be unique (mirrors the old CSS-only
-      // duplicate highlight, now an enforced rule). Flag every duplicate row.
+      // Extra-metadata field names must be unique. Flag every duplicate row.
       const counts = new Map<string, number>();
       val.extraMetadataFields.forEach((field) => {
         const key = field.name.trim();

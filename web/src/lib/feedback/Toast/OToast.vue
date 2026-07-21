@@ -191,7 +191,7 @@ onUnmounted(() => {
     <!-- Inner shell: carries all visual styling + overflow-hidden to clip the progress bar -->
     <div
       :class="[
-        'relative flex gap-2 rounded-lg overflow-hidden p-3 shadow-toast w-full',
+        'relative flex gap-2 rounded-default overflow-hidden p-3 shadow-toast w-full',
         title ? 'items-start' : 'items-center',
         variantClasses[variant ?? 'default'],
       ]"
@@ -258,7 +258,7 @@ onUnmounted(() => {
             v-if="action"
             type="button"
             :class="[
-              'inline-flex items-center gap-1 justify-center rounded px-2.5 py-0.5 text-xs font-semibold shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+              'inline-flex items-center gap-1 justify-center rounded-default px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
               actionSucceeded
                 ? 'bg-toast-success-icon text-white focus-visible:ring-toast-success-icon'
                 : 'bg-toast-action-text text-white hover:bg-toast-action-hover focus-visible:ring-toast-action-text',
@@ -313,13 +313,13 @@ onUnmounted(() => {
 
       <!-- Dismiss button -->
       <ToastClose
-        :class="['shrink-0 flex items-center rounded p-0.5 text-toast-fg-secondary hover:text-toast-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toast-info-border', title ? 'self-start' : 'self-center']"
+        :class="['shrink-0 flex items-center rounded-default p-0.5 text-toast-fg-secondary hover:text-toast-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toast-info-border', title ? 'self-start' : 'self-center']"
         aria-label="Dismiss notification"
       >
         <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
       </ToastClose>
 
-      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-lg.
+      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-default.
            :key on the outer div ensures Vue remounts it (restarting the CSS animation)
            whenever timerKey increments (i.e. a duplicate toast resets the timer). -->
       <div
@@ -329,7 +329,7 @@ onUnmounted(() => {
         aria-hidden="true"
       >
         <div
-          :class="['h-full w-full origin-left [animation:toast-shrink_linear_forwards]', progressBarColorClasses[variant ?? 'default']]"
+          :class="['toast-progress-bar h-full w-full origin-left', progressBarColorClasses[variant ?? 'default']]"
           :style="{
             animationDuration: `${timeout}ms`,
             animationPlayState: isPaused ? 'paused' : 'running',
@@ -340,8 +340,18 @@ onUnmounted(() => {
   </ToastRoot>
 </template>
 
-<style>
-@keyframes toast-shrink {
+<style scoped>
+/* keep(keyframes): the auto-dismiss progress bar is used only by this toast. The
+   `animation` shorthand is declared here, not as a template `[animation:…]`
+   utility, so Vue's scoped compiler renames the keyframe and this reference
+   together. Duration and play-state stay as inline `:style` longhands because
+   they are runtime values (per-toast timeout, pause-on-hover) — inline longhands
+   override this shorthand's initial values, so the pairing is intentional. */
+.toast-progress-bar {
+  animation: shrink linear forwards;
+}
+
+@keyframes shrink {
   from {
     transform: scaleX(1);
   }
@@ -350,3 +360,4 @@ onUnmounted(() => {
   }
 }
 </style>
+

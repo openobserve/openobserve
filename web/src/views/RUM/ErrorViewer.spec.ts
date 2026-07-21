@@ -222,7 +222,7 @@ describe("ErrorViewer.vue", () => {
       const container = wrapper.find('[data-test="error-viewer-container"]');
       expect(container.exists()).toBe(true);
       // Check that the container has the expected layout class
-      expect(container.classes()).toContain("card-container");
+      expect(container.classes()).toContain("bg-card-glass-bg");
     });
   });
 

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -31,11 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
         <div
           v-if="pipelineErrorsToDisplay.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
           Error Validations
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="error-report-container flex-1 min-h-0">
           <!-- Pipeline Errors Section -->
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <!-- pipeline name should not be empty -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'pipeline_name'
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <!-- source stream name should not be empty -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'source_stream_name'
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <!-- source stream type should be one of the valid stream types -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'source_stream_type'
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <!-- sql query should be same across all nodes as well try to match the query in the nodes -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'sql_query_missing'
@@ -146,7 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ errorMessage.message }}
                     <div>
                       <query-editor
-                        style="width: 100%; height: 200px"
+                        class="w-full"
+                        style="height: 200px"
                         data-test="pipeline-import-sql-query-input"
                         :model-value="userSelectedSqlQuery[index] || ''"
                         :label="'SQL Query'"
@@ -161,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <!-- destination stream type should be one of the valid stream types -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'destination_stream_type'
@@ -188,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <!-- destination stream name should not be empty -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'org_id'
@@ -214,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <!-- source stream type should be one of the valid stream types -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field.startsWith('function_name')
@@ -241,7 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
 
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'remote_destination'
@@ -267,7 +268,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </span>
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'source_timezone'
@@ -315,17 +316,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="{
                   'py-1.25 text-sm font-bold': true,
                   'text-green': val.success,
-                  'text-red': !val.success,
+                  'text-status-negative': !val.success,
                 }"
+                class="whitespace-pre-wrap"
                 style="
-                  white-space: pre-wrap;
                   word-wrap: break-word;
                   overflow-wrap: break-word;
                 "
                 :data-test="`pipeline-import-creation-${index}-message`"
               >
                 <pre
-                  style="white-space: pre-wrap; word-break: break-word"
+                  class="whitespace-pre-wrap"
+                  style="word-break: break-word"
                   >{{ val.message }}</pre
                 >
               </div>
@@ -336,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
   </base-import>
 
-  <!-- Actions live in the pipeline shell's AppPageHeader (Functions.vue), next
+  <!-- Actions live in the pipeline shell's OPageHeader (Functions.vue), next
        to the "Pipelines › Import" breadcrumb — the shell owns the single header
        so BaseImport's built-in header is hidden (hide-header). -->
   <!-- defer is required: #o2-page-actions is created by Functions.vue (parent shell)

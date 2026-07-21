@@ -27,6 +27,10 @@ export const emailTemplate = {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenObserve Alert</title>
     <style>
+        /* INTENTIONAL EXCEPTION to the two-font rule: this markup renders inside a
+           mail client, which cannot load our self-hosted webfont and has no access
+           to our CSS custom properties. A system stack is correct here — do not
+           replace with var(--font-sans). */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
         .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
         .header { background-color: #d63638; color: white; padding: 20px; text-align: center; }
@@ -119,7 +123,7 @@ export const emailConfig: PrebuiltConfig = {
         };
       }
     }
-    // CC and Subject fields removed - not supported by backend Email struct
+    // CC and Subject are not supported by the backend Email struct
     // {
     //   key: 'ccRecipients',
     //   label: 'CC Recipients (optional)',

@@ -15,24 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="p-0 storage-settings-editor">
-    <!-- Header -->
-    <AppPageHeader
-      :back="{
-        label: t('storage_settings.title'),
-        onClick: () => emit('cancel'),
-        dataTest: 'storage-settings-editor-back-btn',
-      }"
-      :title="headerTitle"
-      class="px-4 border-b border-border-default mb-[0.675rem]"
-    >
+  <OPageLayout
+    :back="{
+      label: t('storage_settings.title'),
+      onClick: () => emit('cancel'),
+      dataTest: 'storage-settings-editor-back-btn',
+    }"
+    :title="headerTitle"
+  >
       <template #title>
         <span data-test="storage-settings-editor-title">{{ headerTitle }}</span>
       </template>
-    </AppPageHeader>
 
     <!-- Stepper -->
-    <div class="card-container h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
+    <div class="bg-card-glass-bg h-[calc(100vh-7rem)] py-2 px-3 overflow-auto">
     <div style="max-width: 720px;">
       <OForm
         ref="storageForm"
@@ -54,72 +50,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :done="step > 1"
             :navigable="step > 1 && !isEditMode"
           >
-            <div class="text-sm text-gray-500 mb-3">
+            <div class="text-sm text-text-secondary mb-3">
               {{ t("storage_settings.selectProviderDesc") }}
               {{ t("settings.orgStorageEditor.selectProviderDescCont") }}
             </div>
             <div
               v-if="!isEditMode"
-              class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
-              :class="store.state.theme === 'dark'
-                ? 'bg-amber-950/20 border-amber-400/30'
-                : 'bg-amber-50 border-amber-300'"
+              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-warning-bg border-banner-warning-border"
             >
               <OIcon name="warning" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-[0.82rem] leading-[1.55] text-[var(--o2-text-primary)]">
+              <div class="text-compact leading-[1.55] text-text-body">
                 {{ t("settings.orgStorageEditor.irreversibleWarnPre") }}<strong>{{ t("settings.orgStorageEditor.irreversibleWarnEmphasis") }}</strong>{{ t("settings.orgStorageEditor.irreversibleWarnPost") }}
               </div>
             </div>
             <div
               v-if="!isEditMode"
-              class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
-              :class="store.state.theme === 'dark'
-                ? 'bg-blue-950/20 border-blue-400/20'
-                : 'bg-blue-50 border-blue-200'"
+              class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-info-bg border-banner-info-border"
             >
               <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-              <div class="text-[0.82rem] leading-[1.55] text-[var(--o2-text-primary)]">
+              <div class="text-compact leading-[1.55] text-text-body">
                 {{ t("settings.orgStorageEditor.credentialsOnlyInfo") }}
               </div>
             </div>
-            <div class="text-sm font-medium mb-2" style="font-weight: 500">
-              {{ t("settings.orgStorageEditor.selectStorageProviderLabel") }}<span class="text-red">*</span>
+            <div class="text-sm font-medium mb-2">
+              {{ t("settings.orgStorageEditor.selectStorageProviderLabel") }}<span class="text-status-negative">*</span>
             </div>
-            <div class="destination-type-grid grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));">
+            <div class="destination-type-grid grid gap-3 grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))]">
               <div
                 v-for="provider in availableProviders"
                 :key="provider.value"
                 :data-test="`storage-settings-provider-card-${provider.value}`"
-                class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-xl cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5"
-                :class="[
-                  { selected: selectedProvider === provider.value },
-                  store.state.theme === 'dark'
-                    ? 'bg-[#1e1e1e] border-[#424242] hover:border-[#5d9cec] hover:shadow-[0_4px_12px_rgba(93,156,236,0.2)]'
-                    : 'bg-white border-(--o2-border) hover:border-(--o2-border-color) hover:shadow-[0_4px_12px_rgba(25,118,210,0.15)]'
-                ]"
-                :style="selectedProvider === provider.value && store.state.theme !== 'dark'
-                  ? 'border-color: var(--o2-border-color); background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%); box-shadow: 0 4px 16px rgba(25,118,210,0.2);'
-                  : selectedProvider === provider.value && store.state.theme === 'dark'
-                  ? 'border-color: #5d9cec; background: linear-gradient(135deg, #1a3a52 0%, #1e1e1e 100%); box-shadow: 0 4px 16px rgba(93,156,236,0.25);'
-                  : ''"
+                class="group/card relative flex flex-col items-center justify-center py-5 px-3 border-2 rounded-default cursor-pointer transition-all duration-300 min-h-30 hover:-translate-y-0.5 hover:shadow-md"
+                :class="
+                  selectedProvider === provider.value
+                    ? 'selected bg-table-row-selected-bg border-accent shadow-md'
+                    : 'bg-surface-base border-border-default hover:border-card-glass-border'
+                "
                 @click="selectedProvider = provider.value"
               >
                 <img
                   v-if="provider.image"
                   :src="provider.image"
                   :alt="provider.label"
-                  class="card-image w-[48px] h-[48px] mb-2 object-contain"
+                  class="card-image w-12 h-12 mb-2 object-contain"
                 />
                 <OIcon
                   v-else
                   :name="provider.icon"
                   size="lg"
-                  class="mb-2 text-[#666] [transition:color_0.3s_ease] group-[.selected]/card:text-(--o2-border-color) dark:group-[.selected]/card:text-[#5d9cec]"
+                  class="mb-2 text-text-secondary [transition:color_0.3s_ease] group-[.selected]/card:text-card-glass-border"
                 />
-                <div class="text-[13px] font-medium text-center [line-height:1.3] mt-1 text-[var(--o2-text-primary)] group-[.selected]/card:text-[#333333] dark:group-[.selected]/card:text-white">{{ provider.label }}</div>
+                <div class="text-compact font-medium text-center [line-height:1.3] mt-1 text-text-body">{{ provider.label }}</div>
                 <div
                   v-if="selectedProvider === provider.value"
-                  class="check-icon absolute top-[0.375rem] right-[0.375rem] w-[1.25rem] h-[1.25rem] rounded-full overflow-hidden bg-[var(--o2-positive)] text-white flex items-center justify-center z-[1]"
+                  class="check-icon absolute top-1.5 right-1.5 w-5 h-5 rounded-full overflow-hidden bg-status-positive text-white flex items-center justify-center z-[1]"
                 >
                   <OIcon name="check" size="xs" />
                 </div>
@@ -262,13 +246,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- AwsRoleArn Fields -->
               <template v-if="selectedProvider === 'AwsRoleArn'">
                 <div
-                  class="flex items-start gap-[10px] px-3 py-[10px] mb-3 rounded-[10px] border"
-                  :class="store.state.theme === 'dark'
-                    ? 'bg-blue-950/20 border-blue-400/20'
-                    : 'bg-blue-50 border-blue-200'"
+                  class="flex items-start gap-2.5 px-3 py-2.5 mb-3 rounded-default border bg-banner-info-bg border-banner-info-border"
                 >
                   <OIcon name="info" size="sm" class="flex-shrink-0 mt-px" />
-                  <div class="text-[0.82rem] leading-[1.55] text-[var(--o2-text-primary)]">
+                  <div class="text-compact leading-[1.55] text-text-body">
                     <template v-if="isCloud">
                       {{ t("storage_settings.awsStsCloudInfo") }}
                     </template>
@@ -324,9 +305,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step1-cancel-btn"
               variant="outline"
-              class="o2-secondary-button h-[36px] mr-2"
+              class="o2-secondary-button h-9 mr-2"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
@@ -337,9 +318,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step1-continue-btn"
               variant="primary"
-              class="no-border o2-primary-button h-[36px]"
+              class="no-border o2-primary-button h-9"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-primary-button-dark'
                   : 'o2-primary-button-light'
               "
@@ -354,9 +335,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="!isEditMode"
               data-test="step2-back-btn"
               variant="outline"
-              class="o2-secondary-button h-[36px] mr-2"
+              class="o2-secondary-button h-9 mr-2"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
@@ -367,9 +348,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="step2-cancel-btn"
               variant="outline"
-              class="o2-secondary-button h-[36px]"
+              class="o2-secondary-button h-9"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-secondary-button-dark'
                   : 'o2-secondary-button-light'
               "
@@ -380,9 +361,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="storage-settings-submit-btn"
               variant="primary"
-              class="no-border ml-2 o2-primary-button h-[36px]"
+              class="no-border ml-2 o2-primary-button h-9"
               :class="
-                store.state.theme === 'dark'
+                isDark
                   ? 'o2-primary-button-dark'
                   : 'o2-primary-button-light'
               "
@@ -395,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OForm>
     </div>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts" setup>
@@ -404,6 +385,7 @@ import { ref, computed, onMounted, watch } from "vue";
 defineOptions({ name: "OrgStorageEditor" });
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
@@ -413,7 +395,7 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   makeOrgStorageEditorSchema,
@@ -430,6 +412,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
+    const { isDark } = useTheme();
 const { t } = useI18n();
 
 const step = ref(1);
@@ -439,8 +422,7 @@ const selectedProvider = ref("");
 // provider-change reset, and async edit-prefill (form.reset).
 const storageForm = ref<any>(null);
 
-// Schema-driven validation replaces the manual fieldErrors map +
-// validateStorageForm(). Provider-discriminated via superRefine on the bridged
+// Provider-discriminated validation via superRefine on the bridged
 // `selectedProvider` field.
 const orgStorageEditorSchema = makeOrgStorageEditorSchema(t);
 
@@ -567,10 +549,9 @@ function buildDataPayload(value: OrgStorageEditorForm) {
   return data;
 }
 
-// @submit handler — fires only once the provider-discriminated schema passes,
-// so the manual validateStorageForm()/fieldErrors are gone. The Save button is
-// inline (type=submit inside <OForm>) so Enter works natively; OForm awaits this
-// so the spinner spans the POST.
+// @submit handler — fires only once the provider-discriminated schema passes.
+// The Save button is inline (type=submit inside <OForm>) so Enter works
+// natively; OForm awaits this so the spinner spans the POST.
 async function submitStorage(value: OrgStorageEditorForm) {
   const dismiss = toast({
     variant: "loading",
@@ -627,11 +608,10 @@ onMounted(async () => {
         step.value = 2;
         // data is already a parsed object from the API
         const parsed = res.data.data || {};
-        // Prefill the form once the (async) config arrives — form.reset, not a
-        // per-field loop (the documented "data arrives after mount" pattern).
-        // Non-credential fields are disabled in the form; credentials must be
-        // entered fresh — never prefill with masked values. external_id is a
-        // credential but not masked, so it IS prefilled.
+        // Prefill the form once the (async) config arrives. Non-credential
+        // fields are disabled in the form; credentials must be entered fresh —
+        // never prefill with masked values. external_id is a credential but not
+        // masked, so it IS prefilled.
         storageForm.value?.form?.reset({
           selectedProvider: res.data.provider,
           bucket_name: parsed.bucket_name || "",
@@ -653,9 +633,9 @@ onMounted(async () => {
   }
 });
 
-// Bridge the provider card grid into the form (the documented sanctioned
-// discriminator bridge) so superRefine can branch on it. On a create-mode
-// provider change, reset the credential fields fresh for the new provider.
+// Bridge the provider card grid into the form so superRefine can branch on it.
+// On a create-mode provider change, reset the credential fields fresh for the
+// new provider.
 watch(selectedProvider, (newProvider) => {
   storageForm.value?.form?.setFieldValue("selectedProvider", newProvider);
   if (newProvider && !isEditMode.value) {

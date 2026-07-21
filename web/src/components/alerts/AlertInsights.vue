@@ -15,13 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full flex flex-col min-h-0">
-    <AppPageHeader
-      :title="t('alerts.insights.title')"
-      :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
-      tabs-below
-      class="shrink-0 px-4"
-    >
+  <OPageLayout
+    :title="t('alerts.insights.title')"
+    :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+    tabs-below
+    bleed
+  >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -49,11 +48,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <template #tabs>
+      <template #header-tabs>
         <OTabs
           v-model="currentTab"
           dense
-          class="alert-insights-tabs"
           align="left"
           data-test="alert-insights-tabs"
         >
@@ -73,12 +71,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
         </OTabs>
       </template>
-    </AppPageHeader>
 
     <!-- Filters Section -->
     <div
       v-if="show"
-      class="flex items-center gap-2 flex-wrap px-4 py-3 border-b border-(--q-border-color) shrink-0"
+      class="flex items-center gap-2 flex-wrap px-page-edge py-3 border-b border-border-default shrink-0"
     >
           <span class="text-sm font-semibold relative top-1">{{ t("common.filters") }}:</span>
 
@@ -87,7 +84,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="showFailedOnly"
           :label="t('alerts.insights.filters.failedOnly')"
           class="o2-toggle-button-sm"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
           @update:model-value="onFilterChange"
           data-test="failed-only-toggle"
           >
@@ -100,7 +96,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="showSilencedOnly"
           :label="t('alerts.insights.filters.silenced')"
           class="o2-toggle-button-sm"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
           @update:model-value="onFilterChange"
           data-test="silenced-only-toggle"
           >
@@ -112,12 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="[panelId, filter] in rangeFilters"
             :key="panelId"
-            class="inline-flex items-center rounded py-1 px-3 text-sm cursor-default"
-            :class="
-              store.state.theme === 'dark'
-                ? 'bg-indigo-900 text-indigo-100'
-                : 'bg-blue-100 text-blue-800'
-            "
+            class="inline-flex items-center rounded-default py-1 px-3 text-sm cursor-default bg-status-info-bg text-status-info-text"
             data-test="range-filter-chip"
           >
             <span class="chip-label">
@@ -157,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-(--q-border-color) shrink-0"
+      class="bg-primary bg-opacity-10 flex items-center px-4 py-3 gap-3 border-b border-border-default shrink-0"
       data-test="action-buttons-row"
     >
       <OIcon name="campaign" size="sm" />
@@ -213,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Dashboard Content -->
     <div class="flex-1 min-h-0 px-2.5 pb-2.5">
-      <div class="card-container mb-2.5 h-[calc(100vh-13rem)]">
+      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
         <div
           @contextmenu="handleNativeContextMenu"
         >
@@ -222,11 +212,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="ml-3">Loading insights...</div>
           </div>
 
-          <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
-            <div v-if="!dashboardData" class="p-5 text-center text-[#666]">
+          <div :class="isLoading ? 'invisible' : 'visible'">
+            <div v-if="!dashboardData" class="p-5 text-center text-text-muted">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>
-            <div v-else-if="!show" class="p-5 text-center text-[#666]">
+            <div v-else-if="!show" class="p-5 text-center text-text-muted">
               {{ t("alerts.insights.loading.refreshing") }}
             </div>
             <RenderDashboardCharts
@@ -260,14 +250,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OButton from '@/lib/core/Button/OButton.vue';
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -742,9 +732,3 @@ onMounted(async () => {
   isLoading.value = false;
 });
 </script>
-
-<style>
-.alert-insights-tabs :deep(.o-tab__label) {
-  text-transform: none !important;
-}
-</style>

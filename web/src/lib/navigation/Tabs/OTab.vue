@@ -63,8 +63,17 @@ const baseClasses = computed<string>(() => [
   isVertical.value
     ? 'flex justify-start'
     : 'inline-flex justify-center',
-  'px-2 font-normal text-sm whitespace-nowrap',
-  isVertical.value ? 'rounded-lg' : 'rounded-t-md',
+  // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
+  // rail container insets it (px-1.5) to give the pill breathing room from the
+  // rail edges. With that 6px container inset + the tab's own 2px active border
+  // + this pl-1, the label lands on the page-edge grid line (12px) while the
+  // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
+  // their own padding override.
+  isVertical.value
+    ? 'pl-1 pr-2'
+    : 'px-2',
+  'font-normal text-sm whitespace-nowrap',
+  isVertical.value ? 'rounded-default' : 'rounded-t-default',
   'outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150',
   'select-none',
   'ring-offset-1 ring-offset-surface-base',
@@ -108,7 +117,7 @@ const heightClasses = computed<string>(() => {
   if (isVertical.value) {
     return isDense.value ? 'py-1.5' : 'py-2'
   }
-  return isDense.value ? 'h-[32px]' : 'h-[40px]'
+  return isDense.value ? 'h-8' : 'h-10'
 })
 </script>
 

@@ -30,22 +30,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="rootEl"
-    class="card-container llm-trend-panel rounded-lg flex flex-col overflow-hidden"
+    class="bg-card-glass-bg llm-trend-panel rounded-default flex flex-col overflow-hidden border border-border-default"
   >
     <!-- Padding lives on the header only, so the table spans edge-to-edge
          (no left/right/bottom inset) and sits flush within the card. -->
     <div
-      class="flex items-baseline justify-between mb-[0.5rem] px-[1rem] pt-[1rem]"
+      class="flex items-baseline justify-between mb-2 px-4 pt-4"
     >
       <div>
         <div
-          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
+          class="text-sm font-semibold text-text-heading"
         >
           {{ displayTitle }}
         </div>
         <div
           v-if="displaySubtitle"
-          class="text-[0.7rem] leading-normal mt-[0.1rem]"
+          class="text-2xs leading-normal mt-[0.1rem]"
         >
           {{ displaySubtitle }}
         </div>
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operation is the one cell we colour — it names the failed span, so it
            reads in the error colour. -->
       <template #cell-operation="{ value }">
-        <span class="text-[var(--color-error-600)]">{{ value }}</span>
+        <span class="text-error-600">{{ value }}</span>
       </template>
 
       <!-- Trace id: only a title for the full value on hover; default text. -->
@@ -265,9 +265,3 @@ onUnmounted(() => {
   observer = null;
 });
 </script>
-
-<style lang="scss" scoped>
-.llm-trend-panel {
-  border: 1px solid var(--color-border-default);
-}
-</style>

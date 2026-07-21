@@ -86,7 +86,7 @@ const createWrapper = (props = {}, options = {}) => {
         store: mockStore,
       },
       stubs: {
-        PageLayout: {
+        OPageLayout: {
           template: `<div data-test-stub="page-layout">
             <slot name="sidebar"></slot>
             <slot></slot>
@@ -97,7 +97,7 @@ const createWrapper = (props = {}, options = {}) => {
           template: `<div data-test-stub="section-rail"></div>`,
           props: ["groups", "activeKey", "title"],
         },
-        AppPageHeader: {
+        OPageHeader: {
           template: `<div data-test-stub="app-page-header">
             <slot name="title"></slot>
           </div>`,

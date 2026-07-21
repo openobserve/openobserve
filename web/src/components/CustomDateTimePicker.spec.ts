@@ -27,14 +27,7 @@ describe('CustomDateTimePicker.vue', () => {
       props,
       global: {
         plugins: [currentStore],
-        stubs: {
-          'q-btn': true,
-          'q-menu': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-input': true,
-          'q-select': true
-        }
+        stubs: {}
       }
     });
   };
@@ -220,24 +213,24 @@ describe('CustomDateTimePicker.vue', () => {
   });
 
   describe('Theme and Styling', () => {
-    it('computedClass returns dark mode class for dark theme', () => {
+    it('computedClass returns semantic surface class for dark theme', () => {
       wrapper = createWrapper(
-        { changeStyle: true }, 
+        { changeStyle: true },
         { theme: 'dark' }
       );
       const vm = wrapper.vm as any;
-      
-      expect(vm.computedClass).toBe('bg-[#2a2828]! text-white!');
+
+      expect(vm.computedClass).toBe('bg-surface-base!');
     });
 
-    it('computedClass returns light mode class for light theme', () => {
+    it('computedClass returns semantic surface class for light theme', () => {
       wrapper = createWrapper(
-        { changeStyle: true }, 
+        { changeStyle: true },
         { theme: 'light' }
       );
       const vm = wrapper.vm as any;
-      
-      expect(vm.computedClass).toBe('bg-white!');
+
+      expect(vm.computedClass).toBe('bg-surface-base!');
     });
 
     it('computedClass returns empty string when changeStyle is false', () => {

@@ -27,11 +27,18 @@ use infra::{
             search_jobs::JobOperator,
         },
         source_maps::SourceMap,
+        workflows::{Workflow, WorkflowRunErrors},
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
-use crate::service::db::sourcemaps::SOURCEMAP_PREFIX;
+use crate::service::{
+    db::{
+        sourcemaps::SOURCEMAP_PREFIX,
+        workflows::{WORKFLOW_TRIGGER_PREFIX, WORKFLOWS_PREFIX},
+    },
+    workflows::WorkflowTrigger,
+};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -114,6 +121,105 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 )
                 .await?;
         }
+
+        MessageType::WorkflowPut => {
+            let workflow: Workflow = json::from_slice(&msg.value.unwrap())?;
+            let org_id = workflow.org_id.clone();
+            let id = workflow.id.clone();
+            log::info!("received workflow put for {org_id}/{id}");
+
+            let existing = infra::table::workflows::get_by_org_wid(&org_id, &id).await?;
+
+            match existing {
+                Some(_) => {
+                    log::info!("updating existing workflow for {org_id}/{id}");
+                    match infra::table::workflows::update_workflow(workflow.clone()).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!("error while updating workflow to db {org_id}/{id} : {e}");
+                        }
+                    }
+                }
+                None => {
+                    log::info!("saving new workflow for {org_id}/{id}");
+                    match infra::table::workflows::save_workflow(workflow.clone()).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            log::error!("error while saving workflow to db {org_id}/{id} : {e}");
+                        }
+                    }
+                }
+            }
+
+            log::info!("successfully handled workflow put for {org_id}/{id}");
+
+            let cluster_coordinator = get_coordinator().await;
+            cluster_coordinator
+                .put(
+                    WORKFLOWS_PREFIX,
+                    serde_json::to_vec(&workflow)?.into(),
+                    true,
+                    None,
+                )
+                .await?;
+        }
+        MessageType::WorkflowDelete => {
+            let id: String = json::from_slice(&msg.value.unwrap())?;
+            log::info!("received workflow delete for {id}");
+            match infra::table::workflows::delete_workflow(&id).await {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("error while deleting workflow from db {id} : {e}");
+                }
+            }
+            log::info!("successfully handled workflow delete for {id}");
+            // trigger watch event by putting value to cluster coordinator
+            let cluster_coordinator = get_coordinator().await;
+            cluster_coordinator
+                .delete(&format!("{WORKFLOWS_PREFIX}{id}",), false, true, None)
+                .await?;
+        }
+        MessageType::WorkflowErrorPut => {
+            let errors: WorkflowRunErrors = json::from_slice(&msg.value.unwrap())?;
+            let org_id = errors.org_id.clone();
+            let wid = errors.workflow_id.clone();
+            let run_id = errors.run_id.clone();
+            log::info!(
+                "received workflow errors store notification for {org_id}/{wid} : run {run_id}"
+            );
+            match infra::table::workflows::save_workflow_errors(errors.clone()).await {
+                Ok(_) => {
+                    log::info!(
+                        "successfully handled workflow errors store notification for {org_id}/{wid} : run {run_id}"
+                    );
+                }
+                Err(e) => {
+                    log::info!(
+                        "error in handling workflow errors store notification for {org_id}/{wid} : run {run_id} : {e}"
+                    );
+                }
+            }
+        }
+
+        MessageType::WorkflowTriggerPut => {
+            let trigger: WorkflowTrigger = json::from_slice(&msg.value.unwrap())?;
+            log::info!(
+                "received workflow trigger notification for type: {:?} workflow_id: {} trace_id: {}",
+                trigger.trigger_type,
+                trigger.workflow_id,
+                trigger.trace_id
+            );
+            let cluster_coordinator = get_coordinator().await;
+            cluster_coordinator
+                .put(
+                    WORKFLOW_TRIGGER_PREFIX,
+                    serde_json::to_vec(&trigger)?.into(),
+                    true,
+                    None,
+                )
+                .await?;
+        }
+
         _ => {
             log::error!(
                 "[SUPER_CLUSTER:DB] Invalid message for search job: type: {:?}, key: {}",

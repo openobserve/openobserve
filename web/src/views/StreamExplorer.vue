@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="rounded-md">
+  <div class="rounded-default">
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"

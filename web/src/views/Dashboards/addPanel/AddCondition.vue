@@ -5,7 +5,7 @@
       v-model="conditionModel.logicalOperator"
       :options="filterOptions"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator w-fit max-w-[8rem]"
+      class="condition-logical-operator w-fit max-w-32"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
     <OButtonGroup class="axis-field shrink-0" radius="sm">
@@ -23,7 +23,7 @@
           </OButton>
         </template>
         <div class="p-4 w-72">
-          <div style="display: flex; align-items: center; gap: 4px">
+          <div class="flex items-center gap-1">
             <StreamFieldSelect
               class="w-full"
               :streams="getAllSelectedStreams()"
@@ -65,9 +65,8 @@
                           v-model="conditionModel.operator"
                           :options="operators"
                           :label="t('common.operator')"
-                          style="width: 100%"
                           data-test="dashboard-add-condition-operator"
-                          class="o2-custom-select-dashboard"
+                          class="o2-custom-select-dashboard w-full"
                         />
                         <OCombobox
                           v-if="

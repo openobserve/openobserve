@@ -20,19 +20,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="mb-2 stepper-header w-full flex h-full">
       <div
-        :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-[100%]'"
-        style="height: 100% !important; display: flex;"
+        :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
+        class="flex"
+        style="height: 100% !important;"
       >
         <!-- Collapsed field list bar (shown when hidden) -->
         <div
           v-if="collapseFields"
-          class="card-container bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5"
-          style="width: 50px; height: 100%"
+          class="bg-surface-panel! shrink-0 cursor-pointer flex flex-col items-center justify-start pt-2 gap-1.5 h-full"
+          style="width: 50px"
           data-test="scheduled-pipeline-field-list-collapsed-bar"
           @click="collapseFieldList"
         >
-          <OIcon name="expand-all" size="sm" class="rotate-90 mt-[10px] text-[20px]" />
-          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-[12px]">{{ t("pipeline.buildQuery") }}</div>
+          <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-xl" />
+          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t("pipeline.buildQuery") }}</div>
         </div>
 
         <OSplitter
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="o2-custom-splitter"
         >
           <template #before>
-            <div style="display: flex; flex-direction: column; height: 100%;">
+            <div class="flex flex-col h-full">
             <!-- Left panel header with collapse button -->
             <div class="flex items-center justify-between shrink-0 px-2 py-1.5 border-b border-border-default bg-surface-panel">
               <span class="font-semibold text-sm">{{ t("pipeline.buildQuery") }}</span>
@@ -57,16 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="pl-2 flex flex-col flex-1 min-h-0">
             <div
-              style="width: 100%; overflow-y: auto;"
-              class="flex-1 min-h-0"
+              class="flex-1 min-h-0 w-full overflow-y-auto"
             >
                 <!-- fieldlist section -->
                 <div
-                  style="
-                    display: flex;
-                    flex-direction: column;
-                    overflow: hidden;
-                  "
+                  class="flex flex-col overflow-hidden"
                 >
                   <span
                     @click.stop="
@@ -81,13 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <div
                     v-show="expandState.buildQuery"
-                    style="
-                      display: flex;
-                      flex-direction: column;
-                      padding-top: 8px;
-                    "
+                    class="flex flex-col pt-2"
                   >
-                    <div style="flex-shrink: 0">
+                    <div class="shrink-0">
                       <OFormSelect
                         name="stream_type"
                         :options="streamTypes"
@@ -113,14 +105,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- FieldList scrolls within a capped height -->
                     <div
-                      style="max-height: 40vh; overflow-y: auto;"
-                      class="pipeline-field-list-wrapper"
+                      style="max-height: 40vh;"
+                      class="pipeline-field-list-wrapper overflow-y-auto"
                     >
                       <GroupedFieldList
                         :fields="streamFields"
                         :theme="store.state.theme"
                         :show-pagination="false"
                         :page-size="50"
+                        search-class="px-0!"
                       >
                         <template #field-row="{ row }">
                           <FieldRow
@@ -162,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 >
                                   <div
                                     v-if="durationPercentilesLoading"
-                                    class="flex justify-center py-[0.5rem]"
+                                    class="flex justify-center py-2"
                                   >
                                     <OSpinner size="xs" />
                                   </div>
@@ -170,36 +163,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     <div
                                       v-for="p in PERCENTILE_LABELS"
                                       :key="p.key"
-                                      class="flex items-center justify-between py-[0.15rem] pl-[0.5rem]"
+                                      class="flex items-center justify-between py-[0.15rem] pl-2"
                                     >
-                                      <span class="text-[0.7rem] w-[2rem] shrink-0">{{ p.label }}</span>
-                                      <span class="text-[0.7rem] flex-1 text-right pr-[0.25rem]">
-                                        {{ formatTimeWithSuffix(durationPercentiles[p.key] ?? 0) }}
+                                      <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
+                                      <span class="text-2xs flex-1 text-right pr-1">
+                                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
                                       </span>
                                       <div class="flex w-[2.7rem]">
                                         <OButton
                                           v-if="p.key !== 'max'"
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}`"
-                                          @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}'`)"
-                                          class="ml-[0.125rem]! border! border-[var(--o2-border-color)]!"
+                                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          class="ml-0.5! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
                                         </OButton>
                                         <OButton
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}`"
-                                          @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key] ?? 0)}'`)"
-                                          class="ml-auto! mr-[0.5rem]! border! border-[var(--o2-border-color)]!"
+                                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          class="ml-auto! mr-2! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
                                         </OButton>
                                       </div>
                                     </div>
                                   </template>
-                                  <div v-else class="pl-2 py-1 text-[0.7rem] text-o2-text-secondary">
+                                  <div v-else class="pl-2 py-1 text-2xs text-text-secondary">
                                     {{ durationPercentileErrMsg || "No values found" }}
                                   </div>
                                 </template>
@@ -238,17 +231,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       class="flex items-center gap-2"
                     >
                       <div
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0"
                       >
                         <span>{{ t("pipeline.trigger") }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]">
+                              <span class="text-sm">
                                 Based upon the condition of trigger the
                                 pipeline will get trigger <br />
                                 e.g. if the trigger value is &gt;100 and the query
@@ -282,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         data-test="scheduled-pipeline-aggregation-title"
-                        class="w-[172px] shrink-0"
+                        class="w-43 shrink-0"
                       >
                         {{ t("pipeline.aggregation") }}
                       </div>
@@ -366,14 +359,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           size="sm"
                           class="ml-1 cursor-pointer"
                           :class="
-                            store.state.theme === 'dark'
-                              ? 'text-gray-400'
-                              : 'text-gray-400'
+                            'text-text-secondary'
                           "
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span style="font-size: 14px"
+                              <span style="font-size: var(--text-sm)"
                                 >The threshold above/below which the alert will
                                 trigger. <br />
                                 e.g. if the threshold is >100 and the query
@@ -448,8 +439,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !aggregationData.having.value.toString().trim()
                                 .length
                             "
-                            class="text-red-8 pt-1 absolute"
-                            style="font-size: 11px; line-height: 12px"
+                            class="text-status-error-text pt-1 absolute"
+                            style="font-size: var(--text-2xs); line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
                           </div>
@@ -465,14 +456,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :options="triggerOperators"
                                 style="
                                   width: 88px;
-                                  border: 1px solid rgba(0, 0, 0, 0.05);
+                                  border: 1px solid var(--color-border-subtle);
                                 "
                               />
                             </div>
                             <div
                               class="flex items-center"
                               style="
-                                border: 1px solid rgba(0, 0, 0, 0.05);
+                                border: 1px solid var(--color-border-subtle);
                                 border-left: none;
                               "
                             >
@@ -493,14 +484,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   min-width: 90px;
                                   margin-left: 0 !important;
                                   height: 40px;
-                                  font-weight: normal;
                                 "
-                                :class="
-                                  store.state.theme === 'dark'
-                                    ? 'bg-gray-800'
-                                    : 'bg-gray-100'
-                                "
-                                class="flex justify-center items-center"
+                                class="flex justify-center items-center bg-surface-subtle font-normal"
                               >
                                 {{ t("alerts.times") }}
                               </div>
@@ -512,8 +497,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               !triggerData.operator ||
                               !Number(triggerData.threshold)
                             "
-                            class="text-red-8 pt-1 absolute"
-                            style="font-size: 11px; line-height: 12px"
+                            class="text-status-error-text pt-1 absolute"
+                            style="font-size: var(--text-2xs); line-height: 12px"
                           >
                             {{ t("pipeline.fieldRequired") }}
                           </div>
@@ -523,17 +508,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-2">
                       <div
                         data-test="scheduled-pipeline-cron-toggle-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0"
                       >
                         <span>{{ t("alerts.crontitle") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]">
+                              <span class="text-sm">
                                 Configure the option to enable a cron
                                 expression.
                               </span>
@@ -549,25 +534,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start gap-2">
                       <div
                         data-test="scheduled-pipeline-frequency-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0 pt-2"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
                       >
                         <span>{{ t("alerts.frequency") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right">
                             <template #content>
                               <span
-                                class="text-[14px]"
+                                class="text-sm"
                                 v-if="triggerData.frequency_type == 'minutes'"
                                 >How often the task should be executed.<br />
                                 e.g., 2 minutes means that the task will run
                                 every 2 minutes and will be processed based on
                                 the other parameters provided.</span
                               >
-                              <span class="text-[14px]" v-else>
+                              <span class="text-sm" v-else>
                                 Pattern: * * * * * * means every second.
                                 <br />
                                 Format: [Second (optional) 0-59] [Minute 0-59]
@@ -595,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             name="warning"
                             size="sm"
-                            class="cursor-pointer text-orange-500"
+                            class="cursor-pointer text-status-warning-text"
                           >
                             <OTooltip
                               side="right"
@@ -611,10 +596,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                OFormInput's built-in message would render inside
                                the 7.5rem field and wrap/clip. The empty #error
                                slot keeps the field form-owned (name=) but
-                               suppresses its inline message; we surface the schema
-                               error in the full-width sibling below (R3-timed). -->
+                               suppresses its inline message; the schema error is
+                               surfaced in the full-width sibling below. -->
                           <div
-                            class="flex items-stretch border border-[var(--o2-border-color)] rounded-md w-fit overflow-hidden"
+                            class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                           >
                             <OFormInput
                               data-test="scheduled-pipeline-frequency-input-field"
@@ -632,12 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </OFormInput>
                             <div
                               data-test="scheduled-pipeline-frequency-unit"
-                              :class="[
-                                'flex justify-center items-center min-w-[60px] px-2 font-normal',
-                                store.state.theme === 'dark'
-                                  ? 'bg-gray-800'
-                                  : 'bg-gray-100',
-                              ]"
+                              class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
                             >
                               {{ t("alerts.minutes") }}
                             </div>
@@ -645,7 +625,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div
                             v-if="frequencyError"
                             data-test="scheduled-pipeline-frequency-error-text"
-                            class="text-red-700 text-[11px] leading-3"
+                            class="text-status-error-text text-2xs leading-3"
                           >
                             {{ frequencyError }}
                           </div>
@@ -674,17 +654,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start gap-2">
                       <div
                         data-test="scheduled-pipeline-period-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0 pt-2"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
                       >
                         <span>{{ t("alerts.period") + " *" }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]">
+                              <span class="text-sm">
                                 Period for which the query should run.<br />
                                 e.g. 10 minutes means that whenever the query
                                 will run it will use the last 10 minutes of
@@ -703,7 +683,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                              below the bordered control instead of inside the
                              7.5rem field, where it would wrap. -->
                         <div
-                          class="flex items-stretch border border-[var(--o2-border-color)] rounded-md w-fit overflow-hidden"
+                          class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                         >
                           <OFormInput
                             data-test="scheduled-pipeline-period-input"
@@ -718,30 +698,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OFormInput>
                           <div
                             data-test="scheduled-pipeline-period-unit"
-                            :class="[
-                              'flex justify-center items-center min-w-[60px] px-2 font-normal',
-                              store.state.theme === 'dark'
-                                ? 'bg-gray-800'
-                                : 'bg-gray-100',
-                            ]"
+                            class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
                           >
                             {{ t("alerts.minutes") }}
                           </div>
                         </div>
                         <!-- The required rule lives in the schema (period ≥ 1);
-                             surfaced here after submit (R3). Otherwise, once a
+                             surfaced here after submit. Otherwise, once a
                              period is set, show the informational note. -->
                         <div
                           v-if="periodError"
                           data-test="scheduled-pipeline-period-error-text"
-                          class="text-red-700 text-[11px] leading-3"
+                          class="text-status-error-text text-2xs leading-3"
                         >
                           {{ periodError }}
                         </div>
                         <div
                           v-else-if="Number(triggerData.period)"
                           data-test="scheduled-pipeline-period-warning-text"
-                          class="text-[var(--o2-primary)] text-[12px] leading-3 py-0.5"
+                          class="text-accent text-xs leading-3 py-0.5"
                         >
                           Note: The period should be the same as frequency.
                         </div>
@@ -750,17 +725,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-center gap-2">
                       <div
                         data-test="scheduled-pipeline-delay-title"
-                        class="font-bold flex items-center gap-1 w-[160px] shrink-0"
+                        class="font-bold flex items-center gap-1 w-40 shrink-0"
                       >
                         <span>{{ t("pipeline.delay") }}</span>
                         <OIcon
                           name="info"
                           size="sm"
-                          class="cursor-pointer text-gray-400"
+                          class="cursor-pointer text-icon-color"
                         >
                           <OTooltip side="right" max-width="300px">
                             <template #content>
-                              <span class="text-[14px]"
+                              <span class="text-sm"
                                 >Delay for which the pipeline is scheduled to
                                 run.<br />
                                 e.g. 10 minutes delay means that the pipeline
@@ -772,7 +747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </OIcon>
                       </div>
                       <div
-                        class="flex items-stretch border border-[var(--o2-border-color)] rounded-md w-fit overflow-hidden"
+                        class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                       >
                         <OFormInput
                           data-test="scheduled-pipeline-delay-input"
@@ -783,12 +758,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                         <div
                           data-test="scheduled-pipeline-delay-unit"
-                          :class="[
-                            'flex justify-center items-center min-w-[60px] px-2 font-normal',
-                            store.state.theme === 'dark'
-                              ? 'bg-gray-800'
-                              : 'bg-gray-100',
-                          ]"
+                          class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
                         >
                           {{ t("alerts.minutes") }}
                         </div>
@@ -799,10 +769,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div></div>
 
                   <div
-                    class="flex justify-start items-end mt-4 pb-4 w-full"
-                    :class="
-                      store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'
-                    "
+                    class="flex justify-start items-end mt-4 pb-4 w-full bg-surface-base"
                   ></div>
                 </div>
             </div>
@@ -810,13 +777,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
+            <div
+              class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            ></div>
           </template>
           <template #after>
-            <div class="w-full flex flex-col border-l border-border-default" style="height: 100%">
+            <div class="w-full flex flex-col border-l border-border-default h-full">
               <div
-                class="flex-1 overflow-auto"
-                style="height: calc(100vh - 200px) !important; width: 100%"
+                class="flex-1 overflow-auto w-full"
+                style="height: calc(100vh - 200px) !important"
               >
                 <div class="query-editor-container scheduled-pipelines">
                   <span @click.stop="expandState.query = !expandState.query">
@@ -852,7 +821,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay absolute inset-0 flex items-start pt-0.75 pl-[2.15rem] pr-2 pointer-events-none z-1 select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter [font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
+                      <span class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
                     </div>
                   </div>
 
@@ -937,8 +906,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div
-                class="border-t border-(--o2-border-color) sticky bottom-0 px-4 py-3 z-10"
-                :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+                class="border-t border-card-glass-border sticky bottom-0 px-4 py-3 z-10 bg-surface-base"
               >
                 <div class="flex justify-end gap-2">
                   <OButton
@@ -987,18 +955,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="ml-2"
+        class="ml-2 w-1/4 max-w-full"
         v-if="store.state.isAiChatEnabled"
         style="
-          width: 25%;
-          max-width: 100%;
           min-width: 75px;
           height: calc(100vh - 70px) !important;
-        "
-        :class="
-          store.state.theme == 'dark'
-            ? 'dark-mode-chat-container'
-            : 'light-mode-chat-container'
         "
       >
         <O2AIChat
@@ -1026,6 +987,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import {
   getImageURL,
   timestampToTimezoneDate,
@@ -1210,7 +1172,7 @@ const getColumns = computed(() => {
 
 const { t } = useI18n();
 
-// ── Rule ③ DESCENDANT ─────────────────────────────────────────────────────────
+// ── Form descendant ───────────────────────────────────────────────────────────
 // ScheduledPipeline is rendered INSIDE Query's <OForm>; it injects that form and
 // treats it as the SINGLE source of truth. The validated scalar controls below
 // are OForm* `name=` fields (trigger_condition.* / delay / query_condition.type /
@@ -1233,8 +1195,8 @@ const delayCondition = form.useStore((s: any) => s.values.delay);
 // fields wrapped in a shared w-fit/overflow-hidden border, so their OFormInput
 // carries an empty #error slot (suppresses the built-in inline message) and we
 // render the schema error in a full-width sibling below the group. These read
-// the same R3-timed field errors OFormInput would have surfaced — single source
-// of truth, just displayed at column width.
+// the same field errors OFormInput would have surfaced — single source of truth,
+// just displayed at column width.
 const frequencyError = form.useStore((s: any) =>
   firstFieldError(s.fieldMeta?.["trigger_condition.frequency"]?.errors ?? []),
 );
@@ -1256,7 +1218,7 @@ const setAggregation = (value: any) => {
   });
 };
 
-// Stream type / name are form-owned (Rule ③): the two <OFormSelect> controls own
+// Stream type / name are form-owned: the two <OFormSelect> controls own
 // `stream_type` / `stream_name`. These are reactive READ views of that single
 // source of truth — every programmatic write goes through form.setFieldValue so
 // all the internal read-sites (query preview, field lists, watches, AI context)
@@ -1287,6 +1249,7 @@ const collapseFields = ref(false);
 
 
 const store = useStore();
+const { isDark } = useTheme();
 
 const queryEditorPlaceholderFlag = ref(true);
 const pipelineEditorRef: any = ref(null);
@@ -1457,10 +1420,9 @@ watch(
   },
 );
 
-// The stream-name <OFormSelect> owns `stream_name`; loading the selected stream's
-// fields was the old @update:model-value="getStreamFields" side effect. React to
-// the form-owned value here (the SQL-sync path awaits getStreamFields explicitly,
-// so skip it to avoid a double fetch).
+// The stream-name <OFormSelect> owns `stream_name`; react to the form-owned value
+// here to load the selected stream's fields. The SQL-sync path awaits
+// getStreamFields explicitly, so skip it there to avoid a double fetch.
 watch(
   () => selectedStreamName.value,
   (val) => {
@@ -1508,8 +1470,7 @@ watch(
 );
 
 // Cross-field reset: when frequency_type flips, recompute the form-owned period.
-// flush:"sync" so the period write lands before any same-tick read (matches the
-// established cross-field-reset timing in the other migrated forms).
+// flush:"sync" so the period write lands before any same-tick read.
 watch(
   () => triggerData.value.frequency_type,
   (val) => {
@@ -1528,10 +1489,8 @@ watch(
   { flush: "sync" },
 );
 
-// The frequency / cron OForm* fields write the form directly; mirror the old
-// `@update:model-value="updateFrequency/updateCron"` side effects (validate +
-// recompute period) by watching the form-owned values. These were previously
-// inline change handlers — now they react to the single source of truth.
+// The frequency / cron OForm* fields write the form directly; their side effects
+// (validate + recompute period) run by watching the form-owned values.
 watch(
   () => triggerData.value.frequency,
   () => {
@@ -1956,7 +1915,7 @@ const updateQuery = () => {
     query.value = form.state.values?.query_condition?.sql ?? props.sql ?? "";
 };
 
-// group_by[] is a form-owned array (Rule ①): each row renders as an indexed
+// group_by[] is a form-owned array: each row renders as an indexed
 // OFormSelect (`query_condition.aggregation.group_by[${i}]`) so the row value is
 // owned by the form and its per-row error comes from the schema's superRefine —
 // no bare <OSelect>, no manual :error binding, no bridge. Add/remove rows go
@@ -2006,9 +1965,6 @@ const onBlurQueryEditor = debounce(async () => {
   emits("validate-sql");
 }, 10);
 
-// NOTE: the old imperative `validateInputs()` gate is GONE — the Query schema
-// (makeQuerySchema: period ≥ 1, frequency/cron validity, group_by rows required
-// when aggregation enabled) now gates the save through OForm.
 const collapseFieldList = () => {
   splitterModel.value = collapseFields.value ? 30 : 0;
   collapseFields.value = !collapseFields.value;
@@ -2078,9 +2034,8 @@ const getStreamFields = () => {
         }
       })
       .finally(() => {
-        // Note: Default query generation removed
-        // Query is now cleared when stream changes (see watch on selectedStreamName)
-        // Initial query generation happens in onMounted
+        // Query is cleared when stream changes (see watch on selectedStreamName);
+        // initial query generation happens in onMounted.
         expandState.value.query = true;
         expandState.value.output = false;
         resolve(true);
@@ -2295,7 +2250,7 @@ const filterStreams = (val: string, update: any) => {
   });
 };
 
-// Modify getStreamList to store the full list
+// getStreamList stores the full stream list
 async function getStreamList() {
   if (streamsLoading.value) return;
   streamsLoading.value = true;
@@ -2603,7 +2558,7 @@ const getBtnLogo = computed(() => {
     return getImageURL("images/common/ai_icon_dark.svg");
   }
 
-  return store.state.theme === "dark"
+  return isDark.value
     ? getImageURL("images/common/ai_icon_dark.svg")
     : getImageURL("images/common/ai_icon_gradient.svg");
 });
@@ -2682,8 +2637,7 @@ const sendToAiChat = (value: any, append: boolean = true) => {
 defineExpose({
   tab,
   tabOptions,
-  // The imperative validateInputs() gate is GONE (schema replaces it). The
-  // reactive form-owned slices are exposed for tests/behaviour.
+  // Reactive form-owned slices exposed for tests/behaviour.
   form,
   triggerData,
   aggregationData,
@@ -2747,36 +2701,30 @@ defineExpose({
 });
 </script>
 
-<style>
-.scheduled-pipeline-container .o-splitter__before {
+<style scoped>
+/* keep(lib-override): all of these reach into DOM owned by child/third-party components —
+   OSplitter panes (.o-splitter__*), the field-list component (.index-menu/.index-table/
+   .traces-field-table) and the Monaco-based query editor (.monaco-editor/
+   .query-editor-container) — so they cannot be expressed as template utilities. */
+.scheduled-pipeline-container :deep(.o-splitter__before),
+.scheduled-pipeline-container :deep(.o-splitter__after) {
   overflow: hidden;
 }
 
-.scheduled-pipeline-container .o-splitter__after {
-  overflow: hidden;
-}
-
-.scheduled-pipeline-container .pipeline-field-list-wrapper .index-menu,
-.scheduled-pipeline-container .pipeline-field-list-wrapper .index-table {
+.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.index-menu),
+.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.index-table) {
   height: 100%;
 }
 
-.scheduled-pipeline-container .pipeline-field-list-wrapper .traces-field-table {
+.scheduled-pipeline-container .pipeline-field-list-wrapper :deep(.traces-field-table) {
   height: 100% !important;
 }
 
-.scheduled-pipeline-container .scheduled-pipelines .monaco-editor {
+.scheduled-pipeline-container .scheduled-pipelines :deep(.monaco-editor) {
   width: 100%;
 }
 
-.scheduled-pipeline-container .scheduled-pipelines .query-editor-container {
+.scheduled-pipeline-container .scheduled-pipelines :deep(.query-editor-container) {
   width: 100% !important;
-}
-
-.o2-custom-splitter > .o-splitter__separator {
-  width: 0.625rem;
-  z-index: 999 !important;
-  height: 100%;
-  background: transparent;
 }
 </style>

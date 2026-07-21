@@ -67,14 +67,7 @@ interface PendingJob {
    * last owner has let go.
    */
   waiters: Waiter[];
-  /**
-   * Whether this job's result may enter the LRU.
-   *
-   * Lives on the JOB, not in a side Set keyed by request key. The Set only ever
-   * grew: every label-value fan-out mints keys that embed the time range, so it
-   * accumulated a fresh entry per label per range for the life of the page and
-   * nothing ever removed them. The flag dies with the job it describes.
-   */
+  /** Whether this job's result may enter the LRU. */
   cache: boolean;
 
   /**
@@ -107,12 +100,6 @@ export interface RunOptions {
    * This is what a refresh means, and it is not `cache: false` — that one also
    * refuses to store the result, so the next card to ask the same question would
    * re-fetch it too.
-   *
-   * Without it, "skip the cache" was only true by accident of call order: the
-   * caller had to remember to wipe the whole LRU first, and a refresh that forgot
-   * was silently answered from the cache it was trying to get past — the user
-   * clicked refresh and got the same stale answer back, instantly, with no way to
-   * tell. The flag belongs on the request that wants fresh data.
    */
   refresh?: boolean;
 }
@@ -297,12 +284,9 @@ export function createPreviewQueue(
       // Same key already running or queued: join it rather than issuing a second
       // identical request.
       // Whoever joins, the STRICTEST intent wins: if any participant says this
-      // result does not belong in the LRU, it does not go in. A joiner used to
-      // inherit whatever the job's creator had asked for, so the answer to
-      // "should this be cached" depended on who happened to ask first — and the
-      // one caller that passes `cache: false` does it to keep label-value strings
-      // out of a cache sized for chart results. Losing that race quietly
-      // reintroduces the eviction storm it exists to prevent.
+      // result does not belong in the LRU, it does not go in. The one caller that
+      // passes `cache: false` does it to keep label-value strings out of a cache
+      // sized for chart results.
       const join = <U>(job: PendingJob): Promise<U> => {
         job.cache = job.cache && cache;
         return attach<U>(job, ownerId);

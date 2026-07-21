@@ -103,14 +103,14 @@ export const convertLogData = (
           ? params.itemStyle
           : {
               color: (() => {
-                const isDarkMode = document.body.classList.contains('body--dark');
+                const isDarkMode = document.documentElement.classList.contains('dark');
                 if (isDarkMode) {
                   return getComputedStyle(document.body)
-                    .getPropertyValue("--o2-dark-theme-color")
+                    .getPropertyValue("--color-theme-accent")
                     .trim();
                 } else {
                   return getComputedStyle(document.documentElement)
-                    .getPropertyValue("--o2-theme-color")
+                    .getPropertyValue("--color-theme-accent")
                     .trim();
                 }
               })(),

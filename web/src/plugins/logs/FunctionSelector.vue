@@ -15,7 +15,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OButtonGroup
-    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
     class="p-0 float-left mr-1 function-selector element-box-shadow border border-button-outline-border"
   >
     <div v-if="!hideToggle" class="flex items-center px-1">
@@ -56,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
             :data-test="`logs-search-saved-function-${item.name}`"
-            class="saved-view-item border-b border-(--o2-border-color) rounded-none last:border-none"
+            class="saved-view-item border-b border-card-glass-border rounded-none last:border-none"
             @select="applyFunction(item, true)"
           >
             {{ item.name }}
@@ -99,6 +98,7 @@ import { useI18n } from "vue-i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 const props = withDefaults(defineProps<{
   functionOptions: { name: string; function: string }[];
   hideToggle?: boolean;
@@ -113,12 +113,22 @@ const { t } = useI18n();
 const { searchObj } = searchState();
 
 const store = useStore();
+  const { isDark } = useTheme();
+
+const functionToggleIcon = computed(() => {
+  return (
+    "img:" +
+    (isDark.value
+      ? getImageURL("images/common/function_dark.svg")
+      : getImageURL("images/common/function.svg"))
+  );
+});
 
 const iconRight = computed(() => {
   return (
     "img:" +
     getImageURL(
-      store.state.theme === "dark"
+      isDark.value
         ? "images/common/function_dark.svg"
         : "images/common/function.svg",
     )
@@ -157,4 +167,13 @@ const applyFunction = (
   emit("select:function", item, flag);
 };
 </script>
+
+<style scoped>
+/* keep(lib-override:obuttongroup): rounds OButtonGroup's own root, which this
+   component only receives as a class — not settable from the template without
+   losing to the group's internal radius. */
+.function-selector {
+  border-radius: 0.375rem;
+}
+</style>
 

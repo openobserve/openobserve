@@ -26,28 +26,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container llm-trend-panel rounded-lg p-[1rem] flex flex-col"
+    class="bg-card-glass-bg rounded-default flex flex-col border border-border-default"
   >
-    <div class="flex items-baseline justify-between mb-[0.25rem]">
+    <div class="flex items-baseline justify-between mb-1 p-page-edge">
       <div>
         <div
-          class="text-[0.85rem] font-semibold text-[var(--color-text-heading)]"
+          class="text-sm font-semibold text-text-heading"
         >
           {{ displayTitle }}
         </div>
         <div
           v-if="displaySubtitle"
-          class="text-[0.7rem] leading-normal mt-[0.1rem]"
+          class="text-2xs leading-normal mt-[0.1rem]"
         >
           {{ displaySubtitle }}
         </div>
       </div>
     </div>
 
-    <div class="llm-schema-panel__body w-full">
+    <!-- h-55 matches LLMTrendPanel's chart height (13.75rem) so the converted
+         panel lines up with the legacy ones in the same grid row. The renderer
+         needs an explicit full size to fill the box — without it the echarts
+         canvas collapses to a sliver. -->
+    <div class="llm-schema-panel__body w-full h-55 relative">
       <PanelSchemaRenderer
         v-if="chartData"
-        class="llm-schema-panel__renderer"
+        class="llm-schema-panel__renderer h-full w-full"
         :panelSchema="chartData"
         :selectedTimeObj="selectedTimeObj"
         :variablesData="{}"
@@ -150,23 +154,3 @@ const selectedTimeObj = computed(() => ({
   end_time: new Date(props.endTime),
 }));
 </script>
-
-<style lang="scss" scoped>
-.llm-trend-panel {
-  border: 1px solid var(--color-border-default);
-}
-
-/* Match LLMTrendPanel's chart height (.llm-trend-chart = 220px) so the
-   converted panel lines up with the legacy ones in the same grid row.
-   PanelSchemaRenderer needs an explicit 100% size to fill the box — without
-   it the echarts canvas collapses to a sliver. */
-.llm-schema-panel__body {
-  height: 220px;
-  position: relative;
-}
-
-.llm-schema-panel__renderer {
-  height: 100%;
-  width: 100%;
-}
-</style>

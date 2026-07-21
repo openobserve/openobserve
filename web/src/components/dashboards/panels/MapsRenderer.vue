@@ -11,8 +11,8 @@
 -->
 
 <template>
-  <div style="padding: 5px; height: 100%; width: 100%">
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+  <div class="p-1.25 h-full w-full">
+    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
   </div>
 </template>
 
@@ -28,6 +28,7 @@ import {
 import * as echarts from "echarts/core";
 import { MapChart } from "echarts/charts";
 import worldMap from "@/assets/dashboard/maps/map.json";
+import { withChartFont } from "@/utils/fonts";
 
 echarts.use([MapChart]);
 
@@ -62,7 +63,7 @@ export default defineComponent({
 
         // Default empty chart configuration to ensure map is visible
     
-        chart.setOption(DEFAULT_MAP_OPTIONS, true);
+        chart.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
       }
     };
 
@@ -88,11 +89,11 @@ export default defineComponent({
         if (chart) {
           await nextTick();
           if (newOptions && newOptions.series && newOptions.series.length > 0) {
-            chart?.setOption(newOptions, true);
+            chart?.setOption(withChartFont(newOptions), true);
           } else {
             // If no data provided, set a default empty map
             
-            chart?.setOption(DEFAULT_MAP_OPTIONS, true);
+            chart?.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
           }
         }
       },

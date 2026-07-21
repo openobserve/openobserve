@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container w-[100vw] h-[100vh]">
+  <div class="bg-card-glass-bg w-[100vw] h-[100vh]">
     <div style="max-width: 400px; padding-top: 100px" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"
@@ -48,15 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
         <img
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="appLogo"
-          style="height: auto"
+          class="appLogo h-auto"
           :style="
             store.state.zoConfig.custom_logo_text != ''
               ? 'width: 150px;'
               : 'width: 250px;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
@@ -64,15 +63,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex justify-center mb-4" v-else>
         <img
-          class="appLogo"
-          style="height: auto"
+          class="appLogo h-auto"
           :style="
             store.state.zoConfig.custom_logo_text != ''
               ? 'width: 150px;'
               : 'width: 250px;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
@@ -87,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div v-else>
-        <div style="font-size: 22px" class="w-full text-center pb-3">
+        <div style="font-size: var(--text-xl)" class="w-full text-center pb-3">
           Login
         </div>
 
@@ -114,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <a
-            class="cursor-pointer py-3 hover:text-[#595959]"
+            class="cursor-pointer py-3 hover:text-text-secondary"
             style="text-decoration: underline"
             data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
@@ -182,6 +180,7 @@ import {
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
+import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OInput from '@/lib/forms/Input/OInput.vue';
@@ -196,6 +195,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
+    const { isDark } = useTheme();
     const { t } = useI18n();
     const name = ref("");
     const password = ref("");
@@ -443,6 +443,7 @@ export default defineComponent({
       loginWithSSo,
       config,
       autoRedirectDexLogin,
+      isDark,
     };
   },
   methods: {

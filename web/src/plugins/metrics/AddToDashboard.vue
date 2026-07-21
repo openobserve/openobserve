@@ -110,7 +110,7 @@ export default defineComponent({
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
 
-    // Fetch folders only when the drawer opens (matches old q-dialog behaviour where the
+    // Fetch folders only when the drawer opens (matches old dialog behaviour where the
     // component mounted only on first open). Avoids an eager API call on page load.
     // On close, reset the non-form dropdown state (folder/dashboard/tab). The
     // form-owned `panelTitle` needs no manual reset — ODialog unmounts the body

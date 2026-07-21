@@ -33,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
       data-test="add-stream-input-stream-routing-section"
-      :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+      :class="'bg-surface-base'"
     >
 
 
-    <div class="stream-routing-container w-full py-3">
+    <div class="stream-routing-container w-full">
       <!-- Mode toggle — stays a bare UI control OUTSIDE the form: it swaps the
            select-existing form for the AddStream create child. -->
       <OSwitch
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="create-stream-toggle"
         :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
         v-model="createNewStream"
-        class="px-3 mb-3"
+        class="mb-3"
       />
 
       <div>
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           id="stream-node-form"
           :form="form"
         >
-          <div class="p-4 flex flex-col gap-3">
+          <div class="flex flex-col gap-3">
             <div data-test="input-node-stream-type-select" class="w-full">
               <OFormSelect
                 name="stream_type"
@@ -92,27 +92,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="selectedNodeType == 'output'"
-              class="note-message bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 flex flex-col gap-2"
+              class="note-message bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2"
             >
-              <div class="text-sm text-gray-800">Guidelines:</div>
-              <div class="flex flex-col gap-1 text-sm text-gray-800">
+              <div class="text-sm text-banner-warning-text">Guidelines:</div>
+              <div class="flex flex-col gap-1 text-sm text-banner-warning-text">
                 <div class="flex items-start gap-2">
-                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                   <span>
                     Select an existing stream from the list or enter the name to create a new one
                   </span>
                 </div>
                 <div class="flex items-start gap-2">
-                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                   <span>
-                    <span class="highlight font-bold text-[#007bff]">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
+                    <span class="highlight font-bold text-text-link">Enrichment_tables</span> as destination stream is only available for scheduled pipelines
                   </span>
                 </div>
                 <div class="flex items-start gap-2">
-                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                  <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                   <span>
-                    Use curly braces <span class="code [font-family:monospace] py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">{}</span> to configure stream name dynamically. e.g.
-                    <span class="code [font-family:monospace] py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code [font-family:monospace] py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">{}</span> is optional
+                    Use curly braces <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{}</span> to configure stream name dynamically. e.g.
+                    <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">static_text_{fieldname}_postfix</span>. Static text before/after <span class="code font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{}</span> is optional
                   </span>
                 </div>
               </div>
@@ -533,17 +533,18 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(complex-state): :deep overrides of the nested add-stream form's internal
+   structure (header row, nth input alignment, separators). */
 .pipeline-add-stream {
-  .add-stream-header.row {
+  :deep(.add-stream-header.row) {
     display: none;
   }
-  .add-stream-inputs :nth-child(5) {
-    /* background-color: red; */
+  :deep(.add-stream-inputs :nth-child(5)) {
     justify-content: flex-start;
   }
 
-  [role="separator"] {
+  :deep([role="separator"]) {
     display: none !important;
   }
 }

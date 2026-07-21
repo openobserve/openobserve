@@ -16,37 +16,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph min-h-[400px] flex flex-col m-3 p-5 rounded-xl overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-[#e5e7eb] shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
-    style="height: calc(100vh - 202px); position: relative;"
+    class="incident-service-graph relative h-[calc(100vh-12.625rem)] min-h-100 flex flex-col m-3 p-5 rounded-default overflow-hidden transition-all duration-200 bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] border border-border-default shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:border-grey-700 dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
   >
-    <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
+    <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="info-icon-btn absolute top-4 right-4 z-10"
+      class="info-icon-btn group absolute top-4 right-4 z-10"
     >
       <OButton variant="ghost" size="icon-circle-sm">
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-[240px] py-[14px] px-4 text-[13px] leading-normal text-[#1f2937] bg-white border border-(--o2-border) rounded-lg shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap"
+        class="graph-legend absolute top-[calc(100%+8px)] right-0 min-w-60 py-3.5 px-4 text-compact leading-normal text-text-body bg-surface-overlay border border-border-default rounded-default shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] opacity-0 invisible -translate-y-1 transition-all duration-150 pointer-events-none whitespace-nowrap group-hover:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:pointer-events-auto dark:text-grey-200 dark:bg-grey-800 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         role="tooltip"
       >
         <div class="font-semibold text-sm mb-2.5">Graph Legend</div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #ef4444;">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-negative">●</span>
           Red = Potential Root Cause
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #f97316;">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-status-warning-text">●</span>
           Orange = High Frequency
         </div>
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #3b82f6;">●</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-text-link">●</span>
           Blue = Normal
         </div>
-        <div class="graph-legend__divider h-px bg-(--o2-border) my-2" />
+        <div class="graph-legend__divider h-px bg-border-default my-2 dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]" />
         <div class="graph-legend__row flex items-center gap-2 py-1">
-          <span class="graph-legend__dot text-[14px] leading-none w-[14px] text-center shrink-0" style="color: #a78bfa;">→</span>
+          <span class="graph-legend__dot text-sm leading-none w-3.5 text-center shrink-0 text-badge-purple-ol-text">→</span>
           Purple arrows show temporal flow
         </div>
       </div>
@@ -55,8 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading State -->
     <div
       v-if="loading"
-      class="flex items-center justify-center h-full"
-      :class="isDarkMode ? 'bg-gray-900/50' : 'bg-white/50'"
+      class="flex items-center justify-center h-full bg-surface-base/50"
     >
       <OSpinner size="md" />
     </div>
@@ -66,12 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
       class="flex flex-col items-center justify-center gap-3 h-full"
     >
-      <OIcon name="hub" :class="isDarkMode ? 'text-gray-600' : 'text-gray-300'" style="width: 48px; height: 48px;" />
+      <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
+           is required because OIcon's own `size-6` default sits in the same layer. -->
+      <OIcon name="hub" class="text-text-muted size-12!" />
       <div class="text-center">
-        <div class="text-sm font-medium" :class="isDarkMode ? 'text-gray-400' : 'text-gray-600'">
+        <div class="text-sm font-medium text-text-secondary">
           Service Graph Unavailable
         </div>
-        <div class="text-xs mt-1" :class="isDarkMode ? 'text-gray-500' : 'text-gray-400'">
+        <div class="text-xs mt-1 text-text-secondary">
           No topology data available for this incident.
         </div>
       </div>
@@ -80,7 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Graph Canvas using ECharts -->
     <div
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      style="width: 100%; height: 100%;"
+      class="w-full h-full"
     >
       <ChartRenderer
         ref="chartRendererRef"
@@ -94,7 +94,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
+import { useTheme } from "@/composables/useTheme";
+import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -124,7 +125,7 @@ export default defineComponent({
     const chartKey = ref(0);
     const nodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
 
-    const isDarkMode = computed(() => store.state.theme === "dark");
+    const { isDark: isDarkMode } = useTheme();
 
     // Use topology_context directly from props
     const graphData = computed(() => props.topologyContext);
@@ -214,7 +215,7 @@ export default defineComponent({
       return simulation.nodes().map(n => ({ ...n }));
     };
 
-    // No longer need to load graph via API - data comes from props
+    // Data comes from props.
     const loadGraph = () => {
       // Increment chartKey to force re-render if topology_context changes
       chartKey.value++;
@@ -241,13 +242,9 @@ export default defineComponent({
     };
 
     // Above this raw-node count the graph is bucketed by time to stay legible;
-    // at or below it every firing is shown 1:1 (preserving the clean timeline).
-    // Kept low because the backend already caps nodes well below the alert count
-    // (e.g. 434 alerts -> 42 nodes), and the force layout blobs past ~15 nodes.
+    // at or below it every firing is shown 1:1. The force layout blobs past ~15 nodes.
     const NODE_CAP = 15;
     // Pick the smallest time unit that yields no more than this many windows.
-    // Kept low so dense incidents collapse into a coarse, readable timeline
-    // rather than dozens of overlapping nodes.
     const BUCKET_TARGET_MAX = 24;
     // Bucket-unit ladder in microseconds (backend timestamps are microseconds).
     const US = 1000; // microseconds per millisecond
@@ -510,8 +507,8 @@ export default defineComponent({
               const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
               const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
 
-              let html = `<div style="padding: 8px; font-size: 12px;">`;
-              html += `<strong style="font-size: 14px;">${originalNode.alert_name}</strong><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs);">`;
+              html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
               html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
               html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
               html += `First Fired: ${firstTime}<br/>`;
@@ -519,7 +516,7 @@ export default defineComponent({
                 html += `Last Fired: ${lastTime}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: var(--color-status-negative);">⚠ First Alert (Potential Root Cause)</span>`;
               }
               html += `</div>`;
               return html;
@@ -550,8 +547,8 @@ export default defineComponent({
           },
           tooltip: {
             formatter: () => {
-              let html = `<div style="padding: 8px; font-size: 12px; text-align: center;">`;
-              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: #a78bfa;">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs); text-align: center;">`;
+              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: var(--color-badge-purple-ol-text);">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
 
               if (edge.edge_type === "temporal") {
                 const sourceTime = new Date(sourceNode.first_fired_at / 1000);
@@ -570,12 +567,12 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span style="color: #a78bfa;">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
+                html += `<span style="color: var(--color-badge-purple-ol-text);">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
                 html += `From: ${sourceTime.toLocaleString()}<br/>`;
                 html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span style="color: #a78bfa;">Temporal correlation</span>`;
+                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">Temporal correlation</span>`;
               } else {
-                html += `<span style="color: #9ca3af;">Service dependency</span>`;
+                html += `<span style="color: var(--color-text-muted);">Service dependency</span>`;
               }
 
               html += `</div>`;
@@ -647,53 +644,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Graph Legend popover — appears on hover of the info-icon-btn wrapper.
-   Background/text use explicit colors per theme because `--o2-popover-background`
-   and `--o2-text-primary` both resolve to `#F0F1F2` in dark mode, which gave
-   us a white card with invisible (same-color) text. */
-
-/* Dark-mode overrides — using both signals so it works regardless of which
-   class is currently toggled (theme.ts toggles both `body.body--dark` and
-   `html.dark`). Vue scoped CSS scopes only the rightmost selector. */
-html.dark .graph-legend,
-body.body--dark .graph-legend {
-  color: #e5e7eb;
-  background-color: #1f2937;
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.6),
-    0 3px 6px rgba(0, 0, 0, 0.4);
-}
-
-html.dark .graph-legend__divider,
-body.body--dark .graph-legend__divider {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.info-icon-btn:hover .graph-legend,
-.info-icon-btn:focus-within .graph-legend {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-/* Dark mode for incident-service-graph container */
-.body--dark .incident-service-graph {
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  border: 1px solid #374151;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.3),
-    0 1px 2px 0 rgba(0, 0, 0, 0.2),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-
-.body--dark .incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.4),
-    0 2px 4px -1px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-</style>

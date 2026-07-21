@@ -148,7 +148,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -178,9 +177,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
             "OIcon": true,
             AppTabs: true,
           },
@@ -201,9 +197,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
             "OIcon": true,
             AppTabs: true,
           },
@@ -255,7 +248,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: {
               template:
@@ -290,7 +282,6 @@ describe("RealUserMonitoring.vue", () => {
             "router-view": {
               template: '<div class="router-view"><slot /></div>',
             },
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -319,7 +310,6 @@ describe("RealUserMonitoring.vue", () => {
                 '<component :is="Component" v-bind="$attrs" v-slot="{ Component }" />',
               components: { component: childComponentStub },
             },
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -344,7 +334,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -380,7 +369,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -401,7 +389,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -421,7 +408,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -441,7 +427,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },
@@ -532,7 +517,6 @@ describe("RealUserMonitoring.vue", () => {
           plugins: [store, router, i18n],
           stubs: {
             "router-view": true,
-            "q-btn": true,
             "OIcon": true,
             AppTabs: true,
           },

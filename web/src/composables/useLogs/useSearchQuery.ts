@@ -208,7 +208,6 @@ export const useSearchQuery = () => {
 
     if (searchObj.meta.sqlMode == true) {
       // if query has aggregation or groupby then we need to set size to -1 to get all records
-      // issue #5432
       // BUT: Don't override size when patterns mode is enabled - we need the configured scan size for pattern extraction
       if (
         (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) &&

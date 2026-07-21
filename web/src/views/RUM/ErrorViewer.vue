@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="error-viewer-container"
-    class="card-container h-full overflow-y-auto"
+    class="bg-card-glass-bg h-full overflow-y-auto"
   >
     <template v-if="isLoading.length">
       <div
@@ -36,11 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
     <div v-else>
-      <div class="p-[0.625rem]">
+      <div class="py-2.5">
         <ErrorHeader :error="errorDetails" />
       </div>
       <OSeparator class="w-full" />
-      <div class="p-[0.625rem]">
+      <div class="px-page-edge py-2.5">
         <ErrorTags :error="errorDetails" />
         <ErrorStackTrace
           :error_stack="errorDetails.error_stack || []"

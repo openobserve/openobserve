@@ -16,12 +16,13 @@
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { calculateGridPositions } from "../../calculateGridForSubPlot";
 import { getSeriesColor } from "../../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
 
 /**
  * Applies chart-specific options for: gauge
  *
- * Mutates `ctx.options` in place, exactly as the original switch case did.
+ * Mutates `ctx.options` in place.
  */
 export function applyGaugeChart(ctx: SQLContext): void {
   const {
@@ -54,7 +55,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
     show: true,
     trigger: "item",
     textStyle: {
-      color: store.state.theme === "dark" ? "#fff" : "#000",
+      color: chartColor("--color-tooltip-text"),
       fontSize: 12,
     },
     valueFormatter: (value: any) => {
@@ -73,8 +74,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
       }
     },
     enterable: true,
-    backgroundColor:
-      store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+    backgroundColor: chartColor("--color-tooltip-bg"),
     extraCssText:
       "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
   };

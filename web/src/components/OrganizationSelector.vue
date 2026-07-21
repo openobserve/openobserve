@@ -212,7 +212,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           variant="outline-primary"
           size="xs"
           data-test="navbar-organizations-select-trigger"
-          class="w-56 text-text-primary!"
+          class="w-56 text-text-body!"
           :class="open ? 'ring-1 ring-inset ring-primary-300' : ''"
         >
           <template #icon-left>
@@ -244,12 +244,12 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <div
           class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5"
         >
-          <span class="text-[13px] font-semibold text-text-primary">
+          <span class="text-compact font-semibold text-text-heading">
             {{ t("organization.header") }}
           </span>
           <span
             data-test="organization-menu-count"
-            class="shrink-0 text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-select-item-hover-bg text-text-secondary"
+            class="shrink-0 text-2xs font-semibold leading-none px-2 py-1 rounded-full bg-select-item-hover-bg text-text-secondary"
           >
             {{
               searchQuery
@@ -290,7 +290,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
               :key="row.key"
               data-test="organization-menu-item-label-item-label"
               :data-test-org-identifier="row.org.identifier"
-              class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-md cursor-pointer transition-colors"
+              class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-default cursor-pointer transition-colors"
               :class="rowStateClass(row)"
               :style="{
                 transform: `translateY(${row.start}px)`,
@@ -306,13 +306,13 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                    to whatever space is left. -->
               <div class="flex items-baseline gap-2 min-w-0 flex-1">
                 <span
-                  class="flex-none max-w-full min-w-0 truncate text-[13px] font-medium leading-tight"
+                  class="flex-none max-w-full min-w-0 truncate text-compact font-medium leading-tight"
                 >
                   {{ row.org.label }}
                 </span>
                 <span
                   v-if="row.org.identifier && row.org.identifier !== row.org.label"
-                  class="shrink min-w-0 truncate text-[11px] font-mono leading-tight text-text-secondary"
+                  class="shrink min-w-0 truncate text-2xs font-mono leading-tight text-text-secondary"
                 >
                   {{ row.org.identifier }}
                 </span>
@@ -325,7 +325,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 type="button"
                 data-test="organization-menu-item-copy-id"
                 :aria-label="`Copy organization ID ${row.org.identifier}`"
-                class="shrink-0 inline-flex items-center justify-center size-6 rounded-md transition hover:bg-primary-200 hover:text-select-item-selected-text"
+                class="shrink-0 inline-flex items-center justify-center size-6 rounded-default transition hover:bg-primary-200 hover:text-select-item-selected-text"
                 :class="
                   copiedId === row.org.identifier
                     ? 'opacity-100 text-primary-600'
@@ -350,7 +350,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         <div
           v-else
           data-test="organization-menu-no-data"
-          class="w-full text-center py-7 text-[13px] text-text-secondary"
+          class="w-full text-center py-7 text-compact text-text-secondary"
         >
           No organizations found
         </div>
@@ -358,3 +358,16 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
     </ODropdown>
   </div>
 </template>
+
+<style scoped>
+/* keep(lib-override:o2-button): dark-only, element-scoped re-point of OButton's
+   ghost-primary tokens for the navbar organization switcher trigger. The custom properties are READ by OButton's
+   own internal DOM, so they have to be declared on the button element itself —
+   there is no utility that sets them. Scoping appends [data-v] to the
+   [data-test] compound, which is OButton's root and therefore carries this
+   component's scope id. Was a global in styles/utilities.css (W1.d). */
+.dark [data-test="navbar-organizations-select-trigger"] {
+  --color-button-ghost-primary-active-bg: var(--color-primary-900);
+  --color-button-ghost-primary-text: var(--color-primary-200);
+}
+</style>

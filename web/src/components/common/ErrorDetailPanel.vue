@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="text-left rounded-lg border border-border-default bg-surface-panel flex flex-col"
+    class="text-left rounded-default border border-border-default bg-surface-panel flex flex-col"
     data-test="error-detail-panel"
   >
     <!-- Summary row (always shown) -->
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <small
         v-if="traceId"
-        class="text-text-caption"
+        class="text-text-secondary"
         data-test="error-detail-trace-id"
       >
         <span class="font-medium">{{ t("queryError.traceId") }}</span>

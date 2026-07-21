@@ -857,7 +857,7 @@ describe("OTable", () => {
     it("applies custom cell styles via getCellStyle callback", () => {
       const getCellStyle = vi.fn(({ columnId, value }) => {
         if (columnId === "status" && value === "Active") {
-          return { backgroundColor: "var(--color-success-bg)" };
+          return { backgroundColor: "var(--color-status-success-bg)" };
         }
         return {};
       });

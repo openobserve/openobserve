@@ -73,27 +73,7 @@ describe("DateTime Component", () => {
         provide: {
           store,
         },
-        stubs: {
-          'q-btn': true,
-          'q-menu': true,
-          'q-separator': true,
-          'q-select': true,
-          'q-input': true,
-          'q-date': true,
-          'q-time': true,
-          'q-card': true,
-          'q-card-section': true,
-          'q-card-actions': true,
-          'q-tabs': true,
-          'q-tab': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-item': true,
-          'q-item-section': true,
-          'q-item-label': true,
-          'q-list': true,
-          'q-tooltip': true
-        }
+        stubs: {}
       },
     });
   };

@@ -160,12 +160,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="aiEnabled && (isQueryError || errorCode === 0)"
           variant="ghost"
           size="sm"
-          class="ai-hover-btn"
+          class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
           data-test="query-error-ask-ai-btn"
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="w-4 h-4 shrink-0" alt="" />
+            <img :src="aiIconSrc" class="w-4 h-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" alt="" />
           </template>
           {{ t("queryError.askAi") }}
         </OButton>
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="sm"
         icon-left="bolt"
-        class="ai-hover-btn"
+        class="[background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
       <div
         v-if="showDetail"
-        class="rounded bg-surface-panel border border-border-default px-3 py-2 max-h-40 overflow-y-auto"
+        class="rounded-default bg-surface-panel border border-border-default px-3 py-2 max-h-40 overflow-y-auto"
         data-test="query-error-detail-expanded"
       >
         <p
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Trace ID (block) -->
-    <small v-if="traceId" class="text-text-caption" data-test="query-error-trace-id">
+    <small v-if="traceId" class="text-text-secondary" data-test="query-error-trace-id">
       <span class="font-medium">{{ t("queryError.traceId") }}</span>
       {{ traceId }}
     </small>
@@ -300,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="sm"
         icon-left="bolt"
-        class="ai-hover-btn"
+        class="[background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >

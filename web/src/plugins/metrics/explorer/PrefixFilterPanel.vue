@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="facet in visibleFacets"
         :key="facet.id"
-        class="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-surface-subtle"
+        class="flex items-center justify-between gap-2 px-2 py-1 rounded-default hover:bg-surface-subtle"
         :class="{ 'bg-surface-subtle': selected.has(facet.id) }"
       >
         <OCheckbox
@@ -94,19 +94,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="countChip"
           value="neutral"
           size="xs"
-          shape="rounded"
+          shape="rounded-default"
           :data-test="`metrics-explorer-${mode}-count-${facet.id}`"
           >{{ facet.count }}</OTag
         >
       </div>
 
-      <div
+      <OEmptyState
         v-if="!visibleFacets.length"
-        class="px-2 py-3 text-xs text-text-secondary"
+        size="inline"
+        icon="search-off"
+        :title="emptyLabel"
         :data-test="`metrics-explorer-${mode}-empty`"
-      >
-        {{ emptyLabel }}
-      </div>
+      />
     </div>
   </div>
 </template>
@@ -118,6 +118,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 /** A rail facet. Counts are recomputed by the caller against the OTHER active
  *  filters, so this component only ever renders them. */

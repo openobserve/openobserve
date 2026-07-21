@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="update"
-            :class="isAnimating ? '![animation:rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : ''"
+            :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
           <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <div class="w-75 p-2">
         <div class="flex">
-          <div class="flex flex-col w-full p-2" style="text-align: center">
+          <div class="flex flex-col w-full p-2 text-center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -52,13 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <hr class="border-0 border-t border-solid border-(--o2-border) my-0" />
+        <hr class="border-0 border-t border-solid border-border-default my-0" />
         <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="flex">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="flex flex-col w-1/3 p-2"
-            style="text-align: center"
+            class="flex flex-col w-1/3 p-2 text-center"
           >
             <OButton
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
@@ -100,19 +99,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="update"
               size="sm"
               :class="[
-                isAnimating ? '![animation:rotate_2s_linear_infinite] ![transform-origin:center_center] !inline-block' : '',
+                isAnimating ? 'auto-refresh-icon--spinning' : '',
                 isAnimating ? 'text-primary' : '',
                 'mr-0.5',
               ]"
             />
-            <div class="text-center text-[0.8125rem] leading-4">{{ selectedLabel }}</div>
+            <div class="text-center text-compact leading-4">{{ selectedLabel }}</div>
             <OIcon name="arrow-drop-down" size="sm" class="ml-0.5" />
           </div>
         </OButton>
       </template>
       <div class="w-75 p-2">
         <div class="flex">
-          <div class="flex flex-col w-full p-2" style="text-align: center">
+          <div class="flex flex-col w-full p-2 text-center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -134,8 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="flex flex-col w-1/3 p-2"
-            style="text-align: center"
+            class="flex flex-col w-1/3 p-2 text-center"
           >
             <OButton
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
@@ -383,7 +381,19 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): the spinning refresh icon is used only by this component (both
+   the icon-only and the labelled dropdown trigger share this one class). The
+   `animation` is declared here rather than as a template `[animation:…]` utility
+   so Vue's scoped compiler renames the keyframe and this reference together.
+   The class lands on an OIcon root, which carries this component's scope id too.
+   `!important` is retained from the original `!`-prefixed utilities. */
+.auto-refresh-icon--spinning {
+  display: inline-block !important;
+  transform-origin: center center !important;
+  animation: rotate 2s linear infinite !important;
+}
+
 @keyframes rotate {
   0% {
     transform: rotate(0deg);
@@ -393,3 +403,4 @@ export default defineComponent({
   }
 }
 </style>
+

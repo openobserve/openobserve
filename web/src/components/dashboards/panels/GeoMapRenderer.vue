@@ -15,11 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <div class="p-1.25 h-full w-full"
     data-test="dashboard-geomap-renderer"
-    style="padding: 5px; height: 100%; width: 100%"
   >
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
   </div>
 </template>
 
@@ -64,6 +63,51 @@ import {
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
+import type {
+  BarSeriesOption,
+  LineSeriesOption,
+  CustomSeriesOption,
+  GaugeSeriesOption,
+  PieSeriesOption,
+  ScatterSeriesOption,
+  HeatmapSeriesOption,
+  SankeySeriesOption,
+  TreeSeriesOption,
+} from "echarts/charts";
+import type { ComposeOption } from "echarts/core";
+import { withChartFont } from "@/utils/fonts";
+import type {
+  TitleComponentOption,
+  TooltipComponentOption,
+  GridComponentOption,
+  ToolboxComponentOption,
+  DatasetComponentOption,
+  LegendComponentOption,
+  PolarComponentOption,
+  VisualMapComponentOption,
+  DataZoomComponentOption,
+} from "echarts/components";
+
+type ECOption = ComposeOption<
+  | BarSeriesOption
+  | LineSeriesOption
+  | CustomSeriesOption
+  | GaugeSeriesOption
+  | PieSeriesOption
+  | ScatterSeriesOption
+  | HeatmapSeriesOption
+  | SankeySeriesOption
+  | TreeSeriesOption
+  | TitleComponentOption
+  | TooltipComponentOption
+  | GridComponentOption
+  | ToolboxComponentOption
+  | DatasetComponentOption
+  | LegendComponentOption
+  | PolarComponentOption
+  | VisualMapComponentOption
+  | DataZoomComponentOption
+>;
 
 echarts.use([
   TitleComponent,
@@ -130,7 +174,7 @@ export default defineComponent({
         ...props.data.options,
         lmap: lmapOptions,
       };
-      chart?.setOption(options || {}, true);
+      chart?.setOption(withChartFont(options || {}), true);
       window.addEventListener("resize", windowResizeEventCallback);
 
       // Get Leaflet extension component
@@ -181,7 +225,7 @@ export default defineComponent({
           ...props.data.options,
           lmap: lmapOptions,
         };
-        chart?.setOption(options || {}, true);
+        chart?.setOption(withChartFont(options || {}), true);
         // Get Leaflet extension component
         // getModel and getComponent do not seem to be exported in echarts typescript
         // add the following two comments to circumvent this

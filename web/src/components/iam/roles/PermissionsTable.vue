@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length && !loading"
-        class="w-full text-center mt-4 font-bold text-gray-600"
-        style="margin-top: 64px; font-size: 18px"
+        class="w-full text-center mt-4 font-bold text-text-secondary"
+        style="margin-top: 64px; font-size: var(--text-lg)"
       >
         <span> {{ t('iam.permissionsTable.noPermissionsSelected') }} </span>
       </div>
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
-        class="py-2 text-left text-gray-700 bg-white relative"
+        class="py-2 text-left text-text-body bg-surface-base relative"
         :style="{
           paddingLeft: level
             ? parent.has_entities
@@ -357,10 +357,11 @@ defineExpose({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(complex-state): :deep override of the OTable header cell height */
 .iam-permissions-table {
-  th{
-    height: 48px !important;
+  :deep(th) {
+    height: 3rem !important;
   }
 }
 </style>

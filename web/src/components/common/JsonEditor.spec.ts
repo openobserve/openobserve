@@ -492,15 +492,18 @@ describe("JsonEditor", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.html()).toContain("bg-(--o2-primary-background)");
+      // Dark background is gated behind the `dark:` variant token
+      expect(wrapper.classes()).toContain("dark:bg-surface-base");
     });
 
-    it("does not apply dark background class on root when theme is light", async () => {
+    it("does not apply a bare surface background class on root when theme is light", async () => {
       store.state.theme = "light";
       wrapper = createWrapper();
       await nextTick();
-      // Dark background class is only applied in dark theme
-      expect(wrapper.html()).not.toContain("bg-(--o2-primary-background)");
+      // The surface background is only ever applied via the `dark:` variant,
+      // never as a bare `bg-surface-base` class
+      expect(wrapper.classes()).toContain("dark:bg-surface-base");
+      expect(wrapper.classes()).not.toContain("bg-surface-base");
     });
   });
 

@@ -46,11 +46,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         ref="playbackBarRef"
         data-test="video-player-playback-bar"
-        class="w-full h-[0.3125rem] bg-[#ebebeb] mt-2 mb-3 relative cursor-pointer"
+        class="w-full h-[0.3125rem] bg-surface-subtle mt-2 mb-3 relative cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="bg-(--o2-primary-btn-bg)! absolute"
+          class="bg-button-primary! absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="bg-(--o2-primary-btn-bg)! absolute"
+          class="bg-button-primary! absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="replay-10"
               size="md"
-              class="mr-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
+              class="mr-2 cursor-pointer text-icon-color hover:text-button-primary"
               @click="skipTo('backward')"
             />
             <OIcon
@@ -109,13 +109,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : 'play-circle-filled'
               "
               size="lg"
-              class="cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
+              class="cursor-pointer text-icon-color hover:text-button-primary"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="ml-2 cursor-pointer text-[var(--o2-icon-color-dark)] hover:text-[var(--o2-primary-btn-bg)]"
+              class="ml-2 cursor-pointer text-icon-color hover:text-button-primary"
               @click="skipTo('forward')"
             />
           </div>
@@ -490,12 +490,12 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "bg-[#fb923c]! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
+    return "bg-badge-orange-solid-bg! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
   }
   if (event.type === "error") {
-    return "bg-[#ef4444]!";
+    return "bg-badge-error-solid-bg!";
   }
-  return "bg-[#14b8a6]!";
+  return "bg-badge-teal-solid-bg!";
 };
 
 const getEventTooltip = (event: any) => {

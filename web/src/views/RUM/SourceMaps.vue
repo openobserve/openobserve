@@ -16,10 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="source-maps-container card-container flex flex-col h-full overflow-hidden"
+    class="source-maps-container bg-card-glass-bg flex flex-col h-full overflow-hidden"
   >
     <!-- Filters Section -->
-    <div class="p-3 bg-(--q-background)">
+    <div class="px-page-edge py-3 bg-surface-base">
       <div class="flex justify-between items-end">
       <div class="flex gap-4 items-end">
           <!-- Version Filter -->
@@ -116,13 +116,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-full"
         >
           <template #expansion="{ row }">
-            <div class="p-3 bg-(--q-background) border-t border-(--q-border-color,var(--o2-border))">
+            <div class="p-3 bg-surface-base border-t border-(--color-border-default,var(--color-border-default))">
               <div class="text-sm font-medium mb-2">
                 Source Map Files ({{ row.files.length }})
               </div>
               <ul
-                class="flex flex-col divide-y divide-border border rounded-md"
-                style="max-height: 400px; overflow-y: auto;"
+                class="flex flex-col divide-y divide-border border rounded-default overflow-y-auto"
+                style="max-height: 400px"
               >
                 <li
                   v-for="(file, index) in row.files"
@@ -132,11 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex flex-col flex-1 min-w-0">
                     <span class="block text-xs text-muted-foreground">Source File</span>
-                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_file_name }}</span>
+                    <span class="font-mono break-all text-sm">{{ file.source_file_name }}</span>
                   </div>
                   <div class="flex flex-col flex-1 min-w-0">
                     <span class="block text-xs text-muted-foreground">Source Map File</span>
-                    <span class="font-[SF_Mono,Monaco,Inconsolata,'Fira_Code','Droid_Sans_Mono',monospace] break-all text-sm">{{ file.source_map_file_name }}</span>
+                    <span class="font-mono break-all text-sm">{{ file.source_map_file_name }}</span>
                   </div>
                 </li>
               </ul>

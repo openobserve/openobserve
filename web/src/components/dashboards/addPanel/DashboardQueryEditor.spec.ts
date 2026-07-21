@@ -270,20 +270,6 @@ describe("DashboardQueryEditor", () => {
             ],
             emits: ["update:query", "updateQuery", "runQuery"],
           },
-          "q-tabs": true, // Stub as true to prevent rendering
-          "q-tab": {
-            template: "<div><slot /></div>",
-            props: ["name", "label"],
-          },
-          "q-splitter": {
-            template:
-              '<div><slot name="before"></slot><slot name="after"></slot></div>',
-            props: ["modelValue", "limits", "disable"],
-          },
-          "q-select": {
-            template: '<div data-test="vrl-function-select"></div>',
-            props: ["modelValue", "options"],
-          },
         },
         mocks: {
           $t: (key: string) => key,
@@ -560,7 +546,7 @@ describe("DashboardQueryEditor", () => {
       wrapper = createWrapper();
 
       // Test editor configuration via the splitter component lookup
-      const splitter = wrapper.findComponent({ name: "QSplitter" });
+      const splitter = wrapper.findComponent({ name: "OSplitter" });
       expect(splitter.exists() || wrapper.exists()).toBe(true);
     });
 

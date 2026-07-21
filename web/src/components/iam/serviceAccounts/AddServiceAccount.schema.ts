@@ -2,28 +2,25 @@
 //
 // Validation schema + synthetic-email helpers for AddServiceAccount.vue.
 //
-// Service accounts are no longer created from a user-supplied email. The form
-// asks only for a NAME (a lowercase slug); the UI derives the stored identifier
-// as `<name>.<org_id>@sa.internal` — org-scoped so two orgs creating the same
-// name can never collide.
+// The form asks only for a NAME (a lowercase slug); the UI derives the stored
+// identifier as `<name>.<org_id>@sa.internal` — org-scoped so two orgs creating
+// the same name can never collide.
 //
-// Why this exact shape: the backend EMAIL_REGEX requires a letters-only final
-// domain label and forbids underscores anywhere in the domain, so the org id
-// must live in the LOCAL part (which permits underscores, digits, and mixed
-// case). `k1.my_org1@sa.internal`, `k1._meta@sa.internal`, and ksuid cloud
-// orgs all pass; an org-in-domain scheme like `k1@sa.my_org1` would be
-// rejected server-side. The fixed `sa.internal` domain uses the
+// The exact shape is dictated by the backend EMAIL_REGEX, which requires a
+// letters-only final domain label and forbids underscores anywhere in the
+// domain, so the org id must live in the LOCAL part (which permits underscores,
+// digits, and mixed case). `k1.my_org1@sa.internal`, `k1._meta@sa.internal`,
+// and ksuid cloud orgs all pass; an org-in-domain scheme like `k1@sa.my_org1`
+// would be rejected server-side. The fixed `sa.internal` domain uses the
 // ICANN-reserved `.internal` TLD, so it can never collide with a real
-// registrable domain. The whole identifier is lowercased to match the
-// backend, which lowercases emails on save.
+// registrable domain. The whole identifier is lowercased to match the backend,
+// which lowercases emails on save.
 //
 // `name` is CREATE-ONLY: required + slug + length-capped in create mode (the
 // local part `<name>.<org_id>` must stay within the 64-char email local-part
 // limit, so the cap is org-dependent). In update mode the field is neither
-// rendered nor submitted, so it is skipped. The mode is supplied by the
-// component (which knows `beingUpdated`) via this factory; the dialog body
-// remounts per open, so OForm always reads the right variant. `first_name`
-// (the description) and the `roles`/`groups` pickers are always optional.
+// rendered nor submitted, so it is skipped. `first_name` (the description) and
+// the `roles`/`groups` pickers are always optional.
 
 import { z } from "zod";
 
@@ -69,9 +66,9 @@ const addServiceAccountBaseSchema = z.object({
 
 export type AddServiceAccountForm = z.infer<typeof addServiceAccountBaseSchema>;
 
-// `name` is CREATE-ONLY, modelled as a conditional superRefine — like AddUser —
-// so the base shape (and its z.infer type) stay stable across modes. The
-// component supplies `beingUpdated` and the org-dependent `maxNameLength`.
+// `name` is CREATE-ONLY, modelled as a conditional superRefine so the base
+// shape (and its z.infer type) stay stable across modes. The component supplies
+// `beingUpdated` and the org-dependent `maxNameLength`.
 export const makeAddServiceAccountSchema = (
   beingUpdated: boolean,
   t: (_key: string, _named?: Record<string, unknown>) => string,

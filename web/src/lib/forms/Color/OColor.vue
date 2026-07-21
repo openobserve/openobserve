@@ -120,7 +120,7 @@ function handleClear() {
 }
 
 const wrapperClasses = computed(() => [
-  "flex items-stretch w-full rounded-md border transition-[color,background-color,border-color,box-shadow] duration-150",
+  "flex items-stretch w-full rounded-default border transition-[color,background-color,border-color,box-shadow] duration-150",
   "ring-offset-1 ring-offset-surface-base",
   "bg-datepicker-bg",
   hasError.value
@@ -159,12 +159,12 @@ const wrapperClasses = computed(() => [
           type="button"
           :disabled="disabled || readonly"
           :aria-label="label ? `${label} — pick color` : 'Pick color'"
-          class="flex items-center ps-2 pe-1 shrink-0 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150 rounded-s-md"
+          class="flex items-center ps-2 pe-1 shrink-0 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150 rounded-s-default"
           :class="disabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
         >
           <span
             :class="[
-              'rounded border border-datepicker-border shadow-sm',
+              'rounded-default border border-datepicker-border',
               swatchSize[size ?? 'md'],
             ]"
             :style="{ background: swatchHex }"
@@ -176,8 +176,7 @@ const wrapperClasses = computed(() => [
         <PopoverContent
           :side-offset="6"
           align="start"
-          class="z-[10001] rounded-lg border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border"
-          style="width: 220px"
+          class="z-[10001] rounded-default border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border w-55"
         >
           <!-- Saturation / Brightness area -->
           <!-- ColorAreaRoot passes gradient styles via scoped slot -->
@@ -186,8 +185,7 @@ const wrapperClasses = computed(() => [
             color-space="hsb"
             x-channel="saturation"
             y-channel="brightness"
-            class="w-full rounded overflow-hidden relative"
-            style="height: 140px"
+            class="w-full rounded-default overflow-hidden relative h-35"
             @update:model-value="handlePickerChange"
             v-slot="{ style: areaStyle }"
           >
@@ -202,10 +200,10 @@ const wrapperClasses = computed(() => [
             :model-value="pickerColor"
             color-space="hsb"
             channel="hue"
-            class="relative flex items-center w-full h-4 rounded"
+            class="relative flex items-center w-full h-4 rounded-default"
             @update:model-value="handlePickerChange"
           >
-            <ColorSliderTrack class="w-full h-3 rounded overflow-hidden" />
+            <ColorSliderTrack class="w-full h-3 rounded-default overflow-hidden" />
             <ColorSliderThumb
               class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
             />
@@ -218,7 +216,7 @@ const wrapperClasses = computed(() => [
             maxlength="7"
             placeholder="#000000"
             :disabled="disabled"
-            class="w-full rounded border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
+            class="w-full rounded-default border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
             @input="handleText"
           />
         </PopoverContent>

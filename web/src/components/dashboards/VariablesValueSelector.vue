@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     v-if="variablesData.values?.length > 0"
-    class="flex flex-wrap mt-1 ml-1"
+    class="flex flex-wrap mt-1"
   >
     <div
       v-for="(item, index) in variablesData.values"
@@ -38,8 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mr-4 mt-1"
-          style="max-width: 150px !important"
+          class="mr-4 mt-1 max-w-37.5!"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
@@ -51,8 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-else-if="item.type == 'textbox'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="mr-4 mt-1"
-          style="max-width: 150px !important"
+          class="mr-4 mt-1 max-w-37.5!"
           :debounce="1000"
           v-model="item.value"
           :label="item.label || item.name"
@@ -151,7 +149,7 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // New props for scoped variables
+    // Props for scoped variables
     scope: {
       type: String as PropType<"global" | "tabs" | "panels">,
       default: "global",
@@ -191,8 +189,6 @@ export default defineComponent({
     const { t } = useI18n();
     // Alias preserves the same prop reference for in-place mutation.
     const initialVariableValuesModel = computed(() => props.initialVariableValues);
-    // Try to inject variablesManager from parent (for backward compatibility)
-
     // Try to inject variablesManager from parent (for backward compatibility)
     const injectedManager = inject<any>("variablesManager", undefined);
     const manager = props.variablesManager || injectedManager;
@@ -1260,7 +1256,6 @@ export default defineComponent({
     };
 
     // it is used to change/update initial variables values from outside the component
-    // NOTE: right now, it is not used after variables in variables feature
     const changeInitialVariableValues = async (
       newInitialVariableValues: any,
     ) => {

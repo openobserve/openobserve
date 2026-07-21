@@ -209,7 +209,7 @@ describe("ActionScripts", () => {
 
   describe("Header section", () => {
     it("should display page title", () => {
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       const title = wrapper.find(".app-page-header h1");
       expect(title.exists()).toBe(true);
     });

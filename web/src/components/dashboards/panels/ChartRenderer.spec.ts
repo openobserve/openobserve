@@ -181,8 +181,9 @@ describe("ChartRenderer", () => {
       expect(wrapper.find('[data-test="chart-renderer"]').exists()).toBe(true);
       const container = wrapper.find('[data-test="chart-renderer"]');
       expect(container.attributes("id")).toBe("chart1");
-      expect(container.attributes("style")).toContain("height: 100%");
-      expect(container.attributes("style")).toContain("width: 100%");
+      // Sizing moved from inline `style="height:100%;width:100%"` to utilities.
+      expect(container.classes()).toContain("h-full");
+      expect(container.classes()).toContain("w-full");
     });
 
     it("should initialize ECharts instance", async () => {

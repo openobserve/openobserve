@@ -1,10 +1,7 @@
 <template>
   <div
-    class="rich-text-input-wrapper py-1 px-2 pb-2 rounded-xl transition-all duration-200 ease-in-out min-h-15 cursor-text"
+    class="rich-text-input-wrapper py-1 px-2 pb-2 rounded-default transition-all duration-200 ease-in-out min-h-15 cursor-text bg-surface-base border border-border-default focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
     :class="[
-      theme === 'dark'
-        ? ['dark-mode', 'bg-[#191919]', 'border', 'border-[#323232]', 'focus-within:border-transparent', 'focus-within:shadow-[0_0_0_2px_#5a6ec3]']
-        : ['light-mode', 'bg-white', 'border', 'border-[#e4e7ec]', 'focus-within:border-transparent', 'focus-within:shadow-[0_0_0_2px_#8B5CF6]'],
       disabled ? ['is-disabled', 'opacity-60', 'cursor-not-allowed'] : [],
       borderless ? ['borderless', 'p-0', 'border-0!', 'bg-transparent!', 'shadow-none!', 'rounded-none'] : []
     ]"
@@ -12,8 +9,8 @@
   >
     <div
       ref="editableDiv"
-      class="rich-text-input relative outline-none text-sm leading-[1.6] min-h-[40px] max-h-[300px] overflow-y-auto break-words whitespace-pre-wrap"
-      :class="theme === 'dark' ? 'text-[#e2e8f0]' : 'text-[#1a202c]'"
+      class="rich-text-input relative outline-none text-sm leading-[1.6] min-h-10 max-h-75 overflow-y-auto break-words whitespace-pre-wrap text-text-body"
+      :class="disabled ? 'cursor-not-allowed' : ''"
       contenteditable="true"
       :data-placeholder="placeholder"
       @input="handleInput"
@@ -26,10 +23,7 @@
     <!-- Detail Card -->
     <div
       v-if="showDetailCard"
-      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-lg shadow-[0_8px_24px_rgba(0,0,0,0.25)] z-[100000] flex flex-col overflow-hidden"
-      :class="theme === 'dark'
-        ? ['dark-mode', 'bg-(--o2-primary-background)', 'border-(--o2-primary-background)']
-        : ['light-mode', 'bg-white', 'border-[#e4e7ec]']"
+      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-default shadow-lg z-[100000] flex flex-col overflow-hidden bg-surface-base border-border-default"
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',
@@ -37,8 +31,7 @@
       }"
       @click.stop
     >
-      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-[Monaco,Menlo,'Courier_New',monospace] text-[11px] leading-[1.5] whitespace-pre-wrap break-words"
-        :class="theme === 'dark' ? 'text-[#e2e8f0]' : 'text-[#1a202c]'"
+      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-mono text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-body"
         v-html="formatContent(detailCardContent)"></div>
     </div>
   </div>
@@ -620,35 +613,27 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Disabled cursor on inner input */
-.rich-text-input-wrapper.is-disabled .rich-text-input {
-  cursor: not-allowed;
-}
+<style scoped>
+/* keep(generated-content) — .reference-chip and its children are built in JS with
+   document.createElement() inside the contenteditable, and .json-* spans are
+   injected via v-html. None of these nodes carry the scoped data-v attribute, so
+   they can only be reached with :deep() and cannot be expressed as utilities.
+   keep(scrollbar) — ::-webkit-scrollbar pseudo-elements have no utility form.
+   keep(complex-state) — .is-empty is toggled imperatively by the input handlers,
+   so the placeholder :before has no Tailwind variant. */
 
-/* Light mode placeholder */
-.rich-text-input-wrapper.light-mode .rich-text-input.is-empty:before {
+/* Placeholder for the empty contenteditable */
+.rich-text-input.is-empty:before {
   content: attr(data-placeholder);
-  color: #a0aec0;
+  color: var(--color-text-placeholder);
   pointer-events: none;
   position: absolute;
   left: 0;
-  top: 4px;
+  top: 0.25rem;
 }
 
-/* Dark mode placeholder */
-.rich-text-input-wrapper.dark-mode .rich-text-input.is-empty:before {
-  content: attr(data-placeholder);
-  color: #718096;
-  pointer-events: none;
-  position: absolute;
-  left: 0;
-  top: 4px;
-}
-
-/* Scrollbar styling */
 .rich-text-input::-webkit-scrollbar {
-  width: 6px;
+  width: 0.375rem;
 }
 
 .rich-text-input::-webkit-scrollbar-track {
@@ -656,175 +641,98 @@ export default defineComponent({
 }
 
 .rich-text-input::-webkit-scrollbar-thumb {
-  background: #cbd5e0;
-  border-radius: 3px;
-}
-
-.dark-mode .rich-text-input::-webkit-scrollbar-thumb {
-  background: #4a5568;
+  background: var(--color-border-strong);
+  border-radius: 0.1875rem;
 }
 
 /* Reference chips — dynamically created in JS */
-.reference-chip {
+.rich-text-input :deep(.reference-chip) {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
-  margin: 4px 2px;
-  border-radius: 6px;
-  font-size: 12px;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  margin: 0.25rem 0.125rem;
+  border-radius: 0.375rem;
+  font-size: var(--text-xs);
   cursor: pointer;
   user-select: none;
   vertical-align: middle;
   transition: all 0.15s ease;
   line-height: 1.4;
 
-  /* Default light mode colors */
-  background: #f0f4ff;
-  border: 1px solid #d0d9ff;
-  color: #4a5568;
+  background: var(--color-file-chip-bg);
+  border: 0.0625rem solid var(--color-file-border);
+  color: var(--color-file-chip-text);
 }
 
-.reference-chip .chip-preview {
+.rich-text-input :deep(.reference-chip .chip-preview) {
   font-weight: 500;
-  max-width: 120px;
+  max-width: 7.5rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.reference-chip .chip-meta {
-  font-size: 10px;
+.rich-text-input :deep(.reference-chip .chip-meta) {
+  font-size: var(--text-3xs);
   white-space: nowrap;
-  color: #718096;
+  color: var(--color-text-secondary);
 }
 
-.reference-chip .chip-remove {
+.rich-text-input :deep(.reference-chip .chip-remove) {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 1rem;
+  height: 1rem;
   padding: 0;
-  margin-left: 2px;
+  margin-left: 0.125rem;
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--text-base);
   line-height: 1;
-  border-radius: 3px;
+  border-radius: 0.1875rem;
   transition: all 0.15s ease;
-  color: #a0aec0;
+  color: var(--color-file-chip-remove);
 }
 
-.reference-chip .chip-remove:hover {
+.rich-text-input :deep(.reference-chip .chip-remove:hover) {
   transform: scale(1.1);
-  color: #e53e3e;
-  background: rgba(229, 62, 62, 0.1);
+  color: var(--color-status-negative);
+  background: var(--color-button-ghost-destructive-hover-bg);
 }
 
-.reference-chip:hover {
-  background: #e6edff;
-  border-color: #b8c5ff;
-}
-
-/* Light mode chip overrides */
-.rich-text-input-wrapper.light-mode .reference-chip {
-  background: #f0f4ff;
-  border: 1px solid #d0d9ff;
-  color: #4a5568;
-}
-
-.rich-text-input-wrapper.light-mode .reference-chip .chip-meta {
-  color: #718096;
-}
-
-.rich-text-input-wrapper.light-mode .reference-chip .chip-remove {
-  color: #a0aec0;
-}
-
-.rich-text-input-wrapper.light-mode .reference-chip .chip-remove:hover {
-  color: #e53e3e;
-  background: rgba(229, 62, 62, 0.1);
-}
-
-.rich-text-input-wrapper.light-mode .reference-chip:hover {
-  background: #e6edff;
-  border-color: #b8c5ff;
-}
-
-/* Dark mode chip overrides */
-.dark-mode .reference-chip,
-.rich-text-input-wrapper.dark-mode .reference-chip {
-  background: #2d3748;
-  border: 1px solid #4a5568;
-  color: #e2e8f0;
-}
-
-.dark-mode .reference-chip .chip-meta,
-.rich-text-input-wrapper.dark-mode .reference-chip .chip-meta {
-  color: #a0aec0;
-}
-
-.dark-mode .reference-chip .chip-remove,
-.rich-text-input-wrapper.dark-mode .reference-chip .chip-remove {
-  color: #718096;
-}
-
-.dark-mode .reference-chip .chip-remove:hover,
-.rich-text-input-wrapper.dark-mode .reference-chip .chip-remove:hover {
-  color: #fc8181;
-  background: rgba(252, 129, 129, 0.1);
-}
-
-.dark-mode .reference-chip:hover,
-.rich-text-input-wrapper.dark-mode .reference-chip:hover {
-  background: #374151;
-  border-color: #5a6c7d;
+/* Chip hover — derived from the chip tokens so it flips with the theme on its
+   own (both --color-file-chip-bg and --color-file-chip-text are dark-aware),
+   which replaces the former light/dark literal pair. */
+.rich-text-input :deep(.reference-chip:hover) {
+  background: color-mix(in srgb, var(--color-file-chip-bg) 88%, var(--color-file-chip-text) 12%);
+  border-color: color-mix(in srgb, var(--color-file-border) 70%, var(--color-file-chip-text) 30%);
 }
 
 /* JSON syntax highlighting in detail card (v-html injected content) */
-.chip-detail-card .card-content .json-key {
-  color: #0066cc;
+.chip-detail-card .card-content :deep(.json-key) {
+  color: var(--color-json-key);
   font-weight: 600;
 }
 
-.dark-mode .chip-detail-card .card-content .json-key {
-  color: #60a5fa;
+.chip-detail-card .card-content :deep(.json-string) {
+  color: var(--color-json-string);
 }
 
-.chip-detail-card .card-content .json-string {
-  color: #22863a;
+.chip-detail-card .card-content :deep(.json-number) {
+  color: var(--color-json-number);
 }
 
-.dark-mode .chip-detail-card .card-content .json-string {
-  color: #86efac;
-}
-
-.chip-detail-card .card-content .json-number {
-  color: #005cc5;
-}
-
-.dark-mode .chip-detail-card .card-content .json-number {
-  color: #7dd3fc;
-}
-
-.chip-detail-card .card-content .json-boolean {
-  color: #d73a49;
+.chip-detail-card .card-content :deep(.json-boolean) {
+  color: var(--color-json-boolean);
   font-weight: 600;
 }
 
-.dark-mode .chip-detail-card .card-content .json-boolean {
-  color: #fca5a5;
-}
-
-.chip-detail-card .card-content .json-null {
-  color: #6f42c1;
+.chip-detail-card .card-content :deep(.json-null) {
+  color: var(--color-json-null);
   font-weight: 600;
-}
-
-.dark-mode .chip-detail-card .card-content .json-null {
-  color: #c4b5fd;
 }
 </style>

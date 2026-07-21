@@ -1,5 +1,6 @@
 <template>
   <ODrawer
+    bleed
     :open="open"
     side="right"
     :width="70"
@@ -18,7 +19,7 @@
            above the cards (right-aligned) so it reads as a page-level control,
            not a per-tab filter. Refresh re-queries everything. -->
       <div
-        class="flex items-center justify-end gap-[0.5rem] px-5 pt-3"
+        class="flex items-center justify-end gap-2 px-5 pt-3"
       >
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
@@ -44,7 +45,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="flex-shrink-0 grid grid-cols-4 gap-[0.625rem] px-5 py-4 border-b border-b-[var(--color-dialog-header-border,var(--o2-border))]"
+        class="flex-shrink-0 grid grid-cols-4 gap-2.5 px-5 py-4 border-b border-b-dialog-header-border"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -53,22 +54,22 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="rounded-lg flex flex-col px-[0.875rem] pt-[0.625rem] pb-[0.625rem] gap-[0.25rem] bg-[var(--color-surface-base)] border border-[var(--color-border-default)] transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
         >
           <div
-            class="kpi-label text-[0.7rem] leading-normal font-semibold mb-[0.25rem] text-[var(--color-text-secondary)]"
+            class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary"
           >
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-[0.2rem]">
             <span
-              class="text-[1.4rem] font-bold leading-none text-[var(--color-grey-600)]"
+              class="text-2xl font-bold leading-none text-text-secondary"
             >
               {{ card.value }}
             </span>
             <span
               v-if="card.unit"
-              class="text-[0.8rem] font-semibold text-[var(--color-text-secondary)]"
+              class="text-compact font-semibold text-text-secondary"
             >
               {{ card.unit }}
             </span>
@@ -110,13 +111,13 @@
           v-show="tableEnabled"
           class="flex items-center justify-end gap-2 flex-wrap px-5"
         >
-          <div class="w-[14rem] flex-shrink-0">
+          <div class="w-56 flex-shrink-0">
             <OSelect
               v-model="agentKey"
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="w-full rounded"
+              class="w-full rounded-default"
               data-test="eval-job-detail-runs-agent-filter"
             />
           </div>
@@ -127,23 +128,28 @@
           <!-- Target -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
-              <dd>{{ row.stream }}</dd>
+            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-body wrap-break-word">{{ row.stream }}</dd>
 
-              <dt>{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
-              <dd>{{ streamType }}</dd>
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-body wrap-break-word">{{ streamType }}</dd>
             </dl>
 
             <!-- Filter rendered as a code block with a header bar + copy action,
                  matching the Alert History condition view. -->
-            <div class="jd-codeblock" data-test="eval-job-detail-filter">
-              <div class="jd-codeblock__header">
-                <span class="jd-codeblock__label">{{
+            <div
+              class="border border-dialog-header-border rounded-default overflow-hidden bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
+              data-test="eval-job-detail-filter"
+            >
+              <div
+                class="flex items-center justify-between px-2.5 py-1.5 border-b border-b-dialog-header-border bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,var(--color-card-bg))]"
+              >
+                <span class="text-2xs font-medium text-text-secondary">{{
                   t("onlineEvals.job.detail.filterLabel")
                 }}</span>
                 <OButton
@@ -161,7 +167,10 @@
                   <OTooltip :content="t('common.copy')" />
                 </OButton>
               </div>
-              <pre class="jd-codeblock__content">{{
+              <!-- Hard cap the filter condition height; longer conditions scroll. -->
+              <pre
+                class="m-0 px-3.5 py-2.5 font-mono text-compact leading-[1.6] text-text-body whitespace-pre-wrap overflow-x-auto max-h-50 overflow-y-auto"
+              >{{
                 filterText || t("onlineEvals.job.detail.filterEmpty")
               }}</pre>
             </div>
@@ -170,7 +179,7 @@
           <!-- Scorers -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -181,18 +190,32 @@
               :title="t('onlineEvals.job.detail.scorersEmpty')"
               data-test="eval-job-detail-scorers-empty"
             />
-            <ul v-else class="jd-scorers">
+            <!-- Show ~3 scorer cards; the rest scroll. The small extra lets the
+                 4th card peek as a scroll affordance. padding-right keeps the
+                 scrollbar off the card edges. -->
+            <ul
+              v-else
+              class="list-none m-0 p-0 flex flex-col gap-2.5 max-h-100 overflow-y-auto pr-1 pt-2.5"
+            >
               <li v-for="item in resolvedScorers" :key="item.id">
+                <!-- `group` drives the card's hover affordances on the CTA /
+                     chevron below. The chain is hover-AND-enabled, so the group
+                     variant carries :not(:disabled) with it — a disabled card
+                     must not light up on hover. -->
                 <button
                   type="button"
-                  class="jd-scorers__card"
+                  class="group w-full flex items-center gap-3.5 px-4 py-3.5 bg-card-bg border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] rounded-default text-left cursor-pointer transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] enabled:hover:-translate-y-px disabled:opacity-55 disabled:cursor-not-allowed"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
                 >
                   <span
-                    class="jd-scorers__icon"
-                    :class="`jd-scorers__icon--${item.scorerType}`"
+                    class="shrink-0 inline-flex items-center justify-center size-8.5 rounded-default"
+                    :class="{
+                      'bg-badge-indigo-soft-bg text-badge-indigo-soft-text': item.scorerType === 'llm_judge',
+                      'bg-badge-orange-soft-bg text-badge-orange-soft-text': item.scorerType === 'remote',
+                      'bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)] text-text-secondary': item.scorerType === 'unknown',
+                    }"
                   >
                     <OIcon
                       :name="
@@ -201,9 +224,9 @@
                       size="sm"
                     />
                   </span>
-                  <div class="jd-scorers__main">
-                    <div class="jd-scorers__row">
-                      <span class="jd-scorers__name">{{
+                  <div class="flex-1 min-w-0 flex flex-col gap-1.25">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-bold text-sm text-text-heading">{{
                         item.name
                       }}</span>
                       <OTag
@@ -211,49 +234,49 @@
                         type="scorerType"
                         :value="item.scorerType"
                       />
-                      <span class="jd-scorers__version"
+                      <span class="text-2xs text-text-secondary"
                         >v{{ item.version }}</span
                       >
                     </div>
                     <div
                       v-if="item.scoreConfigName"
-                      class="jd-scorers__produces"
+                      class="flex items-center gap-1.5 text-xs text-text-secondary flex-wrap"
                     >
                       <OIcon
                         name="rule"
                         size="xs"
-                        class="jd-scorers__produces-icon"
+                        class="shrink-0 text-text-secondary opacity-70"
                       />
-                      <span class="jd-scorers__produces-prefix">
+                      <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="jd-scorers__produces-name">{{
+                      <span class="text-text-body font-bold">{{
                         item.scoreConfigName
                       }}</span>
                       <template v-if="item.scoreConfigDataType">
-                        <span class="jd-scorers__sep">·</span>
-                        <span class="jd-scorers__produces-type">
+                        <span class="text-text-secondary opacity-50">·</span>
+                        <span class="text-text-secondary">
                           {{ item.scoreConfigDataType }}
                         </span>
                       </template>
                       <template v-if="item.scoreConfigRangeText">
-                        <span class="jd-scorers__sep">·</span>
-                        <span class="jd-scorers__produces-range">
+                        <span class="text-text-secondary opacity-50">·</span>
+                        <span class="text-text-secondary">
                           {{ item.scoreConfigRangeText }}
                         </span>
                       </template>
                     </div>
                   </div>
                   <span
-                    class="jd-scorers__cta text-[0.6875rem] font-semibold"
+                    class="shrink-0 inline-flex items-center gap-1 text-text-secondary text-2xs font-semibold group-[:hover:not(:disabled)]:text-primary-600"
                   >
-                    <span class="jd-scorers__cta-label">
+                    <span class="opacity-0 transition-opacity duration-150 group-[:hover:not(:disabled)]:opacity-100">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
                     </span>
                     <OIcon
                       name="chevron-right"
                       size="sm"
-                      class="jd-scorers__chevron"
+                      class="shrink-0 opacity-50 transition-[opacity,transform] duration-150 group-[:hover:not(:disabled)]:opacity-100 group-[:hover:not(:disabled)]:translate-x-0.5"
                     />
                   </span>
                 </button>
@@ -264,18 +287,18 @@
           <!-- Sampling -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
-              <dd>{{ samplingModeLabel }}</dd>
+            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-body wrap-break-word">{{ samplingModeLabel }}</dd>
 
-              <dt v-if="samplingValue != null">
+              <dt v-if="samplingValue != null" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.samplingValueLabel") }}
               </dt>
-              <dd v-if="samplingValue != null">
+              <dd v-if="samplingValue != null" class="m-0 text-compact text-text-body wrap-break-word">
                 {{ samplingValue }}
               </dd>
             </dl>
@@ -284,27 +307,27 @@
           <!-- Metadata -->
           <section class="flex flex-col gap-2 px-5">
             <h4
-              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-[0.8125rem] font-semibold leading-[1.5] text-[var(--color-text-primary)] border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
-              <dd>v{{ row.version }}</dd>
-              <dt v-if="pipelineId">
+            <dl class="grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-body wrap-break-word">v{{ row.version }}</dd>
+              <dt v-if="pipelineId" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
-              <dd v-if="pipelineId">{{ pipelineId }}</dd>
-              <dt v-if="createdAt">
+              <dd v-if="pipelineId" class="m-0 text-compact text-text-body wrap-break-word">{{ pipelineId }}</dd>
+              <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.createdLabel") }}
               </dt>
-              <dd v-if="createdAt">
+              <dd v-if="createdAt" class="m-0 text-compact text-text-body wrap-break-word">
                 {{ formatTimestamp(createdAt) }}
               </dd>
-              <dt v-if="updatedAt">
+              <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">
                 {{ t("onlineEvals.job.detail.updatedLabel") }}
               </dt>
-              <dd v-if="updatedAt">
+              <dd v-if="updatedAt" class="m-0 text-compact text-text-body wrap-break-word">
                 {{ formatTimestamp(updatedAt) }}
               </dd>
             </dl>
@@ -333,7 +356,7 @@
             class="w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-[var(--color-text-secondary)]">{{
+              <span class="text-text-secondary">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
@@ -347,7 +370,7 @@
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
@@ -356,7 +379,7 @@
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>
@@ -395,7 +418,7 @@
             class="w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-[var(--color-text-secondary)]">{{
+              <span class="text-text-secondary">{{
                 relativeTime(row.timestampMs)
               }}</span>
             </template>
@@ -409,7 +432,7 @@
                 :title="row.targetSpanId"
                 >{{ row.targetSpanId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
               <span
@@ -418,7 +441,7 @@
                 :title="row.targetTraceId"
                 >{{ row.targetTraceId }}</span
               >
-              <span v-else class="text-[var(--color-text-secondary)]">—</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>
@@ -947,301 +970,3 @@ function relativeTime(timestampMs: number): string {
   return `${day}d ago`;
 }
 </script>
-
-<style lang="scss">
-// Page layout, spacing, colors, and text styling are Tailwind utilities in the
-// template (matching SessionDetails.vue). Only cohesive blocks that rely on
-// descendant/element selectors or hover state remain here. Font-family is never
-// set per component — it inherits the global --font-sans.
-
-/* — Key/value description lists — */
-.jd-kv {
-  display: grid;
-  grid-template-columns: 8.125rem 1fr;
-  gap: 0.375rem 0.875rem;
-  margin: 0;
-}
-
-// Field labels follow the alert form convention (AddAlert.vue's
-// `.alert-v3-inline-label`): 12px / 600, in the muted-secondary color so the
-// label reads as a strong caption while the value below stays primary.
-.jd-kv dt {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-kv dd {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-primary, currentColor);
-  word-break: break-word;
-}
-
-// Filter code block — mirrors the Alert History condition view (rounded,
-// bordered, neutral surface + header bar) so condition rendering is consistent
-// across drawers.
-.jd-codeblock {
-  border: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 0.5rem;
-  overflow: hidden;
-  background: color-mix(
-    in srgb,
-    var(--color-text-secondary) 4%,
-    var(--color-card-bg)
-  );
-}
-
-.jd-codeblock__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.375rem 0.625rem;
-  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
-  background: color-mix(
-    in srgb,
-    var(--color-text-secondary) 6%,
-    var(--color-card-bg)
-  );
-}
-
-.jd-codeblock__label {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-codeblock__content {
-  margin: 0;
-  padding: 0.625rem 0.875rem;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  color: var(--color-text-primary, currentColor);
-  white-space: pre-wrap;
-  overflow-x: auto;
-  // Hard cap the filter condition height; longer conditions scroll.
-  max-height: 12.5rem;
-  overflow-y: auto;
-}
-
-.jd-scorers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  // Show ~3 scorer cards (~65px each + 10px gap); the rest scroll. The small
-  // extra lets the 4th card peek as a scroll affordance. padding-right keeps
-  // the scrollbar off the card edges.
-  max-height: 25rem;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-  padding-top:0.625rem
-}
-
-.jd-scorers__card {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  padding: 0.875rem 1rem;
-  background: var(--color-card-bg);
-  border: 0.0625rem solid
-    color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 0.5rem;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background 0.15s,
-    box-shadow 0.15s,
-    transform 0.15s;
-}
-
-.jd-scorers__card:hover:not(:disabled) {
-  border-color: color-mix(
-    in srgb,
-    var(--color-primary-600, #3f7994) 45%,
-    transparent
-  );
-  background: color-mix(
-    in srgb,
-    var(--color-primary-600, #3f7994) 4%,
-    var(--color-card-bg)
-  );
-  box-shadow: 0 0.0625rem 0.1875rem
-    color-mix(in srgb, var(--color-primary-600, #3f7994) 12%, transparent);
-  transform: translateY(-0.0625rem);
-}
-
-.jd-scorers__card:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.jd-scorers__icon {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.125rem;
-  height: 2.125rem;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.jd-scorers__icon--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.jd-scorers__icon--unknown {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3125rem;
-}
-
-.jd-scorers__row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.jd-scorers__name {
-  font-weight: 700;
-  font-size: 0.875rem;
-  color: var(--color-text-primary, currentColor);
-}
-
-.jd-scorers__type {
-  display: inline-flex;
-  padding: 0.0625rem 0.4375rem;
-  border-radius: 0.1875rem;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.jd-scorers__type--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.jd-scorers__version {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__produces {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  flex-wrap: wrap;
-}
-
-.jd-scorers__produces-icon {
-  flex-shrink: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.jd-scorers__produces-prefix {
-  font-weight: 500;
-}
-
-.jd-scorers__produces-name {
-  color: var(--color-text-primary, currentColor);
-  font-weight: 700;
-}
-
-.jd-scorers__produces-type,
-.jd-scorers__produces-range {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__sep {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.5;
-}
-
-.jd-scorers__cta {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__cta-label {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.jd-scorers__card:hover:not(:disabled) .jd-scorers__cta {
-  color: var(--color-primary-600, #3f7994);
-}
-
-.jd-scorers__card:hover:not(:disabled) .jd-scorers__cta-label {
-  opacity: 1;
-}
-
-.jd-scorers__chevron {
-  flex-shrink: 0;
-  opacity: 0.5;
-  transition:
-    opacity 0.15s,
-    transform 0.15s;
-}
-
-.jd-scorers__card:hover:not(:disabled) .jd-scorers__chevron {
-  opacity: 1;
-  transform: translateX(0.125rem);
-}
-
-/* — Runs / Failures status cell — */
-.jd-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-status-cell__dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-status-cell--success {
-  color: var(--color-status-success-text);
-}
-.jd-status-cell--success .jd-status-cell__dot {
-  background: var(--color-status-success-text);
-}
-
-.jd-status-cell--error,
-.jd-status-cell--timeout {
-  color: var(--color-status-error-text);
-}
-.jd-status-cell--error .jd-status-cell__dot,
-.jd-status-cell--timeout .jd-status-cell__dot {
-  background: var(--color-status-error-text);
-}
-
-.jd-status-cell--skipped .jd-status-cell__dot {
-  background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
-}
-</style>

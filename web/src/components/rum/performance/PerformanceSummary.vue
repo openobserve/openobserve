@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @variablesManagerReady="onVariablesManagerReady"
       >
         <template v-slot:before_panels>
-          <div class="flex items-center q-pb pt-3 text-base font-medium font-bold">
+          <div class="flex items-center pt-3 text-base font-medium font-bold">
             <div class="text-center w-[25%]">
               {{ t("rum.webVitalsLabel") }}
             </div>

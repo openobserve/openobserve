@@ -108,18 +108,6 @@ describe("AddCondition.vue", () => {
       global: {
         plugins: [i18n],
         stubs: [
-          "q-select",
-          "q-btn",
-          "q-btn-group",
-          "q-menu",
-          "q-tabs",
-          "q-tab",
-          "q-tab-panels",
-          "q-tab-panel",
-          "q-separator",
-          "q-item",
-          "q-item-section",
-          "q-checkbox",
           "CommonAutoComplete",
           "SanitizedHtmlRenderer",
         ],

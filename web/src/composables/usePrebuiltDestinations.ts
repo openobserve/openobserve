@@ -95,17 +95,7 @@ export function usePrebuiltDestinations() {
   const typesByCategory = computed(() => getPrebuiltTypesByCategory());
 
   /**
-   * Ensure system templates exist in DEFAULT_ORG
-   * NOTE: System templates are now managed by the backend via prebuilt destinations config
-   * This function is kept for backward compatibility but does nothing
-   */
-  /**
-   * Ensure system templates exist for all prebuilt destinations
-   * Creates templates if they don't exist in the backend
-   */
-  /**
    * Fetch system templates from backend and cache them
-   * System templates are now managed entirely by the backend
    */
   async function fetchSystemTemplates(): Promise<void> {
     try {

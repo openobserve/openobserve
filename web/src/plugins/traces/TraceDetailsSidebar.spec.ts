@@ -240,18 +240,6 @@ const traceErrorTabStub = {
 
 // Base stubs shared across all mount calls in this spec file
 const baseStubs = {
-  "q-resize-observer": true,
-  "q-virtual-scroll": {
-    template: `
-      <div>
-        <slot name="before"></slot>
-        <div v-for="(item, index) in items" :key="index">
-          <slot :item="item" :index="index"></slot>
-        </div>
-      </div>
-    `,
-    props: ["items"],
-  },
   TraceErrorTab: traceErrorTabStub,
   ...tabStubs,
 };
@@ -710,7 +698,7 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="trace-details-sidebar-no-events"]',
       );
       expect(noEventsMsg.exists()).toBe(true);
-      expect(noEventsMsg.text()).toContain("No events present for this span");
+      expect(noEventsMsg.text()).toContain("No events for this span");
     });
 
     describe("When events exist", () => {
@@ -1595,7 +1583,7 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("apply-filter-immediately emit — getFilterValue called at the emit site", () => {
     // This describe block mounts a separate wrapper with JsonPreview stubbed to render
-    // its #field-dropdown slot directly in the DOM (no q-btn-dropdown popup layer).
+    // its #field-dropdown slot directly in the DOM (no popup layer).
     // This lets us click the filter item without needing popup mechanics.
     //
     // start_time and end_time are provided as nanosecond strings to reflect the real
@@ -1624,7 +1612,7 @@ describe("TraceDetailsSidebar", async () => {
           stubs: {
             ...baseStubs,
             // Stub JsonPreview to render its #field-dropdown slot inline for each key
-            // in `value`, so the q-item inside is immediately clickable without a popup.
+            // in `value`, so the dropdown item inside is immediately clickable without a popup.
             JsonPreview: {
               props: [
                 "value",
@@ -1820,7 +1808,6 @@ describe("TraceDetailsSidebar", async () => {
               ],
             },
             TenstackTable: true,
-            "q-expansion-item": true,
             CodemirrorEditor: true,
             CodeQueryEditor: true,
           },

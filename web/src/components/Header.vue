@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Dark mode: Show dark logo, fallback to light logo -->
         <img
           v-if="
-            store.state.theme === 'dark' &&
+            isDark &&
             store.state.zoConfig.hasOwnProperty('custom_logo_dark_img') &&
             store.state.zoConfig?.custom_logo_dark_img != null
           "
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Light mode: Show light logo, fallback to dark logo -->
         <img
           v-else-if="
-            store.state.theme === 'light' &&
+            !isDark &&
             store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
             store.state.zoConfig?.custom_logo_img != null
           "
@@ -99,10 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
           <img
             data-test="header-openobserve-logo"
-            class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
+            class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
             :src="
               getImageURL(
-                store.state.theme === 'dark'
+                isDark
                   ? 'images/common/openobserve_latest_dark_2.svg'
                   : 'images/common/openobserve_latest_light_2.svg',
               )
@@ -118,10 +118,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <a :href="homeUrl" @click.prevent="goToHome" class="inline-flex items-center">
         <img
           data-test="header-openobserve-logo"
-          class="openobserve-logo cursor-pointer h-8 max-w-[150px] block transition-opacity duration-200 hover:opacity-80"
+          class="openobserve-logo cursor-pointer h-8 max-w-37.5 block transition-opacity duration-200 hover:opacity-80"
           :src="
             getImageURL(
-              store.state.theme === 'dark'
+              isDark
                 ? 'images/common/openobserve_latest_dark_2.svg'
                 : 'images/common/openobserve_latest_light_2.svg',
             )
@@ -145,11 +145,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         type="warning"
         icon="cloud"
-        class="warning-msg"
-        style="display: inline"
+        class="inline bg-status-warning-bg p-1.25 rounded-default"
       >
         <OIcon name="warning"
-size="xs" class="warning" />{{
+size="xs" class="text-warning" />{{
           store.state.organizationData.quotaThresholdMsg
         }}
       </div>
@@ -216,12 +215,12 @@ size="xs" class="warning" />{{
           size="icon-toolbar"
           @click="toggleAIChat"
           data-test="menu-link-ai-item"
-          class="ai-hover-btn"
+          class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
           :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
           @mouseenter="handleMouseEnter"
           @mouseleave="handleMouseLeave"
         >
-          <img :src="getBtnLogo" class="ai-icon w-5 h-5 shrink-0" />
+          <img :src="getBtnLogo" class="w-5 h-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" />
           <OTooltip
             side="bottom"
             align="center"
@@ -253,7 +252,7 @@ size="xs" class="warning" />{{
             <OTooltip side="top" align="center" :content="t('menu.help')" />
           </OButton>
         </template>
-        <div class="header-menu-bar min-w-[250px]">
+        <div class="header-menu-bar min-w-62.5">
           <!-- OpenAPI link (only for non-cloud deployments) -->
           <template
             v-if="
@@ -321,7 +320,7 @@ size="xs" class="warning" />{{
             <OTooltip side="top" align="center" :content="user.given_name ? user.given_name + ' ' + user.family_name : user.email" />
           </OButton>
         </template>
-        <div class="header-menu-bar min-w-[250px]">
+        <div class="header-menu-bar min-w-62.5">
           <!-- User information (non-clickable info row) -->
           <div class="flex items-center gap-3 px-3 py-2">
             <OIcon
@@ -339,7 +338,7 @@ size="xs" class="warning" />{{
           <!-- Language selector — nested sub-dropdown (click to open) -->
           <div
             data-test="header-language-submenu-trigger"
-            class="relative flex items-center gap-3 py-1.5 px-3 text-sm leading-[1.2] cursor-pointer select-none hover:bg-[rgba(0,0,0,0.05)] dark:hover:bg-[rgba(255,255,255,0.08)]"
+            class="relative flex items-center gap-3 py-1.5 px-3 text-sm leading-[1.2] cursor-pointer select-none hover:bg-dropdown-item-hover-bg"
             @click.stop="showLanguageSubmenu = !showLanguageSubmenu"
           >
             <OIcon size="xs" name="language" class="padding-none" />
@@ -349,7 +348,7 @@ size="xs" class="warning" />{{
                 v-if="selectedLanguage.icon && selectedLanguage.icon.startsWith('img:')"
                 :src="selectedLanguage.icon.slice(4)"
                 :alt="selectedLanguage.label"
-                class="w-4 h-3 object-cover rounded-xs inline-block shrink-0"
+                class="w-4 h-3 object-cover rounded-default inline-block shrink-0"
               />
               <OIcon
                 v-else-if="selectedLanguage.icon"
@@ -364,10 +363,7 @@ size="xs" class="warning" />{{
             <!-- Submenu — absolutely positioned to the left of parent dropdown -->
             <div
               v-if="showLanguageSubmenu"
-              class="absolute right-full top-0 mr-1 min-w-50 border rounded-md py-1 z-9999"
-              :class="store.state.theme === 'dark'
-                ? 'bg-[#1f2937] border-[rgba(255,255,255,0.12)] shadow-[0_8px_24px_rgba(0,0,0,0.5)]'
-                : 'bg-white border-black/12 shadow-[0_8px_24px_rgba(0,0,0,0.15)]'"
+              class="absolute right-full top-0 mr-1 min-w-50 border rounded-default py-1 z-9999 bg-dropdown-bg border-dropdown-border shadow-[0_8px_24px_rgba(0,0,0,0.15)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
               data-test="language-dropdown-item"
               @click.stop
             >
@@ -378,9 +374,7 @@ size="xs" class="warning" />{{
                 :data-test="`language-dropdown-item-${lang.code}`"
                 class="flex items-center gap-2.5 w-full py-1.5 px-3 text-sm leading-[1.2] text-left bg-transparent border-0 cursor-pointer text-inherit"
                 :class="[
-                  store.state.theme === 'dark'
-                    ? 'hover:bg-[rgba(255,255,255,0.08)]'
-                    : 'hover:bg-[rgba(0,0,0,0.05)]',
+                  'hover:bg-dropdown-item-hover-bg',
                   { 'font-semibold': selectedLanguage.code === lang.code },
                 ]"
                 @click="changeLanguage(lang); showLanguageSubmenu = false"
@@ -389,7 +383,7 @@ size="xs" class="warning" />{{
                   v-if="lang.icon && lang.icon.startsWith('img:')"
                   :src="lang.icon.slice(4)"
                   :alt="lang.label"
-                  class="w-4 h-3 object-cover rounded-xs inline-block shrink-0"
+                  class="w-4 h-3 object-cover rounded-default inline-block shrink-0"
                 />
                 <OIcon v-else-if="lang.icon" size="xs" :name="lang.icon" />
                 <span class="flex-1">{{ lang.label }}</span>
@@ -442,6 +436,7 @@ size="xs" class="warning" />{{
 import { defineComponent, PropType, computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { useTheme } from "@/composables/useTheme";
 import ThemeSwitcher from "./ThemeSwitcher.vue";
 import EnterpriseUpgradeDialog from "./EnterpriseUpgradeDialog.vue";
 import OrganizationSelector from "./OrganizationSelector.vue";
@@ -454,6 +449,7 @@ import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 
 import { getImageURL } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 
 export default defineComponent({
   name: "HeaderComponent",
@@ -554,6 +550,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n();
     const router = useRouter();
+    const { isDark } = useTheme();
 
     const homeUrl = computed(() => {
       if (!router) return "/";
@@ -596,8 +593,8 @@ export default defineComponent({
     // Computed property for ingestion quota warning color
     const ingestionQuotaColor = computed(() => {
       return props.store.state.zoConfig.ingestion_quota_used >= 95
-        ? "red"
-        : "orange";
+        ? chartColor("--color-status-negative")
+        : chartColor("--color-status-warning-text");
     });
 
     // Event handlers that emit to parent component
@@ -666,6 +663,7 @@ export default defineComponent({
     };
 
     return {
+      isDark,
       t,
       getImageURL,
       enterpriseButtonText,
@@ -694,3 +692,15 @@ export default defineComponent({
 });
 </script>
 
+<style scoped>
+/* keep(lib-override:o2-button): dark-only, element-scoped re-point of OButton's
+   ghost-primary tokens for the navbar upgrade CTA. The custom properties are READ by OButton's
+   own internal DOM, so they have to be declared on the button element itself —
+   there is no utility that sets them. Scoping appends [data-v] to the
+   [data-test] compound, which is OButton's root and therefore carries this
+   component's scope id. Was a global in styles/utilities.css (W1.d). */
+.dark [data-test="upgrade-to-enterprise-btn"] {
+  --color-button-ghost-primary-active-bg: var(--color-primary-900);
+  --color-button-ghost-primary-text: var(--color-primary-200);
+}
+</style>

@@ -15,16 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OPageLayout
     data-test="ai-sessions-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="t('aiObservability.nav.sessions')"
+    :subtitle="t('aiObservability.subtitle.sessions')"
+    icon="forum"
+    bleed
+    :scroll="false"
   >
-    <AppPageHeader
-      :title="t('aiObservability.nav.sessions')"
-      :subtitle="t('aiObservability.subtitle.sessions')"
-      icon="forum"
-      class="px-4 border-b border-border-default"
-    >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -37,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
           data-test="ai-sessions-date-time"
-          class="h-[2rem]"
+          class="h-8"
           @on:date-change="onDateChange"
         />
         <!-- Last-refresh + refresh control (logs-style), consistent with the
              LLM Insights page header. -->
         <div
-          class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
         >
           <ORefreshButton
             :last-run-at="sessionsLastRunAt"
@@ -54,19 +52,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </template>
-    </AppPageHeader>
 
-    <div class="flex-1 min-h-0 overflow-hidden">
-      <SessionsList
-        ref="sessionsRef"
-        :stream-name="streamName"
-        :start-time="timeRange.startTime"
-        :end-time="timeRange.endTime"
-        detail-route-name="aiSessionDetails"
-        class="h-full"
-      />
-    </div>
-  </div>
+    <SessionsList
+      ref="sessionsRef"
+      :stream-name="streamName"
+      :start-time="timeRange.startTime"
+      :end-time="timeRange.endTime"
+      detail-route-name="aiSessionDetails"
+      class="flex-1 min-h-0"
+    />
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -75,7 +70,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import SessionsList from "@/plugins/traces/SessionsList.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {

@@ -81,10 +81,6 @@ describe('MemberSubscription.vue', () => {
           $store: store,
         },
         stubs: {
-                    'q-btn': {
-            template: '<button class="q-btn"><slot /></button>',
-            props: ['label'],
-          },
           'SanitizedHtmlRenderer': {
             template: '<div class="sanitized-html" data-test="sanitized-html">{{ htmlContent }}</div>',
             props: ['htmlContent'],
@@ -127,7 +123,7 @@ describe('MemberSubscription.vue', () => {
       wrapper = createWrapper('#token=test-token-123', true); // Prevent auto processing
       await wrapper.vm.$nextTick();
       
-      expect(wrapper.find('.rounded-md').exists()).toBe(true);
+      expect(wrapper.find('.rounded-default').exists()).toBe(true);
       expect(wrapper.text()).toContain('Member Subscription');
     });
 

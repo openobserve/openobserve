@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     search-data-test="server-list-search-input"
   >
     <div class="w-full h-full">
-      <div class="card-container h-full">
+      <div class="bg-card-glass-bg h-full">
         <div class="overflow-auto h-full pt-0.5">
           <router-view
             :title="tabs"

@@ -110,7 +110,7 @@ export interface InputSlots {
   suffix?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
-   * Provide a `<q-tooltip>` element as the slot content.
+   * Provide a tooltip element as the slot content.
    */
   tooltip?: () => unknown;
   /** Content rendered after the field, outside the border */

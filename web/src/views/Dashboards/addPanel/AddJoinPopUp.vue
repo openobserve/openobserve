@@ -18,7 +18,7 @@
   <div data-test="dashboard-join-pop-up" class="w-156 flex flex-col max-h-[54vh] overflow-hidden">
     <div class="flex justify-between items-center mb-3.75" data-test="dashboard-join-pop-up-header">
       <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-(--q-primary)">
+        <div class="flex items-center gap-2 text-theme-accent">
           <LeftJoinSvg class="h-5.25" />
           <label>{{ t('dashboard.addJoinPopUp.join') }}</label>
         </div>
@@ -31,7 +31,7 @@
         />
       </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-theme-accent">
         <LeftJoinLineSvg class="h-10 w-14.5" />
       </div>
 
@@ -39,7 +39,7 @@
         <label for="joinType">{{ t('dashboard.addJoinPopUp.joinType') }}</label>
         <div class="flex justify-center items-center gap-2">
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
             @click="handleJoinTypeChange('left')"
             :aria-label="t('panel.leftJoin')"
             data-test="dashboard-join-type-left"
@@ -48,7 +48,7 @@
             <div :class="getJoinTypeLabelClass('left')">{{ t('dashboard.addJoinPopUp.left') }}</div>
           </div>
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
             @click="handleJoinTypeChange('inner')"
             :aria-label="t('panel.innerJoin')"
             data-test="dashboard-join-type-inner"
@@ -57,7 +57,7 @@
             <div :class="getJoinTypeLabelClass('inner')">{{ t('dashboard.addJoinPopUp.inner') }}</div>
           </div>
           <div
-            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-(--q-primary) hover:opacity-80"
+            class="flex flex-col items-center cursor-pointer transition-opacity duration-200 text-theme-accent hover:opacity-80"
             @click="handleJoinTypeChange('right')"
             :aria-label="t('panel.rightJoin')"
             data-test="dashboard-join-type-right"
@@ -68,12 +68,12 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-(--q-primary)">
+      <div class="flex items-center gap-2 pt-5.25 px-2.5 text-theme-accent">
         <RightJoinLineSvg class="h-10 w-14.5" />
       </div>
 
       <div class="flex-1 gap-2">
-        <div class="flex items-center gap-2 text-(--q-primary)">
+        <div class="flex items-center gap-2 text-theme-accent">
           <RightJoinSvg class="h-5.25" />
           <label>{{ t('dashboard.addJoinPopUp.on') }}</label>
         </div>
@@ -89,23 +89,19 @@
     </div>
 
     <div class="flex items-center gap-4">
-      <div class="border-t border-gray-200 flex-1"></div>
+      <div class="border-t border-border-default flex-1"></div>
       <div
-        :class="[
-          'py-2 text-center text-xs',
-          store.state.theme === 'dark' ? 'text-white' : 'text-gray-700',
-        ]"
+        class="py-2 text-center text-xs text-text-body"
         v-if="showJoinSummary"
       >
         {{ t('dashboard.addJoinPopUp.performing') }}
         <span
-          class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold"
-          style="background-color: color-mix(in srgb, var(--o2-primary-color) 15%, transparent); color: var(--o2-primary-color);"
+          class="inline-flex items-center rounded-default px-1.5 py-0.5 text-xs font-semibold bg-[color-mix(in_srgb,var(--color-accent)_15%,transparent)] text-accent"
         >{{ joinTypeLabel }} {{ t('dashboard.addJoinPopUp.join') }}</span> {{ t('dashboard.addJoinPopUp.between') }}
         <span class="font-semibold">{{ mainStream }}</span> {{ t('dashboard.addJoinPopUp.and') }}
         <span class="font-semibold">{{ modelValue.stream }}</span>
       </div>
-      <div class="border-t border-gray-200 flex-1"></div>
+      <div class="border-t border-border-default flex-1"></div>
     </div>
 
     <div class="mb-2.5 flex flex-col min-h-0 flex-1">
@@ -123,7 +119,7 @@
       <div
         v-for="(arg, argIndex) in modelValue.conditions"
         :key="argIndex + JSON.stringify(arg)"
-        class="mb-2.5 p-2.5 border border-border-default rounded"
+        class="mb-2.5 p-2.5 border border-border-default rounded-default"
       >
         <div class="mb-2 font-medium">{{ t('dashboard.addJoinPopUp.clause', { number: argIndex + 1 }) }}</div>
         <div class="flex items-center gap-2.5">

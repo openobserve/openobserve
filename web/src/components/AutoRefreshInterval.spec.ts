@@ -40,15 +40,8 @@ describe("AutoRefreshInterval", () => {
       global: {
         plugins: [i18n, mockRouter],
         stubs: {
-          'q-btn-dropdown': {
-            template: '<div class="q-btn-dropdown"><slot /><slot name="label" /></div>'
-          },
           'OIcon': {
             template: '<div class="OIcon"></div>'
-          },
-          'q-btn': {
-            template: '<button @click="$emit(\'click\')" :disabled="disable"><slot /></button>',
-            props: ['disable', 'disabled']
           },
           OButton: {
             template: '<button :data-test="$attrs[\'data-test\']" :disabled="disabled" @click="$emit(\'click\')"><slot /><slot name="label" /></button>',
@@ -63,13 +56,6 @@ describe("AutoRefreshInterval", () => {
           ODropdownSeparator: {
             template: '<hr />',
           },
-
-          'q-tooltip': {
-            template: '<div class="q-tooltip"><slot /></div>'
-          },
-          'q-menu': {
-            template: '<div class="q-menu"><slot /></div>'
-          }
         }
       },
     });

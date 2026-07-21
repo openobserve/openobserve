@@ -91,8 +91,8 @@ const useRoutes = () => {
     },
     {
       path: "/logout",
-      beforeEnter() {
-        // Clear backend auth cookies before redirecting to login (#10900)
+      beforeEnter(to: any, from: any, next: any) {
+        // Clear backend auth cookies before redirecting to login
         invalidateLoginData();
         useLocalCurrentUser("", true);
         useLocalUserInfo("", true);

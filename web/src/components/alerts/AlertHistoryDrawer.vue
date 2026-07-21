@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="alert-history-drawer"
+    bleed
     :open="open"
     :width="65"
     :title="alertDetails?.name"
@@ -35,10 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="alertDetails"
               :class="[
-                'flex items-center gap-1 px-2 py-1 rounded-md border shrink-0',
-                store.state.theme === 'dark'
-                  ? 'bg-gray-800/50 border-gray-600'
-                  : 'bg-gray-50 border-gray-200',
+                'flex items-center gap-1 px-2 py-1 rounded-default border shrink-0',
+                'bg-surface-subtle border-border-default',
               ]"
             >
               <OIcon
@@ -55,9 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 :class="[
                   'text-xs font-semibold',
-                  store.state.theme === 'dark'
-                    ? 'text-gray-200'
-                    : 'text-gray-800',
+                  'text-text-body',
                 ]"
               >
                 {{
@@ -101,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div class="col-auto flex items-center gap-1">
         <DateTime
-          :style="activeTab !== 'history' ? 'visibility: hidden' : ''"
+          :class="activeTab !== 'history' ? 'invisible' : ''"
           ref="dateTimeRef"
           auto-apply
           :default-type="dateTimeType"
@@ -117,13 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Content -->
-    <div class="flex flex-col h-[calc(100vh-4rem)]" v-if="alertDetails">
+    <div class="flex flex-col h-full min-h-0" v-if="alertDetails">
       <!-- Tab Panels -->
       <OTabPanels
         v-model="activeTab"
         animated
-        class="flex-1 overflow-hidden bg-transparent"
-        style="display: flex; flex-direction: column"
+        class="flex-1 overflow-hidden bg-transparent flex flex-col"
       >
         <!-- History Panel -->
         <OTabPanel
@@ -158,11 +154,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
 
               <div
-                class="rounded-lg overflow-hidden border flex flex-col flex-1"
+                class="rounded-default overflow-hidden border flex flex-col flex-1"
                 :class="
-                  store.state.theme === 'dark'
-                    ? 'border-[#374151]'
-                    : 'border-[#e5e7eb] bg-[#f9fafb]'
+                  'border-border-default bg-surface-panel'
                 "
               >
                 <OTable
@@ -183,8 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #[`cell-#`]="{ row }">
                     <span
-                      class="text-[13px] tabular-nums"
-                      :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'"
+                      class="text-compact tabular-nums"
+                      :class="'text-text-secondary'"
                     >
                       {{ row._displayIndex ?? '—' }}
                     </span>
@@ -200,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
                       <OTag type="alertState" value="flapping" class="cursor-pointer shrink-0" @click="toggleFlappingGroup(row.timestamp)" />
-                      <span class="text-[11px] truncate" style="color: var(--color-text-secondary)">
+                      <span class="text-2xs truncate text-text-secondary">
                         {{ row._children.length }} rows · {{ row._duration }}
                       </span>
                     </div>
@@ -216,39 +210,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
 
                   <template #cell-timestamp="{ row }">
-                    <span class="text-[13px] tabular-nums whitespace-nowrap" :class="row._child ? 'pl-5 opacity-70' : ''">
+                    <span class="text-compact tabular-nums whitespace-nowrap" :class="row._child ? 'pl-5 opacity-70' : ''">
                       {{ formatTimestampFull(row.timestamp) }}
                     </span>
                   </template>
 
                   <template #cell-evaluation_time="{ row }">
-                    <span class="text-[13px] tabular-nums">
+                    <span class="text-compact tabular-nums">
                       {{ row.evaluation_took_in_secs ? row.evaluation_took_in_secs.toFixed(3) + "s" : "—" }}
                     </span>
                   </template>
 
                   <template #cell-query_time="{ row }">
-                    <span class="text-[13px] tabular-nums">
+                    <span class="text-compact tabular-nums">
                       {{ row.query_took ? row.query_took + "ms" : "—" }}
                     </span>
                   </template>
 
                   <template #cell-anomaly_count="{ row }">
                     <span
-                      class="text-[13px] tabular-nums"
-                      :class="row.anomaly_count > 0 ? 'text-red-500 font-medium' : ''"
+                      class="text-compact tabular-nums"
+                      :class="row.anomaly_count > 0 ? 'text-status-error-text font-medium' : ''"
                     >
                       {{ row.anomaly_count != null ? row.anomaly_count : "—" }}
                     </span>
                   </template>
 
                   <template #cell-error="{ row }">
-                    <span class="text-[13px]">{{ row.error || "—" }}</span>
+                    <span class="text-compact">{{ row.error || "—" }}</span>
                   </template>
 
                   <template #bottom>
-                    <div class="flex items-center w-full h-[48px]">
-                      <div class="o2-table-footer-title flex items-center w-[220px]">
+                    <div class="flex items-center w-full h-12">
+                      <div class="text-xs font-normal flex items-center w-55">
                         {{ resultTotal }} {{ t("alerts.alertDetails.results") }}
                       </div>
                     </div>
@@ -272,28 +266,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Anomaly detection condition view — mirrors the alert SQL code block -->
             <template v-if="isAnomaly">
               <div
-                class="rounded-lg overflow-hidden border flex flex-col flex-1"
+                class="rounded-default overflow-hidden border flex flex-col flex-1"
                 :class="
-                  store.state.theme === 'dark'
-                    ? 'border-[#374151]'
-                    : 'border-[#e5e7eb] bg-[#f9fafb]'
+                  'border-border-default bg-surface-panel'
                 "
               >
                 <div
                   class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
                   :class="
-                    store.state.theme === 'dark'
-                      ? 'border-[#374151]'
-                      : 'bg-[#f3f4f6] border-[#e5e7eb]'
+                    'bg-surface-subtle border-border-default'
                   "
                 >
                   <div class="flex items-center gap-1.5">
                     <span
-                      class="text-[11px] font-medium"
+                      class="text-2xs font-medium"
                       :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
+                        'text-text-secondary'
                       "
                     >
                       SQL
@@ -311,7 +299,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-[13px] m-0 leading-relaxed flex-1 overflow-y-auto"
+                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-compact m-0 leading-relaxed flex-1 overflow-y-auto"
                   >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
                 >
               </div>
@@ -320,29 +308,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Regular alert condition view -->
             <template v-else>
               <div
-                class="rounded-lg overflow-hidden border flex flex-col flex-1"
+                class="rounded-default overflow-hidden border flex flex-col flex-1"
                 :class="
-                  store.state.theme === 'dark'
-                    ? 'border-[#374151]'
-                    : 'border-[#e5e7eb] bg-[#f9fafb]'
+                  'border-border-default bg-surface-panel'
                 "
               >
                 <!-- Code block header bar — stays fixed -->
                 <div
                   class="flex items-center justify-between py-1.5 px-2.5 border-b shrink-0"
                   :class="
-                    store.state.theme === 'dark'
-                      ? 'border-[#374151]'
-                      : 'bg-[#f3f4f6] border-[#e5e7eb]'
+                    'bg-surface-subtle border-border-default'
                   "
                 >
                   <div class="flex items-center gap-1.5">
                     <span
-                      class="text-[11px] font-medium"
+                      class="text-2xs font-medium"
                       :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
+                        'text-text-secondary'
                       "
                     >
                       {{
@@ -382,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-[13px] m-0 leading-relaxed flex-1 overflow-y-auto"
+                  class="p-[10px_14px] font-mono whitespace-pre-wrap overflow-x-auto text-compact m-0 leading-relaxed flex-1 overflow-y-auto"
                   >{{
                     alertDetails.conditions !== "" &&
                     alertDetails.conditions !== "--"
@@ -401,22 +383,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Description (only show if exists) -->
             <div v-if="alertDetails.description" class="mt-3 shrink-0">
               <div
-                class="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wider mb-1"
+                class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-1"
                 :class="
-                  store.state.theme === 'dark'
-                    ? 'text-gray-400'
-                    : 'text-gray-500'
+                  'text-text-secondary'
                 "
               >
                 <OIcon name="info-outline" size="xs" />
                 {{ t("common.description") }}
               </div>
               <div
-                class="text-[13px] px-3 py-2 rounded leading-relaxed"
+                class="text-compact px-3 py-2 rounded-default leading-relaxed"
                 :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-gray-800 text-gray-300'
-                    : 'bg-gray-50 text-gray-700'
+                  'bg-surface-panel text-text-body'
                 "
               >
                 {{ alertDetails.description }}
@@ -777,15 +755,16 @@ const historyTableColumns = computed(() =>
 
 const getRowClass = (row: any) => {
   if (row?._flappingGroup) {
-    return store.state.theme === "dark" ? "!bg-[#1e1a2e]" : "!bg-[#f5f3ff]";
+    // Violet-tinted highlight for flapping-group rows; token carries the theme.
+    return "!bg-[color-mix(in_srgb,var(--color-sql-accent)_8%,var(--color-surface-base))]";
   }
   if (row?._child) {
-    return store.state.theme === "dark" ? "!bg-[#1a1a1a]" : "!bg-[#fafafa]";
+    return "!bg-surface-subtle";
   }
   const status = row?.status?.toLowerCase();
   const isFiringStatus = status === "firing" || status === "error" || status === "anomaly" || status === "completed";
   if (isFiringStatus) {
-    return store.state.theme === "dark" ? "!bg-[#2d1b1b]" : "!bg-[#fff5f5]";
+    return "!bg-status-error-bg";
   }
   return "";
 };

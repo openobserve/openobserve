@@ -40,15 +40,15 @@ async function copy() {
   <!-- ── Block mode: full-width scrollable pre/code ── -->
   <pre
     v-if="block"
-    class="relative block w-full rounded-md border border-code-border bg-code-block-bg text-code-block-text overflow-x-auto"
+    class="relative block w-full rounded-default border border-code-border bg-code-block-bg text-code-block-text overflow-x-auto"
   ><code
       ref="codeRef"
-      class="block px-3 py-2 text-xs [font-family:var(--font-mono)] leading-relaxed whitespace-pre"
+      class="block px-3 py-2 text-xs font-mono leading-relaxed whitespace-pre"
     ><slot /></code><button
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
-      class="absolute top-2 right-2 rounded p-1 transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
+      class="absolute top-2 right-2 rounded-default p-1 transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400"
       @click.prevent="copy"
     ><OIcon
         :name="copied ? 'check' : 'content-copy'"
@@ -62,9 +62,9 @@ async function copy() {
     ref="codeRef"
     :class="[
       'inline-flex items-center gap-1',
-      'rounded border border-code-border bg-code-bg text-code-text',
+      'rounded-default border border-code-border bg-code-bg text-code-text',
       'px-1 py-px',
-      'text-xs [font-family:var(--font-mono)] leading-none',
+      'text-xs font-mono leading-none',
       truncate ? 'max-w-full truncate' : '',
     ]"
   >
@@ -73,7 +73,7 @@ async function copy() {
       v-if="copyable"
       type="button"
       :aria-label="copied ? 'Copied!' : 'Copy'"
-      class="shrink-0 rounded p-px transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-400"
+      class="shrink-0 rounded-default p-px transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-400"
       @click.prevent="copy"
     >
       <OIcon

@@ -22,11 +22,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="card-container rounded-lg flex flex-col bg-surface-base border border-border-default overflow-hidden"
+    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
     data-test="monitor-status-timeline"
   >
     <div
-      class="flex items-center gap-2 px-[0.875rem] pt-[0.625rem] pb-[0.5rem]"
+      class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
     >
       <span class="font-bold text-xs text-text-heading"> {{ t('synthetics.timeline.title') }} </span>
       <span class="flex-1" />
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
     <div class="border-t border-border-default" />
-    <div class="flex flex-col gap-1 py-2 px-[0.875rem]">
+    <div class="flex flex-col gap-1 py-2 px-3.5">
       <div class="flex items-center gap-1">
         <OButton
           variant="ghost"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
         <div
           ref="scrollRef"
-          class="flex-1 overflow-hidden flex rounded h-[26px] gap-0.5"
+          class="flex-1 overflow-hidden flex rounded-default h-6.5 gap-0.5"
           @scroll="onScroll"
         >
           <div
@@ -82,9 +82,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTooltip side="top" :delay="0" :max-width="'auto'">
               <template #content>
-                <div class="py-0.5 min-w-[200px]">
+                <div class="py-0.5 min-w-50">
                   <div
-                    class="px-1 font-semibold text-text-heading mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
+                    class="px-1 font-semibold text-text-secondary mb-1.5 text-xs flex items-center gap-1.5 flex-wrap border-b pb-1"
                   >
                     <span
                       class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-success-solid-bg)]"
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="flex justify-between text-[10.5px] font-mono tabular-nums text-text-secondary"
+        class="flex justify-between text-3xs font-mono tabular-nums text-text-secondary"
       >
         <span>{{ endLabel }}</span>
         <span>{{ rangeLabel }}</span>

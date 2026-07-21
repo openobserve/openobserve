@@ -265,7 +265,7 @@ describe("ValueMappingPopUp", () => {
 
     it('should render "cancel" icon in the page', () => {
       wrapper = createWrapper();
-      // After q-icon → OIcon migration, "cancel" is the OIcon name prop, not a vm property
+      // After the icon → OIcon migration, "cancel" is the OIcon name prop, not a vm property
       const cancelIcons = wrapper
         .findAllComponents({ name: "OIcon" })
         .filter((i: any) => i.props("name") === "cancel");

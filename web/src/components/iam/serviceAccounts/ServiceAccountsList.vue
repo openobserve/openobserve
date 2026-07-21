@@ -19,15 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 <template>
-  <div class="p-0 h-full flex flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
+  <OPageLayout
       :title="t('serviceAccounts.header')"
       icon="manage-accounts"
-      :subtitle="t('serviceAccounts.headerSubtitle')"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+      :subtitle="t('serviceAccounts.headerSubtitle')" bleed>
       <template #actions>
         <OButton
           data-test="service-accounts-add-btn"
@@ -38,9 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t('serviceAccounts.add') }}
         </OButton>
       </template>
-    </AppPageHeader>
       <div class="w-full flex-1 min-h-0 overflow-hidden">
-        <div class="card-container h-full">
+        <div class="bg-card-glass-bg h-full">
           <OTable
             :frame="false"
             :data="serviceAccountsState.service_accounts_users"
@@ -59,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-global-filter="false"
             filter-mode="client"
             :default-columns="false"
+            show-index
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="iam-service-accounts-list"
@@ -102,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #cell-email="{ row }">
               <template v-if="row.is_system">
-                <span data-test="service-accounts-system-account-label" class="text-weight-medium">{{ row.first_name }}</span>
+                <span data-test="service-accounts-system-account-label" class="font-medium">{{ row.first_name }}</span>
                 <OTag data-test="service-accounts-system-badge" type="serviceAccountKind" value="system" class="ml-2" />
               </template>
               <template v-else-if="isSyntheticSA(row.email)">
@@ -135,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-created_at="{ row }">
               <span
                 :data-test="`service-accounts-created-${row.email}`"
-                class="text-text-primary"
+                class="text-text-body"
               >{{ formatCreatedAt(row.created_at) }}</span>
             </template>
 
@@ -180,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #bottom>
-              <span class="o2-table-footer-title">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
+              <span class="text-xs font-normal">{{ serviceAccountsState.service_accounts_users.length }} {{ t('serviceAccounts.header') }}</span>
               <OButton
                 v-if="selectedAccounts.length > 0"
                 data-test="service-accounts-list-delete-accounts-btn"
@@ -258,17 +253,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OTabPanels v-model="tokenTab" animated>
             <OTabPanel name="curl">
-              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-body p-3 rounded-default text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenCurlSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="header">
-              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-body p-3 rounded-default text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenHeaderSnippet
               }}</pre>
             </OTabPanel>
             <OTabPanel name="env">
-              <pre class="bg-surface-subtle text-text-primary p-3 rounded text-xs overflow-auto whitespace-pre-wrap">{{
+              <pre class="bg-surface-subtle text-text-body p-3 rounded-default text-xs overflow-auto whitespace-pre-wrap">{{
                 tokenEnvSnippet
               }}</pre>
             </OTabPanel>
@@ -321,11 +316,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mt-4"
           >
             <div v-if="grantedRolesText" class="flex items-start gap-2 mb-1">
-              <OIcon name="check" size="sm" class="text-success-500 mt-0.5 shrink-0" />
+              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
               <span class="text-xs text-text-secondary">{{ grantedRolesText }}</span>
             </div>
             <div v-if="grantedGroupsText" class="flex items-start gap-2 mb-1">
-              <OIcon name="check" size="sm" class="text-success-500 mt-0.5 shrink-0" />
+              <OIcon name="check" size="sm" class="text-status-success-text mt-0.5 shrink-0" />
               <span class="text-xs text-text-secondary">{{ grantedGroupsText }}</span>
             </div>
 
@@ -334,11 +329,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-token-access-failed"
               class="flex items-start gap-2 mb-1"
             >
-              <OIcon name="warning" size="sm" class="text-amber-500 mt-0.5 shrink-0" />
+              <OIcon name="warning" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
               <span class="text-xs text-text-secondary">{{ failedRolesText }}</span>
             </div>
             <div v-if="failedGroupsText" class="flex items-start gap-2 mb-1">
-              <OIcon name="warning" size="sm" class="text-amber-500 mt-0.5 shrink-0" />
+              <OIcon name="warning" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
               <span class="text-xs text-text-secondary">{{ failedGroupsText }}</span>
             </div>
             <p v-if="hasAccessFailures" class="text-xs text-text-secondary mt-1">
@@ -355,7 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="showGroupLink"
                   name="warning"
                   size="sm"
-                  class="text-amber-500 mt-0.5"
+                  class="text-status-warning-text mt-0.5"
                 />
                 <span class="text-xs text-text-secondary">{{ tokenNextStepHint }}</span>
               </div>
@@ -364,7 +359,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <router-link
                   data-test="service-accounts-list-token-add-to-role"
                   :to="roleLinkTarget"
-                  class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                  class="group inline-flex items-center gap-1.5 rounded-default border border-border-default px-2.5 py-1.5 text-xs text-text-body transition-colors hover:border-primary hover:bg-primary/5"
                   @click="isShowToken = false"
                 >
                   <OIcon name="shield" size="sm" class="text-primary shrink-0" />
@@ -378,7 +373,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <router-link
                   data-test="service-accounts-list-token-add-to-group"
                   :to="groupLinkTarget"
-                  class="group inline-flex items-center gap-1.5 rounded-md border border-border-default px-2.5 py-1.5 text-xs text-text-primary transition-colors hover:border-primary hover:bg-primary/5"
+                  class="group inline-flex items-center gap-1.5 rounded-default border border-border-default px-2.5 py-1.5 text-xs text-text-body transition-colors hover:border-primary hover:bg-primary/5"
                   @click="isShowToken = false"
                 >
                   <OIcon name="group" size="sm" class="text-primary shrink-0" />
@@ -405,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -414,7 +409,7 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -445,7 +440,7 @@ import {
   getImageURL,
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
@@ -457,7 +452,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 export default defineComponent({
   name: "ServiceAccountsList",
-  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, AppPageHeader, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
+  components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, OPageLayout, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
   emits: [],
   setup() {
     const store = useStore();
@@ -645,15 +640,6 @@ export default defineComponent({
 
     const columns: OTableColumnDef[] = [
       {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        minSize: 32,
-        maxSize: 40,
-        meta: { align: "left", compactPadding: true },
-      },
-      {
         id: "email",
         header: t("serviceAccounts.list.col.identifier"),
         accessorKey: "email",
@@ -742,11 +728,9 @@ export default defineComponent({
           )
           .then((res) => {
             resultTotal.value = res.data.data.length;
-            let counter = 1;
             currentUserRole.value = "";
             serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
               return {
-                "#": counter <= 9 ? `0${counter++}` : counter++,
                 email: data.email,
                 first_name: data.first_name,
                 last_name: data.last_name,
@@ -885,10 +869,6 @@ export default defineComponent({
             store.state.selectedOrganization.identifier == data.organization
           ) {
             const user = {
-              "#":
-              serviceAccountsState.service_accounts_users.length + 1 <= 9
-                  ? `0${serviceAccountsState.service_accounts_users.length + 1}`
-                  : serviceAccountsState.service_accounts_users.length + 1,
               email: data.email,
               first_name: data.first_name,
               last_name: data.last_name,

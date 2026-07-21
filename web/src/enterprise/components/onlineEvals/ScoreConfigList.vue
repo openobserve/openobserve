@@ -79,21 +79,21 @@
         </template>
 
         <template #cell-rangeValues="{ row }">
-          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ rangeOrValues(row) }}</span>
+          <span class="tabular-nums">{{ rangeOrValues(row) }}</span>
         </template>
 
         <template #cell-healthy="{ row }">
-          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs font-semibold">{{ healthyDisplay(row) }}</span>
+          <span class="font-semibold">{{ healthyDisplay(row) }}</span>
         </template>
 
         <template #cell-version="{ row }">
-          <span class="inline-flex items-center gap-1.5 font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">
-            <span class="w-1.5 h-1.5 rounded-full bg-(--color-success-600) inline-block" />v{{ row.version }}
+          <span class="inline-flex items-center gap-1.5 tabular-nums">
+            <span class="w-1.5 h-1.5 rounded-full bg-status-positive inline-block" />v{{ row.version }}
           </span>
         </template>
 
         <template #cell-usedBy="{ row }">
-          <span class="font-[ui-monospace,SFMono-Regular,Menlo,monospace] text-xs">{{ usedByText(row) }}</span>
+          <span class="tabular-nums">{{ usedByText(row) }}</span>
         </template>
 
         <template #cell-created="{ row }">
@@ -101,7 +101,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="o2-table-footer-title">
+          <span class="text-xs font-normal">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scoreConfig.listTitle") }}
           </span>
           <OButton
@@ -385,6 +385,13 @@ function usedByText(row: ScoreConfig) {
 function formatDateShort(value: number) {
   if (!value) return "—";
   return formatDate(value, "YYYY-MM-DD HH:mm:ss");
+}
+
+function dtypeChipClass(dataType: string): string {
+  if (dataType === 'numeric') return 'bg-[color-mix(in_srgb,var(--color-blue-700)_14%,transparent)] text-status-info-text';
+  if (dataType === 'categorical') return 'bg-[color-mix(in_srgb,var(--color-warning-700)_14%,transparent)] text-warning-700';
+  if (dataType === 'boolean') return 'bg-[color-mix(in_srgb,var(--color-success-600)_14%,transparent)] text-status-success-text';
+  return '';
 }
 
 useShortcuts([

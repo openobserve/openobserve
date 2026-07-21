@@ -1,5 +1,5 @@
 <template>
-    <div style="display: flex; flex-direction: row" class="pl-2">
+    <div class="pl-2 flex flex-row">
       <div
         data-test="promql-operations-list-label"
         class="text-sm whitespace-nowrap flex items-center min-w-21.5"
@@ -24,7 +24,7 @@
                 <OButton
                   variant="outline"
                   size="icon-chip"
-                  class="drag-handle cursor-grab"
+                  class="drag-handle cursor-grab active:cursor-grabbing"
                   :data-test="`promql-operation-drag-${index}`"
                 >
                   <template #icon-left>
@@ -37,7 +37,7 @@
                     <OButton
                       variant="primary"
                       size="chip"
-                      class="!text-[12px]"
+                      class="!text-xs"
                       :no-wrap="true"
                       :data-test="`promql-operation-${index}`"
                     >
@@ -48,14 +48,17 @@
                     </OButton>
                   </template>
                   <div
-                    class="operations-list-dropdown p-4 shadow-[0px_3px_15px_rgba(0,0,0,0.1)] translate-y-2 rounded-none"
+                    class="operations-list-dropdown p-3"
                     :data-test="`promql-operation-${index}-menu`"
                   >
-                    <div style="width: 350px">
-                      <div class="text-weight-medium">
+                    <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
+                      <div class="font-medium">
                         {{ getStepSpec(element.id)?.name || element.id }}
                       </div>
-                      <div class="text-xs text-gray-400">
+                      <div
+                        v-if="getStepSpec(element.id)?.documentation"
+                        class="text-xs text-text-secondary mb-2"
+                      >
                         {{ getStepSpec(element.id)?.documentation }}
                       </div>
 
@@ -72,7 +75,7 @@
                           v-model.number="element.params[paramIndex] as number"
                           type="number"
                           :label="param.name"
-                          class="showLabelOnTop mb-2"
+                          class="showLabelOnTop mb-1.5"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -82,7 +85,7 @@
                           v-model="element.params[paramIndex] as string"
                           :label="param.name"
                           :placeholder="param.placeholder"
-                          class="showLabelOnTop mb-2"
+                          class="showLabelOnTop mb-1.5"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         />
 
@@ -94,7 +97,7 @@
                           :label="param.name"
                           multiple
                           searchable
-                          class="operation-label-selector showLabelOnTop no-case mb-2"
+                          class="operation-label-selector showLabelOnTop no-case mb-1.5"
                           :data-test="`promql-operation-param-${paramIndex}`"
                         >
                           <template #empty>
@@ -143,8 +146,8 @@
         clearable
       />
 
-      <div style="max-height: 400px; overflow-y: auto">
-        <div class="border border-border rounded-md divide-y divide-border">
+      <div class="overflow-y-auto" style="max-height: 400px">
+        <div class="border border-border rounded-default divide-y divide-border">
           <div
             v-for="category in categories"
             :key="category"
@@ -292,21 +295,3 @@ defineExpose({
   availableLabels,
 });
 </script>
-
-<style>
-/* Deep override — must stay in CSS */
-:deep(
-  .operation-label-selector.q-field--labeled.showLabelOnTop.q-select
-    .q-field__control-container
-    .q-field__native
-    > :first-child
-) {
-  text-transform: none;
-  max-width: 75% !important;
-}
-
-/* drag-handle :active state — compound pseudo-class selector, keep in CSS */
-.drag-handle:active {
-  cursor: grabbing;
-}
-</style>

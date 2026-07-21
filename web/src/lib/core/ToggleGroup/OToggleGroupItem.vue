@@ -3,11 +3,17 @@ import type {
   ToggleGroupItemProps,
   ToggleGroupItemSlots,
 } from "./OToggleGroup.types";
+import { ToggleGroupAnimatedKey } from "./OToggleGroup.types";
 import { ToggleGroupItem } from "reka-ui";
+import { computed, inject } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 defineOptions({ inheritAttrs: false });
+
+// Opt-in from the parent OToggleGroup: when set, the active item runs the sheen.
+const animatedSelection = inject(ToggleGroupAnimatedKey, undefined);
+const isAnimated = computed(() => Boolean(animatedSelection?.value));
 
 const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
   disabled: false,
@@ -50,15 +56,19 @@ const iconSize: Record<
         sizeClasses[props.size],
         // Base state - inactive (transparent on track)
         'bg-toggle-item-bg text-toggle-item-text font-medium whitespace-nowrap',
-        'rounded-md',
+        'rounded-default',
         'transition-all duration-150',
         'outline-none cursor-pointer',
-        // Hover (inactive only)
-        'hover:bg-toggle-item-hover-bg',
-        // Active / pressed state (data-state=on) — white chip with shadow
-        'data-[state=on]:bg-toggle-item-active-bg',
+        // Hover (inactive only) — scoped to data-state=off so hovering the
+        // active item never repaints over the sliding indicator / active fill.
+        'data-[state=off]:hover:bg-toggle-item-hover-bg',
+        // Active fill: normally painted per-item. When the group animates the
+        // selection (opt-in), a single sliding indicator paints the fill instead,
+        // so suppress the per-item background and just keep the active text colour.
+        !isAnimated && 'data-[state=on]:bg-toggle-item-active-bg',
         'data-[state=on]:text-toggle-item-active-text',
-        'data-[state=on]:shadow-sm',
+        // Sit above the sliding indicator so the icon/label stay readable.
+        isAnimated && 'relative z-10',
         // Focus ring
         'focus-visible:ring-2 focus-visible:ring-toggle-focus-ring focus-visible:ring-inset',
         // Disabled — cursor is on the wrapper span; pointer-events-none prevents hover/active styles

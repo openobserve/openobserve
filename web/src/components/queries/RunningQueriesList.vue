@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      show-index
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="settings-query-management"
@@ -127,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     <ODrawer
+      bleed
       v-model:open="showListSchemaDialog"
       size="lg"
       data-test="list-schema-dialog"
@@ -153,7 +155,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
@@ -211,7 +213,6 @@ export default defineComponent({
     };
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       {
         id: "user_id",
         header: t("user.email"),
@@ -355,8 +356,8 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Deep override for empty-state image spacing — must stay in CSS */
+<style scoped>
+/* keep(lib-override): empty-state image spacing (child EmptyState DOM) */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
 }

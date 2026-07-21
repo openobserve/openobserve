@@ -16,14 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="p-0 pt-1 overflow-hidden h-full flex flex-col">
-    <!-- Standard page header: title + icon. Usage date / data-type controls live
-         in the toolbar row below. -->
-    <AppPageHeader
-      :title="headerBasedOnRoute()"
-      icon="paid"
-      class="shrink-0 px-4 border-b border-border-default"
-    >
+  <OPageLayout
+    :title="headerBasedOnRoute()"
+    icon="paid"
+    bleed
+  >
       <template #actions>
         <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
           <OButton
@@ -37,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
       </template>
-    </AppPageHeader>
     <OSplitter
       v-model="splitterModel"
       unit="px"
@@ -46,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex-1 min-h-0"
     >
       <template v-slot:before>
-        <div class="w-full h-full pl-[0.625rem] pt-2 pb-[0.625rem]">
+        <div class="w-full h-full pl-2.5 pt-2 pb-2.5">
           <div class="overflow-y-auto h-full">
             <OTabs
               v-model="billingtab"
@@ -131,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="selectUsageDate"
-                class="p-0 mx-0 h-[40px] mt-1"
+                class="p-0 mx-0 h-10 mt-1"
               >
                 <template v-slot:prepend>
                   <OIcon name="schedule" size="xs" class="mr-2 mt-1" @click.stop.prevent />
@@ -148,15 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @hide="onRangeChange"
             />
             <div class="flex items-center">
-              <div class="app-tabs-container h-[36px]">
+              <div class="app-tabs-container h-9">
                 <AppTabs class="tabs-selection-container" :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
               </div>
             </div>
           </div>
-          <div class="flex-1 min-h-0 pr-[0.625rem] pb-[0.625rem] flex gap-[0.625rem]">
+          <div class="flex-1 min-h-0 pr-2.5 pb-2.5 flex gap-2.5">
             <div
               v-if="isUsageRoute && billingMembers.length > 0"
-              class="w-[260px] shrink-0 h-full"
+              class="w-65 shrink-0 h-full"
               data-test="usage-member-list"
             >
               <UsageMemberList
@@ -171,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -188,7 +184,7 @@ import config from "@/aws-exports";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import BillingService from "@/services/billings";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -200,7 +196,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    AppPageHeader, OTabs, ORouteTab, AppTabs, OSelect,
+    OPageLayout, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
     OIcon, OSplitter, OButton, UsageMemberList, DateTimePickerDashboard },
   setup() {
     const { t } = useI18n();

@@ -165,7 +165,7 @@ const i18n = createI18n({
 });
 
 // ---------------------------------------------------------------------------
-// ODrawer stub — replaces the migrated dialog-mode overlay (q-dialog -> ODrawer).
+// ODrawer stub — the dialog-mode overlay.
 // Renders header/default/footer slots and exposes migrated props/emits so we
 // can assert wiring without going through the real Reka portal/teleport.
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ const ODrawerStub = {
 };
 
 // ---------------------------------------------------------------------------
-// ODialog stub — replaces the metric selector dialog (q-dialog -> ODialog).
+// ODialog stub — the metric selector dialog.
 // ---------------------------------------------------------------------------
 const ODialogStub = {
   name: "ODialog",
@@ -792,7 +792,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Dialog-mode ODrawer wiring (replaces previous q-dialog)
+  // Dialog-mode ODrawer wiring
   // -------------------------------------------------------------------------
   describe("ODrawer wiring (dialog mode)", () => {
     it("should render an ODrawer when mode is dialog", () => {
@@ -870,7 +870,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Metric selector ODialog wiring (replaces previous q-dialog)
+  // Metric selector ODialog wiring
   // -------------------------------------------------------------------------
   describe("ODialog wiring (metric selector)", () => {
     it("should render an ODialog stub for the metric selector", () => {

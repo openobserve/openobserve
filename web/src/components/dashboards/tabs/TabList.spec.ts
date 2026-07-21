@@ -79,9 +79,6 @@ describe("TabList", () => {
           selectedTabId: selectedTabIdRef,
         },
         stubs: {
-          "q-tooltip": {
-            template: "<span data-test='tooltip-wrapper'><slot /></span>",
-          },
           "OIcon": {
             template: "<span data-test='OIcon'></span>",
           },
@@ -226,12 +223,14 @@ describe("TabList", () => {
       wrapper = createWrapper();
 
       const tabNames = wrapper.findAll('[data-test$="-name"]');
+      expect(tabNames.length).toBeGreaterThan(0);
       tabNames.forEach((tabName) => {
-        const style = tabName.attributes("style");
-        expect(style).toContain("white-space: nowrap");
-        expect(style).toContain("overflow: hidden");
-        expect(style).toContain("text-overflow: ellipsis");
-        expect(style).toContain("width: 100%");
+        // The inline truncation style is now a set of utilities.
+        const classes = tabName.classes();
+        expect(classes).toContain("whitespace-nowrap");
+        expect(classes).toContain("overflow-hidden");
+        expect(classes).toContain("text-ellipsis");
+        expect(classes).toContain("w-full");
       });
     });
   });
@@ -450,9 +449,6 @@ describe("TabList", () => {
             selectedTabId: customSelectedTabIdRef,
           },
           stubs: {
-            "q-tooltip": {
-              template: "<span data-test='tooltip-wrapper'><slot /></span>",
-            },
             "OIcon": {
               template: "<span data-test='OIcon'></span>",
             },
@@ -533,14 +529,17 @@ describe("TabList", () => {
       wrapper = createWrapper();
 
       const container = wrapper.find('[data-test="dashboard-tab-list-container"]');
-      expect(container.attributes("style")).toContain("display: flex");
+      // Was inline `display: flex`; now the `flex` utility.
+      expect(container.classes()).toContain("flex");
+      expect(container.classes()).toContain("items-center");
     });
 
     it("should apply correct styling to tabs", () => {
       wrapper = createWrapper();
 
       const oTabs = wrapper.find('[data-test="dashboard-tab-list"]');
-      expect(oTabs.attributes("style")).toContain("max-width: calc(100% - 40px)");
+      // Was inline `max-width: calc(100% - 40px)`; the 40px is now 2.5rem.
+      expect(oTabs.classes()).toContain("max-w-[calc(100%_-_2.5rem)]");
     });
   });
 

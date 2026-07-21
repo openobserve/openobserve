@@ -15,22 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-query-config w-full min-w-0 h-full overflow-auto mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content rounded-lg min-h-full w-full min-w-0 overflow-hidden box-border bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]">
+  <div class="step-query-config w-full min-w-0 h-full overflow-auto mx-auto">
+    <div class="step-content rounded-default min-h-full w-full min-w-0 overflow-hidden box-border bg-surface-overlay border border-border-default">
       <!-- Section header -->
-      <div class="section-header flex items-center gap-0 py-2.5 px-3"
-        :class="store.state.theme === 'dark'
-          ? 'border-b border-[#343434]'
-          : 'border-b border-[#eeeeee]'">
-        <div class="section-header-accent w-0.75 h-4 rounded-sm mr-2 shrink-0 bg-[var(--q-primary)]" />
-        <span class="section-header-title text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]">{{ t('alerts.queryConfig.sectionTitle') }}</span>
+      <div class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default">
+        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+        <span class="section-header-title text-compact font-semibold tracking-[0.01em] text-text-heading">{{ t('alerts.queryConfig.sectionTitle') }}</span>
       </div>
-      <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE
-           <OForm> and provides FORM_CONTEXT_KEY. The OForm* fields below bind by
-           nested `name=` (trigger_condition.*, query_condition.*, logGroupBy[])
-           into that form; the composed schema in AddAlert.schema.ts (which
-           reuses makeQueryConfigSchema) validates them on save. Non-form widgets
-           (tabs / editors / VRL / FilterGroup) live inside and are bridged. -->
+      <!-- Descendant step: the AddAlert orchestrator owns the ONE <OForm> and
+           provides FORM_CONTEXT_KEY. The OForm* fields below bind by nested
+           `name=` (trigger_condition.*, query_condition.*, logGroupBy[]) into that
+           form; the composed schema in AddAlert.schema.ts validates them on save.
+           Non-form widgets (tabs / editors / VRL / FilterGroup) are bridged. -->
       <div class="px-3 py-2 min-w-0 w-full box-border">
       <!-- Query Mode Tabs (hidden for real-time alerts) -->
       <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
@@ -77,10 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- LOGS/TRACES -->
             <template v-if="isEventBased">
               <!-- Alert if row -->
-              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-if-row-logs">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
+              <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact" data-test="alert-if-row-logs">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
                 <div class="flex flex-nowrap items-start gap-2">
-                  <div class="min-w-[130px] max-w-[180px]">
+                  <div class="min-w-32.5 max-w-45">
                     <OSelect
                       v-model="selectedFunction"
                       :options="logFunctionOptions"
@@ -92,13 +88,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <!-- "of [field]" shown for measure modes -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionOf') }}</span>
+                    <span class="font-semibold text-text-secondary text-compact whitespace-nowrap leading-8.5">{{ t('alerts.conditionOf') }}</span>
                     <OFormSelect
                       name="query_condition.aggregation.having.column"
                       :options="numericColumns"
                       searchable
                       :placeholder="t('alerts.placeholders.selectColumn')"
-                      :class="['min-w-[140px] max-w-[200px]']"
+                      :class="['min-w-35 max-w-50']"
                       @update:model-value="onLogMeasureColumnChange($event)"
                     />
                   </template>
@@ -108,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormSelect
                       name="trigger_condition.operator"
                       :options="numericOperators"
-                      class="min-w-[70px] max-w-[120px]"
+                      class="min-w-17.5 max-w-30"
                       data-test="alert-trigger-operator-select"
                       :searchable="false"
                       @update:model-value="onTriggerOperatorChange"
@@ -134,17 +130,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ thresholdError }}
                       </div>
                     </div>
-                    <span v-if="streamName" class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
+                    <span v-if="streamName" class="font-semibold text-text-secondary text-compact whitespace-nowrap leading-8.5">{{ t('alerts.matchingTypeFound', { type: streamType === 'traces' ? 'traces' : 'logs' }) }}</span>
                   </template>
 
                   <!-- MEASURE mode -->
                   <template v-else>
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionIs') }}</span>
+                    <span class="font-semibold text-text-secondary text-compact whitespace-nowrap leading-8.5">{{ t('alerts.conditionIs') }}</span>
                     <OFormSelect
                       name="query_condition.aggregation.having.operator"
                       :options="numericOperators"
                       :searchable="false"
-                      class="min-w-[70px] max-w-[120px]"
+                      class="min-w-17.5 max-w-30"
                       data-test="alert-condition-operator-select"
                       @update:model-value="onConditionOperatorChange"
                     />
@@ -172,8 +168,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row (hidden for count mode) -->
-              <div v-if="selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-group-by-row">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-default text-compact" data-test="alert-group-by-row">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -188,14 +184,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        style="min-width: 120px; max-width: 180px;"
                         :data-test="`alert-group-by-select-${index}`"
                         @update:model-value="onLogGroupByChange"
                       />
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="text-gray-400 hover:text-red-500"
+                        class="text-icon-color hover:text-status-error-text"
                         @click="deleteLogGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -215,8 +210,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]" data-test="alert-having-groups-row">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">
+              <div v-if="selectedFunction !== 'total_events' && hasLogGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-default text-compact" data-test="alert-having-groups-row">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -225,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="trigger_condition.operator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="min-w-[70px] max-w-[120px]"
+                    class="min-w-17.5 max-w-30"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <!-- Message hangs under the threshold field it describes. -->
@@ -255,10 +250,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- METRICS -->
             <template v-else>
               <!-- Alert if row -->
-              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
+              <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">{{ t('alerts.threshold') }}*</span>
                 <div class="flex flex-nowrap items-start gap-2">
-                  <div class="min-w-[130px] max-w-[180px]">
+                  <div class="min-w-32.5 max-w-45">
                     <OSelect
                       v-model="selectedFunction"
                       :options="logFunctionOptions"
@@ -271,8 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- "of [field]" hidden for count mode -->
                   <template v-if="selectedFunction !== 'total_events'">
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionOf') }}</span>
-                    <div style="position: relative; display: inline-flex;">
+                    <span class="font-semibold text-text-secondary text-compact whitespace-nowrap leading-8.5">{{ t('alerts.conditionOf') }}</span>
+                    <div class="relative inline-flex">
                       <OFormSelect
                         name="query_condition.aggregation.having.column"
                         :options="columns"
@@ -281,11 +276,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :readonly="inputData.aggregation?.having?.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         :disable="inputData.aggregation?.having?.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')"
                         @update:model-value="onLogMeasureColumnChange($event)"
-                        style="min-width: 140px; max-width: 200px;"
+                        class="min-w-35 max-w-50"
                       />
                       <OTooltip v-if="inputData.aggregation?.having?.column === 'value' && columns.some((c: any) => (typeof c === 'string' ? c : c.value) === 'value')" :content="t('alerts.metricsValueFieldTooltip')" :delay="300" side="bottom" />
                     </div>
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.conditionIs') }}</span>
+                    <span class="font-semibold text-text-secondary text-compact whitespace-nowrap leading-8.5">{{ t('alerts.conditionIs') }}</span>
                   </template>
 
                   <!-- Count mode for metrics -->
@@ -294,7 +289,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="trigger_condition.operator"
                       :options="numericOperators"
                       :searchable="false"
-                      style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onTriggerOperatorChange"
                     />
                     <!-- Message hangs under the threshold field it describes. -->
@@ -315,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ thresholdError }}
                       </div>
                     </div>
-                    <span class="condition-text font-semibold text-[13px] whitespace-nowrap leading-8.5">{{ t('alerts.matchingMetricsFound') }}</span>
+                    <span class="font-semibold text-text-secondary text-compact whitespace-nowrap leading-8.5">{{ t('alerts.matchingMetricsFound') }}</span>
                   </template>
 
                   <!-- Measure mode for metrics -->
@@ -324,7 +318,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="query_condition.aggregation.having.operator"
                       :options="numericOperators"
                       :searchable="false"
-                      style="min-width: 70px; max-width: 120px;"
                       @update:model-value="onConditionOperatorChange"
                     />
                     <!-- Message hangs under the value field it describes. -->
@@ -351,8 +344,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- group by row — hidden for count mode -->
-              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0">
+              <div v-if="inputData.aggregation && selectedFunction !== 'total_events'" class="flex items-center gap-3 py-2 px-3 rounded-default text-compact">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0">
                   {{ t('alerts.groupBy') }}
                   <OTooltip :content="t('alerts.queryConfig.groupByTooltip')" :delay="300" side="top" />
                 </span>
@@ -367,13 +360,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :options="columns"
                         searchable
                         :placeholder="t('alerts.placeholders.selectColumn')"
-                        style="min-width: 120px; max-width: 180px;"
+                        class="min-w-30 max-w-45"
                         @update:model-value="syncMetricGroupByToProps"
                       />
                       <OButton
                         variant="ghost"
                         size="icon-circle-sm"
-                        class="text-gray-400 hover:text-red-500"
+                        class="text-icon-color hover:text-status-error-text"
                         @click="deleteGroupByColumn(index)"
                       >
                         <OIcon name="close" size="sm" />
@@ -392,8 +385,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- no. of groups row — visible only when group-by fields are added -->
-              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0 leading-8.5">
+              <div v-if="selectedFunction !== 'total_events' && hasMetricGroupByFields" class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-8.5">
                   {{ t('alerts.queryConfig.havingGroups') }}
                   <OTooltip :content="t('alerts.queryConfig.havingGroupsTooltip')" :delay="300" side="top" />
                 </span>
@@ -402,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="trigger_condition.operator"
                     :options="numericOperators"
                     :searchable="false"
-                    class="min-w-[70px] max-w-[120px]"
+                    class="min-w-17.5 max-w-30"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <!-- Message hangs under the threshold field it describes. -->
@@ -431,8 +424,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Check every row -->
             <div class="flex items-start
-             gap-3 py-2 px-3 rounded-md text-[13px]">
-              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[90px] shrink-0" style="line-height: 28px;">
+             gap-3 py-2 px-3 rounded-default text-compact">
+              <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-22.5 shrink-0 leading-7">
                 {{ t('alerts.queryConfig.checkEvery') }} *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -443,7 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       name="_ui.checkEvery"
                       type="number"
-                      style="min-width: 100px; max-width: 100px;"
+                      class="min-w-25 max-w-25"
                       min="1"
                       @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
@@ -458,31 +451,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       name="trigger_condition.cron"
                       :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
-                      style="min-width: 100px; max-width: 100px;"
+                      class="min-w-25 max-w-25"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
 
                   <!-- Unit dropdown: minutes / hours / cron -->
-                  <OSelect
+                  <OSelect class="min-w-20 max-w-25"
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
 
                   <!-- Timezone (only for cron, inline) -->
                   <template v-if="frequencyMode === 'cron'">
-                    <span class="inline-block" style="min-width: 150px; max-width: 150px;">
+                    <span class="inline-block min-w-37.5 max-w-37.5">
                       <OFormSelect
                         name="trigger_condition.timezone"
                         :options="filteredTimezones"
                         searchable
                         :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                        style="min-width: 150px; max-width: 150px;"
+                        class="min-w-37.5 max-w-37.5"
                         @update:model-value="onCronTimezoneChange"
                       />
                       <OTooltip
@@ -494,42 +486,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                   </template>
 
-                  <span class="condition-text font-semibold text-[13px] whitespace-nowrap">{{ t('alerts.queryConfig.onThese') }}</span>
+                  <span class="font-semibold text-text-secondary text-compact whitespace-nowrap">{{ t('alerts.queryConfig.onThese') }}</span>
                   <div
-                    class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-md transition-colors bg-surface-panel hover:bg-primary-50"
+                    class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-default transition-colors bg-surface-panel hover:bg-primary-50"
                     @click="toggleFilters"
                   >
                     <OIcon
                       name="filter-alt"
                       size="xs"
                       :class="filterCount > 0
-                        ? 'text-[var(--q-primary)]'
-                        : (store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500')"
+                        ? 'text-theme-accent'
+                        : ('text-text-secondary')"
                     />
                     <span class="text-xs font-semibold"
                           :class="filterCount > 0
-                            ? 'text-[var(--q-primary)]'
-                            : (store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-600')">
+                            ? 'text-theme-accent'
+                            : ('text-text-body')">
                       {{ t('alerts.queryConfig.filters') }}
                     </span>
                     <span v-if="filterCount > 0"
-                          class="text-[11px] px-1.5 py-0 rounded-full font-bold leading-5"
-                          :class="store.state.theme === 'dark' ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-700'">
+                          class="text-2xs px-1.5 py-0 rounded-full font-bold leading-5"
+                          :class="'bg-status-info-bg text-status-info-text'">
                       {{ filterCount }}
                     </span>
                     <OIcon
                       :name="showFilters ? 'expand-more' : 'chevron-right'"
                       size="sm"
-                      :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                      :class="'text-text-secondary'"
                     />
                     <!-- Review your SQL query hint -->
                     <span v-if="generatedSqlQuery && !showFilters"
-                          class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
-                          :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'">
+                          class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-2"
+                          :class="'text-text-secondary'">
                       {{ t('alerts.queryConfig.viewAlertQuery') }}
                       <OTooltip :delay="200" side="bottom">
                         <template #content>
-                          <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded" v-html="highlightedSqlQuery" />
+                          <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded-default" v-html="highlightedSqlQuery" />
                         </template>
                       </OTooltip>
                     </span>
@@ -545,11 +537,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ checkEveryError }}
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-[11px] ml-0 italic"
-                     :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-2xs ml-0 italic"
+                     :class="'text-text-secondary'">
                   {{ cronDescription }}
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronError" class="text-red-500 text-[11px] ml-0">
+                <div v-if="frequencyMode === 'cron' && cronError" class="text-status-error-text text-2xs ml-0">
                   {{ cronError }}
                 </div>
               </div>
@@ -580,40 +572,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else class="mb-1 px-3">
             <div class="flex items-center gap-2 py-1">
               <div
-                class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-md transition-colors bg-surface-panel hover:bg-primary-50"
+                class="flex items-center gap-1 cursor-pointer select-none filters-inline-toggle px-2 py-0.5 rounded-default transition-colors bg-surface-panel hover:bg-primary-50"
                 @click="toggleFilters"
               >
                 <OIcon
                   name="filter-alt"
                   size="xs"
                   :class="filterCount > 0
-                    ? 'text-[var(--q-primary)]'
-                    : (store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500')"
+                    ? 'text-theme-accent'
+                    : ('text-text-secondary')"
                 />
                 <span class="text-xs font-semibold"
                       :class="filterCount > 0
-                        ? 'text-[var(--q-primary)]'
-                        : (store.state.theme === 'dark' ? 'text-gray-300' : 'text-gray-600')">
+                        ? 'text-theme-accent'
+                        : ('text-text-body')">
                   {{ t('alerts.queryConfig.filters') }}
                 </span>
                 <span v-if="filterCount > 0"
-                      class="text-[11px] px-1.5 py-0 rounded-full font-bold leading-5"
-                      :class="store.state.theme === 'dark' ? 'bg-blue-800 text-blue-200' : 'bg-blue-100 text-blue-700'">
+                      class="text-2xs px-1.5 py-0 rounded-full font-bold leading-5"
+                      :class="'bg-status-info-bg text-status-info-text'">
                   {{ filterCount }}
                 </span>
                 <OIcon
                   :name="showFilters ? 'expand-more' : 'chevron-right'"
                   size="sm"
-                  :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'"
+                  :class="'text-text-secondary'"
                 />
                 <!-- Review your SQL query hint -->
                 <span v-if="generatedSqlQuery && !showFilters"
-                      class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[2px]"
-                      :class="store.state.theme === 'dark' ? 'text-gray-500' : 'text-gray-400'">
+                      class="text-xs italic ml-1 whitespace-nowrap cursor-help underline decoration-dotted underline-offset-2"
+                      :class="'text-text-secondary'">
                   {{ t('alerts.queryConfig.viewAlertQuery') }}
                   <OTooltip :delay="200" side="bottom">
                     <template #content>
-                      <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded" v-html="highlightedSqlQuery" />
+                      <pre class="hljs text-xs m-0 whitespace-pre-wrap font-mono p-2 rounded-default" v-html="highlightedSqlQuery" />
                     </template>
                   </OTooltip>
                 </span>
@@ -645,16 +637,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-full flex flex-col gap-2 overflow-hidden">
 
           <!-- Editor area — position:relative shell owns the size; inner absolute never leaks -->
-          <div style="position: relative; height: 320px;">
-            <div style="position: absolute; inset: 0; display: flex; overflow: hidden;">
+          <div class="relative h-80">
+            <div class="absolute inset-0 flex overflow-hidden">
 
               <!-- SQL/PromQL pane — with its own header -->
-              <div style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;"
-                :style="{ width: showVrl && localTab === 'sql' ? '50%' : '100%' }">
+              <div class="flex flex-col shrink-0 overflow-hidden"
+                :class="showVrl && localTab === 'sql' ? 'w-1/2' : 'w-full'">
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
-                  :class="store.state.theme === 'dark' ? 'bg-white/4 border-b border-[#2d3748]' : 'bg-gray-100 border-b border-[#e5e7eb]'">
+                  :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
-                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--q-primary)" />
+                    <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-theme-accent" />
                     <span class="text-xs font-semibold">{{ localTab === 'sql' ? t('alerts.sqlEditor') : t('alerts.promqlEditor') }}</span>
                   </div>
                   <!-- fx toggle shown here only when VRL is not yet enabled -->
@@ -665,8 +657,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip :content="t('alerts.queryConfig.showVrlEditor')" :delay="300" />
                   </OSwitch>
                 </div>
-                <div style="position: relative; flex: 1; min-height: 0;">
-                  <div style="position: absolute; inset: 0;">
+                <div class="relative flex-1 min-h-0">
+                  <div class="absolute inset-0">
                     <UnifiedQueryEditor
                       ref="inlineQueryEditorRef"
                       data-test-prefix="alert-inline-sql"
@@ -684,7 +676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
-                    class="query-editor-placeholder-overlay"
+                    class="query-editor-placeholder-overlay absolute inset-0 flex items-start pt-0.75 pl-[2.15rem] pr-2 pointer-events-none z-1 select-none"
                   >
                     <span class="query-editor-placeholder-typewriter">{{ inlineEditorPlaceholder }}</span>
                   </div>
@@ -692,23 +684,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- VRL pane — with its own header, side-by-side with SQL pane -->
-              <div v-if="showVrl && localTab === 'sql'"
-                style="display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden; width: 50%;"
-                :style="{ borderLeft: store.state.theme === 'dark' ? '1px solid #2d3748' : '1px solid #e5e7eb' }">
+              <div class="flex flex-col shrink-0 overflow-hidden w-1/2 border-l border-border-default" v-if="showVrl && localTab === 'sql'">
                 <div class="flex items-center justify-between shrink-0 h-9 px-2.5"
-                  :class="store.state.theme === 'dark' ? 'bg-white/4 border-b border-[#2d3748]' : 'bg-gray-100 border-b border-[#e5e7eb]'">
+                  :class="'bg-surface-subtle border-b border-border-default'">
                   <div class="flex items-center gap-2">
-                    <div class="w-0.75 h-3.5 rounded-sm shrink-0 bg-(--q-secondary)" />
+                    <div class="w-0.75 h-3.5 rounded-default shrink-0 bg-section-accent-secondary" />
                     <span class="text-xs font-semibold">{{ t('alerts.queryConfig.vrlEditor') }}</span>
                   </div>
                   <div class="flex items-center gap-1">
-                    <OSelect
+                    <OSelect class="w-32.5!"
                       v-model="selectedSavedFunctionName"
                       :options="functionsList"
                       labelKey="name"
                       valueKey="name"
                       clearable
-                      style="width: 130px;"
                       :placeholder="t('alerts.placeholders.savedFunctions')"
                       @update:model-value="(name: any) => { const fn = functionsList.find((f: any) => f.name === name); if (fn) vrlFunctionContent = fn.function || fn.body || ''; }"
                     >
@@ -721,8 +710,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OSwitch>
                   </div>
                 </div>
-                <div style="position: relative; flex: 1; min-height: 0;">
-                  <div style="position: absolute; inset: 0;">
+                <div class="relative flex-1 min-h-0">
+                  <div class="absolute inset-0">
                     <UnifiedQueryEditor
                       data-test-prefix="alert-inline-vrl"
                       :languages="['vrl']"
@@ -737,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!vrlFunctionContent && vrlEditorPlaceholderFlag"
-                      class="query-editor-placeholder-overlay"
+                      class="query-editor-placeholder-overlay absolute inset-0 flex items-start pt-0.75 pl-[2.15rem] pr-2 pointer-events-none z-1 select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
                     </div>
@@ -751,21 +740,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Status bar — outside overflow:hidden so borders render correctly -->
           <div
             v-if="localTab !== 'promql'"
-            class="inline-sql-status-bar relative h-[22px] shrink-0 text-[13px] font-medium cursor-default"
-            :class="[inlineStatusState, store.state.theme === 'dark' ? 'sql-status-bar--dark' : 'sql-status-bar--light']"
+            class="relative h-5.5 shrink-0 text-compact font-medium border-x border-b border-border-default rounded-b-default"
+            :class="inlineStatusBarClass"
           >
-            <div class="sql-status-bar__inner">
+            <div class="absolute inset-0 flex items-center gap-1.25 px-2.5 overflow-hidden">
               <template v-if="inlineStatusState === 'sql-status-bar--error'">
-                <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
-                <span class="sql-status-bar__msg">{{ sqlQueryErrorMsg }}</span>
-                <OTooltip side="top" style="font-size:11px;white-space:pre-wrap;word-break:break-word;">{{ sqlQueryErrorMsg }}</OTooltip>
+                <OIcon class="shrink-0" name="error-outline" size="xs" />
+                <span class="truncate min-w-0 flex-1">{{ sqlQueryErrorMsg }}</span>
+                <OTooltip side="top">{{ sqlQueryErrorMsg }}</OTooltip>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--hint'">
-                <OIcon name="edit" size="xs" style="flex-shrink:0;opacity:0.6;" />
+                <OIcon class="shrink-0 opacity-60" name="edit" size="xs" />
                 <span>{{ t('alerts.queryConfig.writeQueryHint') }}</span>
               </template>
               <template v-else-if="inlineStatusState === 'sql-status-bar--idle'">
-                <OIcon name="check-circle-outline" size="xs" style="flex-shrink:0;opacity:0.7;" />
+                <OIcon class="shrink-0 opacity-70" name="check-circle-outline" size="xs" />
                 <span>{{ t('alerts.queryConfig.sqlEditorHint') }}</span>
               </template>
             </div>
@@ -775,8 +764,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="isRealTime === 'false'" class="flex flex-col gap-0 mt-2 px-1">
 
             <!-- Check every -->
-            <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
-              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0" style="line-height: 28px;">
+            <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
+              <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-7">
                 {{ t('alerts.queryConfig.checkEvery') }} *
                 <OTooltip :content="t('alerts.howOftenCheckTooltip')" :delay="300" side="top" />
               </span>
@@ -786,7 +775,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       name="_ui.checkEvery"
                       type="number"
-                      style="min-width: 100px; max-width: 100px;"
+                      class="min-w-25 max-w-25"
                       min="1"
                       @update:model-value="onCheckEveryChange($event)"
                       @blur="restoreDefaultFrequency"
@@ -799,27 +788,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OFormInput
                       name="trigger_condition.cron"
                       :placeholder="t('alerts.queryConfig.cronExpressionPlaceholder')"
-                      style="min-width: 100px; max-width: 100px;"
+                      class="min-w-25 max-w-25"
                       @update:model-value="onCronExpressionChange"
                     />
                   </template>
-                  <OSelect
+                  <OSelect class="min-w-20 max-w-25"
                     :model-value="frequencyMode"
                     :options="frequencyUnitOptions"
                     labelKey="label"
                     valueKey="value"
                     :searchable="false"
-                    style="min-width: 80px; max-width: 100px;"
                     @update:model-value="onFrequencyUnitChange"
                   />
                   <template v-if="frequencyMode === 'cron'">
-                    <span class="inline-block" style="min-width: 150px; max-width: 150px;">
+                    <span class="inline-block min-w-37.5 max-w-37.5">
                       <OFormSelect
                         name="trigger_condition.timezone"
                         :options="filteredTimezones"
                         searchable
                         :placeholder="t('alerts.queryConfig.timezonePlaceholder')"
-                        style="min-width: 150px; max-width: 150px;"
+                        class="min-w-37.5 max-w-37.5"
                         @update:model-value="onCronTimezoneChange"
                       />
                       <OTooltip
@@ -839,26 +827,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   {{ checkEveryError }}
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-[11px] italic"
-                     :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-500'">
+                <div v-if="frequencyMode === 'cron' && cronDescription && !cronError" class="text-2xs italic"
+                     :class="'text-text-secondary'">
                   {{ cronDescription }}
                 </div>
-                <div v-if="frequencyMode === 'cron' && cronError" class="text-red-500 text-[11px]">
+                <div v-if="frequencyMode === 'cron' && cronError" class="text-status-error-text text-2xs">
                   {{ cronError }}
                 </div>
               </div>
             </div>
 
             <!-- SQL: Alert if No. of events -->
-            <div v-if="localTab === 'sql'" class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
-              <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.alertIfNoOfEvents') }} *</span>
+            <div v-if="localTab === 'sql'" class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
+              <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.alertIfNoOfEvents') }} *</span>
               <div class="flex items-start gap-2">
                 <OFormSelect
                   name="trigger_condition.operator"
                   :options="numericOperators"
                   :searchable="false"
                   data-test="alert-trigger-operator-select"
-                  style="min-width: 70px; max-width: 120px;"
                   @update:model-value="onTriggerOperatorChange"
                 />
                 <!-- The message belongs to the threshold, so it hangs under the
@@ -890,8 +877,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- PromQL: Alert if the value is + Having series -->
             <template v-if="localTab === 'promql' && promqlCondition">
-              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.alertIfValueIs') }} *
+              <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.alertIfValueIs') }} *
                   <OTooltip :content="t('alerts.queryConfig.alertIfValueIsTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex items-start gap-2">
@@ -900,7 +887,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :options="numericOperators"
                     :searchable="false"
                     data-test="alert-threshold-operator-select"
-                    style="min-width: 70px; max-width: 120px;"
+                    class="min-w-17.5 max-w-30"
                     @update:model-value="onPromqlOperatorChange"
                   />
                   <!-- Message hangs under the value field it describes. -->
@@ -925,8 +912,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
               </div>
-              <div class="flex items-start gap-3 py-2 px-3 rounded-md text-[13px]">
-                <span class="condition-label font-bold text-[13px] whitespace-nowrap min-w-[160px] w-[160px] shrink-0 leading-8.5">{{ t('alerts.havingSeries') }} *
+              <div class="flex items-start gap-3 py-2 px-3 rounded-default text-compact">
+                <span class="font-bold text-text-heading text-compact whitespace-nowrap min-w-40 w-40 shrink-0 leading-8.5">{{ t('alerts.havingSeries') }} *
                   <OTooltip :content="t('alerts.queryConfig.havingSeriesTooltip')" :delay="300" side="top" />
                 </span>
                 <div class="flex items-start gap-2">
@@ -934,7 +921,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="trigger_condition.operator"
                     :options="numericOperators"
                     :searchable="false"
-                    style="min-width: 70px; max-width: 120px;"
                     @update:model-value="onTriggerOperatorChange"
                   />
                   <!-- Message hangs under the threshold field it describes. -->
@@ -1126,15 +1112,13 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
 
-    // DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE form and
-    // provides FORM_CONTEXT_KEY. All field reads/writes below go through it; the
-    // composed AddAlert schema (which reuses makeQueryConfigSchema) validates on
-    // save.
+    // Descendant step: the AddAlert orchestrator owns the ONE form and provides
+    // FORM_CONTEXT_KEY. All field reads/writes below go through it; the composed
+    // AddAlert schema validates on save.
     const form: any = inject(FORM_CONTEXT_KEY, null);
 
-    // ── Initial values for the discriminator refs below (the form itself is
-    // seeded by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta
-    // watcher). Mirrors the pre-migration ref initializers verbatim. ──────────
+    // Initial values for the discriminator refs below (the form itself is seeded
+    // by useAlertForm's defaults; `_meta` is kept fresh by the syncMeta watcher).
     const isEventBasedInit = props.streamType !== "metrics";
     const initialSelectedFunction = isEventBasedInit
       ? (props.isAggregationEnabled && props.inputData.aggregation?.function
@@ -1156,19 +1140,14 @@ export default defineComponent({
       ).length > 0;
 
     // Field get/set helpers — the form is the single source of truth for the
-    // validated scalars; props.* stay a write-through copy for the SQL-gen path
-    // (mutated in place at each handler + emitted, unchanged from pre-migration).
+    // validated scalars; props.* stay a write-through copy for the SQL-gen path.
     //
     // `fv` must be BOTH fresh AND reactive:
     //  • `getFieldValue` is a synchronous read straight off TanStack's store, so a
     //    handler that just wrote a field reads its own write back in the same tick.
     //  • but `getFieldValue` is NOT a Vue reactive source. A `computed()` whose
-    //    getter only calls it therefore tracks NO dependency, so Vue caches the
-    //    FIRST result and never re-evaluates it. That silently broke every
-    //    fv-backed computed below: `cronExpression` cached "" at mount, so
-    //    `validateCron()` always saw an empty expression and pinned "Cron
-    //    expression and timezone are required" on screen — and `cronDescription`
-    //    stayed blank — even though the form held the seeded `0 */10 * * * *`.
+    //    getter only calls it tracks NO dependency, so Vue caches the FIRST result
+    //    and never re-evaluates it.
     // Touching the reactive values snapshot registers the dependency (so the
     // computeds invalidate on any form write); the value still comes from the
     // fresh synchronous read, so same-tick read-after-write stays correct.
@@ -1182,12 +1161,9 @@ export default defineComponent({
     };
 
     // Build a fresh aggregation object off the CURRENT form value (NEVER the
-    // readonly `props.inputData`), apply `mutate`, and write it back through the
-    // form. The pre-migration handlers mutated `props.inputData.aggregation` in
-    // place — that silently fails now the prop is the readonly form read-view
-    // ("Set operation … target is readonly"), so aggregation edits were lost and
-    // the stale object got re-seeded. Cloning + setFV keeps the form the single
-    // source of truth.
+    // readonly `props.inputData`, which is the readonly form read-view), apply
+    // `mutate`, and write it back through the form. Cloning + setFV keeps the form
+    // the single source of truth.
     const writeAggregation = (mutate: (agg: any) => void): any => {
       const current = fv("query_condition.aggregation");
       const next = current
@@ -1303,6 +1279,13 @@ export default defineComponent({
       return 'sql-status-bar--idle';
     });
 
+    // Status-bar color/cursor per state (was CSS .sql-status-bar--*).
+    const inlineStatusBarClass = computed(() =>
+      inlineStatusState.value === 'sql-status-bar--error'
+        ? 'bg-status-error-bg text-status-error-text cursor-pointer'
+        : 'bg-surface-subtle text-text-secondary cursor-default'
+    );
+
     // Placeholder flags for inline editors (show image when empty + not focused)
     const queryEditorPlaceholderFlag = ref(true);
     const vrlEditorPlaceholderFlag = ref(true);
@@ -1394,10 +1377,10 @@ export default defineComponent({
     // schema). Seeded from the shared initial const.
     const selectedFunction = ref(initialSelectedFunction);
 
-    // ── Form-backed scalar accessors (Rule ②: the form is the single source of
-    // truth; these writable computeds let the pre-migration handlers/watchers and
-    // the specs read/write the field values without a parallel ref). The `.vue`
-    // controls are name=-owned OForm* — these never drive a v-model. ──────────
+    // Form-backed scalar accessors: the form is the single source of truth; these
+    // writable computeds let handlers/watchers read/write the field values without
+    // a parallel ref. The `.vue` controls are name=-owned OForm* — these never
+    // drive a v-model.
     // Log/metric MEASURE column → aggregation.having.column.
     const logMeasureColumn = computed<any>({
       get: () => fv("query_condition.aggregation.having.column") ?? "",
@@ -1970,18 +1953,12 @@ export default defineComponent({
 
     // Emit trigger condition update (for non-aggregation mode).
     //
-    // Emit the CURRENT FORM value, never `props.triggerCondition`. The prop is
-    // `formData.trigger_condition` — a `form.useStore` read-view that only
-    // refreshes on the next render. Every caller here is a handler that JUST
-    // wrote fields via setFV in the same tick, so the prop still holds the
-    // PRE-write snapshot. The parent's `update:triggerCondition` handler does
-    // `setFieldValue("trigger_condition", value)` — a WHOLE-OBJECT write — so
-    // emitting the stale prop round-tripped it back and CLOBBERED those writes.
-    // That is what silently ate the cron seed: onFrequencyUnitChange wrote
-    // frequency_type='cron' + cron='0 */10 * * * *', then this emit put
-    // {frequency_type:'minutes', cron:''} straight back, leaving the cron input
-    // empty with "Cron expression and timezone are required".
-    // `fv` is form.getFieldValue — a synchronous, always-fresh read.
+    // Emit the CURRENT FORM value (`fv` = form.getFieldValue, a synchronous
+    // always-fresh read), never `props.triggerCondition` — the prop is a
+    // `form.useStore` read-view that only refreshes next render, so it still
+    // holds the PRE-write snapshot in a same-tick handler, and the parent's
+    // whole-object `setFieldValue("trigger_condition", value)` would round-trip
+    // that stale value back and clobber the writes.
     // `overrides` mirrors emitAggregationUpdate: a consumer @update:model-value
     // handler runs BEFORE field.handleChange commits, so `fv("trigger_condition")`
     // still holds the OLD value there. Callers that have the new value in hand must
@@ -2604,6 +2581,7 @@ export default defineComponent({
       onBlurInlineSqlEditor,
       onBlurInlineVrlEditor,
       inlineStatusState,
+      inlineStatusBarClass,
       inlineQueryEditorRef,
       autoCompleteKeywords,
       autoCompleteSuggestions,
@@ -2619,92 +2597,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* placeholder overlay positioning — typewriter text styling is global
-   (styles/tailwind.css), shared with logs/traces/RUM pages. */
-.query-editor-placeholder-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 0.1875rem 0.5rem 0 2.15rem;
-  pointer-events: none;
-  z-index: 1;
-  user-select: none;
-}
-
-/* status bar child/compound selectors — cannot be inlined */
-.inline-sql-status-bar .sql-status-bar__inner {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 10px;
-  overflow: hidden;
-}
-
-.inline-sql-status-bar .sql-status-bar__msg {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-  flex: 1;
-}
-
-.inline-sql-status-bar.sql-status-bar--hint    { background: #f3f4f6; color: #6b7280; }
-.inline-sql-status-bar.sql-status-bar--idle    { background: #f3f4f6; color: #6b7280; }
-.inline-sql-status-bar.sql-status-bar--error   { background: rgba(239, 68, 68, 0.08); color: #ef4444; cursor: pointer; }
-
-.inline-sql-status-bar.sql-status-bar--light {
-  border-left: 1px solid #e5e7eb;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-.inline-sql-status-bar.sql-status-bar--dark {
-  border-left: 1px solid #2d3748;
-  border-right: 1px solid #2d3748;
-  border-bottom: 1px solid #2d3748;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
-}
-.inline-sql-status-bar.sql-status-bar--dark.sql-status-bar--hint,
-.inline-sql-status-bar.sql-status-bar--dark.sql-status-bar--idle {
-  background: rgba(255, 255, 255, 0.04);
-  color: #d1d5db;
-}
-
-/* global tooltip selectors */
-:global(.sql-preview-tooltip) {
-  background: #1e1e1e !important;
-  padding: 0 !important;
-  border-radius: 6px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
-}
-
-:global(.sql-preview-tooltip) .hljs {
-  background: #1e1e1e !important;
-  border-radius: 6px;
-}
-
-/* descendant color overrides for condition labels/text */
-.light-mode .condition-label {
-  color: rgba(0, 0, 0, 0.8);
-}
-.light-mode .condition-text {
-  color: rgba(0, 0, 0, 0.7);
-}
-
-.dark-mode .condition-label {
-  color: rgba(255, 255, 255, 0.9);
-}
-.dark-mode .condition-text {
-  color: rgba(255, 255, 255, 0.75);
-}
-</style>

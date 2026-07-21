@@ -248,7 +248,6 @@ function mountTraceTree(
     global: {
       plugins: [i18n, router, storePlugin],
       stubs: {
-        "q-resize-observer": true,
         "span-block": true,
       },
     },
@@ -425,7 +424,7 @@ describe("TraceTree", () => {
 
       const highlightedSpans = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("bg-yellow-300"));
+        .filter((el) => el.classes().includes("bg-table-highlight-bg"));
       expect(highlightedSpans.length).toBeGreaterThan(0);
     });
 
@@ -438,7 +437,7 @@ describe("TraceTree", () => {
 
       const currentMatch = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("text-red-600"));
+        .filter((el) => el.classes().includes("text-status-error-text"));
       expect(currentMatch.length).toBeGreaterThan(0);
     });
 
@@ -753,7 +752,7 @@ describe("TraceTree", () => {
         '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
       );
       expect(operationContainer.exists()).toBe(true);
-      expect(operationContainer.classes()).toContain("bg-white");
+      expect(operationContainer.classes()).toContain("bg-surface-base");
     });
 
     it("should apply dark theme when store theme is dark", async () => {
@@ -776,7 +775,8 @@ describe("TraceTree", () => {
         '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
       );
       expect(operationContainer.exists()).toBe(true);
-      expect(operationContainer.classes()).toContain("bg-dark");
+      // Token-based utility handles dark mode; class is identical in both themes.
+      expect(operationContainer.classes()).toContain("bg-surface-base");
 
       darkWrapper.unmount();
     });

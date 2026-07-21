@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div>
             <div class="flex items-center gap-4">
               <div class="text-sm font-medium whitespace-nowrap">
-                Time Range <span class="text-red-600">*</span>
+                Time Range <span class="text-status-error-text">*</span>
               </div>
               <OFormDateTimeRange
                 name="timerange"
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-if="timerangeError"
-              class="text-xs text-red-600 mt-1"
+              class="text-xs text-status-error-text mt-1"
             >
               {{ timerangeError }}
             </div>
@@ -100,18 +100,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   v-if="deleteBeforeBackfill"
-                  class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
+                  class="mt-2 p-3 rounded-default border bg-banner-warning-bg border-banner-warning-border"
                 >
                   <div class="flex items-start">
-                    <OIcon name="warning" size="sm" class="mr-2 tw-mt-0.5" />
-                    <div class="text-xs text-orange-800">
-                      <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
-                      <div class="tw-mb-2">
+                    <OIcon name="warning" size="sm" class="mr-2 mt-0.5" />
+                    <div class="text-xs text-banner-warning-text">
+                      <div class="font-semibold mb-1">Warning: Irreversible Data Deletion</div>
+                      <div class="mb-2">
                         This will permanently delete all data in the destination stream for the specified time
                         range before running the backfill. This action cannot be undone.
                       </div>
-                      <div class="tw-font-semibold tw-text-xs tw-mb-1">Time Alignment Requirements (UTC):</div>
-                      <ul class="tw-ml-5 tw-space-y-0.5 tw-list-disc tw-text-xs">
+                      <div class="font-semibold text-xs mb-1">Time Alignment Requirements (UTC):</div>
+                      <ul class="ml-5 space-y-0.5 list-disc text-xs">
                         <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
                         <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
                       </ul>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCollapsible>
 
       <!-- Error Message -->
-      <div v-if="errorMessage" class="text-red-500">
+      <div v-if="errorMessage" class="text-status-error-text">
         <OIcon name="error" size="sm" class="mr-2" />
         {{ errorMessage }}
       </div>

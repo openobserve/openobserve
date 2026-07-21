@@ -41,9 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
             <span
-              class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm"
-              :style="{ color: 'var(--color-text-primary)' }"
-              >{{ selectedOptionLabel }}</span
+              class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-text-body"
+            >{{ selectedOptionLabel }}</span
             >
           </div>
         </template>
@@ -71,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
               <span
                 class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-                >{{ opt.label }}</span
+              >{{ opt.label }}</span
               >
             </div>
           </OSelectItem>
@@ -91,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-1.5 w-full min-w-0">
               <span
                 v-if="opt.colorPalette?.length"
-                class="block w-10 h-2 rounded-[0.1875rem] flex-shrink-0"
+                class="block w-10 h-2 rounded-default flex-shrink-0"
                 aria-hidden="true"
                 :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
               />
               <span
                 class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-                >{{ opt.label }}</span
+              >{{ opt.label }}</span
               >
             </div>
           </OSelectItem>
@@ -107,12 +106,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- color picker for fixed and shades typed color mode -->
       <div
         v-if="['fixed', 'shades'].includes(dashboardPanelData.data.config.color.mode)"
-        class="inline-flex items-center flex-shrink-0 mt-[1.875rem] ml-1.5 relative"
+        class="inline-flex items-center flex-shrink-0 mt-7.5 ml-1.5 relative"
         data-test="dashboard-color-palette-color-input-wrapper"
       >
         <button
           type="button"
-          class="w-8 h-8 rounded-full cursor-pointer flex-shrink-0 transition-[box-shadow,border-color] duration-200 ease border-2 border-solid [border-color:var(--color-border-default)] hover:[border-color:var(--color-button-primary)] hover:[box-shadow:0_0_0_0.125rem_var(--color-button-primary-focus-ring)] focus-visible:[outline:2px_solid_var(--color-button-primary-focus-ring)] focus-visible:outline-offset-[0.125rem]"
+          class="w-8 h-8 rounded-full cursor-pointer flex-shrink-0 transition-[box-shadow,border-color] duration-200 ease border-2 border-solid border-border-default hover:border-button-primary hover:ring-2 hover:ring-button-primary-focus-ring focus-visible:outline-2 focus-visible:outline-button-primary-focus-ring focus-visible:outline-offset-2"
           :aria-label="`Panel color: ${dashboardPanelData.data.config.color.fixedColor[0]}`"
           :style="{ background: dashboardPanelData.data.config.color.fixedColor[0] }"
           data-test="dashboard-color-palette-swatch-btn"
@@ -335,8 +334,3 @@ export default defineComponent({
   },
 });
 </script>
-<style>
-.selectedLabel span {
-  text-transform: none !important;
-}
-</style>

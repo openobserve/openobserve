@@ -81,9 +81,7 @@ export const SUBJECT_BUTTONS_BY_SET: Record<string, SubjectButtonSpec[]> = {
     {
       id: "node",
       semanticIds: ["k8s-node-name"],
-      // Node view includes pod-level metrics too — they're all running on
-      // that node, so scoping to a node means "show me what's happening
-      // on this node" (pod metrics + any node-aggregated metrics).
+      // Also pool pod-level metrics — they run on this node.
       poolSemanticIds: ["k8s-node-name", "k8s-pod-name"],
       label: "Node",
     },

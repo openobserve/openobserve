@@ -358,7 +358,7 @@ export function createTreeVisualizationEngine() {
       -webkit-backdrop-filter: blur(24px) saturate(180%);
       border: 1px solid ${isDarkMode ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"};
       border-radius: 8px; padding: 9px 13px; font-size: 12px; line-height: 1.5;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      font-family: var(--font-sans);
       letter-spacing: 0.01em; white-space: nowrap; display: none;
       color: ${isDarkMode ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)"};
     `
@@ -491,11 +491,12 @@ export function createTreeVisualizationEngine() {
 }
 
 /**
- * Legacy wrapper for backward compatibility with existing ServiceGraph.vue
- * This ensures zero breaking changes during the migration
+ * Placeholder tree-options API for ServiceGraph.vue — not yet implemented.
  */
-export const createLegacyTreeOptions = () => {
-  // This will be implemented when we migrate ServiceGraph.vue
-  // For now, this is a placeholder to maintain the existing API
+export const createLegacyTreeOptions = (
+  graphData: { nodes: any[]; edges: any[] },
+  layoutType: string = "horizontal",
+  isDarkMode: boolean = true
+) => {
   throw new Error('Legacy tree options not yet implemented - use convertServiceGraphToTree for now')
 }

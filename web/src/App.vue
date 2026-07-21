@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <router-view
-    :class="store.state.theme === 'dark' ? 'dark-theme' : 'light-theme'"
-  ></router-view>
+  <router-view></router-view>
   <OToastProvider />
   <ConfirmDialogProvider />
 </template>

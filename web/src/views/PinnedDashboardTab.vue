@@ -20,8 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default"
       >
-        <div class="w-[12rem]"><OSkeleton class="h-8" /></div>
-        <div class="w-[6rem]"><OSkeleton class="h-8" /></div>
+        <div class="w-48"><OSkeleton class="h-8" /></div>
+        <div class="w-24"><OSkeleton class="h-8" /></div>
         <div class="w-8"><OSkeleton class="h-8" /></div>
       </div>
       <div class="flex-1 min-h-0 overflow-hidden p-4">
@@ -29,13 +29,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="i in 4"
             :key="i"
-            class="flex flex-col gap-3 rounded-lg border border-border-default p-4 min-h-[10rem]"
+            class="flex flex-col gap-3 rounded-default border border-border-default p-4 min-h-40"
           >
             <div class="flex items-center justify-between">
-              <div class="w-[10rem]"><OSkeleton class="h-4" /></div>
+              <div class="w-40"><OSkeleton class="h-4" /></div>
               <div class="w-4"><OSkeleton class="h-4" /></div>
             </div>
-            <OSkeleton class="flex-1 min-h-[6rem]" />
+            <OSkeleton class="flex-1 min-h-24" />
           </div>
         </div>
       </div>

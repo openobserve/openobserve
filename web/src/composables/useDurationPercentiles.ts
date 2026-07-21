@@ -28,24 +28,6 @@ const DURATION_UNIT_MULTIPLIERS: Record<string, number> = {
   m: 60 * 1_000_000,
 };
 
-/**
- * Converts duration comparisons in a WHERE clause that carry human-readable
- * unit suffixes (produced by `formatTimeWithSuffix`) back to raw microseconds.
- *
- * Accepts a WHERE clause and the already-loaded SQL parser instance.  Wraps
- * the clause in a full `SELECT * FROM "stream" WHERE …` query, uses the parser
- * to produce an AST, walks the tree to locate duration binary expressions whose
- * right-hand side is a quoted string value (e.g. `'1.50ms'`), converts the
- * value, and applies the replacement back on the original WHERE string.
- *
- * Falls back to the original string if the parser throws (malformed input).
- *
- * Examples:
- *   `duration >= '100.00us'`  →  `duration >= 100`
- *   `duration >= '1.50ms'`    →  `duration >= 1500`
- *   `duration >= '2.50s'`     →  `duration >= 2500000`
- *   `duration >= '1.50m'`     →  `duration >= 90000000`
- */
 /** Maps every accepted unit spelling to a canonical key in DURATION_UNIT_MULTIPLIERS. */
 const UNIT_ALIASES: Record<string, string> = {
   // Microseconds

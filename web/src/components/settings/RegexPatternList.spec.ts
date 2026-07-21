@@ -1055,7 +1055,7 @@ describe('RegexPatternList.vue Component Logic', () => {
 // -----------------------------------------------------------------------------
 // ODrawer Migration tests
 //
-// The AddRegexPattern dialog was migrated from <q-dialog> to <ODrawer>. The
+// The AddRegexPattern dialog was migrated to <ODrawer>. The
 // rest of the spec exercises the setup() function in isolation, so a focused
 // describe block here mounts the real component with a minimal stub surface
 // to assert the new ODrawer contract (open binding, width based on
@@ -1106,7 +1106,7 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
   };
 
   // Stub AddRegexPattern so the tests don't pull in the full implementation
-  // (heavy q-input/q-table/AI chat dependencies). The component now owns the
+  // (heavy input/table/AI chat dependencies). The component now owns the
   // ODrawer internally, so the host passes v-model:open and the drawer
   // mechanics are encapsulated here.
   const AddRegexPatternStub = {
@@ -1177,9 +1177,9 @@ describe('RegexPatternList.vue - ODrawer Migration', () => {
           Trash2: true,
           Download: true,
           // Layout primitives are stubbed so the page renders without
-          // needing a Layout context (q-page normally requires a QLayout
-          // ancestor; without one it silently fails to render its slot,
-          // which would hide the ODrawer that lives inside).
+          // needing a Layout context; without one the page could silently
+          // fail to render its slot, which would hide the ODrawer that lives
+          // inside.
           QPage: { template: '<div><slot /></div>' },
           QTable: { template: '<div><slot name="no-data" /></div>' },
           QInput: { template: '<input />' },

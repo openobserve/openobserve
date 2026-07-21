@@ -110,7 +110,7 @@ const platform = {
 };
 
 // ODrawer stub: mirrors props/events from the real component so tests can drive
-// open/close via v-model:open and the @close emit (q-dialog → ODrawer migration).
+// open/close via v-model:open and the @close emit (migrated to ODrawer).
 // Props are exposed via `data-stub-*` to avoid colliding with the parent's
 // `data-test` attr which fallthroughs to the stub root.
 const ODrawerStub = {
@@ -643,7 +643,7 @@ describe("ReportList Component", () => {
     });
   });
 
-  // ── Move-to-folder ODrawer (q-dialog → ODrawer migration) ────────────────
+  // ── Move-to-folder ODrawer (migrated to ODrawer) ────────────────
   describe("Move-to-folder ODrawer", () => {
     it("should keep showMoveDialog false on initial render", () => {
       expect(wrapper.vm.showMoveDialog).toBe(false);

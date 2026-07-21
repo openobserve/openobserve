@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <div class="flex h-[calc(100%-40px)]!">
-      <div class="flex flex-col" style="border-top: 1px solid #dbdbdb; height: 100px">
+      <div class="flex flex-col border-t border-border-default h-25">
         <b>Query Editor:</b>
         <code-query-editor
           editor-id="logsStreamQueryEditor"
@@ -219,8 +219,9 @@ export default defineComponent({
 });
 </script>
 
-<style>
-#logsStreamQueryEditor {
-  height: calc(100% - 20px) !important;
+<style scoped>
+/* keep(lib-override:monaco): sizes the query editor's own container by id (rendered by the editor lib) */
+:deep(#logsStreamQueryEditor) {
+  height: calc(100% - 1.25rem) !important;
 }
 </style>

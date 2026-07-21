@@ -15,19 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col pb-[0.625rem] h-full" data-test="edit-role-page">
-    <!-- Sub-page header: the listing's icon becomes a Back button (→ Roles). -->
-    <AppPageHeader
-      :title="editingRole"
-      :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
-      class="shrink-0 px-4 border-b border-border-default"
-    />
+  <OPageLayout
+    class="pb-2.5"
+    data-test="edit-role-page"
+    :title="editingRole"
+    :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+    bleed
+  >
     <!-- TODO OK : Add button to delete role in toolbar -->
     <div
       data-test="edit-role-title"
       class="shrink-0"
     >
-    <div class="card-container py-2 flex flex-col">
+    <div class="bg-card-glass-bg py-2 flex flex-col">
            <AppTabs
               data-test="edit-role-tabs"
               :tabs="tabs"
@@ -62,17 +62,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-show="activeTab === 'permissions'"
           data-test="edit-role-permissions-section"
-          class="card-container flex flex-col h-full"
+          class="bg-card-glass-bg flex flex-col h-full"
         >
           <div
-            class="flex justify-between items-center flex-shrink-0"
-            :class="store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white'"
+            class="flex justify-between items-center flex-shrink-0 bg-surface-base"
           >
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class="flex items-start px-3 py-2 justify-start gap-3"
-              style="position: sticky; top: 0px; z-index: 2"
+              class="flex items-start px-3 py-2 justify-start gap-3 sticky"
+              style="top: 0px; z-index: 2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
@@ -80,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span
                   data-test="edit-role-permissions-show-text"
-                  style="font-size: 14px"
+                  style="font-size: var(--text-sm)"
                 >
                   {{ t('iam.editRole.show') }}
                 </span>
@@ -104,8 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OInput
                   v-model="filter.value"
                   :debounce="500"
-                  class="no-border o2-search-input h-[36px] w-[200px]"
-                  :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                  class="no-border o2-search-input h-9 w-50"
                   :placeholder="t('iam.editRole.searchPermissions')"
                   @update:model-value="onResourceChange"
                 >
@@ -130,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-2">
               <span
                 data-test="edit-role-permissions-count"
-                class="font-bold text-[14px]"
+                class="font-bold text-sm"
               >
                 {{ t('iam.editRole.permissionsCount', { count: selectedPermissionsHash.size }) }}
               </span>
@@ -155,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             data-test="edit-role-permissions-table-section"
-            class="el-border-radius flex-1 min-h-0 overflow-y-auto"
+            class="rounded-default flex-1 min-h-0 overflow-y-auto"
           >
             <div v-show="permissionsUiType === 'table'">
               <permissions-table
@@ -206,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div v-if="isHelpOpen" style="width: 350px" class="p-2">
                   <div class="flex justify-between items-center px-2">
-                    <div style="font-size: 16px">{{ t('iam.editRole.quickReference') }}</div>
+                    <div style="font-size: var(--text-base)">{{ t('iam.editRole.quickReference') }}</div>
                     <OIcon
                       class="cursor-pointer"
                       name="close"
@@ -220,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div>
                       {{ t('iam.editRole.jsonConfigHelp') }}
                     </div>
-                    <pre style="font-size: 12px">
+                    <pre style="font-size: var(--text-xs)">
 {
   "object": "MainResource:ChildResource",
   "permission": "AccessType"
@@ -239,10 +237,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end w-full flex-shrink-0 mt-[0.625rem]"
+        class="flex justify-end w-full flex-shrink-0 mt-2.5"
         style="z-index: 2"
       >
-      <div class="card-container w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
+      <div class="bg-card-glass-bg w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"
@@ -262,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       </div>
-  </div>
+  </OPageLayout>
   <ConfirmDialog
     :title="t('iam.editRole.leaveConfirm.title')"
     :message="t('iam.editRole.leaveConfirm.message')"
@@ -310,7 +308,7 @@ import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
@@ -714,8 +712,8 @@ const modifyResourcePermissions = (resource: Resource) => {
 };
 
 const getResourcePermissions = () => {
-  // Single request returns the role's permissions across all resource types,
-  // replacing one request per resource. Backend returns a flat Permission[].
+  // Single request returns the role's permissions across all resource types.
+  // Backend returns a flat Permission[].
   return new Promise((resolve, reject) => {
     getAllRolePermissions({
       role_name: editingRole.value,

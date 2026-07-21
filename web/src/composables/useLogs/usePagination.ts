@@ -98,7 +98,6 @@ export const usePagination = () => {
 
       if (searchObj.meta.sqlMode == true && parsedSQL != undefined) {
         // if query has aggregation or groupby then we need to set size to -1 to get all records
-        // issue #5432
         //here BE return all the records if we set the size to -1 and we are doing it as we dont support pagination for aggregation and groupby
         if (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) {
           queryReq.query.size = -1;

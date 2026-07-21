@@ -239,7 +239,6 @@ export const useSearchPagination = () => {
   };
 
   const shouldGetPageCount = (queryReq: any): boolean => {
-    // Simplified logic - in the actual implementation this would be more complex
     if (!queryReq || !queryReq.query) return false;
 
     // Check if it's a simple query that supports page count

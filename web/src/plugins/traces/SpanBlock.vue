@@ -16,11 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex wrap justify-start items-center"
-    :class="[
-      defocusSpan ? 'opacity-30' : '',
-      store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white',
-    ]"
+    class="flex wrap justify-start items-center bg-surface-base"
+    :class="defocusSpan ? 'opacity-30' : ''"
     :style="{
       zIndex: 2,
     }"
@@ -28,12 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'bg-white']"
+      class="flex justify-between items-end cursor-pointer span-block relative-position bg-surface-base w-full pb-1.5"
       :style="{
         height: spanDimensions.height + 'px',
-        width: '100%',
-        paddingBottom: '6px',
       }"
       ref="spanBlock"
       @click="selectSpan(span.spanId)"
@@ -41,11 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="span-block"
     >
       <div
-        :style="{
-          width: '100%',
-          overflow: 'hidden',
-        }"
-        class="cursor-pointer flex items-center flex-nowrap position-relative"
+        class="cursor-pointer flex items-center flex-nowrap position-relative w-full overflow-hidden"
         :class="defocusSpan ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
@@ -55,29 +45,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height: spanDimensions.barHeight + 'px',
             width: spanWidth + '%',
             left: leftPosition + '%',
-            position: 'relative',
           }"
-          class="flex justify-start items-center flex-nowrap"
+          class="flex justify-start items-center flex-nowrap relative"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
           <div
+            class="w-[calc(100%-0.375rem)] h-full rounded-default"
             :style="{
-              width: 'calc(100% - 6px)',
-              height: '100%',
-              borderRadius: '2px',
-              backgroundColor: span.style?.color || '#58508d',
+              backgroundColor: span.style?.color || DEFAULT_SPAN_COLOR,
             }"
           />
         </div>
         <div
           :style="{
-            position: 'absolute',
             ...durationStyle,
-            transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="text-xs flex items-center"
+          class="text-xs flex items-center absolute transition-all duration-500 ease-[ease]"
           data-test="span-block-duration"
         >
           <div>
@@ -102,6 +87,12 @@ import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
+
+// TODO(design-tokens): fallback bar colour for a span the trace colour allocator
+// never assigned. No semantic token fits — it is a categorical "unassigned span"
+// slate-purple, not a status/surface/accent role. Needs e.g.
+// --color-trace-span-unassigned; this const is then the only site to change.
+const DEFAULT_SPAN_COLOR = "#58508d";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -297,6 +288,7 @@ export default defineComponent({
       onSpanHover,
       durationStyle,
       searchObj,
+      DEFAULT_SPAN_COLOR,
     };
   },
 });

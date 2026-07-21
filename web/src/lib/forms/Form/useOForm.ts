@@ -12,7 +12,7 @@
 // `inject(FORM_CONTEXT_KEY)` and call `form.useStore(...)` directly. And simple
 // forms with no parent-side conditional rendering keep the plain
 // <OForm :schema :default-values @submit> form (OForm creates the form itself
-// via this same helper). See START-HERE.md (Rule ③) for the full rationale.
+// via this same helper).
 //
 // The config here MUST stay identical to OForm.vue's fallback so an internal and
 // an externally-supplied form behave the same: submit-then-change timing

@@ -20,26 +20,26 @@ const COMPONENTS = {
   // overlay intercepts pointer events on the dashboard, so missing the new selector
   // here causes clicks on variable dropdowns to time out.
   DIALOG: '[data-test="dashboard-settings-drawer"], [data-o2-dialog], [data-o2-drawer]',
-  DIALOG_CARD: '[data-test="dashboard-settings-drawer"] .q-card',
+  DIALOG_CARD: '[data-test="dashboard-settings-drawer"]',
 
   // Menu/Dropdown components
   MENU: '[data-test$="-popover"]',
   MENU_ITEM: '[data-test$="-option"]',
 
   // Form components
-  CHECKBOX: '.q-checkbox',
-  CHECKBOX_CHECKED: '.q-checkbox[aria-checked="true"]',
-  CHECKBOX_UNCHECKED: '.q-checkbox[aria-checked="false"]',
+  CHECKBOX: '[role="checkbox"]',
+  CHECKBOX_CHECKED: '[role="checkbox"][aria-checked="true"]',
+  CHECKBOX_UNCHECKED: '[role="checkbox"][aria-checked="false"]',
 
   // Loading indicators (legacy — kept for backward compat; prefer specific data-test selectors)
   SPINNER: '[data-test*="loading-indicator"]',
   LINEAR_PROGRESS: '[data-test*="loading-indicator"]',
 
-  // Chip/Badge components — OBadge replaces q-chip; use data-test or aria where available
+  // Chip/Badge components — OBadge replaces the legacy chip; use data-test or aria where available
   CHIP: '[data-test*="chip"], [data-test*="badge"]',
 
   // Tooltip
-  TOOLTIP: '.q-tooltip',
+  TOOLTIP: '[role="tooltip"]',
 };
 
 /**
@@ -209,7 +209,7 @@ function getPanelRefreshBtn(panelId) {
 
 /**
  * Get menu item by text (case-insensitive)
- * Uses filter pattern: .q-item filter hasText
+ * Uses filter pattern: option filter hasText
  * @param {string} text - Item text
  * @param {boolean} exact - Use exact match (default: true)
  * @returns {Object} Object with selector and filter pattern

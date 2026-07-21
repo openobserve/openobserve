@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="traces-search-result" class="overflow-hidden h-full">
     <div
-      class="card-container h-full flex flex-col overflow-hidden"
+      class="bg-card-glass-bg h-full flex flex-col overflow-hidden"
     >
       <!-- Section header: title + count badge + insights + pagination -->
       <div
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         ref="sectionHeaderRef"
         data-test="traces-section-header"
-        class="flex items-center px-[0.4rem]! h-[2.25rem] shrink-0 border-b border-[rgba(0,0,0,0.07)]"
+        class="flex items-center px-[0.4rem]! h-9 shrink-0 border-b border-border-default"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
@@ -65,10 +65,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           variant="error"
           :clickable="true"
-          class="text-xs rounded! py-[0.4rem]! px-[0.625rem]! text-[0.75rem]!"
+          class="text-xs rounded-default! py-[0.4rem]! px-2.5! text-xs!"
           :class="showErrorOnly
             ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-            : 'bg-[var(--o2-error-tag-bg)]! text-[var(--o2-error-tag-text)]!'"
+            : 'bg-error-tag-bg! text-error-tag-text!'"
           @click="toggleErrorOnly"
         >
           {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex-1" />
 
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
-        <div class="inline-flex items-center border border-[var(--o2-border-color)] rounded-md px-1 h-6 mr-1 overflow-hidden">
+        <div class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 mr-1 overflow-hidden">
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading"
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination mr-[0.25rem] mt-0! ml-1"
+            class="select-pagination mr-1 mt-0! ml-1"
             size="sm"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
@@ -122,15 +122,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </div>
 
-      <!-- Combined scroll area: RED metrics + trace list scroll together -->
-      <div class="flex-1 overflow-y-auto bg-[var(--o2-card-bg-solid)]">
+      <!-- Combined scroll area: RED metrics + trace list scroll together.
+           This is the single vertical scroller — the trace table delegates its
+           virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
+      <div ref="scrollContainerRef" class="flex-1 overflow-auto bg-card-glass-solid">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
           leave-active-class="transition-all duration-300 ease-in-out"
           enter-from-class="opacity-0 -translate-y-4 max-h-0"
-          enter-to-class="opacity-100 translate-y-0 max-h-[1000px]"
-          leave-from-class="opacity-100 translate-y-0 max-h-[1000px]"
+          enter-to-class="opacity-100 translate-y-0 max-h-250"
+          leave-from-class="opacity-100 translate-y-0 max-h-250"
           leave-to-class="opacity-0 -translate-y-4 max-h-0"
         >
           <TracesMetricsDashboard
@@ -158,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <TracesSearchResultList
           :hits="hits"
+          :scroll-el="scrollContainerRef"
           :loading="searchObj.loading"
           :search-performed="searchPerformed"
           :total="searchObj.data.queryResults.total"
@@ -298,6 +301,11 @@ export default defineComponent({
     const { searchObj, updatedLocalLogFilterField } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
+
+    // Single vertical scroll container for the results area. Delegated to the
+    // trace table's virtualizer (:scroll-el) so the table doesn't render its own
+    // nested scrollbar — fixes the double-scrollbar on the traces page.
+    const scrollContainerRef = ref<HTMLElement | null>(null);
 
     const sectionHeaderRef = ref<HTMLElement | null>(null);
     const containerWidth = ref(9999);
@@ -444,6 +452,7 @@ export default defineComponent({
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
+      scrollContainerRef,
       sectionHeaderRef,
       showActionLabels,
       expandRowDetail,
@@ -464,3 +473,47 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
+   button DOM to compress the pagination controls into the results toolbar. */
+.paginator-section {
+  line-height: 1.5rem;
+  max-height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem;
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  backdrop-filter: blur(0.625rem);
+  margin-top: 0;
+  overflow: visible;
+}
+
+.paginator-section :deep(.o-pagination__btn) {
+  padding: 0.125rem 0.25rem !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  min-width: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  border-radius: 0.25rem !important;
+  line-height: 1rem !important;
+}
+
+.paginator-section :deep(.o-pagination__btn svg) {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.select-pagination {
+  position: relative;
+  width: 4rem !important;
+  height: 1.5rem !important;
+  margin-top: 0;
+}
+
+.select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  padding-inline: 0.5rem !important;
+}
+</style>

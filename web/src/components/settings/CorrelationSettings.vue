@@ -15,21 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col h-full min-h-0">
-    <AppPageHeader
-      icon="group-work"
-      :subtitle="t('settings.correlationSettingsPage.subtitle')"
-      class="shrink-0 px-4 border-b border-border-default"
-      data-test="correlation-settings-header"
-    >
-      <template #title>
-        <span data-test="correlation-settings-page-title">{{ t('settings.correlationSettings') }}</span>
-      </template>
-    </AppPageHeader>
+  <OPageLayout
+    icon="group-work"
+    :subtitle="t('settings.correlationSettingsPage.subtitle')"
+    data-test="correlation-settings-header"
+    tabs-below
+    bleed
+  >
+    <template #title>
+      <span data-test="correlation-settings-page-title">{{ t('settings.correlationSettings') }}</span>
+    </template>
 
-    <!-- Tab bar -->
-    <div class="shrink-0 px-4 border-b border-border-subtle" data-test="correlation-settings-tabs">
-      <OTabs :model-value="activeTab" dense @update:model-value="onTabChange">
+    <!-- Module tabs (Level-2 nav) -->
+    <template #header-tabs>
+      <OTabs
+        :model-value="activeTab"
+        dense
+        align="left"
+        data-test="correlation-settings-tabs"
+        @update:model-value="onTabChange"
+      >
         <OTab
           name="services"
           :label="t('settings.correlation.discoveredServicesTab')"
@@ -48,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('settings.correlation.fieldAliasesTab')"
         />
       </OTabs>
-    </div>
+    </template>
 
     <!-- Tab content -->
     <div class="flex-1 min-h-0 overflow-hidden">
@@ -56,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DiscoveredServices @navigate-to-configuration="onTabChange('discovery')" />
       </div>
 
-      <div v-show="activeTab === 'discovery'" class="h-full overflow-y-auto px-4 py-3">
+      <div v-show="activeTab === 'discovery'" class="h-full overflow-y-auto px-page-edge py-4">
         <ServiceIdentitySetup
           :org-identifier="store.state.selectedOrganization.identifier"
           :semantic-groups="semanticGroups"
@@ -66,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'alert-correlation'" class="h-full overflow-y-auto px-4">
+      <div v-show="activeTab === 'alert-correlation'" class="h-full overflow-y-auto px-page-edge">
         <OrganizationDeduplicationSettings
           :org-id="store.state.selectedOrganization.identifier"
           :config="store.state.organizationSettings?.deduplication_config"
@@ -74,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div v-show="activeTab === 'field-aliases'" class="h-full overflow-y-auto px-4">
+      <div v-show="activeTab === 'field-aliases'" class="h-full overflow-y-auto px-page-edge py-4">
         <SemanticFieldGroupsConfig
           :key="`field-aliases-${fieldAliasesEditorKey}`"
           :semantic-field-groups="draftSemanticGroups"
@@ -95,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </SemanticFieldGroupsConfig>
       </div>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -110,7 +115,7 @@ import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import serviceStreamsService from "@/services/service_streams";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -125,7 +130,7 @@ export default defineComponent({
     OTabs,
     OTab,
     OButton,
-    AppPageHeader,
+    OPageLayout,
   },
   setup() {
     const store = useStore();

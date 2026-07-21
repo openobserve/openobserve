@@ -23,27 +23,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col h-full min-h-0 w-full" data-test="metrics-explorer">
-    <!-- No page title. Metrics is an EXPLORE surface, like Logs and Traces:
-         you arrive to look at data, so the data starts at the top of the frame.
-         An H1 saying "Metrics" above a nav item already saying "Metrics" bought
-         nothing and cost ~68px of chart. AppPageHeader stays where it earns its
-         keep — settings, billing, list and detail pages.
-
-         So the first row IS the toolbar, and it carries both clusters the way
-         the Logs toolbar does: scope on the left (what you are looking at),
-         time on the right (which window, and how often it reloads). -->
-    <!-- items-center: every control on this row (mode toggle, filter label +
-         button, time picker, refresh) sits on one centred line. LabelFilterBar
-         wraps its OWN chips internally (flex-wrap), so the row does not need
-         items-start to let chips grow — that only left the controls top-aligned
-         and visibly out of line with each other. -->
-    <!-- `p-[0.375rem]`, the SAME padding the Logs and Traces toolbars use
-         (SearchBar.vue:23 / traces SearchBar.vue:19). It was `px-4 py-2`, which
-         put the mode toggle 10px further right than the Logs one — switching
-         Logs -> Metrics visibly jumped the control that is in the same place on
-         both pages. The toolbars are the same object; they must share geometry. -->
+    <!-- No page title: Metrics is an EXPLORE surface like Logs and Traces, so the
+         first row is the toolbar — scope on the left, time on the right, like the
+         Logs toolbar. -->
+    <!-- items-center: LabelFilterBar wraps its own chips internally (flex-wrap),
+         so the row keeps every control on one centred line rather than items-start. -->
+    <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
+         (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
     <div
-      class="flex items-center gap-2 shrink-0 p-[0.375rem] border-b border-border-default"
+      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
@@ -85,14 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="metrics-explorer-mode-workspace"
         >
-          <!-- The SAME ♥ the card's button carries: the icon the user clicks to
-               fill this tab is the icon that names it. `workspaces` was left over
-               from when this was called Scratchpad.
-
-               `favorite-border` (outline), not the filled `favorite`: a filled
-               heart is the card's ON state — on a tab it reads as "already
-               favourited" rather than "your favourites live here". The tab names
-               a place; it is not itself a toggle. -->
+          <!-- `favorite-border` (outline), not the filled `favorite`: a filled
+               heart is the card's ON state and on a tab would read as "already
+               favourited" rather than "your favourites live here". -->
           <template #icon-left>
             <OIcon name="favorite-border" size="sm" class="shrink-0" />
           </template>
@@ -140,27 +123,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!--
-      The filter row.
+      The filter row. Its own line, not a slot in the toolbar: a matcher's width
+      is unbounded (a regex value, any number of them), so it needs the full width.
 
-      Its own line, not a slot in the toolbar: filters are the one control here
-      whose width is UNBOUNDED (a matcher is `label=value`, the value can be a
-      regex, and there can be any number of them), and sharing a line with the
-      fixed-width mode toggle and time cluster meant they were permanently
-      squeezed. Given the full width, the chips simply fit.
-
-      ALWAYS present in grid mode, never `v-if="labelFilters.length"`. A row that
-      appears with the first filter would push the whole grid down at the exact
-      moment the user is reading it — the same shift we removed from the facet
-      panel's Clear control. The picker is the row's resting state, so the height
-      is identical at zero filters and at ten.
+      ALWAYS present in grid mode, never `v-if="labelFilters.length"` — a row that
+      appeared with the first filter would push the grid down as the user reads it.
 
       Explore + Workspace only: in Visualize the PromQL query carries its own
-      matchers, so a filter bar would be a second, conflicting way to say the
-      same thing — the same split Logs' visualize uses.
+      matchers, so a filter bar would conflict with it.
     -->
     <div
       v-if="isGridMode"
-      class="flex items-center gap-2 shrink-0 p-[0.375rem] border-b border-border-default"
+      class="flex items-center gap-2 shrink-0 p-1.5 border-b border-border-default"
       data-test="metrics-explorer-filter-row"
     >
       <!-- No "Filters" caption: the chips already read `action = accept_challenge`
@@ -219,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="flex items-center gap-1">
                 <span>{{ rail.label }}</span>
                 <span
-                  class="w-4 shrink-0 text-right text-[0.6875rem] font-semibold tabular-nums text-primary"
+                  class="w-4 shrink-0 text-right text-2xs font-semibold tabular-nums text-primary"
                   :data-test="`metrics-explorer-rail-count-${rail.id}`"
                   >{{ rail.count || "" }}</span
                 >
@@ -254,12 +228,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-else-if="grid.activeRail.value === 'type'"
-          class="flex flex-col min-h-0"
+          class="flex flex-col min-h-0 flex-1 py-2"
         >
-          <!-- Type has no facet search, but carries the SAME always-present
-               "Clear filters" row so the affordance is consistent across all
-               three facets. Count + button always shown; button disabled when
-               nothing is selected — no disappearing controls, no shift. -->
+          <!-- Type search — narrows the type LIST (mirrors the prefix/suffix
+               rails). The flex-1/py-2 above match the PrefixFilterPanel wrapper
+               (class="flex-1 min-h-0 py-2") so the search box sits at the exact
+               same Y when switching Prefix / Suffix / Type. px-2 matches the
+               facet toggle's horizontal padding above. -->
+          <div class="px-2 pb-2">
+            <OInput
+              v-model="typeSearch"
+              size="sm"
+              clearable
+              :placeholder="t('metrics.explorer.facets.searchTypes')"
+              :aria-label="t('metrics.explorer.facets.searchTypesAria')"
+              data-test="metrics-explorer-type-search"
+            />
+          </div>
+          <!-- Always-present "Clear filters" row so the affordance is consistent
+               across all three facets. Count + button always shown; button
+               disabled when nothing is selected — no disappearing controls. -->
           <div
             class="flex items-center justify-between gap-2 px-3 pb-2"
           >
@@ -281,12 +269,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                composable / URL state — the array<->Set conversion is confined to
                this one binding (`selectedTypesArray`). -->
           <OCheckboxGroup
+            v-if="visibleTypeFacets.length"
             :model-value="selectedTypesArray"
             class="px-3 pb-2 overflow-y-auto"
             @update:model-value="onSelectedTypesChange"
           >
             <OCheckbox
-              v-for="facet in grid.typeFacets.value"
+              v-for="facet in visibleTypeFacets"
               :key="facet.id"
               size="xs"
               :value="facet.id"
@@ -294,6 +283,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`metrics-explorer-type-${facet.id}`"
             />
           </OCheckboxGroup>
+          <OEmptyState
+            v-else
+            size="inline"
+            icon="search-off"
+            :title="t('metrics.explorer.facets.noTypeMatch')"
+            data-test="metrics-explorer-type-empty"
+          />
         </div>
       </aside>
 
@@ -386,11 +382,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </OToggleGroup>
 
-          <!-- Convert to dashboard — the bridge from ephemeral Favourites to a
-               durable Dashboard: each favourite becomes a panel. FAVOURITES only,
-               where they are what's on screen, so "convert what I'm looking at"
-               is unambiguous. This is why Favourites needs no save of its own —
-               you promote it to a real Dashboard instead. -->
+          <!-- Convert to dashboard: each favourite becomes a panel. FAVOURITES
+               only, where they are what's on screen. -->
           <OButton
             v-if="isWorkspace && grid.favorites.value.length"
             variant="outline"
@@ -586,6 +579,7 @@ import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import { isEqual, debounce } from "lodash-es";
 
@@ -595,6 +589,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCheckboxGroup from "@/lib/forms/Checkbox/OCheckboxGroup.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -653,10 +648,7 @@ const ROW_GAP = 12;
 const CARD_HEIGHT = 224;
 /**
  * Card height + the gap. The row box is sized to exactly this.
- *
- * The same in both views: rows view used to squeeze the card into 76px, which
- * left the chart a 56px strip — too short to read, which defeats the point of
- * the wider layout. One constant rather than two, so they cannot drift.
+ * The same in both views (one constant rather than two, so they cannot drift).
  */
 const ROW_HEIGHT = CARD_HEIGHT + ROW_GAP;
 
@@ -669,6 +661,7 @@ export default defineComponent({
     OIcon,
     OCheckbox,
     OCheckboxGroup,
+    OInput,
     OSearchInput,
     OSpinner,
     OEmptyState,
@@ -702,7 +695,7 @@ export default defineComponent({
     });
     const selectedDate = ref<any>(defaultSelectedDate());
 
-    const isDark = computed(() => store.state.theme === "dark");
+    const { isDark } = useTheme();
     const isGrid = computed(() => grid.viewMode.value === "grid");
     // The rendered slice. Colour index is a card's position here, which is a
     // prefix of the full sorted set, so colours stay stable as pages are added.
@@ -735,9 +728,6 @@ export default defineComponent({
 
     /* ---------------------------------------------------------- toolbar */
 
-    // No "Recent". It ranked by what you had opened, which in practice is a
-    // handful of metrics out of thousands — so the option mostly reordered
-    // nothing, and it made the sort control a three-way choice to say it.
     const sortOptions = computed(() => [
       { value: "a-z", label: t("metrics.explorer.sortAsc") },
       { value: "z-a", label: t("metrics.explorer.sortDesc") },
@@ -1070,6 +1060,17 @@ export default defineComponent({
       grid.selectedTypes.value = new Set(next.map(String));
       trackFilter("type");
     };
+
+    // Type-rail search — narrows the type LIST (mirrors the prefix/suffix rails).
+    // Matches against the human label (BADGE_LABELS), falling back to the id.
+    const typeSearch = ref("");
+    const visibleTypeFacets = computed(() => {
+      const term = typeSearch.value.trim().toLowerCase();
+      if (!term) return grid.typeFacets.value;
+      return grid.typeFacets.value.filter((facet: { id: string }) =>
+        (BADGE_LABELS[facet.id] ?? facet.id).toLowerCase().includes(term),
+      );
+    });
 
     const onPrefixChange = (next: Set<string>) => {
       grid.selectedPrefixes.value = next;
@@ -1636,9 +1637,7 @@ export default defineComponent({
           // it was hidden can never come back otherwise (hidden ⇒ not rendered ⇒
           // not queried ⇒ still hidden). The sweep re-queries them WHERE THEY ARE,
           // still hidden, and they return to the grid only if they now have
-          // samples. Un-hiding them first (which is what this used to do) put
-          // every no-data card back on screen and left the ones nobody scrolled
-          // to sitting there.
+          // samples.
           //
           // An auto-refresh tick sweeps too, but without `skipCache` — it picks
           // up cards the user has not reached yet and leaves the known-empty ones
@@ -1764,6 +1763,8 @@ export default defineComponent({
       onClearAllFilters,
       selectedTypesArray,
       onSelectedTypesChange,
+      typeSearch,
+      visibleTypeFacets,
       onPrefixChange,
       onSuffixChange,
       onAddLabelFilter,

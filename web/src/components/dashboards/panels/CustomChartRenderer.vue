@@ -17,13 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
+  <div class="h-full w-full"
     data-test="chart-renderer"
     ref="chartRef"
     id="chart"
     @mouseover="handleMouseOver"
     @mouseleave="handleMouseLeave"
-    style="height: 100%; width: 100%"
   ></div>
 </template>
 
@@ -54,6 +53,7 @@ import {
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 import DOMPurify from "dompurify";
+import { withChartFont } from "@/utils/fonts";
 
 // Register necessary components.
 // echarts' subpath type decls (echarts/components, echarts/renderers) resolve to
@@ -183,13 +183,9 @@ export default defineComponent({
       }
 
       try {
-        // convert/sanitize preserve the open user-authored shape, so re-narrow
-        // the result back to CustomChartData to read o2_events.
-        const convertedData = convertStringToFunction(
-          props.data,
-        ) as CustomChartData;
-        const safeChartOptions = deepSanitize(convertedData) as CustomChartData;
-        chart.setOption(safeChartOptions);
+        const convertedData = convertStringToFunction(props.data);
+        const safeChartOptions = deepSanitize(convertedData);
+        chart.setOption(withChartFont(safeChartOptions));
 
         const o2Events = convertedData.o2_events;
         if (o2Events) {

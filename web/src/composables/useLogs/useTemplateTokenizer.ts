@@ -138,16 +138,16 @@ export function wildcardChipColor(token: string, sampleValues?: any[]): string {
 export function chipColorForLabel(label: string): string {
   const colorMap: Record<string, string> = {
     ip:      "bg-label-chip-ip-bg text-label-chip-ip-text",
-    ipv4:    "bg-label-chip-ipv4-bg text-label-chip-ipv4-text",
-    ipv6:    "bg-label-chip-ipv6-bg text-label-chip-ipv6-text",
+    ipv4:    "bg-label-chip-ip-bg text-label-chip-ip-text",
+    ipv6:    "bg-label-chip-ip-bg text-label-chip-ip-text",
     method:  "bg-label-chip-method-bg text-label-chip-method-text",
     url:     "bg-label-chip-url-bg text-label-chip-url-text",
     num:     "bg-label-chip-num-bg text-label-chip-num-text",
     float:   "bg-label-chip-float-bg text-label-chip-float-text",
     hex:     "bg-label-chip-hex-bg text-label-chip-hex-text",
     ts:      "bg-label-chip-ts-bg text-label-chip-ts-text",
-    date:    "bg-label-chip-date-bg text-label-chip-date-text",
-    time:    "bg-label-chip-time-bg text-label-chip-time-text",
+    date:    "bg-label-chip-ts-bg text-label-chip-ts-text",
+    time:    "bg-label-chip-ts-bg text-label-chip-ts-text",
     id:      "bg-label-chip-id-bg text-label-chip-id-text",
     email:   "bg-label-chip-email-bg text-label-chip-email-text",
     str:     "bg-label-chip-str-bg text-label-chip-str-text",
@@ -291,7 +291,7 @@ export function inferTypeFromValues(rawValues: any[]): string {
 
 /**
  * Generate a human-readable explanation of why a pattern is flagged as an
- * anomaly, using the statistical fields the backend now provides.
+ * anomaly, using the statistical fields the backend provides.
  */
 export function anomalyExplanation(
   pattern: {

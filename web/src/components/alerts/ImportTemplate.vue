@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -21,23 +21,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     test-prefix="template"
     :is-importing="isTemplateImporting"
     container-class=""
-    container-style=""
     @back="arrowBackFn"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Template-specific Error Display -->
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
+      <div class="w-full h-full flex flex-col border-l border-border-default min-w-100">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
-          class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0"
+          class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
           {{ templateErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
         </div>
-        <div v-else class="text-center text-[0.9375rem] font-semibold text-text-primary py-3 shrink-0">Output Messages</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
         <OSeparator class="mt-1 shrink-0" />
-        <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-[400px]">
+        <div class="flex-1 min-h-0 overflow-auto [resize:none] w-full min-w-100">
         <!-- Template Errors Section -->
         <div
           class="error-section p-2.5 mb-2.5"
@@ -58,14 +57,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`template-import-error-${index}-${errorIndex}`"
               >
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'template_name'
                   "
                 >
                   {{ errorMessage.message }}
-                  <div style="width: 300px">
+                  <div class="w-75">
                     <OInput
                       data-test="template-import-name-input"
                       :model-value="userSelectedTemplateNames[index] || ''"
@@ -80,14 +79,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </span>
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'body'
                   "
                 >
                   {{ errorMessage.message }}
-                  <div style="width: 300px">
+                  <div class="w-75">
                     <OInput
                       data-test="template-import-body-input"
                       :model-value="userSelectedTemplateBodies[index] || ''"
@@ -103,14 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'type'
                   "
                 >
                   {{ errorMessage.message }}
-                  <div style="width: 300px">
+                  <div class="w-75">
                     <OSelect
                       data-test="template-import-type-input"
                       :model-value="userSelectedTemplateTypes[index] || ''"
@@ -125,14 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </span>
                 <span
-                  class="text-red"
+                  class="text-status-negative"
                   v-else-if="
                     typeof errorMessage === 'object' &&
                     errorMessage.field == 'title'
                   "
                 >
                   {{ errorMessage.message }}
-                  <div style="width: 300px">
+                  <div class="w-75">
                     <OInput
                       data-test="template-import-title-input"
                       :model-value="userSelectedTemplateTitles[index] || ''"
@@ -146,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </div>
                 </span>
-                <span class="text-red" v-else>{{ errorMessage }}</span>
+                <span class="text-status-negative" v-else>{{ errorMessage }}</span>
               </div>
             </div>
           </div>
@@ -169,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="{
                 'error-item py-1.25 px-0 text-sm wrap-break-word font-bold': true,
                 'text-green ': val.success,
-                'text-red': !val.success,
+                'text-status-negative': !val.success,
               }"
               :data-test="`template-import-creation-${index}-message`"
             >

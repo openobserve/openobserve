@@ -73,6 +73,13 @@ export interface SelectProps {
   /** Hides already selected options in multiple mode */
   hideSelected?: boolean;
   /**
+   * Makes group headers (options with `header: true`) clickable to collapse /
+   * expand their items — an accordion inside the dropdown. Default off, so
+   * existing selects are unaffected. Ignored while a search term is active
+   * (search always spans every group).
+   */
+  collapsibleGroups?: boolean;
+  /**
    * Renders a "Select All" master row at the top of the dropdown (multi-select
    * listbox mode only). Shows an indeterminate dash when only some options are
    * selected, a check when all are, and toggles the entire selection on click.
@@ -171,7 +178,7 @@ export interface SelectSlots {
   "icon-left"?: () => unknown;
   /**
    * Tooltip content rendered inside an info icon in the label area.
-   * Provide a `<q-tooltip>` element as the slot content.
+   * Provide a tooltip element as the slot content.
    */
   tooltip?: () => unknown;
 }

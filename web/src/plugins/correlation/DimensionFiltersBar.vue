@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="py-2 px-4 border-b border-solid border-[var(--o2-border-color)]"
+    class="py-2 px-4 border-b border-solid border-card-glass-border"
   >
     <div class="flex items-center gap-3 flex-wrap">
       <span class="text-xs font-semibold opacity-70">

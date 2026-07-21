@@ -30,34 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header-right>
       <div
         v-if="indexData.name"
-        :class="[
-          'flex items-center gap-1.5 px-2 py-1 rounded-md border',
-          store.state.theme === 'dark'
-            ? 'bg-gray-800/50 border-gray-600'
-            : 'bg-gray-50 border-gray-200',
-        ]"
+        class="flex items-center gap-1.5 px-2 py-1 rounded-default border bg-surface-panel border-border-default"
       >
         <img
           :src="getTimelineIcon"
           alt="Timeline Icon"
-          class="w-[14px] h-[14px] opacity-70"
+          class="w-3.5 h-3.5 opacity-70"
         />
         <div class="flex items-center gap-1.5">
           <span
-            :class="[
-              'text-[10px] font-medium px-1.5 py-0.5 rounded',
-              store.state.theme === 'dark'
-                ? 'text-gray-300 bg-gray-700/50'
-                : 'text-gray-600 bg-gray-100',
-            ]"
+            class="text-3xs font-medium px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
           >
             UTC
           </span>
           <div
-            :class="[
-              'text-xs font-semibold',
-              store.state.theme === 'dark' ? 'text-gray-200' : 'text-gray-800',
-            ]"
+            class="text-xs font-semibold text-text-body"
           >
             {{ indexData.stats.doc_time_min }}
             <span class="text-base leading-none">→</span>
@@ -93,23 +80,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="docs-count-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       Events
                     </div>
@@ -122,12 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{
                       parseInt(indexData.stats.doc_num).toLocaleString("en-US")
@@ -138,23 +110,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Storage Size Tile -->
               <div class="tile" data-test="storage-size-tile">
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       {{ t("logStream.storageSize") }}
                     </div>
@@ -167,12 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{ formatSizeFromMB(indexData.stats.storage_size) }}
                   </div>
@@ -185,23 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="compressed-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       {{ t("logStream.compressedSize") }}
                     </div>
@@ -214,12 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{ formatSizeFromMB(indexData.stats.compressed_size) }}
                   </div>
@@ -232,23 +174,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="index-size-tile"
               >
                 <div
-                  class="tile-content rounded-lg p-3 text-center border shadow-sm h-20 flex flex-col justify-between"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'tile-content-dark border-gray-700'
-                      : 'tile-content-light border-gray-200'
-                  "
+                  class="tile-content rounded-default p-3 text-center border h-20 flex flex-col justify-between bg-surface-base border-border-default"
                 >
                   <div
                     class="tile-header flex justify-between items-start"
                   >
                     <div
-                      class="tile-title text-xs font-bold text-left"
-                      :class="
-                        store.state.theme === 'dark'
-                          ? 'text-gray-400'
-                          : 'text-gray-500'
-                      "
+                      class="tile-title text-xs font-bold text-left text-text-secondary"
                     >
                       {{ t("logStream.indexSize") }}
                     </div>
@@ -261,12 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </div>
                   <div
-                    class="tile-value text-lg flex items-end justify-start"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-900'
-                    "
+                    class="tile-value text-lg flex items-end justify-start text-text-body"
                   >
                     {{ formatSizeFromMB(indexData.stats.index_size) }}
                   </div>
@@ -276,12 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="w-full flex flex-1 min-h-0 gap-2">
               <!--  left section(includes tabs and schema settings) -->
               <div
-                :class="[
-                  'w-[100%] h-full min-h-0 rounded-lg border shadow-sm p-2 flex flex-col overflow-hidden',
-                  store.state.theme === 'dark'
-                    ? 'bg-[#181A1B] border-gray-700'
-                    : 'bg-white border-gray-200',
-                ]"
+                class="w-full h-full min-h-0 rounded-default border p-2 flex flex-col overflow-hidden bg-surface-base border-border-default"
               >
                 <div>
                   <div class="flex justify-start">
@@ -335,12 +257,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div
                       v-if="indexData.defaultFts"
-                      style="font-weight: 400"
-                      class="mt-[12px]"
+                      class="mt-3 font-normal"
                     >
                       <label
-                        style="font-weight: 600"
-                        class="bg-[#f9f290] py-1 px-4 rounded border border-[#f5a623] text-[#865300]"
+                        class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text font-semibold"
                       >
                         {{ t("logStream.mapping") }} Default FTS keys used (no
                         custom keys set).</label
@@ -383,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon
                           name="info"
                           size="sm"
-                          style="color: #f5a623; cursor: pointer"
+                          class="text-status-warning-text cursor-pointer"
                         />
                         <OTooltip
                           side="right"
@@ -415,7 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <div class="mb-3" v-if="isDialogOpen">
-                    <OCard class="add-fields-card">
+                    <OCard class="w-screen max-w-full flex flex-col">
                       <!-- Header Section -->
                       <OCardSection
                         class="p-0"
@@ -436,12 +356,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </OCardSection>
                       <!-- Main Content (Scrollable if necessary) -->
                       <OCardSection
-                        class="p-0"
+                        class="p-0 flex-1 overflow-y-auto mb-0.5"
                         style="
-                          flex: 1;
-                          overflow-y: auto;
                           padding: 0px 16px 0px 16px;
-                          margin-bottom: 2px;
                         "
                       >
                         <OForm
@@ -464,12 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- OTable fills the remaining height inside the schemaSettings flex column -->
                   <div
-                    :class="[
-                      'flex-1 min-h-0 flex flex-col overflow-hidden',
-                      store.state.theme === 'dark'
-                        ? 'dark-theme-table'
-                        : 'light-theme-table',
-                    ]"
+                    class="flex-1 min-h-0 flex flex-col overflow-hidden"
                   >
                     <OTable
                       data-test="schema-log-stream-field-mapping-table"
@@ -492,7 +404,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #cell-name="{ row }">
                         <div class="flex items-center">
-                          <span class="field-name-text" :data-test="`schema-field-name-cell-${row.name}`">
+                          <span class="inline-block max-w-full truncate" :data-test="`schema-field-name-cell-${row.name}`">
                             {{ row.name }}
                           </span>
                           <span
@@ -502,9 +414,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <img
                               :src="quickModeIcon"
                               :alt="t('logStream.envQuickModeMsg')"
-                              class="w-[20px] h-[20px]"
+                              class="w-5 h-5"
                             />
-                            <OTooltip class="text-[12px] w-[200px]">
+                            <OTooltip class="text-xs w-50">
                               {{ t("logStream.envQuickModeMsg") }}
                             </OTooltip>
                           </span>
@@ -535,7 +447,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :options="indexTypeOptionsForRow(row)"
                             label-key="label"
                             value-key="value"
-                            class="min-h-[24px]! max-h-[24px]! h-[24px]! text-[0.813rem]"
+                            class="min-h-6! max-h-6! h-6! text-compact"
                             multiple
                             clearable
                             size="sm"
@@ -560,7 +472,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                         >
                           <span
-                            class="text-[#5960B2] cursor-pointer"
+                            class="text-brand-indigo cursor-pointer"
                             :data-test="`schema-field-${row.name}-pattern-action`"
                             @click="openPatternAssociationDialog(row.name)"
                           >
@@ -581,11 +493,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div v-if="activeMainTab == 'configuration'">
                   <div class="w-full h-full overflow-y-auto p-4 flex flex-col gap-4">
                     <!-- Configuration Settings Card -->
-                    <div class="rounded-lg border border-[var(--o2-border-color)] divide-y divide-[var(--o2-border-color)]">
+                    <div class="rounded-default border border-card-glass-border divide-y divide-card-glass-border">
 
                       <!-- Data Retention -->
                       <div v-if="showDataRetention" class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
+                        <label class="text-compact font-[500] text-text-heading">
                           Data Retention (days)
                         </label>
                         <OInput
@@ -593,21 +505,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="dataRetentionDays"
                           type="number"
                           min="1"
-                          class="max-w-[220px]"
+                          class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
                         <!-- casts: number input can hold "" at runtime while cleared -->
                         <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
                           Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         </small>
-                        <small v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''" class="text-[var(--o2-status-error-text)]">
+                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-status-error-text">
                           Retention period must be at least 1 day
                         </small>
                       </div>
 
                       <!-- Max Query Range -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
+                        <label class="text-compact font-[500] text-text-heading">
                           Max Query Range (hours)
                         </label>
                         <OInput
@@ -615,7 +527,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="maxQueryRange"
                           type="number"
                           min="0"
-                          class="max-w-[220px]"
+                          class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
                         <small>Maximum time range allowed for queries. Set 0 for unlimited range.</small>
@@ -623,7 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                       <!-- Flatten Level -->
                       <div class="flex flex-col gap-1 p-3">
-                        <label class="text-[0.8125rem] font-[500]" style="color: var(--o2-text-heading)">
+                        <label class="text-compact font-[500] text-text-heading">
                           {{ t("logStream.flattenLevel") }}
                         </label>
                         <OInput
@@ -631,14 +543,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-model="flattenLevel"
                           type="number"
                           min="0"
-                          class="max-w-[220px]"
+                          class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
                         <small>Global is {{ store.state.zoConfig.ingest_flatten_level || 3 }}</small>
                       </div>
 
                       <!-- Toggles -->
-                      <div class="flex items-center justify-between px-3 py-2.5 text-[13px]">
+                      <div class="flex items-center justify-between px-3 py-2.5 text-compact">
                         <span>Use Stream Stats for Partitioning</span>
                         <OSwitch
                           data-test="log-stream-use_approx-toggle-btn"
@@ -647,7 +559,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
 
-                      <div v-if="showStoreOriginalDataToggle" class="flex items-center justify-between px-3 py-2.5 text-[13px]">
+                      <div v-if="showStoreOriginalDataToggle" class="flex items-center justify-between px-3 py-2.5 text-compact">
                         <span>Store Original Data</span>
                         <OSwitch
                           data-test="log-stream-store-original-data-toggle-btn"
@@ -656,7 +568,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
 
-                      <div class="flex items-center justify-between px-3 py-2.5 text-[13px]">
+                      <div class="flex items-center justify-between px-3 py-2.5 text-compact">
                         <span>Enable Distinct Values</span>
                         <OSwitch
                           data-test="log-stream-enabled-distinct-values-toggle-btn"
@@ -674,10 +586,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-col h-full min-h-0 overflow-hidden"
                 >
                   <div
-                    class="bg-[#f9f290] py-1 px-4 rounded border border-[#f5a623] text-[#865300] mt-2"
+                    class="bg-banner-warning-bg py-1 px-4 rounded-default border border-banner-warning-border text-banner-warning-text mt-2"
                     style="width: fit-content"
                   >
-                    <span style="font-weight: 600">
+                    <span class="font-semibold">
                       <OIcon name="info" class="mr-1" size="sm" />
 
                       Additional
@@ -719,11 +631,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :show-global-filter="false"
                         :default-columns="false"
                         dense
-                        :class="
-                          store.state.theme == 'dark'
-                            ? 'o2-last-row-border-dark o2-schema-table-header-sticky-dark'
-                            : 'o2-last-row-border-light o2-schema-table-header-sticky-light'
-                        "
                         :style="{ height: '100%' }"
                       />
                     </div>
@@ -757,7 +664,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 </div>
                 <!-- floating footer for the table -->
-                <div class="floating-buttons flex-shrink-0 px-2 py-1">
+                <div class="sticky bottom-0 z-1 w-full mt-auto bg-card-glass-solid flex-shrink-0 px-2 py-1">
                   <div
                     v-if="indexData.schema.length > 0"
                     class="flex items-center justify-between"
@@ -925,6 +832,7 @@ import {
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import {
   convertUnixToDateFormat as convertUnixToFormat,
   formatTimestamp,
@@ -1052,6 +960,7 @@ export default defineComponent({
     }
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -1086,9 +995,9 @@ export default defineComponent({
 
     const patternIdToApplyAtMap = new Map();
 
-    // The "Add Field(s)" rows are owned by a small TanStack form (StreamFieldInputs
-    // is form-only now). Writes go through the form (push/remove/reset); reads use
-    // the reactive `newSchemaFields` view below — single source of truth, no mirror.
+    // The "Add Field(s)" rows are owned by a small TanStack form. Writes go through
+    // the form (push/remove/reset); reads use the reactive `newSchemaFields` view
+    // below — single source of truth, no mirror.
     const newSchemaFieldsForm = useOForm<{ newSchemaFields: any[] }>({
       defaultValues: { newSchemaFields: [] },
       schema: makeSchemaFieldsSchema(t),
@@ -1109,14 +1018,8 @@ export default defineComponent({
       (indexData.value.schema || []).map((f: any) => f.name).sort(),
     );
     const isDialogOpen = ref(false);
-    // Holds Record<field, PatternAssociation[]> after grouping, PatternAssociation[]
-    // transiently while saving — hence `any`.
-    const patternAssociations = ref<any>([]);
-    // Loading-toast dismisser created in getSchema; also used by setSchema.
-    let dismiss: () => void = () => {};
-    // The child (StreamFieldInputs) owns row deletion now and no longer emits a
-    // @remove event, so observe the row count: when rows drain to empty while the
-    // dialog is open, close it (restores main's behavior).
+    // Observe the row count: whenever the rows drain to empty while the dialog is
+    // open, close it.
     watch(
       () => newSchemaFields.value.length,
       (len) => {
@@ -2102,8 +2005,7 @@ export default defineComponent({
     // NOTE: adding/removing "Add Field(s)" rows is owned by the child
     // (StreamFieldInputs) via form.pushFieldValue / form.removeFieldValue. The
     // parent seeds the first row in openDialog and closes the dialog when the
-    // rows drain to empty via the watch above — so no add/remove handlers live
-    // here anymore.
+    // rows drain to empty via the watch above.
 
     const scrollToAddFields = () => {
       const el = document.getElementById("schema-add-fields-section");
@@ -2595,7 +2497,7 @@ export default defineComponent({
     };
     //this function is used to check if the option is present in the default env
     //if present then we will return true else false
-    //this is used to show the tooltip in the q-select for disabled options
+    //this is used to show the tooltip in the select for disabled options
     //why there are disabled
     const checkIfOptionPresentInDefaultEnv = (
       name: string,
@@ -2635,8 +2537,7 @@ export default defineComponent({
     };
 
     // OSelect doesn't have a max-values prop; enforce it client-side instead.
-    // Trims the selection to the last 2 values picked (matches old q-select
-    // :max-values="2" behaviour: silently caps at 2).
+    // Trims the selection to the last 2 values picked (silently caps at 2).
     const MAX_INDEX_TYPES = 2;
     const enforceMaxIndexTypes = (value: any) => {
       if (!Array.isArray(value)) return value;
@@ -2677,18 +2578,18 @@ export default defineComponent({
     };
 
     const quickModeIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/quick_mode_light.svg")
         : getImageURL("images/common/quick_mode.svg");
     });
 
     const getConfigIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/streams/config_light.svg")
         : getImageURL("images/streams/config.svg");
     });
     const getTimelineIcon = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/streams/timeline_light.svg")
         : getImageURL("images/streams/timeline.svg");
     });
@@ -2821,34 +2722,66 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.indexDetailsContainer .o2-schema-table {
+<style scoped>
+/* keep(lib-override:otable): reaches into the OTable-rendered thead/tbody DOM
+   to tune the schema table's header/row sizing — not expressible as utilities
+   on this template. */
+.indexDetailsContainer :deep(.o2-schema-table) {
   border-radius: 0.5rem;
   position: relative;
-  border: 0.0625rem solid var(--o2-border-color);
+  border: 0.0625rem solid var(--color-card-glass-border);
 }
 
-.indexDetailsContainer .o2-schema-table thead tr {
+.indexDetailsContainer :deep(.o2-schema-table thead tr) {
   height: 2.5rem;
   background: var(--color-table-header-bg) !important;
 }
 
-.indexDetailsContainer .o2-schema-table thead tr th {
+.indexDetailsContainer :deep(.o2-schema-table thead tr th) {
   font-size: var(--text-xs);
-  height: 35px;
+  height: 2.1875rem;
 }
 
-.indexDetailsContainer .o2-schema-table .o2-schema-table tbody td:after {
+.indexDetailsContainer :deep(.o2-schema-table .o2-schema-table tbody td:after) {
   background: none !important;
 }
 
-.indexDetailsContainer .o2-schema-table tbody tr {
-  height: 15px;
+.indexDetailsContainer :deep(.o2-schema-table tbody tr) {
+  height: 0.9375rem;
 }
 
-.indexDetailsContainer .o2-schema-table tbody tr td {
-  font-size: 0.875rem;
-  height: 25px;
-  padding: 0px 5px;
+.indexDetailsContainer :deep(.o2-schema-table tbody tr td) {
+  font-size: var(--text-sm);
+  height: 1.5625rem;
+  padding: 0 0.3125rem;
+}
+
+/* !important is load-bearing: the `tbody tr td` rule above is more specific
+   and would otherwise win the padding-left. */
+.indexDetailsContainer :deep(th:first-child),
+.indexDetailsContainer :deep(td:first-child) {
+  padding-left: 0.5rem !important;
+}
+
+.indexDetailsContainer :deep(th:nth-child(5)),
+.indexDetailsContainer :deep(td:nth-child(5)) {
+  min-width: 15rem;
+  width: 15rem;
+  max-width: 15rem;
+}
+
+/* The !important here outranks the less-specific `thead tr th` / `tbody tr td`
+   rules above. */
+.o2-schema-table :deep(th),
+.o2-schema-table :deep(td) {
+  height: 0.875rem !important;
+  min-height: 0.875rem !important;
+  padding: 0.125rem 0.1875rem !important;
+}
+
+.o2-schema-table :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 </style>

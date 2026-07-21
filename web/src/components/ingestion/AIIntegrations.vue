@@ -80,14 +80,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon>
                         <img
                           v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
-                          :src="(store.state.theme === 'dark' && integration.logoDark) || integration.logo"
+                          :src="(isDark && integration.logoDark) || integration.logo"
                           :alt="`${integration.name} logo`"
-                          class="ai-menu-logo"
+                          class="w-4.5 h-4.5 rounded-default flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"
                           @error="onLogoError(integration.slug)"
                         />
-                        <span v-else class="ai-menu-mono" aria-hidden="true">{{
+                        <span
+                          v-else
+                          class="w-4.5 h-4.5 rounded-default flex-none grid place-items-center bg-theme-accent text-text-inverse text-3xs font-bold leading-none"
+                          aria-hidden="true"
+                        >{{
                           integration.name.charAt(0)
                         }}</span>
                       </template>
@@ -101,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template v-slot:after>
           <div class="w-full h-full">
-            <div class="card-container h-full" data-test="ai-integrations-detail-pane">
+            <div class="bg-card-glass-bg h-full" data-test="ai-integrations-detail-pane">
               <div class="overflow-auto h-full pt-0.5">
                 <router-view />
               </div>
@@ -117,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
@@ -130,6 +135,7 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const route = useRoute();
 
@@ -223,6 +229,7 @@ export default defineComponent({
     return {
       t,
       store,
+      isDark,
       aiCategories,
       selectedCategory,
       selectedIntegration,
@@ -238,26 +245,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-/* Sidebar provider logo / monogram — every item gets a marker (logo URL from the
-   manifest, else a lettered tile in the app theme color, matching the card hero). */
-.ai-menu-logo,
-.ai-menu-mono {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  flex: none;
-}
-.ai-menu-logo {
-  object-fit: contain;
-}
-.ai-menu-mono {
-  display: grid;
-  place-items: center;
-  background: var(--q-primary, #3f7994);
-  color: #fff;
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1;
-}
-</style>

@@ -16,18 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <PageLayout
+    <OPageLayout bleed
       v-if="!showImportTemplate && !showTemplateEditor"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+      :title="t('alert_templates.header')"
+      icon="description"
+      :subtitle="'Reusable alert message templates'"
     >
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-      <template #header>
-      <AppPageHeader
-        :title="t('alert_templates.header')"
-        icon="description"
-        :subtitle="'Reusable alert message templates'"
-      >
         <template #actions>
           <OToggleGroup
             :model-value="activeTab"
@@ -63,9 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t(`alert_templates.add`) }}</OButton
           >
         </template>
-      </AppPageHeader>
-      </template>
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         data-test="alert-templates-list-table"
@@ -83,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         sorting="client"
         filter-mode="client"
         :default-columns="false"
+        show-index
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
@@ -188,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedTemplates.length > 0"
           #bottom
         >
-          <span class="text-xs text-text-primary">
+          <span class="text-xs text-text-secondary">
             {{ selectedTemplates.length }} selected
           </span>
           <OButton
@@ -203,8 +196,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </PageLayout>
-    <div v-else-if="!showImportTemplate && showTemplateEditor">
+    </OPageLayout>
+    <div v-else-if="!showImportTemplate && showTemplateEditor" class="flex-1 min-h-0">
       <AddTemplate
         :template="editingTemplate"
         :is-clone="cloningTemplate"
@@ -259,14 +252,12 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const AddTemplate = defineAsyncComponent(
   () => import("@/components/alerts/AddTemplate.vue"),
@@ -278,13 +269,6 @@ const router = useRouter();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
 const columns: OTableColumnDef[] = [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("alert_templates.name"),
@@ -370,10 +354,7 @@ const getTemplates = () => {
     })
     .then((res) => {
       resultTotal.value = res.data.length;
-      templates.value = res.data.map((data: any, index: number) => ({
-        ...data,
-        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-      }));
+      templates.value = res.data;
       updateRoute();
     })
     .catch((err) => {
@@ -534,8 +515,6 @@ const filterData = (rows: any, terms: any) => {
 const exportTemplate = (row: any) => {
   const findTemplate: any = getTemplateByName(row.name);
   const templateByName = { ...findTemplate };
-  if (Object.prototype.hasOwnProperty.call(templateByName, "#"))
-    delete templateByName["#"];
   const templateJson = JSON.stringify(templateByName, null, 2);
   const blob = new Blob([templateJson], { type: "application/json" });
   const url = URL.createObjectURL(blob);

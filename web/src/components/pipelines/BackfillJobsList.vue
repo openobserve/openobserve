@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="Status"
         clearable
         searchable
-        class="w-[150px]"
+        class="w-37.5"
         data-test="status-filter"
       />
       <OSelect
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         placeholder="Pipeline"
         clearable
         searchable
-        class="w-[250px]"
+        class="w-62.5"
         data-test="pipeline-filter"
       />
       <OButton
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Jobs Table -->
     <div class="flex-1 min-h-0 overflow-hidden">
-      <div class="rounded-lg h-full">
+      <div class="rounded-default h-full">
           <OTable
             ref="qTableRef"
             :frame="false"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Bottom footer -->
             <template #bottom="{ totalRows }">
               <div
-                class="flex items-center o2-table-footer-title mr-4 py-2"
+                class="flex items-center text-xs font-normal mr-4 py-2"
               >
                 {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
               </div>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OProgressBar>
                 </div>
                 <div
-                  class="text-xs text-text-primary whitespace-nowrap pr-2 w-24 shrink-0"
+                  class="text-xs text-text-body whitespace-nowrap pr-2 w-24 shrink-0"
                 >
                   <template v-if="row.chunks_total">
                     {{ row.chunks_completed || 0 }}/{{
@@ -278,22 +278,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="errorDialogData">
         <div class="mb-3">
-          <div class="text-xs text-gray-400">Job ID</div>
-          <div class="text-sm text-weight-medium">
+          <div class="text-xs text-text-label">Job ID</div>
+          <div class="text-sm font-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
         <div class="mb-3">
-          <div class="text-xs text-gray-400">Pipeline</div>
+          <div class="text-xs text-text-label">Pipeline</div>
           <div class="text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="text-xs text-gray-400 mb-2">Error Message</div>
-          <div class="p-3 rounded-md bg-[rgba(239,68,68,0.08)] border-l-[3px] border-l-[#ef4444] font-mono text-[13px] leading-[1.6] whitespace-pre-wrap wrap-break-word text-[#991b1b]">
+          <div class="text-xs text-text-label mb-2">Error Message</div>
+          <div class="p-3 rounded-default bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text">
             {{ errorDialogData.error }}
           </div>
         </div>

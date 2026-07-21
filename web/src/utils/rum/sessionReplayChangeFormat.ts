@@ -16,22 +16,16 @@
 /**
  * Session Replay "Change format" -> classic (rrweb V1) record converter.
  *
- * Background
- * ----------
- * The Datadog/OpenObserve browser SDK v7 rewrote how session-replay snapshots are
- * serialized. Instead of the classic rrweb-style tree, snapshots are now encoded as a
- * compact stream of "changes":
+ * The browser SDK v7 encodes session-replay snapshots as a compact stream of
+ * "changes" instead of the classic rrweb-style tree:
  *
- *   - FullSnapshot record (type 2) now carries `format: 1` and `data: Change[]`
- *     (previously `data: { node, initialOffset }`).
- *   - DOM mutations moved to a new Change record (type 12, `data: Change[]`)
- *     (previously an IncrementalSnapshot type 3 with source 0).
+ *   - FullSnapshot record (type 2) carries `format: 1` and `data: Change[]`.
+ *   - DOM mutations are a Change record (type 12, `data: Change[]`).
  *
- * `@openobserve/rrweb-player` only understands the classic V1 format, so feeding it the
- * new records renders a blank screen. This module converts the new records back into the
- * V1 records the player expects, mirroring exactly what the old SDK emitted.
+ * `@openobserve/rrweb-player` only understands the classic V1 format, so this module
+ * converts the new records back into the V1 records the player expects.
  *
- * Key facts about the encoding (from the SDK):
+ * Key facts about the encoding:
  *   - Node ids are NOT stored in the stream. They are assigned by a sequential counter
  *     (starting at 0) as nodes are serialized top-down in document order. The counter,
  *     the string table and the stylesheet table are all reset before EVERY full snapshot
@@ -103,7 +97,7 @@ const MediaInteractionType = {
 const VISUAL_VIEWPORT_RECORD_TYPE = 8;
 
 // ---------------------------------------------------------------------------
-// getValidTagName — replicates the old SDK serializationUtils.getValidTagName
+// getValidTagName — normalize a tag name to a valid HTML tag name
 // ---------------------------------------------------------------------------
 
 const TAG_NAME_REGEX = /[^a-z1-6-_]/;

@@ -17,23 +17,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   MonitorResults — Page shell for the Monitor Runs multi-tab page.
 
   Follows the LLMInsightsPage.vue pattern:
-    ROW 1: AppPageHeader (breadcrumb + title + badge + actions)
+    ROW 1: OPageHeader (breadcrumb + title + badge + actions)
     ROW 2: MonitorRuns (chrome-less tabbed content)
 -->
 <template>
-  <div
+  <OPageLayout
     data-test="synthetic-monitor-results-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="monitorName"
+    :subtitle="folderName"
+    :back="{
+      label: t('synthetics.results.monitors'),
+      to: { name: 'synthetic' },
+    }"
+    bleed
   >
-    <AppPageHeader
-      :title="monitorName"
-      :subtitle="folderName"
-      :back="{
-        label: t('synthetics.results.monitors'),
-        to: { name: 'synthetic' },
-      }"
-      class="px-4 border-b border-border-default"
-    >
       <template #title-trail>
         <!-- <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
           {{ statusBadge.label }}
@@ -72,8 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="refresh"
         />
       </template>
-    </AppPageHeader>
-
     <div class="flex-1 min-h-0 overflow-hidden">
       <MonitorRuns
         ref="runsRef"
@@ -86,10 +81,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @jump-to-window="onJumpToWindow"
       />
     </div>
-  </div>
+  </OPageLayout>
 
   <!-- ════════════ Run Detail Drawer ════════════ -->
   <ODrawer
+    bleed
     v-model:open="drawerOpen"
     side="right"
     :width="90"
@@ -113,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="default"
         size="sm"
         icon="link"
-        class="truncate max-w-[200px]"
+        class="truncate max-w-50"
       >
         {{ drawerUrl }}
       </OBadge>
@@ -134,7 +130,7 @@ import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";

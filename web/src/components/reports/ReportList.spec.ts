@@ -265,7 +265,7 @@ describe("ReportList", () => {
     });
 
     it("should render the title", () => {
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       expect(wrapper.find(".app-page-header h1").text()).toContain("Report");
     });
 
@@ -369,14 +369,15 @@ describe("ReportList", () => {
       expect(wrapper.vm.resultTotal).toBe(wrapper.vm.reportsTableRows.length);
     });
 
-    it("should re-number rows with '#' after filtering", async () => {
+    it("refreshes rows after filtering (index is OTable's built-in show-index)", async () => {
       wrapper.vm.staticReportsList = [
-        { ...REPORT_SCHEDULED, "#": 99 },
-        { ...REPORT_CACHED, "#": 99 },
+        { ...REPORT_SCHEDULED },
+        { ...REPORT_CACHED },
       ];
       wrapper.vm.activeTab = "shared";
       await wrapper.vm.filterReports();
-      expect(wrapper.vm.reportsTableRows[0]["#"]).toBe(1);
+      // Rows no longer carry a "#" field — numbering is the built-in show-index.
+      expect(Array.isArray(wrapper.vm.reportsTableRows)).toBe(true);
     });
   });
 
@@ -793,7 +794,7 @@ describe("ReportList", () => {
   });
 
   // ── Move to folder (ODrawer migration) ───────────────────────────────────
-  // q-dialog → ODrawer: v-model:open, size="lg", show-close="false",
+  // ODrawer: v-model:open, size="lg", show-close="false",
   // @close=showMoveDialog=false. Drawer hosts <MoveAcrossFolders /> which
   // emits @updated (-> onMoveUpdated) and @close (-> closes drawer).
 

@@ -17,14 +17,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="sessions_page flex flex-col flex-1 min-h-0 overflow-hidden">
     <div>
-      <div class="card-container border-b border-border-default py-[0.375rem] px-[0.375rem]">
+      <div class="bg-card-glass-bg border-b border-border-default py-1.5 px-page-edge">
         <div class="flex items-start gap-1">
           <!-- Query editor (flex-grow to fill available space) -->
           <div class="flex-1 min-w-0 relative">
             <query-editor
               ref="errorQueryEditorRef"
               editor-id="rum-errors-query-editor"
-              :class="['border', 'solid', 'border-[var(--o2-border-color)]', 'p-[0.25rem]', 'rounded-[0.375rem]', 'overflow-y-auto', errorEditorHeight]"
+              :class="['border', 'solid', 'border-card-glass-border', 'p-1', 'rounded-default', 'overflow-y-auto', errorEditorHeight]"
               v-model:query="errorTrackingState.data.editorValue"
               :debounce-time="300"
               :keywords="effectiveKeywords"
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div><!-- end controls -->
         </div><!-- end flex row -->
-      </div><!-- end card-container -->
+      </div><!-- end bg-card-glass-bg -->
     </div><!-- end toolbar wrapper -->
     <OSplitter
       class="logs-horizontal-splitter flex-1 min-h-0"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :horizontal="false"
     >
       <template #before>
-        <div class="card-container p-[0.325rem] h-full overflow-auto border-r border-border-default">
+        <div class="bg-surface-panel py-1 h-full overflow-auto border-r border-border-default">
           <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="h-full flex flex-col min-h-0">
           <!-- Errors-over-time chart + KPI summary -->
           <div
-            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-2 pt-1.5 h-[11rem] shrink-0"
+            class="grid grid-cols-1 lg:grid-cols-5 gap-2 px-page-edge pt-1.5 h-44 shrink-0"
           >
             <ErrorsOverTimeChart
               class="lg:col-span-3"
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Status / type / service filters -->
-          <div class="px-2 py-1.5">
+          <div class="px-page-edge py-1.5">
             <ErrorsFilterBar
               :status="statusFilter"
               :type="typeFilter"
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
 
-          <div class="card-container flex-1 min-h-0 overflow-hidden">
+          <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
           <OTable
             :data="visibleIssues"
             :columns="tableColumns"
@@ -444,9 +444,9 @@ const onServiceFilterChange = (value: string) => {
 // Dynamic editor height based on content lines
 const errorEditorHeight = computed(() => {
   const lines = (errorTrackingState.data.editorValue.match(/\n/g) || []).length + 1;
-  if (lines === 1) return 'h-[2rem]!';
-  if (lines === 2) return 'h-[3.5rem]!';
-  return 'h-[5rem]!'; // 3+ lines, capped at 5rem (approx 3 lines)
+  if (lines === 1) return 'h-8!';
+  if (lines === 2) return 'h-14!';
+  return 'h-20!'; // 3+ lines, capped at 5rem (approx 3 lines)
 });
 
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
@@ -657,6 +657,14 @@ const handleRowClick = (row: any) => {
   handleErrorTypeClick({ row });
 };
 
+// Severity spine flush against the row's left edge — same mechanism and
+// colors as the sessions table, for cross-page consistency.
+const getIssueStatusColor = (row: any) => {
+  if (row.error_handling === "handled")
+    return "var(--color-severity-warning-color)";
+  return "var(--color-severity-error-color)";
+};
+
 function restoreUrlQueryParams() {
   const queryParams = router.currentRoute.value.query;
 
@@ -720,22 +728,3 @@ useShortcuts([
   { id: "rumErrorsRefresh", handler: () => { if (!isInputFocused()) runQuery(); } },
 ]);
 </script>
-<style>
-.sessions_page .index-table :hover::-webkit-scrollbar,
-.sessions_page #tracesSearchGridComponent:hover::-webkit-scrollbar {
-  height: 0.8125rem;
-  width: 0.8125rem;
-}
-
-.sessions_page .index-table ::-webkit-scrollbar-track,
-.sessions_page #tracesSearchGridComponent::-webkit-scrollbar-track {
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  border-radius: 0.625rem;
-}
-
-.sessions_page .index-table ::-webkit-scrollbar-thumb,
-.sessions_page #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-  border-radius: 0.625rem;
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-}
-</style>

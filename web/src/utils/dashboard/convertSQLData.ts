@@ -23,6 +23,7 @@
  */
 import { convertSQLChartData } from "./sql";
 import { applySeriesColorMappings } from "./chartColorUtils";
+import { chartColor } from "@/utils/chartTheme";
 import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
 import {
   calculateGridPositions,
@@ -348,7 +349,6 @@ export const convertMultiSQLData = async (
       panelH,
       allMetricSeries.length,
     );
-    const isDark = store?.state?.theme === "dark";
     const longestText = allMetricSeries.reduce(
       (acc: string, s: any) =>
         (s._metricText ?? "").length > acc.length ? (s._metricText ?? "") : acc,
@@ -374,7 +374,7 @@ export const convertMultiSQLData = async (
         ((parseFloat(cell.left) + parseFloat(cell.width) / 2) / 100) * panelW;
       const cy =
         ((parseFloat(cell.top) + parseFloat(cell.height) / 2) / 100) * panelH;
-      const fill = s?._metricFillColor ?? (isDark ? "#fff" : "#000");
+      const fill = s?._metricFillColor ?? chartColor("--color-text-heading");
       // Grid-cell rect (px) is the hover zone; cx/cy/fontSize place + size the
       // copy icon beside the number, clamped inside the cell.
       s._metricLayout = {

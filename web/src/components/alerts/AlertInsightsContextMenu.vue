@@ -16,13 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="context-menu fixed z-9999 min-w-55 overflow-hidden bg-white border border-(--o2-border) rounded-md shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
-    :class="store.state.theme === 'dark' ? 'dark-theme bg-[#2d2d2d] border-[#444] shadow-[0_4px_12px_rgba(0,0,0,0.4)]' : 'light-theme'"
+    class="context-menu fixed z-9999 min-w-50 py-1 overflow-hidden bg-surface-overlay border border-border-default rounded-default shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
     :style="{ top: `${y}px`, left: `${x}px` }"
     @click.stop
     data-test="alert-insights-context-menu"
   >
-    <div class="menu-header px-4 py-2 text-xs font-semibold bg-[#f5f5f5] text-[#666]" :class="store.state.theme === 'dark' ? 'bg-[#1e1e1e] text-[#aaa]' : ''">
+    <div class="menu-header px-4 py-2 text-xs font-semibold bg-surface-subtle text-text-secondary">
       {{ isAlertNameContext ? value : panelTitle }}
     </div>
     <OSeparator />
@@ -72,7 +71,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
-import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -100,12 +98,9 @@ const emit = defineEmits<{
   "view-history": [string];
 }>();
 
-const store = useStore();
-
 const isAlertNameContext = computed(() => {
 
   // Check if we're clicking on a panel that shows alert names
-  // Use panelId for more reliable identification instead of panelTitle
   const alertNamePanels = [
     "Panel_Alert_Frequency",
     "Panel_Dedup_Impact",
@@ -163,20 +158,14 @@ onUnmounted(() => {
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(complex-state): `.menu-item` hover/active are state pseudo-classes on this
+   component's own elements, with no utility equivalent. */
 .context-menu .menu-item:hover {
-  background-color: #f5f5f5;
-}
-
-.context-menu.dark-theme .menu-item:hover {
-  background-color: #383838;
+  background-color: var(--color-dropdown-item-hover-bg);
 }
 
 .context-menu .menu-item:active {
-  background-color: #e8e8e8;
-}
-
-.context-menu.dark-theme .menu-item:active {
-  background-color: #444;
+  background-color: var(--color-dropdown-item-active-bg);
 }
 </style>

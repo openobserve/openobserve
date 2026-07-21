@@ -16,8 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="search-bar-component pb-px h-full flex flex-col" id="searchBarComponent">
-    <div class="flex m-0! p-[0.375rem] items-center justify-between w-full border-b border-border-default">
-      <div ref="toolbarLeftRef" class="flex flex-row items-center gap-[0.375rem] flex-1 min-w-0 overflow-hidden">
+    <div class="flex m-0! p-1.5 items-center justify-between w-full border-b border-border-default">
+      <div ref="toolbarLeftRef" class="flex flex-row items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
         <!-- Unified View Toggle: Service Graph / Traces / Spans -->
         <OToggleGroup
           :model-value="searchObj.meta.searchMode"
@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <div
-            class="py-1 px-[0.375rem] flex items-center justify-center border border-(--color-button-outline-border) rounded-md transition-all duration-200 cursor-pointer hover:bg-(--color-button-outline-hover-bg)"
+            class="py-1 px-1.5 flex items-center justify-center border border-button-outline-border rounded-default transition-all duration-200 cursor-pointer hover:bg-button-outline-hover-bg"
           >
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           searchObj.meta.searchMode !== 'service-graph' &&
           searchObj.meta.searchMode !== 'services-catalog'
         "
-        class="flex items-center gap-[0.375rem]"
+        class="flex items-center gap-1.5"
       >
         <date-time
           ref="dateTimeRef"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :queryRangeRestrictionMsg="
             searchObj.data.datetime.queryRangeRestrictionMsg
           "
-          class="h-[2rem]"
+          class="h-8"
           @on:date-change="updateDateTime"
           @on:timezone-change="updateTimezone"
         />
@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               data-test="traces-search-bar-cancel-btn"
               :title="t('search.cancel')"
-              class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-cancel-query-bg)! text-(--o2-primary-btn-text)! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
+              class="p-0 h-[1.875rem]! [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-cancel-query-bg! text-button-primary-foreground! element-box-shadow ![border-radius:0.375rem_0_0_0.375rem]"
               @click="cancelQueryData"
               >{{ t("search.cancel") }}</OButton
             >
@@ -175,11 +175,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-refresh-btn"
               data-cy="search-bar-refresh-button"
               :title="t('search.runQuery')"
-              class="p-0 h-[1.875rem]! element-box-shadow [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-(--o2-primary-btn-bg)! text-(--o2-primary-btn-text)!"
+              class="p-0 h-[1.875rem]! element-box-shadow [transition:box-shadow_0.3s_ease,_opacity_0.2s_ease] hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)] text-xs! font-medium! leading-4! px-1! py-0! w-[5.875rem]! whitespace-normal break-words text-center bg-button-primary! text-button-primary-foreground!"
               :class="
                 store.state.zoConfig.auto_query_enabled
                   ? '![border-radius:0.375rem_0_0_0.375rem]'
-                  : 'rounded-md'
+                  : 'rounded-default'
               "
               @click="searchData"
               :loading="isLoading"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               {{ t("search.runQuery") }}
             </OButton>
-            <OSeparator class="h-[1.875rem]! w-[1px]" vertical />
+            <OSeparator class="h-[1.875rem]! w-px" vertical />
             <ODropdown
               v-if="store.state.zoConfig.auto_query_enabled"
               side="bottom"
@@ -215,8 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="isLoading"
                   :class="[
                     config.isEnterprise == 'true' && isLoading
-                      ? 'bg-(--o2-cancel-query-bg)! text-(--o2-primary-btn-text)!'
-                      : 'bg-(--o2-primary-btn-bg)! text-(--o2-primary-btn-text)! hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--o2-primary-btn-bg),transparent_30%)]',
+                      ? 'bg-cancel-query-bg! text-button-primary-foreground!'
+                      : 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:shadow-[0_0_0.5rem_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
                     '![border-radius:0_0.375rem_0.375rem_0]',
                   ]"
                 >
@@ -233,18 +233,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
                     "
                     size="sm"
-                    :class="searchObj.meta.liveMode ? 'text-[var(--o2-primary)]' : ''"
+                    :class="searchObj.meta.liveMode ? 'text-accent' : ''"
                   />
                 </template>
                 <span>
-                  <div class="font-medium text-[12px]">
+                  <div class="font-medium text-xs">
                     {{
                       searchObj.meta.liveMode
                         ? t("search.turnOffLiveMode")
                         : t("search.turnOnLiveMode")
                     }}
                   </div>
-                  <div class="text-[11px] text-muted-foreground">
+                  <div class="text-2xs text-muted-foreground">
                     {{ t("search.liveModeTooltip") }}
                   </div>
                 </span>
@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="searchObj.meta.searchMode === 'service-graph'"
         class="ml-auto"
       >
-        <div class="flex items-center gap-[0.5rem]">
+        <div class="flex items-center gap-2">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="service-graph-date-time-picker"
-            class="h-[2rem]!"
+            class="h-8!"
             @on:date-change="updateDateTime"
           />
           <OButton
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="searchObj.meta.serviceGraphLayoutType"
             :options="serviceGraphLayoutOptions"
             :searchable="false"
-            class="w-[7.5rem] min-h-[2rem]! h-[2rem]!"
+            class="w-[7.5rem] min-h-8! h-8!"
             :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
             @update:model-value="onServiceGraphLayoutChange"
           />
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="searchObj.meta.searchMode === 'services-catalog'"
         class="ml-auto"
       >
-        <div class="flex items-center gap-[0.5rem]">
+        <div class="flex items-center gap-2">
           <date-time
             ref="dateTimeRef"
             auto-apply
@@ -351,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="services-catalog-date-time-picker"
-            class="h-[2rem]! mr-[0.375rem]"
+            class="h-8! mr-1.5"
             @on:date-change="updateDateTime"
           />
         </div>

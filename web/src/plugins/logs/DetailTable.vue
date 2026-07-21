@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dialog-box"
   >
     <!-- Single Tab Row -->
-    <div class="flex justify-between pt-2 items-center">
+    <div class="flex justify-between items-center shrink-0">
       <div class="flex items-center gap-2 -mb-0.75">
         <OTabs v-model="tab" align="left">
           <OTab
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'flex flex-col h-full',
+        'flex flex-col flex-1 min-h-0',
         tab.startsWith('correlated-') ? 'overflow-hidden full-height-panels' : 'overflow-y-auto',
       ]"
     >
@@ -83,12 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-model="tab"
       keep-alive
       grow
-      class="overflow-y-auto!"
+      :class="tab.startsWith('correlated-') ? 'overflow-hidden!' : 'overflow-y-auto!'"
     >
       <OTabPanel name="json">
         <OCardSection
           data-test="log-detail-json-content"
-          class="p-0 mb-6 pt-2"
+          class="px-page-edge pt-2 mb-6"
         >
           <json-preview
             :value="rowData"
@@ -109,10 +109,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanel>
       <OTabPanel name="table">
         <OCardSection
-          class="p-[0.675rem] mb-6"
+          class="px-page-edge py-[0.675rem] mb-6"
           data-test="log-detail-table-content"
         >
-          <div v-if="rowData.length == 0" class="pt-3 max-w-[350px]">
+          <div v-if="rowData.length == 0" class="pt-3 max-w-87.5">
             {{ t('logs.detailTable.noDataAvailable') }}
           </div>
           <OTable
@@ -123,18 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             row-key="_rowKey"
             pagination="none"
             :default-columns="false"
-            class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-[var(--o2-border-color)]"
-            :class="store.state.theme === 'dark' && 'dark'"
+            class="o2-table o2-row-md o2-schema-table log-detail-source-table w-full border border-solid border-card-glass-border"
           >
             <template #cell-field="{ value }">
               <div
                 :data-test="`log-detail-${value}-key`"
-                class="text-left"
-                :class="
-                  store.state.theme == 'dark'
-                    ? 'text-[#f67a7aff]'
-                    : 'text-[#B71C1C]'
-                "
+                class="text-left text-status-error-text"
               >
                 {{ value }}
               </div>
@@ -149,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`log-details-include-exclude-field-btn-${row.field}`"
                         size="icon-xs"
                         variant="ghost"
-                        class="log-json-field-dropdown-btn"
+                        class="h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
                         :aria-label="t('logs.detailTable.addIcon')"
                       >
                         <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
@@ -235,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ODropdown>
                   <pre
                     :data-test="`log-detail-${row.field}-value`"
-                    class="table-pre flex-1 min-w-0"
+                    class="wrap-break-word inline font-normal font-mono m-0 p-0 flex-1 min-w-0"
                     :class="
                       !shouldWrapValues
                         ? 'whitespace-nowrap overflow-hidden text-ellipsis'
@@ -280,7 +274,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :hide-search-term-actions="false"
           :hide-dimension-filters="true"
           :hide-reset-filters-button="true"
-          class="pr-3!"
           @sendToAiChat="sendToAiChat"
           @addSearchTerm="addSearchTerm"
         />
@@ -293,11 +286,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
             <div
               v-else-if="correlationError"
-              class="text-base text-red-500"
+              class="text-base text-status-error-text"
             >
               {{ correlationError }}
             </div>
-            <div v-else class="text-base text-gray-500">
+            <div v-else class="text-base text-text-muted">
               {{ t("correlation.clickToLoadLogs") }}
             </div>
           </div>
@@ -331,8 +324,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="flex items-center justify-center h-full py-20">
           <div class="text-center">
             <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="text-base text-red-500">{{ correlationError }}</div>
-            <div v-else class="text-base text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+            <div v-else-if="correlationError" class="text-base text-status-error-text">{{ correlationError }}</div>
+            <div v-else class="text-base text-text-muted">{{ t('correlation.clickToLoadMetrics') }}</div>
           </div>
         </div>
       </OTabPanel>
@@ -364,8 +357,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else class="flex items-center justify-center h-full py-20">
           <div class="text-center">
             <OSpinner v-if="correlationLoading" size="lg" class="mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="text-base text-red-500">{{ correlationError }}</div>
-            <div v-else class="text-base text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+            <div v-else-if="correlationError" class="text-base text-status-error-text">{{ correlationError }}</div>
+            <div v-else class="text-base text-text-muted">{{ t('correlation.clickToLoadTraces') }}</div>
           </div>
         </div>
       </OTabPanel>
@@ -374,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <OSeparator v-if="tab === 'json' || tab === 'table'" />
-    <OCardSection v-if="tab === 'json' || tab === 'table'" class="p-4 pb-4 sticky bottom-0 bg-dialog-bg z-10">
+    <OCardSection v-if="tab === 'json' || tab === 'table'" class="px-page-edge py-4 sticky bottom-0 bg-dialog-bg z-10">
       <div class="flex items-center flex-nowrap justify-between">
         <div class="w-1/12">
           <OButton
@@ -431,6 +424,7 @@ import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -550,6 +544,7 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
+    const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref<number>(10);
@@ -806,14 +801,14 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
 
     const regexIcon = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );
@@ -917,11 +912,57 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.full-height-panels .o-tab-panel {
+<style scoped>
+/* keep(complex-state): :deep override of the child tab component's panel to fill height */
+.full-height-panels :deep(.o-tab-panel) {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.searchdetaildialog {
+  width: 85vw;
+}
+
+/* keep(lib-override:oselect): reaches into the OSelect-rendered button to size
+   the records-per-page control. */
+.select-noof-records {
+  width: 5rem;
+}
+
+.select-noof-records :deep(button[type="button"]) {
+  height: 2.25rem;
+}
+
+/* keep(lib-override:otable): reaches into the OTable-rendered th/td DOM to
+   compress the source table and pin its header; the !important is load-bearing
+   against OTable's own row sizing. */
+.o2-schema-table :deep(th),
+.o2-schema-table :deep(td) {
+  height: 0.875rem !important;
+  min-height: 0.875rem !important;
+  padding: 0.125rem 0.1875rem !important;
+}
+
+.o2-schema-table :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.o2-schema-table :deep(thead th),
+.o2-schema-table :deep(tbody td) {
+  border-right: 1px solid var(--color-card-glass-border);
+  border-bottom: 1px solid var(--color-card-glass-border);
+}
+
+.o2-schema-table :deep(thead th:last-child),
+.o2-schema-table :deep(tbody td:last-child) {
+  border-right: none;
+}
+
+.o2-schema-table :deep(tbody tr:last-child td) {
+  border-bottom: none;
 }
 </style>

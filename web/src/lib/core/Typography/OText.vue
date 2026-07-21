@@ -55,7 +55,7 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
 
   // Section group label (gray eyebrow). Recedes via color + size, not weight.
   "section": [
-    "text-[11.5px] font-medium",
+    "text-2xs font-medium",
     "text-typography-section",
     "leading-none",
   ].join(" "),
@@ -96,11 +96,11 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   ].join(" "),
 
   // Monospace: cron expressions, stream names (non-linked), field paths, IDs.
-  // Uses IBM Plex Mono via the --font-mono CSS custom property.
+  // Uses Geist Mono via the --font-mono CSS custom property.
   // For actual executable code / query content, prefer OCode instead.
   "mono": [
-    "text-xs [font-family:var(--font-mono)]",
-    // HANDOFF §2.1: tabular figures + tight tracking for IDs/counts/timestamps.
+    "text-xs font-mono",
+    // tabular figures + tight tracking for IDs/counts/timestamps.
     "[font-feature-settings:'tnum'] tracking-[-0.2px]",
     "text-typography-mono",
     "leading-none",

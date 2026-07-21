@@ -27,32 +27,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div
     data-test="panel-layout-settings-content"
-    class="p-0"
-    style="min-height: inherit"
-  >
+    class="p-0 [min-height:inherit]"
+   
+    >
     <div>
       <div
         data-test="panel-layout-settings-height"
         class="o2-input"
       >
         <OForm id="panel-layout-settings-form" :form="form">
-          <OFormInput
+          <OFormInput class="min-w-55"
             name="h"
             :label="t('dashboard.panelHeight')"
             required
             type="number"
-            style="min-width: 220px"
             data-test="panel-layout-settings-height-input"
           />
         </OForm>
 
-        <div class="text-[12px] flex items-center gap-1 mt-1">
+        <div class="text-xs flex items-center gap-1 mt-1">
           <span class="whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
           <OIcon
             name="info-outline"
             class="cursor-pointer shrink-0"
             size="xs"
-           />
+          />
             <OTooltip content="1 unit = 30px" />
         </div>
 

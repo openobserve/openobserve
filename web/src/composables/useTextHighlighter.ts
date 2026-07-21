@@ -86,7 +86,6 @@ export function useTextHighlighter() {
 
   /**
    * Splits text by highlight keywords and marks matched parts
-   * Similar to the original HighLight component logic
    *
    * @param text - Text to process
    * @param keywords - Array of keywords to highlight
@@ -126,57 +125,8 @@ export function useTextHighlighter() {
   }
 
   /**
-   * Simplified tokenization - just split by whitespace
-   *
-   * KEY SIMPLIFICATION: We removed the complex "quoted" and "bracketed" types!
-   *
-   * OLD BEHAVIOR (COMPLEX - ~180 lines):
-   * ────────────────────────────────────
-   * Input:  'Hello "quoted text" world [bracket]'
-   * Output: [
-   *   {content: "Hello", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: '"quoted text"', type: "quoted"},      ← Special handling!
-   *   {content: " ", type: "whitespace"},
-   *   {content: "world", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: "[bracket]", type: "bracketed"}        ← Special handling!
-   * ]
-   *
-   * Problems with old approach:
-   * - Complex state machine to track quotes/brackets
-   * - Special logic for apostrophes (don't, it's, 5'10")
-   * - Used .trim() which caused character loss
-   * - Hard to maintain and debug
-   *
-   * NEW BEHAVIOR (SIMPLIFIED - 19 lines):
-   * ────────────────────────────────────
-   * Input:  'Hello "quoted text" world [bracket]'
-   * Output: [
-   *   {content: "Hello", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: '"quoted', type: "token"},              ← Just a token!
-   *   {content: " ", type: "whitespace"},
-   *   {content: 'text"', type: "token"},                ← Just a token!
-   *   {content: " ", type: "whitespace"},
-   *   {content: "world", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: "[bracket]", type: "token"}             ← Just a token!
-   * ]
-   *
-   * Why this works better:
-   * 1. Quotes and brackets are just regular characters - they're part of the data!
-   * 2. No character loss - every character appears exactly once
-   * 3. Semantic detection (IPs, URLs, emails) happens AFTER tokenization
-   * 4. Much simpler to understand and maintain
-   * 5. Identical performance (837ms → 839ms, within variance)
-   *
-   * How quotes/brackets are now handled:
-   * - They stay attached to the text they're part of
-   * - Split happens ONLY on whitespace
-   * - Example: '"hello' and 'world"' are separate tokens
-   * - Semantic highlighting still works correctly
-   * - Keyword highlighting works correctly
+   * Tokenizes text by splitting on whitespace only. Quotes and brackets stay
+   * attached to the text they are part of; semantic detection happens afterwards.
    *
    * @param text - Text to tokenize
    * @returns Array of token objects with only 2 types: "token" or "whitespace"
@@ -200,15 +150,12 @@ export function useTextHighlighter() {
     const tokens: Array<{ content: string; type: string }> = [];
 
     // Split by whitespace but keep the whitespace in the result
-    // Using a regex with capturing group (\s+) preserves the separators
-    // This is the ONLY splitting logic - no quote/bracket detection!
+    // (capturing group (\s+) preserves the separators)
     const parts = text.split(/(\s+)/);
 
     for (const part of parts) {
       if (!part) continue; // Skip empty strings from split
 
-      // Only 2 types now: "whitespace" or "token"
-      // No more "quoted", "bracketed", or other complex types
       const isWhitespace = /^\s+$/.test(part);
       tokens.push({
         content: part,

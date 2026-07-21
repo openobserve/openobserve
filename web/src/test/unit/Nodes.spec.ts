@@ -184,17 +184,6 @@ describe("Nodes.vue", () => {
         stubs: {
           QTablePagination: true,
           NoData: true,
-          'q-splitter': {
-            template: '<div><slot /></div>'
-          },
-          'q-table': true,
-          'q-select': true,
-          'q-range': true,
-          'q-toggle': true,
-          'q-btn': true,
-          'q-input': true,
-          'q-card': true,
-          'q-card-section': true
         }
       }
     });
