@@ -27,11 +27,13 @@ class WorkflowsPage {
     this.page = page;
     // Header / list
     this.addBtn = '[data-test="workflow-list-add-btn"]';
-    // OInput/OTable put the consumer data-test on a NON-interactive wrapper; the real <input>
-    // is exposed as `<name>-field`, and OTable's container is `o2-table-root` (the consumer
-    // `workflow-list-table` never renders). Target those, not the wrapper.
+    // OInput puts the consumer data-test on a NON-interactive wrapper; the real <input> is
+    // exposed as `<name>-field`. For list readiness use the component-owned page container
+    // `workflows-list-page` (present + visible on the list route regardless of OTable version
+    // and before the slow list GET settles) rather than an OTable-internal container, which
+    // differs across builds (o2-table-root vs o2-table / forwarded workflow-list-table).
     this.searchInput = '[data-test="workflow-list-search-input-field"]';
-    this.listTable = '[data-test="o2-table-root"]';
+    this.listTable = '[data-test="workflows-list-page"]';
     // Editor
     this.editorPage = '[data-test="workflow-editor-page"]';
     this.nameField = '[data-test="workflow-editor-name-field"]';
