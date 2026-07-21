@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:selected-ids="selectedAlertIds"
                 selection="multiple"
                 data-test="alert-list-table"
-                :data="filteredResults || []"
+                :data="displayedAlerts"
                 :columns="columns"
                 show-index
                 row-key="alert_id"
@@ -99,8 +99,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :enable-column-resize="true"
                 :persist-columns="true"
                 table-id="alerts-alert-list"
+                :row-class="alertRowClass"
+                :get-row-style="alertRowStyle"
                 @row-click="triggerExpand"
               >
+                <!-- Summary strip: at-a-glance operational counts for the folder.
+                     Rendered via OTable's #subheader slot so it sits BELOW the
+                     search/tabs and above the rows. Always rendered (skeleton
+                     while loading) so data arriving never shifts the layout. -->
+                <template #subheader>
+                  <div
+                    class="px-page-edge pt-3 pb-3 border-b border-table-row-divider"
+                    data-test="alert-list-summary"
+                  >
+                    <OStatStrip
+                      :items="summaryStats"
+                      :loading="loading"
+                      selectable
+                      :selected-key="stateFilter"
+                      @select="onStatSelect"
+                    />
+                  </div>
+                </template>
+
                 <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
                 <template #toolbar>
                   <div class="flex items-center gap-2 w-full">
@@ -179,25 +200,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
                 <template #cell-name="{ row }">
-                  <div class="flex items-center gap-1.5 min-w-0 overflow-hidden">
-                    <OIcon
-                      v-if="row.is_real_time === 'anomaly'"
-                      name="query-stats"
-                      size="sm"
-                      class="text-status-info-text shrink-0"
-                    />
-                    <OIcon
-                      v-else-if="row.is_real_time"
-                      name="bolt"
-                      size="sm"
-                      class="text-status-warning-text shrink-0"
-                    />
-                    <OIcon
-                      v-else
-                      name="schedule"
-                      size="sm"
-                      class="text-icon-color shrink-0"
-                    />
+                  <div class="flex items-center gap-2 min-w-0 overflow-hidden">
+                    <!-- Type chip: glyph + colour by alert type -->
+                    <span
+                      class="w-6 h-6 shrink-0 grid place-items-center rounded-default bg-surface-subtle"
+                    >
+                      <OIcon
+                        :name="typeIconName(row)"
+                        size="sm"
+                        :class="typeIconClass(row)"
+                      />
+                    </span>
                     <span class="truncate">{{ row.name || "--" }}</span>
                   </div>
                   <OTooltip
@@ -212,13 +225,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <template #cell-last_triggered_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_triggered_at"
-                    unit="iso"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="Never"
-                  />
+                  <span class="inline-flex items-center gap-1.5 min-w-0">
+                    <span
+                      v-if="['hot','warm'].includes(recencyLevel(row.last_triggered_at_raw))"
+                      class="w-1.5 h-1.5 rounded-full shrink-0"
+                      :class="recencyLevel(row.last_triggered_at_raw) === 'hot'
+                        ? 'bg-warning-500 motion-safe:animate-pulse'
+                        : 'bg-text-muted'"
+                    />
+                    <OTimeCell
+                      :value="row.last_triggered_at_raw"
+                      unit="us"
+                      mode="relative"
+                      :timezone="store.state.timezone"
+                      empty-label="Never"
+                    />
+                  </span>
                 </template>
 
                 <template #cell-last_satisfied_at="{ row }">
@@ -254,6 +276,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </span>
                   <span v-else class="text-text-body">—</span>
+                </template>
+
+                <template #cell-state="{ row }">
+                  <OTag
+                    :variant="stateVariant(row)"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-state`"
+                  >
+                    <template #icon>
+                      <OIcon :name="stateIconName(row)" size="xs" />
+                    </template>
+                    {{ stateLabel(row) }}
+                  </OTag>
                 </template>
 
                 <template #cell-period="{ row }">
@@ -459,11 +494,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     size="hero"
                     preset="no-alerts"
-                    :filtered="!!(filterQuery || searchQuery)"
+                    :filtered="!!(filterQuery || searchQuery || stateFilter)"
                     @action="
                       (id) =>
                         id === 'clear-filters'
-                          ? ((filterQuery = ''), (searchQuery = ''))
+                          ? ((filterQuery = ''),
+                            (searchQuery = ''),
+                            (stateFilter = null))
                           : showAddUpdateFn({})
                     "
                   />
@@ -707,6 +744,10 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -748,6 +789,7 @@ export default defineComponent({
     OTimeCell,
     OUserCell,
     OTag,
+    OStatStrip,
   },
   emits: [
     "update:changeRecordPerPage",
@@ -918,6 +960,216 @@ export default defineComponent({
 
     const filteredResults: Ref<any[]> = ref([]);
 
+    // ── "Calm Signal" table helpers ─────────────────────────────────────────
+    // Recency of the last trigger, bucketed for the trigger-time dot + the
+    // recently-fired row highlight. Derived from the RAW microsecond timestamp
+    // (last_triggered_at_raw) so it stays correct regardless of display timezone.
+    const RECENT_TRIGGER_MS = 15 * 60 * 1000; // "hot" — fired in the last 15 min
+    const RECENT_TRIGGER_DAY_MS = 24 * 60 * 60 * 1000; // "warm" — within a day
+    const triggerAgeMs = (rawMicros: unknown): number | null => {
+      const n = Number(rawMicros);
+      if (!rawMicros || !Number.isFinite(n) || n <= 0) return null;
+      return Date.now() - n / 1000; // microseconds → milliseconds
+    };
+    const recencyLevel = (
+      rawMicros: unknown,
+    ): "hot" | "warm" | "cold" | "none" => {
+      const age = triggerAgeMs(rawMicros);
+      if (age === null) return "none";
+      if (age <= RECENT_TRIGGER_MS) return "hot";
+      if (age <= RECENT_TRIGGER_DAY_MS) return "warm";
+      return "cold";
+    };
+
+    // ── Alert operational state (single source of truth) ────────────────────
+    // failed  → an anomaly whose model training failed (needs attention)
+    // active  → enabled and running
+    // paused  → disabled
+    const alertState = (row: any): "active" | "paused" | "failed" => {
+      if (
+        row?.is_real_time === "anomaly" &&
+        String(row?.status).toLowerCase() === "failed"
+      )
+        return "failed";
+      return row?.enabled ? "active" : "paused";
+    };
+
+    // Full-row highlight — only the EXCEPTIONS get a wash, so attention goes to
+    // what's off, not what's fine: failed=light red, paused=muted grey, active
+    // stays clean (its state still reads from the green left rail).
+    const alertRowClass = (row: any): string => {
+      const s = alertState(row);
+      return s === "failed"
+        ? "!bg-status-error-bg"
+        : s === "paused"
+          ? "!bg-surface-panel"
+          : "";
+    };
+
+    // Extreme-left state rail — a full-height colour bar at the very start of the
+    // row (inset box-shadow so it paints regardless of border-collapse). rem width
+    // + token colour keep it theme-aware and hardcode-free.
+    const alertRowStyle = (row: any): Record<string, string> => {
+      const s = alertState(row);
+      const color =
+        s === "failed"
+          ? "var(--color-error-500)"
+          : s === "paused"
+            ? "var(--color-grey-400)"
+            : "var(--color-success-500)";
+      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+    };
+
+    // Type chip (the "left chip"): glyph + colour by alert type.
+    const typeIconName = (row: any): IconName =>
+      row?.is_real_time === "anomaly"
+        ? "query-stats"
+        : row?.is_real_time
+          ? "bolt"
+          : "schedule";
+    const typeIconClass = (row: any): string =>
+      row?.is_real_time === "anomaly"
+        ? "text-status-info-text"
+        : row?.is_real_time
+          ? "text-status-warning-text"
+          : "text-text-secondary";
+
+    // Redesigned State chip (icon + colour + word).
+    const stateVariant = (row: any): BadgeVariant => {
+      const s = alertState(row);
+      return s === "failed"
+        ? "error-soft"
+        : s === "paused"
+          ? "default-soft"
+          : "success-soft";
+    };
+    const stateIconName = (row: any): IconName => {
+      const s = alertState(row);
+      return s === "failed"
+        ? "error-outline"
+        : s === "paused"
+          ? "pause"
+          : "check-circle";
+    };
+    const stateLabel = (row: any): string => {
+      const s = alertState(row);
+      return s === "failed"
+        ? t("alerts.stateFailed")
+        : s === "paused"
+          ? t("alerts.statePaused")
+          : t("alerts.stateActive");
+    };
+
+    // At-a-glance operational counts for the summary strip. Counts over the rows
+    // currently shown (folder + tab + search) so it tracks what the user sees.
+    const stateCounts = computed(() => {
+      const rows = filteredResults.value || [];
+      let active = 0;
+      let paused = 0;
+      let failed = 0;
+      let recent = 0;
+      for (const r of rows) {
+        if (r.enabled) active += 1;
+        else paused += 1;
+        if (
+          r.is_real_time === "anomaly" &&
+          String(r.status).toLowerCase() === "failed"
+        )
+          failed += 1;
+        if (recencyLevel(r.last_triggered_at_raw) === "hot") recent += 1;
+      }
+      return { active, paused, failed, recent, total: rows.length };
+    });
+
+    // Stat tiles for the summary strip. `tone` is the single source of colour so
+    // states stay consistent with the row-level State pills. When the folder is
+    // empty (no data at all) every tile shows a muted "—"; once there IS data,
+    // real counts show — including a legitimate "0". The `max` gives each state
+    // tile a proportion bar (its share of the total).
+    const summaryStats = computed<StatItem[]>(() => {
+      const c = stateCounts.value;
+      const hasData = c.total > 0;
+      const v = (n: number): string | number => (hasData ? n : "—");
+      const share = hasData ? c.total : undefined;
+      return [
+        {
+          key: "active",
+          label: t("alerts.summaryActive"),
+          value: v(c.active),
+          icon: "check-circle",
+          tone: "success",
+          max: share,
+          dataTest: "alert-summary-active",
+        },
+        {
+          key: "paused",
+          label: t("alerts.summaryPaused"),
+          value: v(c.paused),
+          icon: "pause",
+          tone: "neutral",
+          max: share,
+          dataTest: "alert-summary-paused",
+        },
+        {
+          key: "failed",
+          label: t("alerts.summaryFailed"),
+          value: v(c.failed),
+          icon: "error-outline",
+          tone: "error",
+          max: share,
+          dataTest: "alert-summary-failed",
+        },
+        {
+          key: "recent",
+          label: t("alerts.summaryRecent"),
+          value: v(c.recent),
+          icon: "bolt",
+          tone: "warning",
+          max: share,
+          dataTest: "alert-summary-recent",
+        },
+        {
+          key: "total",
+          label: t("alerts.summaryTotal"),
+          value: v(c.total),
+          icon: "format-list-bulleted",
+          tone: "primary",
+          // Total is clickable (clears the filter) but never shows the ring — the
+          // selected key is only ever a real state, never "total". No bar (its
+          // share of itself is always 100%).
+          dataTest: "alert-summary-total",
+        },
+      ];
+    });
+
+    // ── Stat-tile quick filter ──────────────────────────────────────────────
+    // Clicking a summary tile filters the table to that state (toggle); the
+    // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
+    // so you always see the folder totals; only the table rows are filtered.
+    const stateFilter = ref<"active" | "paused" | "failed" | "recent" | null>(
+      null,
+    );
+    const displayedAlerts = computed(() => {
+      const rows = filteredResults.value || [];
+      const f = stateFilter.value;
+      if (!f) return rows;
+      if (f === "recent")
+        return rows.filter(
+          (r: any) => recencyLevel(r.last_triggered_at_raw) === "hot",
+        );
+      return rows.filter((r: any) => alertState(r) === f);
+    });
+    const onStatSelect = (key: string) => {
+      if (key === "total") {
+        stateFilter.value = null;
+        return;
+      }
+      stateFilter.value =
+        stateFilter.value === key
+          ? null
+          : (key as "active" | "paused" | "failed" | "recent");
+    };
+
     const activeFolderToMove = ref("default");
 
     // Tabs for alerts view
@@ -964,6 +1216,21 @@ export default defineComponent({
           minSize: 320,
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
+        },
+        // "state" (Active / Paused) — a single at-a-glance operational state for
+        // EVERY alert type, derived from `enabled`. Sits right after the name so
+        // it's always visible without horizontal scroll. Distinct from the
+        // anomaly-only "status" (training) column: this answers "is it running?".
+        {
+          id: "state",
+          accessorKey: "enabled",
+          header: t("alerts.state"),
+          cell: " ",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          meta: { align: "left" },
         },
         {
           id: "owner",
@@ -1145,6 +1412,9 @@ export default defineComponent({
       last_triggered_at: anomaly.last_triggered_at
         ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
+      // Raw microsecond epoch — drives the relative-time cell, recency dot and
+      // recently-fired row highlight (timezone-independent).
+      last_triggered_at_raw: anomaly.last_triggered_at ?? null,
       last_satisfied_at: anomaly.last_satisfied_at
         ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
@@ -1286,6 +1556,9 @@ export default defineComponent({
             last_triggered_at: convertUnixToDateFormat(
               data.last_triggered_at,
             ),
+            // Raw microsecond epoch — drives the relative-time cell, recency dot
+            // and recently-fired row highlight (timezone-independent).
+            last_triggered_at_raw: data.last_triggered_at ?? null,
             last_satisfied_at: convertUnixToDateFormat(
               data.last_satisfied_at,
             ),
@@ -1626,7 +1899,7 @@ export default defineComponent({
     const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
     const resultTotal = computed(function () {
-      return filteredResults.value?.length;
+      return displayedAlerts.value?.length;
     });
 
     // No timezone suffix in this table, unlike the other lists.
@@ -2635,6 +2908,19 @@ export default defineComponent({
       store,
       router,
       columns,
+      recencyLevel,
+      alertRowClass,
+      alertRowStyle,
+      typeIconName,
+      typeIconClass,
+      stateVariant,
+      stateIconName,
+      stateLabel,
+      stateCounts,
+      summaryStats,
+      stateFilter,
+      displayedAlerts,
+      onStatSelect,
       formData,
       hideForm,
       confirmDelete,

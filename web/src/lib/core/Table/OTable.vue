@@ -819,6 +819,9 @@ defineExpose({
       />
       <slot name="toolbar-trailing" />
     </div>
+    <!-- ── Sub-header slot: custom full-width content between the toolbar and
+         the table body (e.g. a summary-stat strip). ── -->
+    <slot name="subheader" />
     <!-- ── Built-in global search ─────────────────────────── -->
     <div
       v-if="props.showGlobalFilter && !slots.top && !slots.toolbar"

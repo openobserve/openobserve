@@ -446,6 +446,38 @@ describe("AlertList - data fetching and columns", () => {
     expect(ids).toContain("frequency");
   });
 
+  it("renders the State column and the summary strip with operational counts", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    // State column is present on every tab (derived from `enabled`).
+    const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+    expect(ids).toContain("state");
+
+    // Drive the counts from an explicit set so the assertion is deterministic
+    // regardless of cross-test store state.
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "a", is_real_time: false },
+      { enabled: false, name: "b", is_real_time: false },
+      { enabled: true, name: "c", is_real_time: "anomaly", status: "failed" },
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.stateCounts.total).toBe(3);
+    expect(wrapper.vm.stateCounts.active).toBe(2);
+    expect(wrapper.vm.stateCounts.paused).toBe(1);
+    expect(wrapper.vm.stateCounts.failed).toBe(1);
+
+    // Summary strip renders (via OTable's #top slot) when rows are present.
+    const summary = wrapper.find('[data-test="alert-list-summary"]');
+    expect(summary.exists()).toBe(true);
+    // The KpiCards inside must actually render their content — guards against
+    // the components being imported but not registered (renders as empty
+    // unknown elements, which the exists() check alone would not catch).
+    expect(wrapper.find('[data-test="alert-summary-active"]').exists()).toBe(true);
+    expect(summary.text()).toContain(String(wrapper.vm.stateCounts.total));
+  });
+
 
   it("dynamicQueryModel binds to filterQuery by default and to searchQuery when across-folders toggled", async () => {
     const wrapper: any = await mountAlertList();
