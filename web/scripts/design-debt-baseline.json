@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 10,
+    "rawProjectRamp": 8,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -27,7 +27,6 @@
       "rawVarInComponent": 50
     },
     "components/OrganizationSelector.vue": {
-      "rawProjectRamp": 2,
       "rawVarInComponent": 2
     },
     "components/RichTextInput.vue": {
