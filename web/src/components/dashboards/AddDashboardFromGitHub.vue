@@ -15,96 +15,104 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="add-dashboard-from-github-drawer"
+  <ODrawer
+    data-test="add-dashboard-from-github-drawer"
     v-model:open="show"
     side="right"
-    size="lg"
-    title="Add Dashboard from Gallery"
+    size="xl"
+    title="Dashboard Gallery"
     secondary-button-label="Cancel"
-    :primary-button-label="`Next (${selectedDashboards.length})`"
+    :primary-button-label="selectedDashboards.length ? `Add ${selectedDashboards.length} dashboard${selectedDashboards.length > 1 ? 's' : ''}` : 'Select dashboards'"
     :primary-button-disabled="selectedDashboards.length === 0"
     @click:secondary="show = false"
     @click:primary="handleNext"
   >
-        <!-- Loading State -->
-        <div
-          v-if="loading"
-          class="flex flex-1 items-center justify-center"
-        >
-          <OSpinner size="lg" />
+    <!-- Loading -->
+    <div v-if="loading" class="gallery-empty">
+      <OSpinner size="lg" />
+      <span class="gallery-empty-label">Loading gallery…</span>
+    </div>
+
+    <!-- Error -->
+    <div v-else-if="error" class="gallery-empty">
+      <OIcon name="error-outline" class="gallery-empty-icon" style="color: var(--o2-negative)" />
+      <span class="gallery-empty-label">{{ error }}</span>
+      <OButton variant="primary" size="sm" @click="loadDashboards">Retry</OButton>
+    </div>
+
+    <!-- Gallery -->
+    <div v-else class="gallery-wrap">
+      <!-- Toolbar -->
+      <div class="gallery-toolbar">
+        <OSearchInput
+          v-model="searchQuery"
+          placeholder="Search dashboards…"
+          clearable
+          data-test="add-dashboard-github-search"
+          class="gallery-search"
+        />
+        <div class="gallery-meta">
+          <span v-if="selectedDashboards.length" class="gallery-sel-badge">
+            {{ selectedDashboards.length }} selected
+          </span>
+          <span class="gallery-count">{{ filteredDashboards.length }} available</span>
         </div>
+      </div>
 
-        <!-- Error State -->
+      <!-- Empty search -->
+      <div v-if="!filteredDashboards.length" class="gallery-empty">
+        <OIcon name="search" style="width:36px;height:36px;opacity:0.3" />
+        <span style="font-size:13px;color:#878da3">No dashboards match "{{ searchQuery }}"</span>
+      </div>
+
+      <!-- Grouped sections -->
+      <div v-else class="gallery-sections">
         <div
-          v-else-if="error"
-          class="flex flex-1 flex-col items-center justify-center text-center"
+          v-for="([category, items]) in groupedDashboards"
+          :key="category"
+          class="gallery-group"
         >
-          <OIcon
-            name="error-outline"
-            class="mb-2" style="width: 3em; height: 3em;" />
-          <div class="text-red-500">{{ error }}</div>
-          <OButton
-            variant="primary"
-            size="sm"
-            class="mt-4"
-            @click="loadDashboards"
-            >Retry</OButton
-          >
-        </div>
-
-        <!-- Dashboard List -->
-        <div v-else class="flex flex-col mx-2 my-2">
-          <OSearchInput
-            v-model="searchQuery"
-            placeholder="Search dashboards..."
-            clearable
-            class="mb-3"
-            data-test="add-dashboard-github-search"
-          />
-
-          <div class="text-xs text-gray-500 mb-2 px-1">
-            {{ filteredDashboards.length }} dashboard(s) available
+          <!-- Group header -->
+          <div class="gallery-group-head">
+            <div
+              class="gallery-group-ico"
+              :style="{ background: getCategoryInfo(items[0]).bg }"
+            >
+              <OIcon
+                :name="getCategoryInfo(items[0]).icon"
+                :style="{ color: getCategoryInfo(items[0]).color }"
+                style="width:15px;height:15px"
+              />
+            </div>
+            <span class="gallery-group-title">{{ category }}</span>
+            <span class="gallery-group-count">{{ items.length }}</span>
           </div>
 
-          <ul
-            class="dashboard-list flex flex-col rounded list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
-            :class="filteredDashboards.length > 0 ? 'border border-border' : ''"
-          >
-            <li
-              v-for="dashboard in filteredDashboards"
+          <!-- 2-column card grid for this group -->
+          <div class="gallery-grid">
+            <div
+              v-for="dashboard in items"
               :key="dashboard.name"
-              @click="toggleDashboard(dashboard)"
-              class="flex items-center gap-2 px-3 py-1 cursor-pointer transition-colors duration-200 border-l-4"
-              :class="[
-                isSelected(dashboard)
-                  ? 'selected-item bg-(--o2-tab-bg)! border-primary'
-                  : 'border-transparent hover:bg-gray-50',
-              ]"
+              class="g-card"
+              :class="{ 'g-card--on': isSelected(dashboard) }"
               data-test="add-dashboard-github-item"
+              @click="toggleDashboard(dashboard)"
             >
-              <div class="shrink-0 pr-2">
-                <OCheckbox
-                  :model-value="isSelected(dashboard)"
-                  @update:model-value="toggleDashboard(dashboard)"
-                />
+              <div class="g-card-text">
+                <div class="g-card-name">{{ dashboard.displayName }}</div>
               </div>
-              <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-medium">
-                  {{ dashboard.displayName }}
-                </span>
-                <span
-                  v-if="dashboard.description"
-                  class="block text-xs text-muted-foreground"
-                >
-                  {{ dashboard.description }}
-                </span>
+              <div class="g-card-chk" :class="{ 'g-card-chk--on': isSelected(dashboard) }">
+                <OIcon v-if="isSelected(dashboard)" name="check" style="width:11px;height:11px;color:#fff" />
               </div>
-            </li>
-          </ul>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
 
     <!-- Folder Selection Dialog -->
-    <ODialog data-test="add-dashboard-from-github-folder-selection-dialog"
+    <ODialog
+      data-test="add-dashboard-from-github-folder-selection-dialog"
       v-model:open="showFolderSelection"
       persistent
       size="sm"
@@ -232,6 +240,25 @@ export default defineComponent({
           d.displayName.toLowerCase().includes(query) ||
           d.description?.toLowerCase().includes(query),
       );
+    });
+
+    // Group filtered dashboards by category for the gallery view
+    const CATEGORY_ORDER = ["Cloud", "Kubernetes", "Database", "Networking", "Observability", "Security", "Storage", "Dashboard"];
+    const groupedDashboards = computed(() => {
+      const groups: Record<string, GitHubDashboard[]> = {};
+      for (const d of filteredDashboards.value) {
+        const cat = getCategoryInfo(d).category;
+        (groups[cat] = groups[cat] || []).push(d);
+      }
+      // Sort groups by preferred order, then alphabetically
+      return Object.entries(groups).sort(([a], [b]) => {
+        const ai = CATEGORY_ORDER.indexOf(a);
+        const bi = CATEGORY_ORDER.indexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.localeCompare(b);
+      });
     });
 
     const isSelected = (dashboard: GitHubDashboard) => {
@@ -570,13 +597,196 @@ export default defineComponent({
       handleNext,
       confirmAdd,
       updateFolderList,
+      getCategoryInfo,
+      groupedDashboards,
     };
   },
 });
+
+function getCategoryInfo(dashboard: { name: string }) {
+  const n = dashboard.name.toLowerCase();
+  if (n.includes("aws") || n.includes("amazon") || n.includes("ec2") || n.includes("s3") || n.includes("rds") || n.includes("elb") || n.includes("lambda"))
+    return { icon: "cloud",         color: "#e07b00", bg: "#fff4e6", category: "AWS" };
+  if (n.includes("cloudwatch"))
+    return { icon: "cloud",         color: "#e07b00", bg: "#fff4e6", category: "CloudWatch" };
+  if (n.includes("gcp") || n.includes("google") || n.includes("bigquery") || n.includes("pubsub"))
+    return { icon: "cloud",         color: "#1a73e8", bg: "#e8f0fe", category: "Google Cloud" };
+  if (n.includes("azure") || n.includes("microsoft"))
+    return { icon: "cloud",         color: "#0078d4", bg: "#e3f2fd", category: "Azure" };
+  if (n.includes("kubernetes") || n.includes("k8s") || n.includes("kube") || n.includes("pod") || n.includes("helm") || n.includes("container") || n.includes("docker"))
+    return { icon: "hub",           color: "#326ce5", bg: "#e8eefb", category: "Kubernetes" };
+  if (n.includes("postgres") || n.includes("mysql") || n.includes("mongo") || n.includes("redis") || n.includes("elastic") || n.includes("cassandra") || n.includes("database") || n.includes("db"))
+    return { icon: "database",      color: "#6b48ff", bg: "#f0eeff", category: "Database" };
+  if (n.includes("nginx") || n.includes("apache") || n.includes("haproxy") || n.includes("istio") || n.includes("envoy") || n.includes("traefik"))
+    return { icon: "dns",           color: "#009639", bg: "#e6f5ec", category: "Networking" };
+  if (n.includes("security") || n.includes("audit") || n.includes("threat") || n.includes("waf") || n.includes("firewall"))
+    return { icon: "shield",        color: "#e5484d", bg: "#fff0f0", category: "Security" };
+  if (n.includes("monitor") || n.includes("alert") || n.includes("metric") || n.includes("prometheus") || n.includes("opentelemetry") || n.includes("otel"))
+    return { icon: "monitor-heart", color: "#30a46c", bg: "#e6f7ef", category: "Observability" };
+  if (n.includes("storage") || n.includes("disk") || n.includes("s3") || n.includes("blob"))
+    return { icon: "storage",       color: "#6b48ff", bg: "#f0eeff", category: "Storage" };
+  return   { icon: "dashboard",     color: "#6d5ce0", bg: "#f0eeff", category: "Dashboard" };
+}
 </script>
 
 <style>
-.dashboard-list li:hover:not(.selected-item) {
-  background-color: var(--o2-hover-gray);
+/* ── wrapper ── */
+.gallery-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  height: 100%;
+  overflow: hidden;
 }
+
+/* ── toolbar ── */
+.gallery-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.gallery-search { flex: 1; }
+.gallery-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.gallery-count { font-size: 12px; color: #878da3; }
+.gallery-sel-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: #6d5ce0;
+  color: #fff;
+}
+
+/* ── empty ── */
+.gallery-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex: 1;
+  padding: 40px 20px;
+}
+
+/* ── scrollable sections container ── */
+.gallery-sections {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-right: 2px;
+  padding-bottom: 8px;
+}
+
+/* ── category group ── */
+.gallery-group { display: flex; flex-direction: column; gap: 8px; }
+
+.gallery-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e6e8ef;
+}
+.gallery-group-ico {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gallery-group-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #1c2030;
+  letter-spacing: -0.1px;
+}
+.gallery-group-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #878da3;
+  background: #eeeef5;
+  border-radius: 20px;
+  padding: 1px 7px;
+}
+
+/* ── 2-column card grid ── */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  align-content: start;
+}
+
+/* ── individual card ── */
+.g-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1.5px solid #e6e8ef;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #fff;
+  transition: border-color 0.13s, box-shadow 0.13s;
+  user-select: none;
+  min-width: 0;
+}
+.g-card:hover {
+  border-color: #6d5ce0;
+  box-shadow: 0 2px 10px rgba(109, 92, 224, 0.1);
+}
+.g-card--on {
+  border-color: #6d5ce0;
+  box-shadow: 0 0 0 2.5px rgba(109, 92, 224, 0.2);
+  background: #faf9ff;
+}
+
+/* ── text block ── */
+.g-card-text { flex: 1; min-width: 0; }
+.g-card-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1c2030;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+/* ── checkmark circle ── */
+.g-card-chk {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  border: 1.5px solid #d0d4e0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+}
+.g-card-chk--on { background: #6d5ce0; border-color: #6d5ce0; }
+
+/* ── dark mode ── */
+body.body--dark .gallery-group-head      { border-bottom-color: #232a37; }
+body.body--dark .gallery-group-title     { color: #e7eaf3; }
+body.body--dark .gallery-group-count     { color: #6f7891; background: #1e2430; }
+body.body--dark .gallery-group-ico       { filter: brightness(0.45) saturate(1.4); }
+body.body--dark .g-card                  { background: #151a23; border-color: #232a37; }
+body.body--dark .g-card:hover            { border-color: #8b90e6; box-shadow: 0 2px 10px rgba(139,144,230,0.12); }
+body.body--dark .g-card--on             { background: #1a1d2e; border-color: #8b90e6; box-shadow: 0 0 0 2.5px rgba(139,144,230,0.2); }
+body.body--dark .g-card-name             { color: #e7eaf3; }
+body.body--dark .g-card-chk              { border-color: #3a4255; }
+body.body--dark .gallery-count           { color: #6f7891; }
 </style>
