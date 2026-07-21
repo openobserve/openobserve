@@ -18,7 +18,7 @@ use std::time::Duration;
 use axum::{
     Router,
     extract::{DefaultBodyLimit, FromRequestParts, Path, Request},
-    http::{Method, StatusCode, header},
+    http::{Method, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
@@ -156,6 +156,44 @@ pub(crate) fn is_origin_allowed(request_origin: &[u8], web_url: &str) -> bool {
     request_origin == allowed_origin.as_bytes()
 }
 
+/// If `resp` is a 401 for an MCP endpoint, attach the RFC 9728 `WWW-Authenticate`
+/// header so MCP clients start the OAuth flow. No-op for every other route/status.
+fn maybe_add_mcp_www_authenticate(uri: &Uri, mut resp: Response) -> Response {
+    if resp.status() != StatusCode::UNAUTHORIZED {
+        return resp;
+    }
+    // MCP endpoint == path segment after "/api/{org}/" equals "mcp".
+    let path = uri.path();
+    let is_mcp = path
+        .strip_prefix("/api/")
+        .and_then(|rest| rest.split('/').nth(1))
+        .map(|seg| seg == "mcp")
+        .unwrap_or(false);
+    if !is_mcp {
+        return resp;
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        let dex = o2_dex::config::get_config();
+        if !dex.dex_enabled {
+            return resp; // no auth server to advertise
+        }
+        let cfg = config::get_config();
+        let o2_base = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
+        let resource_meta = format!(
+            "{}/.well-known/oauth-protected-resource{}",
+            o2_base.trim_end_matches('/'),
+            path // e.g. "/api/default/mcp"
+        );
+        let value = format!(r#"Bearer resource_metadata="{resource_meta}""#);
+        if let Ok(hv) = header::HeaderValue::from_str(&value) {
+            resp.headers_mut().insert(header::WWW_AUTHENTICATE, hv);
+        }
+    }
+    resp
+}
+
 /// Authentication middleware for API routes
 pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract request data FIRST, before any async calls
@@ -168,9 +206,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 
     // Extract auth info from request (synchronous now, no await)
     let (mut parts, body) = request.into_parts();
+    let uri = req_data.uri.clone();
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
-        Err(e) => return e.into_response(),
+        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     };
 
     // Validate authentication using extracted data
@@ -193,7 +232,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 
             next.run(Request::from_parts(parts, body)).await
         }
-        Err(e) => e.into_response(),
+        Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     }
 }
 
