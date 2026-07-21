@@ -1511,7 +1511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div>
         <div
-          class="text-sm font-semibold leading-tight pr-2 text-text-label"
+          class="text-compact font-medium leading-tight pr-2 text-input-label-text"
         >{{ t("search.fileType") }}</div>
         <OButtonGroup
           data-test="custom-download-file-type-button-group"
