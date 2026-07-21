@@ -392,6 +392,7 @@
     --color-file-border: var(--color-border-strong);
     --color-file-disabled-bg: var(--color-surface-subtle);
     --color-file-disabled-border: var(--color-border-default);
+    --color-file-error-text: var(--color-error-400);
     --color-file-error-border: var(--color-error-400);
     --color-file-chip-bg: var(--color-primary-900);
     --color-file-chip-text: var(--color-primary-200);
