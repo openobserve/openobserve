@@ -1,7 +1,7 @@
 {
   "totals": {
     "rawProjectRamp": 148,
-    "rawVarInComponent": 587,
+    "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
     "unscopedStyle": 7,
@@ -68,7 +68,7 @@
       "rawVarInComponent": 14
     },
     "components/alerts/DestinationPreview.vue": {
-      "rawVarInComponent": 7
+      "rawVarInComponent": 4
     },
     "components/alerts/FilterGroup.vue": {
       "rawVarInComponent": 4
