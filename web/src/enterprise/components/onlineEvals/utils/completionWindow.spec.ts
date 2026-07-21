@@ -3,6 +3,7 @@ import {
   buildCompletionConfigPayloads,
   completionWindowConfigFromJob,
   completionWindowDefaultsForScope,
+  durationPartsFromSecs,
   SESSION_COMPLETION_WINDOW_DEFAULTS,
   TRACE_COMPLETION_WINDOW_DEFAULTS,
 } from "./completionWindow";
@@ -115,4 +116,56 @@ describe("buildCompletionConfigPayloads", () => {
       sessionConfig: null,
     });
   });
+});
+
+describe("durationPartsFromSecs", () => {
+  it("splits a seconds field into display units", () => {
+    expect(durationPartsFromSecs(120)).toEqual({
+      hours: 0,
+      minutes: 2,
+      seconds: 0,
+    });
+    expect(durationPartsFromSecs(1800)).toEqual({
+      hours: 0,
+      minutes: 30,
+      seconds: 0,
+    });
+    // Session max age defaults to 4h — where raw seconds stop being readable.
+    expect(durationPartsFromSecs(14400)).toEqual({
+      hours: 4,
+      minutes: 0,
+      seconds: 0,
+    });
+    expect(durationPartsFromSecs("45")).toEqual({
+      hours: 0,
+      minutes: 0,
+      seconds: 45,
+    });
+  });
+
+  it("splits values that span several units", () => {
+    expect(durationPartsFromSecs(90)).toEqual({
+      hours: 0,
+      minutes: 1,
+      seconds: 30,
+    });
+    expect(durationPartsFromSecs(5430)).toEqual({
+      hours: 1,
+      minutes: 30,
+      seconds: 30,
+    });
+  });
+
+  // Unit words are the component's job (i18n), so this returns numbers only.
+  it("returns no formatted text of its own", () => {
+    const parts = durationPartsFromSecs(1800);
+    expect(Object.values(parts!).every((v) => typeof v === "number")).toBe(true);
+  });
+
+  it.each(["", "   ", "0", "-60", "abc"])(
+    "has no duration to show for %s",
+    (value) => {
+      expect(durationPartsFromSecs(value)).toBeNull();
+    },
+  );
 });

@@ -25,7 +25,21 @@ const scorer = {
   variables: ["input", "output", "statistics", "spans", "steps", "custom"],
 } as Scorer;
 
-function mountMapping(targetScope: EvalTargetScope) {
+// A scorer whose every variable is supplied by the system on trace scope, so
+// there is genuinely nothing for the user to map.
+const autoFilledScorer = {
+  id: "scorer-2",
+  entity_id: "scorer-2",
+  name: "Faithfulness",
+  version: 2,
+  template: "Judge {{ input }} against {{ output }}.",
+  variables: ["input", "output"],
+} as Scorer;
+
+function mountMapping(
+  targetScope: EvalTargetScope,
+  scorers: Scorer[] = [scorer],
+) {
   const i18n = createI18n({
     legacy: false,
     locale: "en",
@@ -35,7 +49,7 @@ function mountMapping(targetScope: EvalTargetScope) {
   return mount(JobInputMapping, {
     props: {
       targetScope,
-      selectedScorers: [scorer],
+      selectedScorers: scorers,
       inputMappings: {
         "scorer-1": {
           input: "{{custom_input}}",
@@ -68,7 +82,7 @@ describe("JobInputMapping", () => {
     const wrapper = mountMapping("trace");
 
     expect(
-      wrapper.find('[data-test="job-input-mapping-system-variables"]').exists(),
+      wrapper.find('[data-test="job-input-mapping-system-variables-learn-more"]').exists(),
     ).toBe(true);
     expect(
       wrapper
@@ -86,7 +100,7 @@ describe("JobInputMapping", () => {
       wrapper
         .get('[data-test="job-input-mapping-system-variables-drawer"]')
         .text(),
-    ).toContain("System-provided variables for Trace evaluation");
+    ).toContain("Trace Variables");
     const systemVariablesTable = wrapper.find(
       '[data-test="job-input-mapping-system-variables-table"]',
     );
@@ -96,13 +110,18 @@ describe("JobInputMapping", () => {
     expect(systemVariablesTable.text()).toContain("Value supplied");
     expect(systemVariablesTable.text()).toContain("Span Selector required");
     for (const variable of ["input", "output", "statistics", "steps"]) {
+      // Auto-filled rows are identified by the row itself, not by badge copy:
+      // they render a source description and no mapping input.
+      const row = wrapper.find(
+        `[data-test="job-input-mapping-system-provided-scorer-1-${variable}"]`,
+      );
+      expect(row.exists()).toBe(true);
+      expect(row.text().length).toBeGreaterThan(0);
       expect(
         wrapper
-          .find(
-            `[data-test="job-input-mapping-system-provided-scorer-1-${variable}"]`,
-          )
-          .text(),
-      ).toContain("System provided");
+          .find(`[data-test="job-input-mapping-input-scorer-1-${variable}"]`)
+          .exists(),
+      ).toBe(false);
     }
     expect(
       wrapper
@@ -120,13 +139,18 @@ describe("JobInputMapping", () => {
     const wrapper = mountMapping("session");
 
     for (const variable of ["statistics", "steps"]) {
+      // Auto-filled rows are identified by the row itself, not by badge copy:
+      // they render a source description and no mapping input.
+      const row = wrapper.find(
+        `[data-test="job-input-mapping-system-provided-scorer-1-${variable}"]`,
+      );
+      expect(row.exists()).toBe(true);
+      expect(row.text().length).toBeGreaterThan(0);
       expect(
         wrapper
-          .find(
-            `[data-test="job-input-mapping-system-provided-scorer-1-${variable}"]`,
-          )
-          .text(),
-      ).toContain("System provided");
+          .find(`[data-test="job-input-mapping-input-scorer-1-${variable}"]`)
+          .exists(),
+      ).toBe(false);
     }
     for (const variable of ["input", "output", "spans", "custom"]) {
       expect(
@@ -141,7 +165,7 @@ describe("JobInputMapping", () => {
     const wrapper = mountMapping("span");
 
     expect(
-      wrapper.find('[data-test="job-input-mapping-system-variables"]').exists(),
+      wrapper.find('[data-test="job-input-mapping-system-variables-learn-more"]').exists(),
     ).toBe(false);
     expect(
       wrapper
@@ -202,5 +226,75 @@ describe("JobInputMapping", () => {
     expect(
       wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists(),
     ).toBe(true);
+  });
+
+  // The section keeps ONE shape regardless of what the scorer declares — only
+  // individual rows differ. An earlier version collapsed the whole block when
+  // nothing needed mapping, which made the layout jump as scorers changed.
+  describe("keeps a single consistent layout", () => {
+    it("renders a scorer card whether or not anything needs mapping", () => {
+      const allAuto = mountMapping("trace", [autoFilledScorer]);
+      const needsWork = mountMapping("trace");
+
+      expect(allAuto.findAll("article")).toHaveLength(1);
+      expect(needsWork.findAll("article")).toHaveLength(1);
+    });
+
+    it("shows every declared variable as a row, auto-filled ones included", () => {
+      const wrapper = mountMapping("trace", [autoFilledScorer]);
+
+      for (const variable of ["input", "output"]) {
+        expect(
+          wrapper
+            .find(
+              `[data-test="job-input-mapping-system-provided-scorer-2-${variable}"]`,
+            )
+            .exists(),
+        ).toBe(true);
+      }
+      // Auto rows explain their source instead of repeating a badge.
+      expect(wrapper.text()).toContain("Input from the trace's root span");
+    });
+
+    // Provenance is carried by the heading ("Prompt variables") rather than a
+    // sentence in the hint, so the hint can stay short.
+    it("names the variables' origin in the heading, not a long hint", () => {
+      const wrapper = mountMapping("trace");
+
+      expect(wrapper.text()).toContain("Prompt variables");
+      expect(wrapper.text()).toContain(
+        "Trace values fill in automatically. Map anything else to a span field.",
+      );
+    });
+
+    it("keeps the reference drawer reachable in every case", async () => {
+      const wrapper = mountMapping("trace", [autoFilledScorer]);
+
+      await wrapper
+        .get('[data-test="job-input-mapping-system-variables-learn-more"]')
+        .trigger("click");
+
+      expect(
+        wrapper
+          .find('[data-test="job-input-mapping-system-variables-table"]')
+          .exists(),
+      ).toBe(true);
+    });
+  });
+
+  // Regression: the description interpolates {scope}; calling t() without the
+  // param rendered "from the  itself" with a hole in the sentence.
+  it("interpolates the scope into the system-provided description", async () => {
+    const wrapper = mountMapping("trace");
+
+    await wrapper
+      .get('[data-test="job-input-mapping-system-variables-learn-more"]')
+      .trigger("click");
+
+    const drawer = wrapper.get(
+      '[data-test="job-input-mapping-system-variables-drawer"]',
+    );
+    expect(drawer.text()).toContain("from the trace itself");
+    expect(drawer.text()).not.toContain("from the  itself");
   });
 });

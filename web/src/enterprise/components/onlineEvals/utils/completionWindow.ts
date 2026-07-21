@@ -31,6 +31,41 @@ export function completionWindowDefaultsForScope(
   return null;
 }
 
+export interface DurationParts {
+  hours: number;
+  minutes: number;
+  seconds: number;
+}
+
+/**
+ * Split a seconds field into display units: `1800` → 30 minutes, `14400` → 4
+ * hours, `90` → 1 minute 30 seconds. Session max-age defaults to 4 hours,
+ * which is where a raw `14400` stops being readable at all.
+ *
+ * Returns `null` when the field isn't a usable duration yet (empty,
+ * non-numeric, or non-positive) so the caller can fall back to a generic hint
+ * rather than describing a nonsense window.
+ *
+ * Deliberately returns NUMBERS, not a formatted string — the unit labels are
+ * user-facing text and belong in i18n (`common.hr` / `common.min` /
+ * `common.sec`), so only the component may assemble the final wording.
+ */
+export function durationPartsFromSecs(
+  value: string | number,
+): DurationParts | null {
+  const input = String(value).trim();
+  if (!input) return null;
+
+  const secs = Math.floor(Number(input));
+  if (!Number.isFinite(secs) || secs <= 0) return null;
+
+  return {
+    hours: Math.floor(secs / 3600),
+    minutes: Math.floor((secs % 3600) / 60),
+    seconds: secs % 60,
+  };
+}
+
 /** Read a scope's completion config from either API casing, with defaults. */
 export function completionWindowConfigFromJob(
   row: EvalJob,

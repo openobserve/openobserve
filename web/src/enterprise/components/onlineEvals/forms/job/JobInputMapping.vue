@@ -1,108 +1,94 @@
 ﻿<template>
   <div class="flex flex-col gap-2.5">
     <div class="flex flex-col gap-0.5">
-      <span class="text-compact leading-tight font-medium text-input-label-text">{{
-        t("onlineEvals.job.inputMapping.title")
-      }}</span>
+      <div class="flex flex-wrap items-center gap-1">
+        <span
+          class="text-compact leading-tight font-medium text-input-label-text"
+          >{{ t("onlineEvals.job.inputMapping.title") }}</span
+        >
+        <OButton
+          v-if="systemProvidedVariables.length"
+          data-test="job-input-mapping-system-variables-learn-more"
+          type="button"
+          variant="ghost-primary"
+          size="xs"
+          icon-left="help"
+          class="gap-1 font-medium"
+          @click="systemVariablesDrawerOpen = true"
+        >
+          <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
+        </OButton>
+      </div>
       <span class="text-xs text-input-help-text leading-none">{{
         t(`onlineEvals.job.inputMapping.hint.${targetScope}`)
       }}</span>
     </div>
-    <section
-      v-if="systemProvidedVariables.length"
-      class="flex flex-col gap-1"
-      data-test="job-input-mapping-system-variables"
-    >
-      <div class="flex flex-col gap-1">
-        <div class="flex flex-wrap items-center gap-1">
-          <strong class="text-xs font-semibold text-text-heading">
-            {{ systemProvidedTitle }}
-          </strong>
-          <OButton
-            data-test="job-input-mapping-system-variables-learn-more"
-            type="button"
-            variant="ghost-primary"
-            size="xs"
-            icon-left="help"
-            class="gap-1 font-medium"
-            @click="systemVariablesDrawerOpen = true"
-          >
-            <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
-          </OButton>
-        </div>
-        <span class="text-2xs leading-[1.45] text-text-secondary">
-          {{ t("onlineEvals.job.inputMapping.systemProvided.description") }}
-        </span>
-      </div>
-
+    <!-- Overlay only — deliberately not wrapped in a layout element, so it
+         doesn't claim a row (and a gap) in this flex column. -->
+    <template v-if="systemProvidedVariables.length">
       <ODrawer
         v-model:open="systemVariablesDrawerOpen"
         data-test="job-input-mapping-system-variables-drawer"
         :title="systemProvidedTitle"
         size="lg"
+        bleed
       >
-        <div class="flex flex-col gap-3 p-4">
-          <div class="flex flex-col items-start gap-2">
-            <OTag variant="primary-soft" size="xs">
-              {{
-                t(
-                  "onlineEvals.job.inputMapping.systemProvided.viewComponentBadge",
-                )
-              }}
-            </OTag>
-            <span class="text-xs leading-[1.5] text-text-secondary">
-              {{ t("onlineEvals.job.inputMapping.systemProvided.description") }}
-            </span>
-          </div>
+        <!-- `bleed` drops ODrawer's body inset so the table runs edge to edge.
+             The vertical rhythm and the prose inset are re-applied with the
+             same tokens the drawer would have used, so only the table bleeds. -->
+        <div class="flex flex-col gap-3 py-dialog-content-py">
+          <span
+            class="px-dialog-content-px text-xs leading-relaxed text-text-secondary"
+          >
+            {{ systemProvidedDescriptionText }}
+          </span>
 
-          <div class="overflow-hidden rounded-default border border-border-default">
-            <OTable
-              data-test="job-input-mapping-system-variables-table"
-              :data="systemProvidedVariables"
-              :columns="systemProvidedColumns"
-              row-key="name"
-              pagination="none"
-              sorting="none"
-              selection="none"
-              :show-global-filter="false"
-              :default-columns="false"
-              :fill-height="false"
-              :frame="false"
-              :sticky-header="false"
-              dense
-              wrap
-            >
-              <template #cell-variable="{ row }">
-                <code
-                  class="w-fit max-w-full rounded-default bg-surface-subtle px-1.5 py-0.5 font-mono text-2xs font-semibold text-text-heading"
-                  :data-test="`job-input-mapping-system-variable-${row.name}`"
-                  >{{ formatTemplateVariable(row.name) }}</code
+          <OTable
+            data-test="job-input-mapping-system-variables-table"
+            :data="systemProvidedVariables"
+            :columns="systemProvidedColumns"
+            row-key="name"
+            pagination="none"
+            sorting="none"
+            selection="none"
+            :show-global-filter="false"
+            :default-columns="false"
+            :fill-height="false"
+            :frame="false"
+            :sticky-header="false"
+            dense
+            wrap
+          >
+            <template #cell-variable="{ row }">
+              <code
+                class="w-fit max-w-full rounded-default bg-surface-subtle px-1.5 py-0.5 font-mono text-2xs font-semibold text-text-heading"
+                :data-test="`job-input-mapping-system-variable-${row.name}`"
+                >{{ formatTemplateVariable(row.name) }}</code
+              >
+            </template>
+
+            <template #cell-source="{ row }">
+              <div class="flex flex-wrap items-center gap-1">
+                <OTag variant="primary-soft" size="xs">
+                  {{ t("onlineEvals.job.inputMapping.systemProvided.badge") }}
+                </OTag>
+                <OTag
+                  v-if="row.name === 'spans'"
+                  variant="warning-soft"
+                  size="xs"
                 >
-              </template>
-
-              <template #cell-source="{ row }">
-                <div class="flex flex-wrap items-center gap-1">
-                  <OTag variant="primary-soft" size="xs">
-                    {{ t("onlineEvals.job.inputMapping.systemProvided.badge") }}
-                  </OTag>
-                  <OTag
-                    v-if="row.name === 'spans'"
-                    variant="warning-soft"
-                    size="xs"
-                  >
-                    {{
-                      t(
-                        "onlineEvals.job.inputMapping.systemProvided.selectorRequired",
-                      )
-                    }}
-                  </OTag>
-                </div>
-              </template>
-            </OTable>
-          </div>
+                  {{
+                    t(
+                      "onlineEvals.job.inputMapping.systemProvided.selectorRequired",
+                    )
+                  }}
+                </OTag>
+              </div>
+            </template>
+          </OTable>
         </div>
       </ODrawer>
-    </section>
+    </template>
     <div
       v-if="selectedScorers.length === 0"
       class="py-2.5 px-3 border border-dashed border-dialog-header-border rounded-default text-text-secondary text-xs text-center"
@@ -169,13 +155,17 @@
                   updateSpanSelectorBinding(entityId(scorer), $event)
                 "
               />
+              <!-- Auto-filled rows stay quiet: an icon plus where the value
+                   comes from. A badge on every row shouted the one thing that
+                   is true of most rows, which is what made the list read as
+                   noise rather than as a list. -->
               <template v-else>
-                <OTag variant="primary-soft" size="xs">
-                  {{ t("onlineEvals.job.inputMapping.systemProvided.badge") }}
-                </OTag>
-                <span
-                  class="text-2xs leading-[1.4] text-text-secondary"
-                >
+                <OIcon
+                  name="bolt"
+                  size="xs"
+                  class="shrink-0 text-text-tertiary"
+                />
+                <span class="text-2xs leading-[1.4] text-text-secondary">
                   {{ systemProvidedDescription(variable) }}
                 </span>
               </template>
@@ -222,6 +212,7 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -279,6 +270,13 @@ const targetScopeName = computed(() =>
 const systemProvidedTitle = computed(() =>
   t("onlineEvals.job.inputMapping.systemProvided.title", {
     scope: targetScopeName.value,
+  }),
+);
+// Lower-cased mid-sentence ("…from the trace itself"), unlike the title where
+// the scope leads the phrase.
+const systemProvidedDescriptionText = computed(() =>
+  t("onlineEvals.job.inputMapping.systemProvided.description", {
+    scope: targetScopeName.value.toLowerCase(),
   }),
 );
 const systemProvidedVariables = computed(() =>

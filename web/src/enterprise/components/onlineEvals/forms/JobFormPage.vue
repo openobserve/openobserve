@@ -287,6 +287,7 @@
                   type="number"
                   :min="MIN_COMPLETION_IDLE_WINDOW_SECS"
                   size="sm"
+                  :help-text="idleWindowHelp"
                   data-test="job-form-idle-window-input"
                 />
               </div>
@@ -297,6 +298,7 @@
                   type="number"
                   min="1"
                   size="sm"
+                  :help-text="maxAgeHelp"
                   data-test="job-form-max-age-input"
                 />
               </div>
@@ -429,6 +431,7 @@ import {
   buildCompletionConfigPayloads,
   completionWindowConfigFromJob,
   completionWindowDefaultsForScope,
+  durationPartsFromSecs,
   MIN_COMPLETION_IDLE_WINDOW_SECS,
   TRACE_COMPLETION_WINDOW_DEFAULTS,
 } from "../utils/completionWindow";
@@ -518,6 +521,38 @@ const samplingValueHelp = computed<string>(() => {
   return percent === null
     ? t("onlineEvals.job.samplingValueHelp")
     : t("onlineEvals.job.samplingValuePreview", { percent });
+});
+
+// Completion help echoes the entered window back in readable units, because a
+// bare `1800` in a seconds box says nothing about how long the user will wait.
+// Unit labels come from i18n (same `common.*` keys AutoRefreshInterval uses),
+// so the util hands back numbers and the wording is assembled here.
+function humanizeSecs(value: string | number): string | null {
+  const parts = durationPartsFromSecs(value);
+  if (!parts) return null;
+
+  const words: string[] = [];
+  if (parts.hours) words.push(`${parts.hours} ${t("common.hr")}`);
+  if (parts.minutes) words.push(`${parts.minutes} ${t("common.min")}`);
+  if (parts.seconds) words.push(`${parts.seconds} ${t("common.sec")}`);
+
+  return words.join(" ") || null;
+}
+
+// NOTE: `formValues` is a store ref; script reads need `.value` (templates
+// auto-unwrap, script does not).
+const idleWindowHelp = computed<string>(() => {
+  const duration = humanizeSecs(formValues.value.idleWindowSecs);
+  return duration
+    ? t("onlineEvals.job.idleWindowHelp", { duration })
+    : t("onlineEvals.job.idleWindowHelpEmpty");
+});
+
+const maxAgeHelp = computed<string>(() => {
+  const duration = humanizeSecs(formValues.value.maxAgeSecs);
+  return duration
+    ? t("onlineEvals.job.maxAgeHelp", { duration })
+    : t("onlineEvals.job.maxAgeHelpEmpty");
 });
 
 // Pauses the match-count query while a condition is half-filled (column picked

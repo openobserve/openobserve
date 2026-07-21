@@ -257,6 +257,24 @@ describe("JobFormPage", () => {
     expect(help).not.toContain("%");
   });
 
+  // "This long" told the user nothing — the help echoes the entered window in
+  // human units so a bare 1800 reads as 30m.
+  it("shows the completion windows as readable durations", async () => {
+    wrapper = createWrapper();
+
+    setField(wrapper, "targetScope", "trace");
+    setField(wrapper, "idleWindowSecs", 120);
+    setField(wrapper, "maxAgeSecs", 1800);
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.find('[data-test="job-form-idle-window-input"]').text(),
+    ).toContain("2 min");
+    expect(
+      wrapper.find('[data-test="job-form-max-age-input"]').text(),
+    ).toContain("30 min");
+  });
+
   it("defaults trace and session idle windows to 120 seconds", async () => {
     wrapper = createWrapper();
 

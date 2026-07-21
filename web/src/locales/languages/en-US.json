@@ -8518,7 +8518,7 @@
         "scorerTypeRemote": "Remote",
         "producesPrefix": "Produces",
         "viewScorerHint": "View",
-        "inputMappingSection": "Input Mapping",
+        "inputMappingSection": "Prompt Variables",
         "samplingSection": "Sampling",
         "samplingModeLabel": "Mode",
         "samplingValueLabel": "Value",
@@ -8650,11 +8650,15 @@
       },
       "completionSection": "Completion criteria",
       "completionHelp": {
-        "trace": "A trace becomes ready when an end signal matches, or when the idle window or maximum age is reached.",
-        "session": "A session becomes ready when an end signal matches, or when the idle window or maximum age is reached."
+        "trace": "The trace is evaluated as soon as the first of these is met.",
+        "session": "The session is evaluated as soon as the first of these is met."
       },
       "idleWindowLabel": "Idle window (seconds)",
+      "idleWindowHelp": "Evaluated after {duration} with no new spans.",
+      "idleWindowHelpEmpty": "Evaluated once no new spans arrive.",
       "maxAgeLabel": "Max age (seconds)",
+      "maxAgeHelp": "Evaluated {duration} after the first span.",
+      "maxAgeHelpEmpty": "Evaluated at a fixed age, even if spans are still arriving.",
       "descriptionLabel": "Description",
       "samplingModeLabel": "Sampling mode",
       "samplingValueLabel": "Sampling rate",
@@ -8697,19 +8701,18 @@
         }
       },
       "inputMapping": {
-        "title": "Input mapping",
+        "title": "Prompt variables",
         "hint": {
-          "span": "Map any span field into each scorer template variable.",
-          "trace": "System-provided trace variables are filled automatically. Map any remaining scorer variables below.",
-          "session": "System-provided session variables are filled automatically. Map any remaining scorer variables below."
+          "span": "Map each variable to the span field that supplies its value.",
+          "trace": "Trace values fill in automatically. Map anything else to a span field.",
+          "session": "Session values fill in automatically. Map anything else to a span field."
         },
         "selectScorers": "Select scorers to configure their mappings.",
         "noVariables": "This scorer has no template variables to map.",
         "variableCount": "{count} variables",
         "systemProvided": {
-          "title": "System-provided variables for {scope} evaluation",
-          "description": "OpenObserve builds these bounded View Components when the target is evaluated. If a scorer prompt references them, no field mapping is needed.",
-          "viewComponentBadge": "View Component",
+          "title": "{scope} Variables",
+          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly \u2014 no mapping needed.",
           "badge": "System provided",
           "selectorRequired": "Span Selector required",
           "columns": {
@@ -8719,21 +8722,21 @@
           },
           "variables": {
             "input": {
-              "trace": "Bounded input from the trace's root span."
+              "trace": "Input from the trace's root span."
             },
             "output": {
-              "trace": "Bounded output from the trace's root span."
+              "trace": "Output from the trace's root span."
             },
             "statistics": {
-              "trace": "Bounded trace metrics including span count, duration, LLM and tool calls, errors, tokens, and cost.",
-              "session": "Bounded session metrics including trace and turn counts, duration, and errors."
+              "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
+              "session": "Session metrics: trace and turn counts, duration, and errors."
             },
             "spans": {
-              "trace": "A bounded, filtered span subset supplied by the job's Span Selector."
+              "trace": "A filtered subset of spans, chosen by the job's Span Selector."
             },
             "steps": {
-              "trace": "A bounded, time-ordered span trajectory; the middle is folded when the trace exceeds the item limit.",
-              "session": "A bounded, time-ordered sequence of traces represented as conversation turns."
+              "trace": "Spans in time order; the middle is folded when the trace is very long.",
+              "session": "Traces in time order, represented as conversation turns."
             }
           }
         }
