@@ -115,6 +115,7 @@ const useSyntheticsRecorder = () => {
       pendingCommands.set(nonce, resolve);
     });
 
+    console.log("Post message", command);
     window.postMessage(
       { ch: BRIDGE_CHANNEL, dir: 'to-ext', nonce, msg: { type: 'synthetics-command', command } },
       '*',
@@ -307,23 +308,32 @@ const useSyntheticsRecorder = () => {
     replayPhase.value = 'running'
     isReplaying.value = true
 
-    // Substitute {{ VAR_NAME }} placeholders in wire step fields with actual variable values.
+    // // Substitute {{ VAR_NAME }} placeholders in wire step fields with actual variable values.
     const vars = Object.fromEntries((variables ?? []).map(v => [v.name, v.value]))
     const resolvedSteps = vars && Object.keys(vars).length > 0
       ? steps.map(s => substituteVariables(s, vars))
       : steps
 
-    // Ensure bridge is connected so stepReplayResult events flow through handleBridgeData.
-    console.log("Disconnect ---");
+    // Wake the content script bridge if it went idle. The port may have
+    // died between stopRecording and replay (bfcache, SW suspend, etc.).
+    // The probe re-activates the bridge before we send the replay command.
+    window.postMessage({ ch: 'oo-bridge-probe' }, '*');
+    await new Promise(r => setTimeout(r, 200));
+
     bridgeDisconnect() // discard any previous session
     bridgeConnect()
     bridgeDisconnectHandler = () => {
       isRecording.value = false
     }
 
-    const res = await sendCommand<ReplayResponse>({ action: 'replay', steps: resolvedSteps, targetUrl, auth, headers, cookies })
+    // Unwrap Vue reactive proxies before structured clone. Vue Proxy traps
+    // intercept property access — postMessage structured clone sees the proxy,
+    // not the underlying object, and silently drops all fields.
+    const plainSteps = JSON.parse(JSON.stringify(resolvedSteps)) as WireStep[]
+    const res = await sendCommand<ReplayResponse>({ action: 'replay', steps: plainSteps, targetUrl })
     isReplaying.value = false
     replayResult.value = res
+    console.log("response ----", res);
     if (res) {
       if (res.stopped) replayPhase.value = 'stopped'
       else if (res.passed) replayPhase.value = 'passed'

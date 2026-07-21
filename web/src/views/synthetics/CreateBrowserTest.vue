@@ -463,6 +463,11 @@ function onReplay() {
 }
 
 function onStopReplay() {
+  // Update UI state immediately — the SW has already stopped the replay.
+  // Don't wait for the replay promise to resolve (it may take seconds or
+  // never arrive if the port was disconnected from window focus changes).
+  recorder.replayPhase.value = 'stopped'
+  recorder.isReplaying.value = false
   recorder.stopReplay().catch(() => {})
 }
 
