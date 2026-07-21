@@ -298,10 +298,12 @@ const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
   uncategorized: "logs.patternList.severityUncategorized",
 };
 
-const activeSeverities = ref<string[]>([]);
+const activeSeverities = ref<PatternSeverityKey[]>([]);
 
 const onSeverityFilterChange = (value: unknown) => {
-  activeSeverities.value = Array.isArray(value) ? (value as string[]) : [];
+  activeSeverities.value = Array.isArray(value)
+    ? (value as PatternSeverityKey[])
+    : [];
 };
 
 // Chip counts come from the extraction sample, which is a clean partition
