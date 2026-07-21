@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 16,
+    "rawProjectRamp": 10,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -74,9 +74,6 @@
     "components/alerts/IncidentRCAAnalysis.vue": {
       "rawVarInComponent": 36
     },
-    "components/alerts/IncidentServiceGraph.vue": {
-      "rawProjectRamp": 3
-    },
     "components/alerts/PrebuiltDestinationSelector.vue": {
       "arbZ": 2
     },
@@ -93,7 +90,6 @@
       "unscopedStyle": 1
     },
     "components/common/LoadingProgress.vue": {
-      "rawProjectRamp": 2,
       "arbZ": 1
     },
     "components/dashboards/QueryInspector.vue": {
@@ -148,9 +144,6 @@
     },
     "components/settings/OrgStorageEditor.vue": {
       "arbZ": 1
-    },
-    "components/traces/FlameGraphView.vue": {
-      "rawProjectRamp": 1
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
       "rawVarInComponent": 4
