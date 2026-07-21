@@ -158,55 +158,23 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
                     const {} = {};
                     try {{
                         {}
-                        return JSON.stringify({{ success: true }});
                     }} catch(e) {{
-                        return JSON.stringify({{
-                            success: false,
-                            error: e.name + ': ' + e.message,
-                            line: e.lineNumber || 'unknown',
-                            column: e.columnNumber || 'unknown'
-                        }});
                     }}
+                    // the syntax errors will be caught separately, but because we are
+                    // assigning the var_name as empty object, user's code will likely throw exception
+                    // through no fault of their own. So we ignore that.
+                    return JSON.stringify({{ success: true }});
                 }})();
                 "#,
                 var_name, test_value, func_for_compilation
             );
 
-            let result: String = ctx
+            // error here would mean there was some syntax error, which should be propagated
+            let _: String = ctx
                 .eval(test_code)
-                .map_err(|e| std::io::Error::other(format!("JS compilation failed: {}", e)))?;
-
-            // Parse the result to check if there was an error
-            let result_obj: serde_json::Value = serde_json::from_str(&result)
-                .map_err(|e| std::io::Error::other(format!("Failed to parse result: {}", e)))?;
-
-            if let Some(success) = result_obj.get("success").and_then(|v| v.as_bool())
-                && !success
-            {
-                let error_msg = result_obj
-                    .get("error")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Unknown error");
-                let line = result_obj
-                    .get("line")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| *s != "unknown");
-                let column = result_obj
-                    .get("column")
-                    .and_then(|v| v.as_str())
-                    .filter(|s| *s != "unknown");
-
-                // Only append line/column if we have valid values
-                let full_error = match (line, column) {
-                    (Some(l), Some(c)) => format!("{} (line: {}, column: {})", error_msg, l, c),
-                    (Some(l), None) => format!("{} (line: {})", error_msg, l),
-                    (None, Some(c)) => format!("{} (column: {})", error_msg, c),
-                    (None, None) => error_msg.to_string(),
-                };
-
-                return Err(std::io::Error::other(full_error));
-            }
-
+                .map_err(|e| {
+                    std::io::Error::other(format!("JS compilation failed: {}", e))
+                })?;
             // Extract parameter names (simple heuristic)
             // TODO: Parse function signature properly
             let params = vec!["row".to_string()];
@@ -456,16 +424,6 @@ mod tests {
     }
 
     #[test]
-    fn test_compile_js_function_with_undefined_var() {
-        // Undefined variables should be caught during compilation
-        let func = r#"
-            row.field = undefined_variable;
-        "#;
-        let result = compile_js_function(func, "test_org");
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_compile_js_with_result_array_marker() {
         // #ResultArray# marker should not cause compilation error
         // Note: #ResultArray# functions use 'rows' (array), not 'row' (single object)
@@ -543,13 +501,10 @@ rows.map(function(r) {
     }
 
     #[test]
-    fn test_compile_js_function_with_reference_error() {
+    fn test_compile_js_function_with_syntax_error() {
         // Test that undefined variable errors are caught and reported properly
         let func = r#"
-            row.processed = true;
-            row.count = (row.count || 0) + 1;
-            row.source = "javascript";
-            mayvar
+            row.meta )= 0'
         "#;
         let result = compile_js_function(func, "test_org");
         assert!(result.is_err());
@@ -557,10 +512,8 @@ rows.map(function(r) {
         println!("Captured error message: {}", err_msg);
         // The error message should contain information about the undefined variable
         assert!(
-            err_msg.contains("ReferenceError")
-                || err_msg.contains("mayvar")
-                || err_msg.contains("not defined"),
-            "Error message should mention the undefined variable, got: {}",
+            err_msg.contains("Exception") || err_msg.contains("compilation failed"),
+            "Error message should mention compilation failed, got: {}",
             err_msg
         );
         // Should NOT contain "(line: unknown, column: unknown)"
@@ -812,23 +765,6 @@ for (var i = 0; i < filtered.length; i++) {
         assert_eq!(output_array.len(), 2); // Only values > 50
         assert_eq!(output_array[0]["value"], 60);
         assert_eq!(output_array[1]["value"], 80);
-    }
-
-    #[test]
-    fn test_result_array_error_shows_rows_not_row() {
-        // Test that error messages for #ResultArray# reference 'rows'
-        let func = r#"#ResultArray#
-// This should fail because we're trying to use 'row' instead of 'rows'
-row.field = 1;"#;
-
-        let config = compile_js_function(func, "test_org");
-        // Should fail at compilation with ReferenceError about 'row' not being defined
-        assert!(config.is_err());
-        let err_msg = config.unwrap_err().to_string();
-        assert!(
-            err_msg.contains("ReferenceError") || err_msg.contains("row"),
-            "Error should mention 'row' is not defined when using #ResultArray#"
-        );
     }
 
     // ============================================================================

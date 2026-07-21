@@ -240,6 +240,7 @@ pub fn get_pending_batch_count(org_id: &str) -> i64 {
 
 #[cfg(feature = "enterprise")]
 pub async fn send_grouped_notification(
+    trace_id: &str,
     batch: crate::service::alerts::grouping::PendingBatch,
 ) -> Result<(), anyhow::Error> {
     use config::meta::alerts::deduplication::SendStrategy;
@@ -372,6 +373,7 @@ pub async fn send_grouped_notification(
     // Send notification using alert's send_notification method
     match notification_alert
         .send_notification(
+            trace_id,
             &combined_rows,
             rows_end_time,
             start_time,
