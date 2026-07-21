@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="w-25 h-25 rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] flex items-center justify-center mb-7">
         <div class="w-17 h-17 rounded-full bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] border-[1.5px] border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] border-solid flex items-center justify-center">
-          <OIcon name="account-balance" size="lg" class="text-primary-600 opacity-85" />
+          <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
       </div>
 

@@ -327,7 +327,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 class="shrink-0 inline-flex items-center justify-center size-6 rounded-default transition hover:bg-primary-200 hover:text-select-item-selected-text"
                 :class="
                   copiedId === row.org.identifier
-                    ? 'opacity-100 text-primary-600'
+                    ? 'opacity-100 text-accent'
                     : row.index === highlightedIndex
                       ? 'text-text-secondary opacity-100'
                       : 'text-text-secondary opacity-0 focus-visible:opacity-100'

@@ -221,7 +221,7 @@ const joinSlack = () => {
             stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="mt-0.5 h-4 w-4 shrink-0 text-primary-600"
+            class="mt-0.5 h-4 w-4 shrink-0 text-accent"
             aria-hidden="true"
           >
             <path d="M20 6 9 17l-5-5" />

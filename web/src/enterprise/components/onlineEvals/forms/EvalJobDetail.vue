@@ -268,7 +268,7 @@
                     </div>
                   </div>
                   <span
-                    class="shrink-0 inline-flex items-center gap-1 text-text-secondary text-2xs font-semibold group-[:hover:not(:disabled)]:text-primary-600"
+                    class="shrink-0 inline-flex items-center gap-1 text-text-secondary text-2xs font-semibold group-[:hover:not(:disabled)]:text-accent"
                   >
                     <span class="opacity-0 transition-opacity duration-150 group-[:hover:not(:disabled)]:opacity-100">
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}

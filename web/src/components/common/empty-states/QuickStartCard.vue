@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="group relative flex items-center gap-3 w-64 max-w-full h-16 ps-3 pe-3.5 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-[0.125rem] focus-visible:ring-primary-500/40"
+    class="group relative flex items-center gap-3 w-64 max-w-full h-16 ps-3 pe-3.5 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-[0.125rem] focus-visible:ring-accent/40"
   >
     <span
       class="relative inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-tabs-active-bg text-tabs-active-text transition-colors group-hover:bg-accent group-hover:text-text-inverse"

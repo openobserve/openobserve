@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 102,
+    "rawProjectRamp": 80,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -13,7 +13,7 @@
       "rawVarInComponent": 2
     },
     "components/CommunitySlackInvite.vue": {
-      "rawProjectRamp": 6
+      "rawProjectRamp": 5
     },
     "components/CustomDateTimePicker.vue": {
       "arbZ": 1
@@ -25,13 +25,13 @@
       "rawVarInComponent": 2
     },
     "components/MenuLink.vue": {
-      "rawProjectRamp": 8
+      "rawProjectRamp": 7
     },
     "components/O2AIChat.vue": {
       "rawVarInComponent": 50
     },
     "components/OrganizationSelector.vue": {
-      "rawProjectRamp": 3,
+      "rawProjectRamp": 2,
       "rawVarInComponent": 2
     },
     "components/RichTextInput.vue": {
@@ -39,7 +39,6 @@
       "rawVarInComponent": 18
     },
     "components/TenstackTable.vue": {
-      "rawProjectRamp": 1,
       "rawVarInComponent": 3
     },
     "components/ThemeSwitcher.vue": {
@@ -102,10 +101,10 @@
       "arbZ": 1
     },
     "components/common/SectionHub.vue": {
-      "rawProjectRamp": 2
+      "rawProjectRamp": 1
     },
     "components/common/empty-states/QuickStartCard.vue": {
-      "rawProjectRamp": 2
+      "rawProjectRamp": 1
     },
     "components/dashboards/AddDashboardFromGitHub.vue": {
       "rawProjectRamp": 1
@@ -117,7 +116,7 @@
       "rawProjectRamp": 2
     },
     "components/dashboards/OverrideConfigPopup.vue": {
-      "rawProjectRamp": 2
+      "rawProjectRamp": 1
     },
     "components/dashboards/QueryInspector.vue": {
       "rawVarInComponent": 4
@@ -181,15 +180,6 @@
     "components/traces/FlameGraphView.vue": {
       "rawProjectRamp": 1
     },
-    "enterprise/components/billings/BillingGroup.vue": {
-      "rawProjectRamp": 5
-    },
-    "enterprise/components/billings/plans.vue": {
-      "rawProjectRamp": 1
-    },
-    "enterprise/components/onlineEvals/forms/EvalJobDetail.vue": {
-      "rawProjectRamp": 1
-    },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
       "rawVarInComponent": 4
     },
@@ -201,7 +191,6 @@
       "rawVarInComponent": 47
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
-      "rawProjectRamp": 4,
       "rawVarInComponent": 1
     },
     "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
@@ -370,7 +359,7 @@
       "rawVarInComponent": 6
     },
     "plugins/metrics/explorer/FunctionConfigDialog.vue": {
-      "rawProjectRamp": 2
+      "rawProjectRamp": 1
     },
     "plugins/pipelines/CustomNode.vue": {
       "arbZ": 2,
@@ -401,7 +390,6 @@
       "rawVarInComponent": 9
     },
     "plugins/traces/SessionDetails.vue": {
-      "rawProjectRamp": 1,
       "arbZ": 1,
       "rawVarInComponent": 9
     },
@@ -468,9 +456,6 @@
     "views/Dashboards/DashboardSettings.vue": {
       "rawVarInComponent": 3
     },
-    "views/Dashboards/Dashboards.vue": {
-      "rawProjectRamp": 1
-    },
     "views/Dashboards/ImportDashboard.vue": {
       "unscopedStyle": 1
     },
@@ -492,7 +477,7 @@
       "rawVarInComponent": 18
     },
     "views/OverviewTab.vue": {
-      "rawProjectRamp": 4,
+      "rawProjectRamp": 3,
       "arbZ": 1
     },
     "views/synthetics/CreateBrowserTest.vue": {

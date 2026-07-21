@@ -174,7 +174,7 @@
                 <template #settingsLink>
                   <router-link
                     :to="{ name: 'llmProviders' }"
-                    class="scorer-field__help-link text-primary-600 font-semibold no-underline hover:underline"
+                    class="scorer-field__help-link text-accent font-semibold no-underline hover:underline"
                     target="_blank"
                   >
                     {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
@@ -299,7 +299,7 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer disabled:text-text-muted disabled:cursor-not-allowed"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-accent cursor-pointer disabled:text-text-muted disabled:cursor-not-allowed"
                 :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
                 data-test="scorer-form-extra-field-add"
                 @click="addExtraField"
@@ -312,7 +312,7 @@
 
               <button
                 type="button"
-                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
+                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-accent cursor-pointer"
                 data-test="scorer-form-preview-schema"
                 @click="previewOutputSchema"
               >
@@ -553,7 +553,7 @@
             <div class="flex justify-between gap-3">
               <button
                 type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
+                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-accent cursor-pointer"
                 data-test="scorer-form-remote-header-add"
                 @click="addCustomHeader"
               >

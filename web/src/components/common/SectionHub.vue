@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="item in group.items"
             :key="item.key"
             type="button"
-            class="o2-hub-card group flex items-start gap-3 text-left p-4 rounded-default border border-border-default bg-surface-panel transition-colors hover:border-primary-500 hover:bg-surface-subtle outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            class="o2-hub-card group flex items-start gap-3 text-left p-4 rounded-default border border-border-default bg-surface-panel transition-colors hover:border-primary-500 hover:bg-surface-subtle outline-none focus-visible:ring-2 focus-visible:ring-accent"
             :data-test="item.dataTest || `section-hub-card-${item.key}`"
             @click="router.push(item.to)"
           >

@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             serviceCardClass(svc),
             selectedService?.id === svc.id && servicePanelVisible
-              ? 'outline-solid outline-[0.125em] outline-primary-500 outline-offset-[-0.0625em] bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)]'
+              ? 'outline-solid outline-[0.125em] outline-accent outline-offset-[-0.0625em] bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)]'
               : 'hover:bg-table-row-hover-bg',
           ]"
           @click="openServicePanel(svc)"

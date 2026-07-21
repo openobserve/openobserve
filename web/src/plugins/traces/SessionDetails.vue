@@ -1477,7 +1477,7 @@ function turnRowClass(trace: SessionTraceRow): string {
       ? "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]"
       : "bg-surface-base";
   const flash =
-    flashTurn.value === n ? " ring-2 ring-primary-500" : "";
+    flashTurn.value === n ? " ring-2 ring-accent" : "";
   return `rounded-default border border-border-default ${surface} overflow-hidden${flash}`;
 }
 

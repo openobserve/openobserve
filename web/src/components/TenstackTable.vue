@@ -318,7 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="filter-list"
                           size="sm"
                           :data-test="`o2-table-column-filter-icon-${header.column.id}-${isColFiltered(header.column.id) ? 'active' : 'inactive'}`"
-                          :class="isColFiltered(header.column.id) ? 'text-primary-600' : 'opacity-50'"
+                          :class="isColFiltered(header.column.id) ? 'text-accent' : 'opacity-50'"
                         />
                       </OButton>
                     </template>

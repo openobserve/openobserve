@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <button
               type="button"
               data-test="dashboard-addpanel-config-add-column"
-              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-2.25 rounded-default border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent cursor-pointer text-sm font-medium text-primary-600 transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)] hover:border-primary-600"
+              class="flex items-center justify-center gap-1.5 w-full shrink-0 p-2.25 rounded-default border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_50%,transparent)] bg-transparent cursor-pointer text-sm font-medium text-accent transition-colors hover:bg-[color-mix(in_srgb,var(--color-primary-600)_5%,transparent)] hover:border-primary-600"
             >
               <OIcon name="add" size="sm" />
               {{ t("dashboard.columnFormattingAddField") }}
