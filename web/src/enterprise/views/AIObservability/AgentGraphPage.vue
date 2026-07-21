@@ -37,9 +37,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.datetime.relativeTimePeriod ?? '15m'
           "
           data-test="ai-agent-graph-date-time"
-          class="h-[2rem]"
+          class="h-8"
           @on:date-change="onDateChange"
         />
+        <!-- Last-refresh + refresh control, consistent with LLM Insights /
+             Sessions / Agent Behavior page headers. -->
+        <div
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+        >
+          <ORefreshButton
+            :last-run-at="graphLastRunAt"
+            :loading="isGraphLoading"
+            :disabled="isGraphLoading"
+            data-test="ai-agent-graph-refresh-btn"
+            @click="refresh"
+          />
+        </div>
       </template>
 
     <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
@@ -54,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="agent-graph-filter-mode"
         @update:model-value="onFilterModeChange"
       >
-        <OToggleGroupItem value="stream" size="sm">{{
-          t("aiObservability.agentGraph.stream")
-        }}</OToggleGroupItem>
         <OToggleGroupItem value="agent" size="sm">{{
           t("aiObservability.agentGraph.agent")
+        }}</OToggleGroupItem>
+        <OToggleGroupItem value="stream" size="sm">{{
+          t("aiObservability.agentGraph.stream")
         }}</OToggleGroupItem>
       </OToggleGroup>
 
@@ -103,6 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <ServiceGraph
+      ref="graphRef"
       :stream-filter="effectiveStream"
       hide-stream-selector
       agent-highlight
@@ -121,6 +135,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
@@ -142,9 +157,44 @@ const ServiceGraph = defineAsyncComponent(
 
 const DEFAULT_RELATIVE = "15m";
 
-const filterMode = ref<"stream" | "agent">("stream");
+// Default scope is "agent" — the AI module is agent-centric (agents load on
+// mount, so the default is ready on first paint).
+const filterMode = ref<"stream" | "agent">("agent");
 const availableStreams = ref<string[]>([]);
 const activeStream = ref<string>("default");
+
+// Graph child ref + header refresh state. ServiceGraph exposes
+// { refresh, loading, lastRunAt }.
+const graphRef = ref<any>(null);
+const isRefreshing = ref(false);
+const graphLastRunAt = computed<number | null>(
+  () => graphRef.value?.lastRunAt ?? null,
+);
+const isGraphLoading = computed(
+  () => isRefreshing.value || graphRef.value?.loading || false,
+);
+
+async function refresh() {
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    // Re-anchor a relative window first so "last 15m" refreshes to now.
+    const dt = searchObj.data.datetime;
+    if (dt.type === "relative" && dt.relativeTimePeriod) {
+      const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+      if (r) {
+        searchObj.data.datetime = {
+          ...dt,
+          startTime: r.startTime,
+          endTime: r.endTime,
+        };
+      }
+    }
+    await graphRef.value?.refresh?.();
+  } finally {
+    isRefreshing.value = false;
+  }
+}
 
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentsLoaded = ref(false);

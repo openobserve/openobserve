@@ -616,6 +616,9 @@ export const convertServiceGraphToTree = (
         // to extremes (the "erratic" feel), and wheel zoom centers on the cursor
         // so you can focus an area. The +/- buttons drive the same zoom.
         roam: true,
+        // Nodes + labels track zoom 1:1 (tree default 0.4 barely grew them);
+        // matches the graph view so both feel the same when focusing in.
+        nodeScaleRatio: 1,
         scaleLimit: { min: 0.4, max: 4 },
         selectedMode: "single",
         label: {
@@ -1730,6 +1733,11 @@ export const convertServiceGraphToNetwork = (
         links: edges,
         // Pan + bounded wheel-zoom (scaleLimit below tames the extremes).
         roam: true,
+        // Nodes + labels scale 1:1 with zoom (default 0.6 makes them grow
+        // sub-linearly, so zooming in spread the layout but barely enlarged the
+        // nodes — they looked static). 1.0 = "focus in and everything gets
+        // bigger", the expected map-like behaviour; bounded by scaleLimit.
+        nodeScaleRatio: 1,
         draggable: false,
         focusNodeAdjacency: true,
         selectedMode: "single", // Enable single node selection
