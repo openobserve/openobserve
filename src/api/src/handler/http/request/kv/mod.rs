@@ -187,7 +187,7 @@ pub async fn delete(Path((org_id, key)): Path<(String, String)>) -> Response {
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Key Values", "operation": "list"})),
-        ("x-o2-mcp" = json!({"description": "List all keys", "category": "kv-store"}))
+        ("x-o2-mcp" = json!({"description": "List all keys", "category": "kv-store", "summary_fields": []}))
     )
 )]
 pub async fn list(

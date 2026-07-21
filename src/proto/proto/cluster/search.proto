@@ -24,6 +24,8 @@ service Search {
     rpc StartQuery(StartQueryRequest) returns (StartQueryResponse) {}
     rpc ReleaseQuery(ReleaseQueryRequest) returns (ReleaseQueryResponse) {}
     rpc GetLicenseUsageInfo(GetLicenseUsageRequest) returns (GetLicenseUsageResponse) {}
+    // generic get file call
+    rpc GetWorkflowInputs(GetWorkflowInputsRequest) returns (GetWorkflowInputsResponse) {}
 }
 
 message QueryStatusRequest {}
@@ -212,4 +214,15 @@ message GetLicenseUsageResponse {
     string                  last_usage_response = 7;
     repeated UsageResult    ingestion_history = 8;
 
+}
+
+message GetWorkflowInputsRequest {
+    string  org_id = 1;
+    string  workflow_id = 2;
+    string  run_id = 3;
+    bool    is_error_data = 4;            
+}
+
+message GetWorkflowInputsResponse {
+    string   data = 1;
 }

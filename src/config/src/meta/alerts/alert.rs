@@ -99,6 +99,8 @@ pub struct Alert {
     /// to any incident.
     #[serde(default)]
     pub creates_incident: bool,
+    #[serde(default)]
+    pub workflows: Vec<String>,
 }
 
 impl MemorySize for Alert {
@@ -119,6 +121,7 @@ impl MemorySize for Alert {
             + self.owner.mem_size()
             + self.last_edited_by.mem_size()
             + self.deduplication.mem_size()
+            + self.workflows.mem_size()
     }
 }
 
@@ -156,6 +159,7 @@ impl Default for Alert {
             last_satisfied_at: None,
             deduplication: None,
             creates_incident: false,
+            workflows: vec![],
         }
     }
 }

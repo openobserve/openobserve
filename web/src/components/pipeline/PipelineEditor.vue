@@ -66,26 +66,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </Teleport>
 
-
       <div class="flex mt-3 px-2">
-        <div class="nodes-drag-container pr-3 w-50">
-          <div
-            data-test="pipeline-editor-nodes-list-title"
-            class="mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center border-b-2 tracking-wide relative text-text-heading border-border-default after:content-[''] after:absolute after:-bottom-0.5 after:left-0 after:w-full after:h-0.5 after:bg-accent after:rounded-full"
-          >
-            {{ t("pipeline.nodes") }}
-          </div>
-
-
-          <div class="flex mt-2">
-            <NodeSidebar
-              v-show="
-                !pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'
-              "
-              :nodeTypes="nodeTypes"
-            />
-          </div>
-        </div>
+        <!-- Docked node palette (shared with Workflows). Same component drives
+             both editors, so the two palettes can never drift apart. -->
+        <NodePalette
+          v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
+          :items="pipelineObj.nodeTypes"
+          :title="t('pipeline.nodes')"
+          test-prefix="pipeline-node-sidebar"
+          :on-drag-start="onDragStart"
+        />
         <div
           id="pipelineChartContainer"
           ref="chartContainerRef"
@@ -113,7 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <AssociateFunction
     v-if="pipelineObj.dialog.name === 'function'"
     :open="true"
-    :functions="functionOptions"
     :associated-functions="associatedFunctions"
     @cancel:hideform="resetDialog"
     @add:function="refreshFunctionList"
@@ -127,6 +116,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-if="pipelineObj.dialog.name === 'remote_stream'"
     :open="true"
     @cancel:hideform="resetDialog"
+  />
+  <!-- shared "add next step" picker (opened by the hover-+ on a node) -->
+  <StepPickerDialog
+    v-if="pipelineObj.stepPicker.show"
+    :items="stepItems"
+    :title="t('flow.stepPicker.title')"
+    :search-placeholder="t('flow.stepPicker.search')"
+    :no-match-text="t('flow.stepPicker.noMatch')"
+    test-prefix="pipeline-step"
+    @pick="onStepPick"
+    @close="closeStepPicker"
   />
   <ODrawer data-test="pipeline-editor-json-editor-drawer"
     bleed
@@ -186,6 +186,7 @@ import {
   type Ref,
 } from "vue";
 import { getImageURL } from "@/utils/zincutils";
+import { isJsFunction } from "@/utils/functionLanguage";
 import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.vue";
 import functionsService from "@/services/jstransform";
 
@@ -194,6 +195,8 @@ import useTheme from "@/composables/useTheme";
 import pipelineService from "@/services/pipelines";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
+import NodePalette from "@/components/flow/NodePalette.vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -207,7 +210,6 @@ import {
   type PipelineMetaForm,
 } from "./pipelineMeta.schema";
 import jstransform from "@/services/jstransform";
-import NodeSidebar from "@/components/pipeline/NodeSidebar.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import StreamNode from "@/components/pipeline/NodeForm/Stream.vue";
 import QueryForm from "@/components/pipeline/NodeForm/Query.vue";
@@ -364,7 +366,8 @@ const nodeTypes: any = [
     subtype: "function",
     io_type: "default",
     icon: "img:" + functionImage,
-    tooltip: "Function Node",
+    // Matches the workflow Function node subtitle (workflow.node.functionDesc).
+    tooltip: "Reshape the payload with a function",
     isSectionHeader: false,
   },
   {
@@ -372,7 +375,8 @@ const nodeTypes: any = [
     subtype: "condition",
     io_type: "default",
     icon: "img:" + conditionImage,
-    tooltip: "Condition Node",
+    // Matches the workflow Condition node subtitle (workflow.node.conditionDesc).
+    tooltip: "Branch on a rule",
     isSectionHeader: false,
   },
   {
@@ -391,7 +395,35 @@ const nodeTypes: any = [
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
-const { pipelineObj, resetPipelineData } = useDragAndDrop();
+const { pipelineObj, resetPipelineData, addNodeAfter, closeStepPicker, onDragStart } =
+  useDragAndDrop();
+
+// Items for the shared step picker: the downstream-addable node types
+// (Transform + Destination; sources aren't "added after" a node).
+const stepItems = computed(() =>
+  (pipelineObj.nodeTypes || [])
+    .filter((n: any) => !n.isSectionHeader && n.io_type !== "input")
+    .map((n: any) => ({
+      key: `${n.subtype}-${n.io_type}`,
+      title: n.label,
+      description: n.tooltip,
+      icon: n.icon,
+      // Soft badge tokens, not raw hex: the old literals had no dark variant, so
+      // these tints stayed light-mode colours on a dark canvas.
+      iconTint:
+        n.io_type === "output"
+          ? "bg-badge-success-soft-bg text-badge-success-soft-text"
+          : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
+      subtype: n.subtype,
+      io_type: n.io_type,
+    })),
+);
+
+const onStepPick = (item: any) => {
+  const source = pipelineObj.stepPicker.source;
+  closeStepPicker();
+  addNodeAfter(source, { subtype: item.subtype, io_type: item.io_type });
+};
 pipelineObj.nodeTypes = nodeTypes;
 pipelineObj.functions = functions;
 
@@ -744,9 +776,10 @@ const getFunctions = () => {
       functions.value = {};
       functionOptions.value = [];
       res.data.list.forEach((func: Function) => {
-        // Only include VRL functions (trans_type === 0 or undefined)
-        // JavaScript functions (trans_type === 1) cannot be used in pipelines
-        if (func.trans_type !== 1) {
+        // Pipelines execute VRL — JavaScript functions can't run here.
+        // (isJsFunction reads both transType/trans_type; the list response uses
+        // camelCase, so a bare `trans_type` check silently matched everything.)
+        if (!isJsFunction(func)) {
           functions.value[func.name] = func;
           functionOptions.value.push(func.name);
         }
@@ -760,6 +793,8 @@ const getFunctions = () => {
 const resetDialog = () => {
   pipelineObj.dialog.show = false;
   pipelineObj.dialog.name = "";
+  // Discard any staged hover-`+` edge so a cancelled add doesn't wire the next node.
+  pipelineObj.pendingEdge = null;
   editingFunctionName.value = "";
   editingStreamRouteName.value = "";
 };
@@ -1112,9 +1147,8 @@ const onNodeDragOver = (event: any) => {
 
 const updateNewFunction = (_function: Function) => {
   if (!functions.value[_function.name]) {
-    // Only add VRL functions (trans_type !== 1) to pipeline options
-    // JavaScript functions cannot be used in pipelines
-    if (_function.trans_type !== 1) {
+    // Pipelines execute VRL — a JS function must not enter the options.
+    if (!isJsFunction(_function)) {
       functions.value[_function.name] = _function;
       functionOptions.value.push(_function.name);
     }
@@ -1219,9 +1253,9 @@ const cleanupPipelinesContextProvider = () => {
    async <PipelineFlow> child — and the two `.vue-flow.dragging` / `.vue-flow:has()`
    rules target the canvas ROOT, which is not in this template at all, so neither
    scoping nor :deep() can reach them. `o2vf_node_*` is the shared pipeline
-   node-type convention: the same class names are defined in NodeSidebar.vue and
-   asserted by NodeSidebar.spec.ts, so this block must stay unscoped and keep
-   riding those names rather than moving to colocated utilities.
+   node-type convention: the same class names are now produced by the shared
+   NodePalette (which replaced NodeSidebar.vue), so this block must stay unscoped
+   and keep riding those names rather than moving to colocated utilities.
 
    The `transition: none` blocks kill drag lag; NOTE: never set `transform: none`
    here — Vue Flow positions each node via an inline `transform: translate(x, y)`,

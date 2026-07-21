@@ -15,7 +15,7 @@
 
 use axum::{
     Json,
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
 use infra::errors;
@@ -44,14 +44,14 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
                 (
                     StatusCode::TOO_MANY_REQUESTS,
-                    [(ERROR_HEADER, code.to_json())],
+                    [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
                     Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
                 )
                     .into_response()
             }
             errors::ErrorCodes::SearchTimeout(_) => (
                 StatusCode::REQUEST_TIMEOUT,
-                [(ERROR_HEADER, code.to_json())],
+                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
                 Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             )
                 .into_response(),
@@ -65,21 +65,23 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
             | errors::ErrorCodes::SearchStreamNotFound(_)
             | errors::ErrorCodes::SearchHistogramNotAvailable(_) => (
                 StatusCode::BAD_REQUEST,
-                [(ERROR_HEADER, code.to_json())],
+                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
                 Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             )
                 .into_response(),
             errors::ErrorCodes::ServerInternalError(_)
             | errors::ErrorCodes::SearchParquetFileNotFound => (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, code.to_json())],
+                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
                 Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
             )
                 .into_response(),
         },
+        // These errors don't carry a structured error code, so we don't set the
+        // `X-Error-Message` header (it should only carry error codes). The full
+        // message is still returned in the JSON response body.
         errors::Error::ResourceError(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
-            [(ERROR_HEADER, err.to_string())],
             Json(MetaHttpResponse::error(
                 StatusCode::SERVICE_UNAVAILABLE,
                 err,
@@ -90,13 +92,11 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
         // request body, so surface it as 400 rather than a 500 server error.
         errors::Error::SerdeJsonError(_) => (
             StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, err.to_string())],
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
         _ => (
             StatusCode::BAD_REQUEST,
-            [(ERROR_HEADER, err.to_string())],
             Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
         )
             .into_response(),
@@ -125,7 +125,8 @@ impl From<AlertError> for Response {
             | AlertError::AlertNotFound
             | AlertError::AlertDestinationNotFound { .. }
             | AlertError::AlertTemplateNotFound { .. }
-            | AlertError::StreamNotFound { .. } => MetaHttpResponse::not_found(value),
+            | AlertError::StreamNotFound { .. }
+            | AlertError::AlertWorkflowNotFound { .. } => MetaHttpResponse::not_found(value),
             AlertError::DecodeVrl(err) => MetaHttpResponse::bad_request(err),
             AlertError::ParseCron(err) => MetaHttpResponse::bad_request(err),
             AlertError::SendNotificationError { .. } | AlertError::ResolveStreamNameError(_) => {
@@ -343,5 +344,34 @@ impl From<RatelimitError> for Response {
             RatelimitError::NotFound(_) => MetaHttpResponse::not_found(value),
             error => MetaHttpResponse::bad_request(error),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_code_response_sets_numeric_code_header() {
+        // Error-code responses carry only the numeric error code in the header
+        // (e.g. 20002 for SearchStreamNotFound), never the message.
+        let err = errors::Error::ErrorCode(errors::ErrorCodes::SearchStreamNotFound(
+            "nginx".to_string(),
+        ));
+        let resp = map_error_to_http_response(&err, None);
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(resp.headers().get(ERROR_HEADER).unwrap(), "20002");
+    }
+
+    #[test]
+    fn test_non_code_error_omits_header() {
+        // Errors without a structured code don't set the header at all; the
+        // message is surfaced only in the JSON body.
+        let err = errors::Error::SerdeJsonError(
+            serde_json::from_str::<serde_json::Value>("{").unwrap_err(),
+        );
+        let resp = map_error_to_http_response(&err, None);
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(resp.headers().get(ERROR_HEADER).is_none());
     }
 }

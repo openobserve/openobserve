@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-submitting="isSubmitting"
         :disable-name="beingUpdated"
         :transform-type-options="transformTypeOptions"
+        :hide-trans-type="!!forcedLanguage"
         @test="onTestFunction"
         @back="closeAddFunction"
         @cancel="cancelAddFunction"
@@ -91,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-success="handleGenerationSuccess"
                     />
                     <div
-                      v-if="!formData.function && functionEditorPlaceholderFlag"
+                      v-if="!formData.function && functionEditorPlaceholderFlag && !forcedLanguage"
                       class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                     >
                       <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
@@ -109,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="expandState.functionError"
+                        data-test="function-error-details"
                         class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
                       >
                         <pre class="my-0 text-status-error-text whitespace-pre-wrap" style="font-family: var(--font-mono); font-size: var(--text-compact);">{{
@@ -127,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :vrlFunction="vrlFunctionData"
                 @function-error="handleFunctionError"
                 :heightOffset="heightOffset"
+                :sample-events="sampleEvents"
                 @sendToAiChat="sendToAiChat"
               />
             </div>
@@ -173,6 +176,7 @@ import {
 import jsTransformService from "../../services/jstransform";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import config from "@/aws-exports";
 import segment from "../../services/segment_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
@@ -214,6 +218,24 @@ export default defineComponent({
     heightOffset: {
       type: Number,
       default: 0,
+    },
+    // Optional sample events for the TestFunction "Events" editor (workflows pass
+    // the alert payload; omitted elsewhere → generic log sample).
+    sampleEvents: {
+      type: Array,
+      default: undefined,
+    },
+    // When set ('vrl' | 'javascript'), the language is locked to this value and
+    // the VRL/JS toggle is hidden (workflow function nodes force 'javascript').
+    forcedLanguage: {
+      type: String,
+      default: "",
+    },
+    // Seed code for a fresh function editor (replaces the typewriter placeholder
+    // with ready-to-edit boilerplate + a worked example in comments).
+    defaultCode: {
+      type: String,
+      default: "",
     },
   },
   components: {
@@ -274,14 +296,27 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
-    // Transform type options for radio buttons
-    const transformTypeOptions = computed(() => {
-      const options = [
-        { label: t("function.vrl"), value: "0" },
-      ];
+    // JavaScript functions are an enterprise/cloud feature; OSS stays VRL-only.
+    // EXCEPT the _meta org, which keeps JS even on OSS — that predates the
+    // entitlement (SSO claim parsing) and must not break.
+    const isJsAllowed = computed(
+      () =>
+        config.isEnterprise === "true" ||
+        config.isCloud === "true" ||
+        store.state.selectedOrganization?.identifier === "_meta",
+    );
 
-      // JavaScript functions are only allowed in _meta organization (for SSO claim parsing)
-      if (store.state.selectedOrganization.identifier === "_meta") {
+    // Transform type options for the VRL/JS radio group.
+    const transformTypeOptions = computed(() => {
+      const options = [{ label: t("function.vrl"), value: "0" }];
+
+      // An already-JS function keeps the JS option even where JS isn't offered
+      // (e.g. a build that lost the entitlement), so editing it renders the right
+      // language instead of a radio group with nothing selected.
+      const editingJsFunction =
+        String((props.modelValue as any)?.transType ?? "0") === "1";
+
+      if (isJsAllowed.value || editingJsFunction) {
         options.push({ label: t("function.javascript"), value: "1" });
       }
 
@@ -631,6 +666,24 @@ export default defineComponent({
       // Ensure transType is a string for radio button binding
       if (this.formData.transType !== undefined) {
         this.formData.transType = String(this.formData.transType);
+      }
+    }
+
+    // Host-forced language (e.g. workflow function nodes are JS-only) — lock the
+    // transType to the forced language. The host HIDES the VRL/JS toggle, so the
+    // displayed + saved language must match forcedLanguage on BOTH the create and
+    // the edit path — otherwise editing a function whose saved transType differs
+    // would run/save the wrong language with no way to correct it.
+    if (this.forcedLanguage) {
+      const tt = this.forcedLanguage === "javascript" ? "1" : "0";
+      this.formData.transType = tt;
+      // transType is form-owned (drives the editor language, the "*Function*"
+      // label, and the info tooltip), so it must be written to the FORM — setting
+      // formData alone leaves the display on VRL.
+      (this as any).addFunctionForm?.setFieldValue?.("transType", tt);
+      // Seed boilerplate only for a brand-new function; never clobber saved code.
+      if (!this.beingUpdated && this.defaultCode && !this.formData.function) {
+        this.formData.function = this.defaultCode;
       }
     }
   },

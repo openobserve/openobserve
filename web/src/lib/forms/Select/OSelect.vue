@@ -90,6 +90,7 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchable: true,
   searchDebounce: 0,
   hideSelected: false,
+  collapsibleGroups: false,
   creatable: false,
   searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
@@ -252,7 +253,7 @@ const pinnedSelected = ref<Set<string>>(new Set());
 
 const inputEnabled = computed(() => props.searchable);
 
-const filteredOptions = computed(() => {
+const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
   const term = searchTerm.value.trim().toLowerCase();
   let options = normalizedOptions.value;
@@ -308,6 +309,56 @@ const filteredOptions = computed(() => {
     }
   }
   return result;
+});
+
+// ── Collapsible groups (opt-in via `collapsibleGroups`) ──────────────────────
+// Group headers become accordion toggles: collapsing a group hides its items
+// (the header stays, so it can be re-expanded). Keyed by header label — group
+// labels are unique in practice. Ignored while searching so matches always show.
+const collapsedGroups = ref<Set<string>>(new Set());
+const isGroupCollapsed = (label: string) => collapsedGroups.value.has(label);
+const toggleGroup = (label: string) => {
+  const next = new Set(collapsedGroups.value);
+  next.has(label) ? next.delete(label) : next.add(label);
+  collapsedGroups.value = next;
+};
+
+// The final option list the dropdown renders — the single source of truth that
+// feeds the virtualizer, keyboard navigation, and the empty-state check. It
+// layers the accordion collapse on top of `baseFilteredOptions` (which has
+// already applied the search + hide-selected filters), one step before render.
+//
+// `baseFilteredOptions` is a FLAT array where each group header
+// (`{ header: true, label }`) is followed by that group's items, e.g.
+//   [Destinations(header), dest1, dest2, Workflows(header), wf1, wf2]
+// Collapsing a group must hide its items but KEEP the header (so the bar stays
+// visible and clickable to re-expand).
+//
+// Two early exits leave `base` untouched:
+//   1. Not in collapsible mode, or nothing collapsed — every other select in the
+//      app hits this, so the feature is invisible unless opted in.
+//   2. An active search term — collapse is bypassed so a match inside a collapsed
+//      group still shows (otherwise search would look broken).
+//
+// Otherwise walk the flat list: on a header, remember whether ITS group is
+// collapsed (and always keep the header); on an item, keep it only while the
+// current group isn't collapsed. `hidden` carries forward until the next header
+// resets it.
+const filteredOptions = computed(() => {
+  const base = baseFilteredOptions.value;
+  if (!props.collapsibleGroups || collapsedGroups.value.size === 0) return base;
+  if (searchTerm.value.trim()) return base; // search spans every group
+  const out: NormalizedOption[] = [];
+  let hidden = false;
+  for (const opt of base) {
+    if (opt.header) {
+      hidden = collapsedGroups.value.has(opt.label);
+      out.push(opt);
+    } else if (!hidden) {
+      out.push(opt);
+    }
+  }
+  return out;
 });
 
 const listboxModeEnabled = computed(
@@ -1351,11 +1402,27 @@ const fieldWidthClass = computed(() => {
                       <div
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
-                          'flex w-full h-full px-3 py-1 text-xs font-bold',
-                          'text-select-item-text bg-select-content-bg',
-                          'select-none pointer-events-none',
+                          'flex w-full h-full px-3 py-1 text-xs font-bold select-none text-select-item-text',
+                          collapsibleGroups
+                            ? 'items-center gap-1 cursor-pointer bg-surface-subtle'
+                            : 'pointer-events-none bg-select-content-bg',
                         ]"
+                        @click.stop="
+                          collapsibleGroups &&
+                            toggleGroup(filteredOptions[vRow.index].label)
+                        "
                       >
+                        <OIcon
+                          v-if="collapsibleGroups"
+                          name="keyboard-arrow-up"
+                          size="sm"
+                          :class="[
+                            'shrink-0 transition-transform duration-150',
+                            !isGroupCollapsed(filteredOptions[vRow.index].label)
+                              ? 'rotate-180'
+                              : '',
+                          ]"
+                        />
                         {{ filteredOptions[vRow.index].label }}
                       </div>
 

@@ -2039,6 +2039,12 @@ pub struct Limit {
         help = "Default is 8192, Batch size for parquet read/write operations and datafusion execution. Range: [1024, 8192]. Should carefully set this value, default is enough for most cases."
     )]
     pub batch_size: usize,
+    #[env_config(
+        name = "ZO_WORKFLOW_ERROR_RETAIN_DURATION",
+        default = 2592000,
+        help = "Default is 30 days, how many days in past to retain the errored workflow input files"
+    )]
+    pub workflow_error_retention_secs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2903,6 +2909,11 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.batch_size = cfg.limit.batch_size.clamp(1024, 8192);
     // clamp datafusion_min_partition_num to 1
     cfg.limit.datafusion_min_partition_num = cfg.limit.datafusion_min_partition_num.max(1);
+
+    // retain for atleast 1 hour
+    if cfg.limit.workflow_error_retention_secs <= 3600 {
+        cfg.limit.workflow_error_retention_secs = 3600;
+    }
 
     Ok(())
 }

@@ -1,0 +1,163 @@
+/* Copyright 2026 OpenObserve Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+/* ─────────────────────────────────────────────────────────────────────────────
+ * NodePalette — the ONE token-driven source for the flow palette (Pipelines +
+ * Workflows). Kept OUT of the SFC so NodePalette.vue carries no style block of
+ * its own, matching flow-canvas.css for the canvas.
+ *
+ * WHY THIS IS NOT SCOPED (the house rule prefers utilities / no in-component
+ * style block; where neither is possible, an imported token-driven stylesheet
+ * is the sanctioned escape hatch — the same reasoning as flow-canvas.css):
+ *
+ *   1. `.o2vf_node_input|_output|_default` are applied to <OButton> through
+ *      `:class`, i.e. to a CHILD COMPONENT'S ROOT. Scoped styles reach that
+ *      root, but see (2).
+ *   2. The pipeline editor targets the SAME class names globally and at equal
+ *      specificity (PipelineEditor.vue: `.o2vf_node .o2vf_node_input`, 0-2-0).
+ *      Scoping appends `[data-v-…]`, which does NOT break the tie — it leaves
+ *      both rule sets at 0-2-0 and hands the decision to bundle order. That
+ *      could silently restyle the EXISTING pipeline palette. Staying global
+ *      preserves today's cascade exactly.
+ *   3. `.dot` / `.np-panel` decorate plain elements in the template and would
+ *      scope fine on their own; they live here so the palette has one home.
+ *
+ * Colours are registered `--color-*` tokens; sizes are rem. Dark mode uses
+ * `.dark` — the class Tailwind's `dark:` variant is bound to in tailwind.css
+ * (`@custom-variant dark`) — never the banned `.body--dark`.
+ *
+ * FOLLOW-UP: PipelineEditor.vue still carries its own hardcoded copy of these
+ * card colours. Once that migrates here, rules (2) disappears and this file can
+ * be scoped or folded into flow-canvas.css.
+ * ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Header: title with a brand-accent underline ─────────────────────────── */
+.np-header {
+  color: var(--color-text-heading);
+  border-bottom: 0.125rem solid var(--color-primary-600);
+}
+
+/* ── Panel wrapping the node cards ───────────────────────────────────────────
+ * Plain grey primitives, no brand tint:
+ *   light  --color-grey-200 (#e5e5e5)
+ *   dark   --color-grey-900 (#171717) — the primitive is a FIXED value, so dark
+ *          must be stated explicitly or the panel renders as a near-white slab
+ *          on the #0d1117 canvas. #171717 is 1.7 from the app's own dark panel
+ *          surface (--d-panel #181818), so it matches the other rails anyway. */
+.np-panel {
+  background: var(--color-blue-50);
+  backdrop-filter: blur(0.75rem);
+  border: 1px solid var(--color-border-default);
+  border-radius: 0.75rem;
+  box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--color-black) 8%, transparent);
+  padding: 0.75rem 0.5rem;
+  margin: 0.25rem 0.125rem;
+  transition: all 0.3s ease-in-out;
+}
+.np-panel:hover {
+  box-shadow: 0 0.375rem 1.25rem color-mix(in srgb, var(--color-black) 12%, transparent);
+}
+.dark .np-panel {
+  background: var(--color-grey-900);
+  box-shadow: 0 0.375rem 1.5rem color-mix(in srgb, var(--color-black) 40%, transparent);
+}
+.dark .np-panel:hover {
+  box-shadow: 0 0.5rem 2rem color-mix(in srgb, var(--color-black) 50%, transparent);
+}
+
+/* Drag-affordance dots. (The old `.drag-handle:hover .dot` rules were dropped —
+   no element in this template ever carried `.drag-handle`, so they were dead.) */
+.dot {
+  /* Muted grey in both themes — flips with the theme, so no override.
+     (was --color-text-caption until #13173 removed that token.) */
+  background: var(--color-text-muted);
+}
+
+/* ── Node-role card colours (single source for both palettes) ────────────── */
+.o2vf_node_input {
+  border: 1px solid color-mix(in srgb, var(--color-blue-400) 40%, transparent);
+  color: var(--color-blue-800);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-blue-50) 90%, transparent);
+  transition: all 0.3s ease;
+}
+.o2vf_node_input:hover {
+  background: var(--color-blue-50);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-blue-500) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-blue-400) 60%, transparent);
+}
+
+.o2vf_node_output {
+  border: 1px solid color-mix(in srgb, var(--color-success-400) 40%, transparent);
+  color: var(--color-grey-900);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-success-50) 90%, transparent);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-success-500) 10%, transparent);
+  transition: all 0.3s ease;
+  padding: 0.5rem 1rem;
+}
+.o2vf_node_output:hover {
+  background: var(--color-success-50);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-success-500) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-success-400) 60%, transparent);
+}
+
+.o2vf_node_default {
+  border: 1px solid color-mix(in srgb, var(--color-amber-500) 40%, transparent);
+  color: var(--color-amber-700);
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--color-amber-50) 90%, transparent);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-amber-600) 10%, transparent);
+  transition: all 0.3s ease;
+}
+.o2vf_node_default:hover {
+  background: var(--color-amber-50);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-amber-600) 20%, transparent);
+  border-color: color-mix(in srgb, var(--color-amber-500) 60%, transparent);
+}
+
+/* ── Dark mode (`.dark`, mirrors the canvas node colours) ────────────────── */
+.dark .o2vf_node_input {
+  background: color-mix(in srgb, var(--color-blue-900) 20%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--color-blue-400) 30%, transparent) !important;
+  color: color-mix(in srgb, var(--color-white) 90%, transparent) !important;
+}
+.dark .o2vf_node_input:hover {
+  background: color-mix(in srgb, var(--color-blue-900) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-blue-400) 50%, transparent) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-blue-500) 20%, transparent) !important;
+}
+
+.dark .o2vf_node_default {
+  background: color-mix(in srgb, var(--color-warning-900) 20%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--color-orange-400) 30%, transparent) !important;
+  color: color-mix(in srgb, var(--color-white) 90%, transparent) !important;
+}
+.dark .o2vf_node_default:hover {
+  background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
+}
+
+.dark .o2vf_node_output {
+  background: color-mix(in srgb, var(--color-success-900) 20%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--color-success-400) 30%, transparent) !important;
+  color: color-mix(in srgb, var(--color-white) 90%, transparent) !important;
+}
+.dark .o2vf_node_output:hover {
+  background: color-mix(in srgb, var(--color-success-900) 30%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-success-400) 50%, transparent) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-success-500) 20%, transparent) !important;
+}

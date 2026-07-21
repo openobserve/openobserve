@@ -10584,33 +10584,51 @@ export class LogsPage {
     /**
      * Get the scroll position (scrollTop) of the main results scroll container.
      * Call waitForResultsLoaded() first to ensure the container exists.
-     * Navigates from pagination -> .search-list -> child with overflow-y-auto.
+     * Post design-token migration (#13173) the `.search-list` wrapper is gone:
+     * the scroller is the combined scroll area (`ref="scrollContainerRef"` in
+     * logs/SearchResult.vue), a scrollable sibling below the pagination header.
+     * Walk up from the pagination until an ancestor has a scrollable child
+     * that is not the header itself (matched by computed overflow-y, so class
+     * renames don't break it).
      * @returns {Promise<number>}
      */
     async getScrollContainerPosition() {
         return await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
             if (!pagination) return -1;
-            const searchList = pagination.closest('.search-list');
-            if (!searchList) return -1;
-            const container = searchList.querySelector('[class*="overflow-y-auto"]');
-            return container ? container.scrollTop : -1;
+            let el = pagination.parentElement;
+            while (el && el !== document.body) {
+                const container = Array.from(el.children).find(
+                    (child) => !child.contains(pagination) &&
+                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
+                );
+                if (container) return container.scrollTop;
+                el = el.parentElement;
+            }
+            return -1;
         });
     }
 
     /**
      * Scroll the main results container to the bottom.
      * Call waitForResultsLoaded() first to ensure the container exists.
+     * Uses the same container discovery as getScrollContainerPosition().
      */
     async scrollToResultsBottom() {
         await this.page.evaluate(() => {
             const pagination = document.querySelector('[data-test="logs-search-result-pagination"]');
             if (!pagination) return;
-            const searchList = pagination.closest('.search-list');
-            if (!searchList) return;
-            const container = searchList.querySelector('[class*="overflow-y-auto"]');
-            if (container) {
-                container.scrollTop = container.scrollHeight;
+            let el = pagination.parentElement;
+            while (el && el !== document.body) {
+                const container = Array.from(el.children).find(
+                    (child) => !child.contains(pagination) &&
+                        /(auto|scroll)/.test(getComputedStyle(child).overflowY)
+                );
+                if (container) {
+                    container.scrollTop = container.scrollHeight;
+                    return;
+                }
+                el = el.parentElement;
             }
         });
         await this.page.waitForTimeout(500);

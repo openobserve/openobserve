@@ -31,19 +31,23 @@ pub async fn process_expired_batches() {
         #[cfg(feature = "enterprise")]
         {
             let batches = crate::service::alerts::grouping::get_expired_batches();
+            let trace_id = config::ider::generate_trace_id();
+            let trace_id = format!("expired_batched_{trace_id}");
 
             if !batches.is_empty() {
                 log::debug!(
-                    "[alert_grouping_worker] Processing {} expired batches",
+                    "[alert_grouping_worker] Processing {} expired batches with trace_id {trace_id}",
                     batches.len()
                 );
 
                 for batch in batches {
-                    if let Err(e) =
-                        crate::service::alerts::grouping::send_grouped_notification(batch).await
+                    if let Err(e) = crate::service::alerts::grouping::send_grouped_notification(
+                        &trace_id, batch,
+                    )
+                    .await
                     {
                         log::error!(
-                            "[alert_grouping_worker] Error sending grouped notification: {}",
+                            "[alert_grouping_worker] Error sending grouped notification trace_id {trace_id} : {} ",
                             e
                         );
                     }

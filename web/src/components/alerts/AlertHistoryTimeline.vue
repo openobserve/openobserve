@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-3">
         <span v-if="firingCount > 0" class="flex items-center gap-1 text-2xs">
           <span class="inline-block w-2 h-2 rounded-default bg-badge-error-solid-bg" />
-          <span class="font-medium text-badge-error-soft-text">{{ firingCount }} Firing</span>
+          <span class="font-medium text-badge-error-soft-text">{{ firingCount }} {{ firingLabel }}</span>
         </span>
         <span class="flex items-center gap-1 text-2xs text-text-secondary">
           <span class="inline-block w-2 h-2 rounded-default bg-badge-success-solid-bg" />
-          {{ okCount }} Ok
+          {{ okCount }} {{ okLabel }}
         </span>
         <span v-if="skippedCount > 0" class="flex items-center gap-1 text-2xs text-text-muted">
           <span class="inline-block w-2 h-2 rounded-default bg-border-default" />
@@ -125,9 +125,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed } from "vue";
 
-const props = defineProps<{
-  history: Array<{ status: string; timestamp: number }>;
-}>();
+const props = withDefaults(
+  defineProps<{
+    history: Array<{ status: string; timestamp: number }>;
+    // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
+    // workflows pass "Failed"/"Success".
+    firingLabel?: string;
+    okLabel?: string;
+  }>(),
+  { firingLabel: "Firing", okLabel: "Ok" },
+);
+const { firingLabel, okLabel } = props;
 
 const hoveredIndex = ref<number | null>(null);
 
@@ -145,8 +153,8 @@ function isOk(s: string) {
 
 function normalizeStatus(s: string): string {
   const v = s?.toLowerCase();
-  if (isFiring(v)) return "Firing";
-  if (isOk(v)) return "Ok";
+  if (isFiring(v)) return firingLabel;
+  if (isOk(v)) return okLabel;
   if (v === "skipped") return "Skipped";
   return s?.replace(/_/g, " ") ?? "Unknown";
 }

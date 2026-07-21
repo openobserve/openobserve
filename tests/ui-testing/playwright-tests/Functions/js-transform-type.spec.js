@@ -5,7 +5,12 @@ const { expect } = require('@playwright/test');
 const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
-// NOTE: JavaScript transform type is ONLY allowed in _meta organization
+// NOTE: JavaScript transform availability is EDITION-dependent — it mirrors the
+// gate in AddFunction.vue:
+//   config.isEnterprise === "true" || config.isCloud === "true" || org === "_meta"
+// i.e. enterprise/cloud offer JS in EVERY org; OSS keeps it to _meta only (where it
+// predates the entitlement, for SSO claim parsing). It used to be _meta-only
+// everywhere, which is what the two skipped tests below still assert.
 // This file consolidates tests from:
 // - javascript-functions.spec.js (JS function operations)
 // - meta-org-js-restriction.spec.js (org-based JS restrictions)
@@ -154,11 +159,13 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
       expect(errorOutput).toBeTruthy();
       testLogger.info(`Error test output: ${errorOutput}`);
 
-      // `row.field = undefinedVar` throws ReferenceError — message always contains 'error'
-      const hasError = errorOutput.toLowerCase().includes('error') ||
-                      errorOutput.toLowerCase().includes('failed');
+      // `row.field = undefinedVar` throws a ReferenceError at RUNTIME, not compile
+      // time — the code is syntactically valid. Only syntax errors fail the request
+      // now, so this returns 200 with the message attached per event and the output
+      // editor keeps showing the (untransformed) events. The error surfaces in the
+      // error-details section instead, which is what we assert on.
+      await pm.functionsPage.expectFunctionErrorContains('ReferenceError');
 
-      expect(hasError).toBe(true);
       testLogger.info('Error handling works - error message displayed');
       await pm.functionsPage.clickCancelButton();
     });
@@ -229,6 +236,18 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
     // NOTE: Consolidated from meta-org "JS radio NOT visible" + "VRL functions work" tests
     // Both validations preserved: JS hidden check + VRL creation
     test('P0: Non-meta org - JS hidden, VRL works', { tag: ['@smoke', '@P0'] }, async ({ page }) => {
+      // SKIPPED — asserts the OSS-only rule, but runs on the enterprise build.
+      // JS is no longer _meta-only: AddFunction.vue offers it whenever
+      // `isEnterprise || isCloud || org === "_meta"`, so on ENT/cloud the JS radio
+      // is visible in EVERY org and step 1 below fails. The rule still holds on OSS.
+      // Re-enabling needs an edition signal, which is awkward: Vite bakes
+      // VITE_OPENOBSERVE_ENTERPRISE into the bundle at build time and /config
+      // exposes no edition key, so it can't be detected at runtime.
+      // TODO(QA): move to the OSS suite, or branch on an edition env var.
+      // NOTE: step 2 (VRL function creation in a non-meta org) is edition-agnostic
+      // and is lost while this is skipped.
+      test.skip(true, 'JS is allowed in all orgs on enterprise/cloud builds; OSS-only assertion');
+
       const nonMetaOrg = getNonMetaOrg();
       testLogger.info(`Test: Non-meta org (${nonMetaOrg}) - JS hidden, VRL works`);
 
@@ -274,6 +293,12 @@ test.describe('JavaScript Transform Type', { tag: ['@jsTransformType', '@functio
     // NOTE: Consolidated from meta-org "Org switching" + "VRL always visible" tests
     // Both validations preserved: JS visibility changes with org + VRL always visible
     test('P1: Radio visibility across orgs', { tag: ['@P1', '@orgSwitching', '@control'] }, async ({ page }) => {
+      // SKIPPED — same reason as 'P0: Non-meta org - JS hidden, VRL works' above:
+      // steps 1 and 3 expect the JS radio hidden in a non-meta org, which is only
+      // true on OSS. TODO(QA): move to the OSS suite, or branch on an edition env var.
+      // NOTE: step 2 (JS visible in _meta) is edition-agnostic and is lost meanwhile.
+      test.skip(true, 'JS is allowed in all orgs on enterprise/cloud builds; OSS-only assertion');
+
       const nonMetaOrg = getNonMetaOrg();
       testLogger.info(`Test: Radio visibility across orgs (non-meta: ${nonMetaOrg})`);
 
