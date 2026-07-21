@@ -3154,17 +3154,13 @@ fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     let queue_store =
         crate::meta::queue_store::QueueStore::try_from(cfg.common.queue_store.as_str())
             .map_err(|e| anyhow::anyhow!("{e}"))?;
-    if queue_store == crate::meta::queue_store::QueueStore::Memory {
-        if !cfg.common.local_mode {
-            return Err(anyhow::anyhow!(
-                "ZO_QUEUE_STORE=memory is only supported in local mode (ZO_LOCAL_MODE=true); it is a process-local, non-durable queue."
-            ));
-        }
-        if cfg.common.memory_queue_max_size == 0 {
-            return Err(anyhow::anyhow!(
-                "ZO_MEMORY_QUEUE_MAX_SIZE_MB must be a positive integer."
-            ));
-        }
+    if queue_store == crate::meta::queue_store::QueueStore::Memory && !cfg.common.local_mode {
+        return Err(anyhow::anyhow!(
+            "ZO_QUEUE_STORE=memory is only supported in local mode (ZO_LOCAL_MODE=true); it is a process-local, non-durable queue."
+        ));
+    }
+    if cfg.common.memory_queue_max_size == 0 {
+        cfg.common.memory_queue_max_size = 64; // MB
     }
     // convert MB to bytes; the config value is bytes after this point
     cfg.common.memory_queue_max_size = cfg
@@ -4323,14 +4319,16 @@ mod tests {
         let mut cfg = Config::default();
         cfg.common.queue_store = "memory".to_string();
         cfg.common.local_mode = true;
+        // zero falls back to the 64 MB default, converted to bytes
         cfg.common.memory_queue_max_size = 0;
-        assert!(check_queue_store_config(&mut cfg).is_err());
+        assert!(check_queue_store_config(&mut cfg).is_ok());
+        assert_eq!(cfg.common.memory_queue_max_size, 64 * 1024 * 1024);
         cfg.common.memory_queue_max_size = usize::MAX;
         assert!(check_queue_store_config(&mut cfg).is_err());
-        cfg.common.memory_queue_max_size = 64;
-        assert!(check_queue_store_config(&mut cfg).is_ok());
         // the config value is converted from MB to bytes during validation
-        assert_eq!(cfg.common.memory_queue_max_size, 64 * 1024 * 1024);
+        cfg.common.memory_queue_max_size = 32;
+        assert!(check_queue_store_config(&mut cfg).is_ok());
+        assert_eq!(cfg.common.memory_queue_max_size, 32 * 1024 * 1024);
     }
 
     #[test]
