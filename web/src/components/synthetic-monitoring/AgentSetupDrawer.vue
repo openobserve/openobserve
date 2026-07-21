@@ -199,9 +199,9 @@ const composedCommand = computed(() => {
     `  --token=${props.token || "<o2syn-token>"} \\`,
   ];
   if (props.locationId) {
-    lines.push(`  --location-id=${props.locationId}`);
+    lines.push(`  --location-id=${props.locationId} \\`);
   } else {
-    lines.push(`  --location="${draftLocation.value || "<location-name>"}"`);
+    lines.push(`  --location="${draftLocation.value || "<location-name>"}" \\`);
   }
   if (draftAgentName.value) lines.push(`  --agent-name="${draftAgentName.value}"`);
   // Join continuation lines; the last line carries no trailing backslash.
