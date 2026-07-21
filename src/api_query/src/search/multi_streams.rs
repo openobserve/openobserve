@@ -60,7 +60,7 @@ use crate::{
                 get_search_event_context_from_request, get_search_type_from_request,
                 get_stream_type_from_request, get_use_cache_from_request,
             },
-            stream::get_settings_max_query_range,
+            stream::{get_max_query_range, get_settings_max_query_range},
         },
     },
     extractors::Headers,
@@ -807,15 +807,8 @@ pub async fn _search_partition_multi(
     let mut max_query_ranges = Vec::with_capacity(req.sql.len());
     for sql in &req.sql {
         let stream_names = resolve_stream_names(sql).unwrap_or_default();
-        max_query_ranges.push(
-            crate::common::utils::stream::get_max_query_range(
-                &stream_names,
-                &org_id,
-                user_id,
-                stream_type,
-            )
-            .await,
-        );
+        max_query_ranges
+            .push(get_max_query_range(&stream_names, &org_id, user_id, stream_type).await);
     }
     let search_fut = SearchService::search_partition_multi(
         &trace_id,
@@ -1507,15 +1500,8 @@ pub async fn search_multi_stream(
     let mut max_query_ranges = Vec::with_capacity(queries.len());
     for req in &queries {
         let stream_names = resolve_stream_names(&req.query.sql).unwrap_or_default();
-        max_query_ranges.push(
-            crate::common::utils::stream::get_max_query_range(
-                &stream_names,
-                &org_id,
-                &user_id,
-                stream_type,
-            )
-            .await,
-        );
+        max_query_ranges
+            .push(get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await);
     }
 
     // Spawn the multi-stream search task.
