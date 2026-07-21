@@ -748,11 +748,11 @@ describe("AddDashboardFromGitHub Component", () => {
       expect(drawer.attributes("data-secondary-label")).toBe("Cancel");
     });
 
-    it("should expose the Next label with selection count on the ODrawer primary button", async () => {
+    it("shows the select prompt on the ODrawer primary button when nothing is selected", async () => {
       wrapper = createWrapper({ modelValue: true });
       await flushPromises();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Next (0)");
+      expect(drawer.attributes("data-primary-label")).toBe("Select dashboards");
     });
 
     it("should reflect updated selection count in the ODrawer primary label", async () => {
@@ -763,7 +763,7 @@ describe("AddDashboardFromGitHub Component", () => {
       ];
       await wrapper.vm.$nextTick();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Next (1)");
+      expect(drawer.attributes("data-primary-label")).toBe("Add 1 dashboard(s)");
     });
 
     it("should disable the ODrawer primary button when no dashboards selected", async () => {

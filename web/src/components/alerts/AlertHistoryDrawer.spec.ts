@@ -381,7 +381,7 @@ describe("AlertHistoryDrawer.vue", () => {
     });
 
     it("should show empty state when no history", async () => {
-      vi.mocked(alertsService.getHistory).mockResolvedValueOnce({
+      vi.mocked(alertsService.getHistory).mockResolvedValue({
         data: { hits: [], total: 0 },
       } as any);
 
@@ -393,7 +393,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Error Handling", () => {
     it("should handle API errors gracefully", async () => {
-      vi.mocked(alertsService.getHistory).mockRejectedValueOnce(
+      vi.mocked(alertsService.getHistory).mockRejectedValue(
         new Error("API Error"),
       );
 
@@ -413,7 +413,7 @@ describe("AlertHistoryDrawer.vue", () => {
           },
         },
       };
-      vi.mocked(alertsService.getHistory).mockRejectedValueOnce(error);
+      vi.mocked(alertsService.getHistory).mockRejectedValue(error);
 
       await mountComponent();
       expect(wrapper.exists()).toBe(true);

@@ -223,6 +223,7 @@ import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -711,7 +712,11 @@ export default defineComponent({
 
 // Classify a dashboard into a category key, its icon, and a token-backed
 // badge variant. Category keys resolve to translated labels via categoryLabel().
-function getCategoryInfo(dashboard: { name: string }) {
+function getCategoryInfo(dashboard: { name: string }): {
+  icon: string;
+  variant: BadgeVariant;
+  category: string;
+} {
   const n = dashboard.name.toLowerCase();
   if (n.includes("aws") || n.includes("amazon") || n.includes("ec2") || n.includes("s3") || n.includes("rds") || n.includes("elb") || n.includes("lambda"))
     return { icon: "cloud",         variant: "orange-soft",  category: "aws" };
