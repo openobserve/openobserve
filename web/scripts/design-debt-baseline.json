@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 107,
+    "rawProjectRamp": 102,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -105,7 +105,7 @@
       "rawProjectRamp": 2
     },
     "components/common/empty-states/QuickStartCard.vue": {
-      "rawProjectRamp": 3
+      "rawProjectRamp": 2
     },
     "components/dashboards/AddDashboardFromGitHub.vue": {
       "rawProjectRamp": 1
@@ -223,7 +223,7 @@
       "rawVarInComponent": 13
     },
     "lib/core/EmptyState/EmptyStateActionCard.vue": {
-      "rawProjectRamp": 3
+      "rawProjectRamp": 2
     },
     "lib/core/EmptyState/EmptyStateIngestionCard.vue": {
       "rawProjectRamp": 2,
@@ -492,7 +492,7 @@
       "rawVarInComponent": 18
     },
     "views/OverviewTab.vue": {
-      "rawProjectRamp": 7,
+      "rawProjectRamp": 4,
       "arbZ": 1
     },
     "views/synthetics/CreateBrowserTest.vue": {

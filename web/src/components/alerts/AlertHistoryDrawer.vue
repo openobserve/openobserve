@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="rounded-default overflow-hidden border flex flex-col flex-1"
                 :class="
-                  'border-border-default bg-surface-panel'
+                  'border-border-default bg-surface-base'
                 "
               >
                 <OTable
