@@ -15,8 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OButton variant="ghost" size="icon-panel" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
-    <OIcon :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="size-5!" />
+  <OButton variant="ghost" size="icon-toolbar" data-test="navbar-theme-toggle-btn" @click="toggleDarkMode">
+    <Transition name="theme-icon" mode="out-in">
+      <OIcon :key="darkMode ? 'dark' : 'light'" :name="darkMode ? 'dark-mode' : 'light-mode'" size="sm" class="size-5!" />
+    </Transition>
     <OTooltip side="top" align="center" :content="tooltipText" />
   </OButton>
 </template>
@@ -28,6 +30,7 @@ import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { switchThemeMode } from "@/utils/theme";
 
 export default defineComponent({
   components: { OButton, OIcon, OTooltip },
@@ -82,9 +85,16 @@ export default defineComponent({
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);
       }
-      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
-      document.documentElement.classList.toggle('dark', theme === 'dark');
-      store.dispatch("appTheme", theme);
+      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant).
+      // Wrapped in switchThemeMode so the mode flip animates as one frame
+      // (soft curtain sweep, defined in styles/tailwind.css).
+      // `darkMode` is the component's source of truth and is always set to
+      // match `theme` before setTheme runs, so the html-class toggle reads it
+      // directly rather than re-deriving the boolean from the string arg.
+      switchThemeMode(theme, () => {
+        document.documentElement.classList.toggle('dark', darkMode.value);
+        store.dispatch("appTheme", theme);
+      });
     };
 
     const toggleDarkMode = () => {

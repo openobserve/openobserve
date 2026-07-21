@@ -39,7 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   applies the agreed class names.
 -->
 <template>
-  <div class="flow-node">
+  <!-- `flow-node` / `flow-node__container` are identifiers only — styling is
+       utilities, so there is no style block. py-[0.3125rem] = the old 5px,
+       mirroring the pipeline node's inner padding so the two match exactly. -->
+  <div class="flow-node flex items-center border-none cursor-pointer w-fit py-[0.3125rem]">
     <Handle
       v-if="hasInput"
       id="input"
@@ -57,10 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OSeparator vertical class="mr-2" />
 
-    <!-- Shared node typography (15px / bold / left) lives here so every #body
-         slot inherits it — wrappers supply content, not styling. -->
+    <!-- Shared node typography (0.9375rem = the old 15px / bold / left) lives
+         here so every #body slot inherits it — wrappers supply content, not
+         styling. Changing it here changes every node type at once. -->
     <div
-      class="flow-node__container text-[15px]! font-bold! leading-[1.4]!"
+      class="flow-node__container text-left min-w-0 text-sm! font-bold! leading-[1.4]!"
     >
       <slot name="body" />
     </div>
@@ -114,19 +118,3 @@ const handleClass = computed(
   () => `node_handle_custom handle_${props.ioType || "default"}`,
 );
 </script>
-
-<style scoped>
-.flow-node {
-  display: flex;
-  align-items: center;
-  border: none;
-  cursor: pointer;
-  width: fit-content;
-  /* mirrors the pipeline node's inner padding so the two match exactly */
-  padding: 5px 0;
-}
-.flow-node__container {
-  text-align: left;
-  min-width: 0;
-}
-</style>

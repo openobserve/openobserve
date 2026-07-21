@@ -17,22 +17,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Outer wrapper: full panel height, flex-column so pagination sits below the scroll area -->
   <div
-    class="my-sticky-virtscroll-table h-full flex flex-col rounded-none! overflow-hidden"
+    class="my-sticky-virtscroll-table h-full flex flex-col rounded-none!"
     :data-sticky-id="tableId"
-    :class="{ 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap }"
+    :class="[
+      props.scrollEl ? 'overflow-visible' : 'overflow-hidden',
+      { 'pivot-sticky-totals': stickyRowTotals, 'wrap-enabled': wrap },
+    ]"
     :style="store.state.printMode ? { position: 'static' } : {}"
   >
     <!-- Scroll container: grows to fill available height -->
     <div
       ref="parentRef"
       :class="[
-        'o2-scroll-container',
-        'table-container',
-        'flex-1',
-        'min-h-0',
-        'overflow-auto',
-        'relative',
-        { 'virtual-scroll-active': useVirtualScroll },
+        // When a parent scroll container is delegated via `scrollEl`, this
+        // wrapper must NOT create its own vertical scroll (that produced a
+        // second, nested scrollbar). It only keeps horizontal overflow so wide
+        // tables can still scroll sideways; the delegated element owns vertical
+        // scroll + virtualization. Without `scrollEl` it stays the scroller.
+        props.scrollEl
+          ? 'overflow-visible relative'
+          : 'o2-scroll-container overflow-auto rounded-default table-container flex-1 min-h-0 relative',
+        { 'virtual-scroll-active will-change-scroll': useVirtualScroll },
       ]"
     >
       <table
@@ -68,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="(level, levelIdx) in pivotHeaderLevels as any[]"
             :key="'hl_' + levelIdx"
-            style="max-height: 28px; height: 28px"
+            class="max-h-7 h-7"
           >
             <!-- Row-field headers: first <tr> only, rowspan all levels -->
             <th
@@ -76,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
-              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)"
+              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg"
               :style="getStickyColumnStyle(col) as any"
               @click="handlePivotSort(col.name)"
             >
@@ -88,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active text-[var(--o2-primary-color)]': pivotSortState.sortBy === col.name,
+                  'pivot-sort-active text-accent': pivotSortState.sortBy === col.name,
                 }"
               />
             </th>
@@ -103,8 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="px-2"
               :class="[
                 level.isLeaf
-                  ? 'text-center font-medium text-[0.85em] align-middle py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)'
-                  : 'text-center font-semibold align-middle whitespace-nowrap py-[5px] [border-right:1px_solid_var(--o2-pivot-header-border)] [border-bottom:1px_solid_var(--o2-pivot-header-border)] bg-(--o2-sticky-col-header-bg)',
+                  ? 'text-center font-medium text-[0.85em] align-middle py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg'
+                  : 'text-center font-semibold align-middle whitespace-nowrap py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg',
                 {
                   'pivot-section-border':
                     cell.hasBorder && !(stickyColTotals && cell._isTotalHeader),
@@ -128,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="xs"
                 class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active text-[var(--o2-primary-color)]':
+                  'pivot-sort-active text-accent':
                     pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
@@ -139,8 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- ── Standard TanStack headers (logs / non-pivot) ─────────────────── -->
         <thead
           v-else
-          class="sticky top-0 z-10"
-          style="max-height: 44px; height: 22px"
+          class="sticky top-0 z-10 max-h-11 h-5.5"
           v-for="headerGroup in table.getHeaderGroups()"
           :key="headerGroup.id"
         >
@@ -162,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               // Header-row chrome via centralized token utilities (same tokens
               // OTable uses): background band + full-width underline on the row
               // so it spans past the last column.
-              'bg-[var(--color-table-header-bg)] border-b border-[var(--color-grey-300)]',
+              'bg-table-header-bg border-b border-table-header-border',
             ]"
             :style="{
               width:
@@ -229,16 +233,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.getResizeHandler()?.($event)
                   "
                   :class="[
-                    'absolute right-0 top-0 h-full w-2 flex items-center justify-end select-none touch-none z-10 group/resizer',
-                    header.column.getCanResize() ? 'resizer cursor-col-resize' : '',
+                    'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
+                    header.column.getCanResize() ? 'resizer w-1.25 cursor-col-resize' : 'w-2',
                   ]"
                 >
                   <div
                     :class="[
                       'rounded-full transition-all duration-150',
                       header.column.getIsResizing()
-                        ? 'w-0.5 h-full bg-[var(--color-table-resize-handle)]'
-                        : 'w-px h-4 bg-[var(--color-border-default)] group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                        ? 'w-0.5 h-full bg-table-resize-handle'
+                        : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
                     ]"
                   />
                 </div>
@@ -253,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       header.column.getToggleSortingHandler(),
                     )
                   "
-                  class="overflow-hidden whitespace-nowrap text-ellipsis! text-[var(--color-table-header-text)] text-xs font-medium capitalize"
+                  class="overflow-hidden whitespace-nowrap text-ellipsis! text-table-header-text text-xs font-medium"
                 >
                   <FlexRender
                     :render="header.column.columnDef.header"
@@ -278,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test-sort-state="active"
                       :data-test-sort-direction="sortOrder"
                       size="sm"
-                      class="text-[var(--o2-primary-color)]"
+                      class="text-table-sort-icon-active"
                     />
                     <OIcon
                       v-else
@@ -313,22 +317,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OIcon
                           name="filter-list"
                           size="sm"
-                          :class="isColFiltered(header.column.id) ? 'text-[var(--color-primary-600)]' : 'opacity-50'"
+                          :data-test="`o2-table-column-filter-icon-${header.column.id}-${isColFiltered(header.column.id) ? 'active' : 'inactive'}`"
+                          :class="isColFiltered(header.column.id) ? 'text-primary-600' : 'opacity-50'"
                         />
                       </OButton>
                     </template>
 
                     <!-- Filter panel -->
                     <div
-                      class="py-1"
-                      style="min-width: 200px; max-width: 300px"
+                      class="py-1 min-w-50 max-w-75"
                       :data-test="`o2-table-column-filter-panel-${header.column.id}`"
                       @click.stop
                     >
                       <!-- Search box — always visible at top -->
                       <div
-                        class="px-2 pb-1"
-                        style="border-bottom: 1px solid var(--color-table-row-divider)"
+                        class="px-2 pb-1 border-b border-table-row-divider"
                       >
                         <OInput
                           v-model="colFilterSearch[header.column.id]"
@@ -348,12 +351,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <ul
                         role="listbox"
                         aria-multiselectable="true"
-                        style="max-height: 240px; overflow-y: auto"
+                        class="max-h-60 overflow-y-auto"
                       >
                         <li
                           v-for="rawVal in getFilteredUniqueValues(header.column.id)"
                           :key="String(rawVal)"
-                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded hover:bg-[var(--color-surface-panel)] transition-colors"
+                          class="flex items-center gap-2 px-3 py-1.5 cursor-pointer rounded-default hover:bg-surface-panel transition-colors"
                           @click.stop="toggleColFilterValue(header.column.id, rawVal)"
                         >
                           <OCheckbox
@@ -375,9 +378,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </ul>
 
                       <!-- Clear filter — always visible at bottom -->
-                      <div style="border-top: 1px solid var(--color-table-row-divider)">
+                      <div class="border-t border-table-row-divider">
                         <div
-                          class="px-3 py-1.5 text-xs cursor-pointer opacity-70 hover:bg-[var(--color-surface-panel)]"
+                          class="px-3 py-1.5 text-xs cursor-pointer opacity-70 hover:bg-surface-panel"
                           @click.stop="clearColFilter(header.column.id)"
                         >
                           {{ t("common.clearFilter") }}
@@ -389,9 +392,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
                   class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex"
-                  :class="
-                    store.state.theme === 'dark' ? 'field_overlay_dark' : ''
-                  "
                   v-if="
                     (header.column.columnDef.meta as any)?.closable ||
                     (header.column.columnDef.meta as any)?.showWrap
@@ -401,12 +401,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
                     name="cancel"
-                    class="m-0 close-icon cursor-pointer"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'text-white'
-                        : 'text-gray-400'
-                    "
+                    class="m-0 close-icon cursor-pointer text-icon-color"
                     :title="t('common.close')"
                     size="sm"
                     @click="closeColumn(header.column.columnDef)"
@@ -425,7 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <td
               :colspan="columnOrder.length"
-              class="font-bold bg-[var(--color-table-header-bg)] opacity-70"
+              class="font-bold bg-table-header-bg opacity-70"
             >
               <slot name="loading" />
             </td>
@@ -439,10 +434,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr v-if="!loading && errMsg != ''" class="w-full">
             <td
               :colspan="columnOrder.length"
-              class="font-bold"
-              style="opacity: 0.7"
+              class="font-bold opacity-70"
             >
-              <div class="text-sm font-medium text-weight-bold bg-amber-500">
+              <div class="text-sm font-medium font-bold bg-warning">
                 <OIcon size="sm" name="warning" class="mr-1" />
                 {{ errMsg }}
               </div>
@@ -451,16 +445,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
             <td
               :colspan="columnOrder.length"
-              class="font-bold"
-              style="opacity: 0.6"
+              class="font-bold opacity-60"
             >
               <div
-                class="text-sm font-medium text-weight-bold pl-2"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'bg-yellow-600'
-                    : 'bg-amber-300'
-                "
+                class="text-sm font-medium font-bold pl-2 bg-warning"
               >
                 <OButton
                   variant="ghost"
@@ -485,13 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
             <td
               :colspan="columnOrder.length"
-              style="opacity: 0.7"
-              class="px-2"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'bg-yellow-600'
-                  : 'bg-amber-300'
-              "
+              class="opacity-70 px-2 bg-warning"
             >
               <pre>{{ functionErrorMsg }}</pre>
             </td>
@@ -511,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <tr
             v-for="r in SKEL_ROW_COUNT"
             :key="`skel-${r}`"
-            class="o2-skel-row flex items-center w-full opacity-0 h-[29px] bg-(--o2-log-table-row-bg) border-b border-(--o2-log-table-row-border) [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
+            class="o2-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border [animation:o2-skel-row-in_320ms_ease-out_forwards] motion-reduce:opacity-100 motion-reduce:animate-none"
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
@@ -520,7 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full px-4 overflow-hidden"
             >
               <span
-                class="o2-skel-pill inline-block h-3 rounded-md"
+                class="o2-skel-pill inline-block h-3 rounded-default"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
                 aria-hidden="true"
               />
@@ -535,7 +517,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="skelTdStyle(header, c)"
               >
                 <span
-                  class="o2-skel-pill inline-block h-3 rounded-md"
+                  class="o2-skel-pill inline-block h-3 rounded-default"
                   :style="{
                     width:
                       c === 0
@@ -580,8 +562,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="row.id"
               :data-index="idx"
               :ref="(node: any) => measureDashboardRow(node)"
-              class="dashboard-data-row cursor-pointer hover:bg-[var(--color-table-row-hover-bg)]"
-              :class="{ 'border-b border-[var(--color-table-row-divider)]': !usesSeparateBorders }"
+              class="dashboard-data-row cursor-pointer hover:bg-table-row-hover-bg"
+              :class="{ 'border-b border-table-row-divider': !usesSeparateBorders }"
               data-test="dashboard-data-row"
               tabindex="0"
               @click="handleDataRowClick(row.original, idx as number, $event)"
@@ -667,7 +649,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
-                        class="h-[16px]! w-[16px]! min-h-0!"
+                        class="h-4! w-4! min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -721,7 +703,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
-                        class="h-[16px]! w-[16px]! min-h-0!"
+                        class="h-4! w-4! min-h-0!"
                         @click.stop="
                           copyCellContent(
                             getCellDisplayValue(cell),
@@ -781,7 +763,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formattedRows?.[virtualRow.index]?.original?.isExpandedRow
               "
               :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="absolute flex w-max items-center justify-start border-b border-b-[var(--color-table-row-divider)] cursor-pointer hover:bg-[var(--color-table-row-hover-bg)] transition-colors duration-150 ease-in-out"
+              class="absolute flex w-max items-center justify-start border-b border-b-table-row-divider cursor-pointer hover:bg-table-row-hover-bg transition-colors duration-150 ease-in-out"
               :class="[
                 defaultColumns &&
                 !wrap &&
@@ -794,7 +776,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 ] === highlightTimestamp &&
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
-                  ? 'bg-(--color-table-row-selected-bg)'
+                  ? 'bg-table-row-selected-bg'
                   : '',
                 !(formattedRows[virtualRow.index]?.original as any)
                   ?.isExpandedRow
@@ -976,7 +958,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
-                            class="h-[16px]! w-[16px]! min-h-0!"
+                            class="h-4! w-4! min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1010,7 +992,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ]
                           "
                           :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                          :class="store.state.theme === 'dark' ? 'dark' : ''"
                           v-html="
                             processedResults[
                               `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
@@ -1046,7 +1027,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             cell.column.columnDef.id ===
                               store.state.zoConfig.timestamp_column
                           "
-                          class="absolute right-0 top-1/2 transform invisible -translate-y-1/2 -translate-x-1/2 ai-btn"
+                          class="invisible ai-btn"
                           @send-to-ai-chat="
                             sendToAiChat(
                               JSON.stringify(cell.row.original),
@@ -1069,7 +1050,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OButton
                             variant="ghost"
                             size="icon-xs-sq"
-                            class="h-[16px]! w-[16px]! min-h-0!"
+                            class="h-4! w-4! min-h-0!"
                             @click.stop="
                               copyCellContent(
                                 getCellDisplayValue(cell),
@@ -1117,7 +1098,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <td
               v-for="col in (columns as any[]) || []"
               :key="'ft_' + col.name"
-              class="px-2 bg-[#f5f5f5] sticky bottom-0"
+              class="px-2 bg-surface-subtle sticky bottom-0"
               :class="[
                 col.align === 'right'
                   ? 'text-right'
@@ -1400,6 +1381,19 @@ const props = defineProps({
   rowsPerPage: {
     type: Number,
     default: TABLE_ROWS_PER_PAGE_DEFAULT_VALUE,
+  },
+  /** Parent element that owns vertical scroll + virtualization. When set, this
+   *  component does not create its own vertical scrollbar — it delegates to this
+   *  element so content above the table (e.g. charts) scrolls as one region. */
+  scrollEl: {
+    type: Object as PropType<HTMLElement | null>,
+    default: null,
+  },
+  /** Pixels of content above the virtual list inside the delegated `scrollEl`
+   *  (e.g. a histogram). Offsets the virtualizer so row positions stay correct. */
+  scrollMargin: {
+    type: Number,
+    default: 0,
   },
 });
 
@@ -1754,7 +1748,7 @@ const getStickyTotalHeaderForPivot = (cell: any) => {
     "min-width": `${width}px`,
     "max-width": `${width}px`,
     // Opaque background so scrolled body content doesn't bleed through
-    "background-color": "var(--o2-sticky-col-header-bg)",
+    "background-color": "var(--color-sticky-col-header-bg)",
     "box-shadow": "-4px 0 8px rgba(0, 0, 0, 0.15)",
     "white-space": "normal",
     "word-break": "break-word",
@@ -2048,7 +2042,7 @@ watch(
     tableCellClass.value = [
       hasDefaultSourceColumn.value && !props.wrap
         ? "table-cell"
-        : "block height-stretch",
+        : "block self-stretch",
       !props.wrap
         ? "overflow-hidden text-ellipsis whitespace-nowrap"
         : "",
@@ -2204,7 +2198,12 @@ const rowVirtualizerOptions = computed(() => {
   const isNonLogs = !props.useVirtualScroll;
   return {
     count: rowCount.value,
-    getScrollElement: () => parentRef.value,
+    // Delegate to a parent scroll container when provided (unified scroll with
+    // content above the table, e.g. the traces RED-metrics charts); otherwise
+    // this component's own wrapper is the scroller.
+    getScrollElement: () =>
+      (props.scrollEl as HTMLElement | null) ?? parentRef.value,
+    scrollMargin: props.scrollMargin,
     estimateSize: (index: number) => {
       // Dashboard virtual scroll: always use 28px regardless of rowHeight prop.
       // The rowHeight prop (default 22) is the *cell content* height and does not
@@ -2577,31 +2576,10 @@ defineExpose({
   getRows: () => table?.getRowModel().rows.map((r: any) => r.original) ?? [],
 });
 </script>
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>
-<style>
-@keyframes o2-skel-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-@keyframes o2-skel-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(2px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ── Loading skeleton pill (uses OTable skeleton tokens from lib/styles/tokens) ── */
+<style scoped>
+/* keep(keyframes) — the shimmer gradient + animation pair is kept as CSS so the
+   skeleton pill stays a single class the template can reuse; it is token-backed
+   via the OTable skeleton tokens in lib/styles/tokens. */
 .o2-skel-pill {
   background: linear-gradient(
     90deg,
@@ -2613,8 +2591,9 @@ defineExpose({
   animation: o2-skel-shimmer 1.5s ease-in-out infinite;
 }
 
+/* The row half is expressed in the template via motion-reduce:* utilities; the
+   pill needs the CSS form because the scoped rule above outranks a utility. */
 @media (prefers-reduced-motion: reduce) {
-  .o2-skel-row  { opacity: 1; animation: none; }
   .o2-skel-pill { animation: none; }
 }
 </style>

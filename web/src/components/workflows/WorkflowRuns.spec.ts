@@ -63,8 +63,8 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import WorkflowRuns from "./WorkflowRuns.vue";
 
-const AppPageHeaderStub = {
-  name: "AppPageHeader",
+const OPageHeaderStub = {
+  name: "OPageHeader",
   props: ["title", "back"],
   template: `<div class="page-header">
     <button class="back-btn" @click="back && back.onClick && back.onClick()" />
@@ -88,7 +88,7 @@ const stub = (name: string) => ({ name, template: `<div class="${name}" />` });
 const globalCfg = {
   plugins: [i18n, store],
   stubs: {
-    AppPageHeader: AppPageHeaderStub,
+    OPageHeader: OPageHeaderStub,
     OButton: OButtonStub,
     WorkflowRunsPanel: RunsPanelStub,
     WorkflowCanvas: stub("WorkflowCanvas"),

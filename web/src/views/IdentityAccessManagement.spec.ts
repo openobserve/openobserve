@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IdentityAccessManagement from "@/views/IdentityAccessManagement.vue";
-import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -45,8 +44,7 @@ function allItems(sectionGroups: any[]): any[] {
 
 const defaultStubs = {
   RouterView: { template: "<div>Router View</div>" },
-  RouteTabs: true,
-  PageLayout: {
+  OPageLayout: {
     template:
       '<div><slot name="sidebar" /><slot /></div>',
   },
@@ -91,10 +89,6 @@ describe("IdentityAccessManagement.vue Component", () => {
 
     it("should have the correct component structure", () => {
       expect(wrapper.element.tagName).toBe("DIV");
-    });
-
-    it("should have RouteTabs component available", () => {
-      expect(RouteTabs).toBeDefined();
     });
   });
 

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="insight.kind === 'error'">
           <button
             type="button"
-            class="insight-action-btn"
+            class="text-current text-compact font-medium underline underline-offset-3 hover:opacity-75"
             data-test="rum-sessions-insight-filter-btn"
             @click="emit('filter')"
           >
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
           <button
             type="button"
-            class="insight-action-btn"
+            class="text-current text-compact font-medium underline underline-offset-3 hover:opacity-75"
             data-test="rum-sessions-insight-open-error-tracking-btn"
             @click="emit('open-error-tracking')"
           >
@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-else
           type="button"
-          class="insight-action-btn"
+          class="text-current text-compact font-medium underline underline-offset-3 hover:opacity-75"
           data-test="rum-sessions-insight-apply-btn"
           @click="emit('apply')"
         >
@@ -135,18 +135,3 @@ const message = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
-// Inherit the banner variant's text color — the soft variants use their
-// darkest palette step for text, so currentColor stays readable.
-.insight-action-btn {
-  color: currentColor;
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  text-decoration: underline;
-  text-underline-offset: 0.1875rem;
-
-  &:hover {
-    opacity: 0.75;
-  }
-}
-</style>

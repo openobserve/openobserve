@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="account-tree"
           :data-test="`traces-no-stream-recent-${recentStream}`"
           @click="emit('pick-stream', recentStream)"
-        ><span class="truncate max-w-[10rem]">{{ recentStream }}</span></EmptyStateIngestionChip>
+        ><span class="truncate max-w-40">{{ recentStream }}</span></EmptyStateIngestionChip>
       </div>
     </template>
   </OEmptyState>

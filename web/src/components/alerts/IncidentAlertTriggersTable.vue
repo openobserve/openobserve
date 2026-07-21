@@ -34,14 +34,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #empty>
         <div data-test="no-triggers-message" class="text-center py-8">
-          <span :class="isDarkMode ? 'text-gray-500' : 'text-gray-400'" class="text-sm">
+          <span class="text-sm text-text-secondary">
             No triggers loaded
           </span>
         </div>
       </template>
 
       <template #cell-alert_name="{ row }">
-        <span data-test="alert-name-text" :class="isDarkMode ? 'text-gray-200' : 'text-gray-800'" class="text-xs font-medium">
+        <span data-test="alert-name-text" class="text-xs font-medium text-text-body">
           {{ row.alert_name }}
         </span>
       </template>
@@ -173,9 +173,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.o2-table tbody tr {
-  cursor: pointer;
-}
-</style>

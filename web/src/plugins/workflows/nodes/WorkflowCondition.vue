@@ -31,9 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :fields="fields"
       :initial-conditions="savedConditions"
     >
+      <!-- The examples below are CODE SAMPLES held in en-US.json: only the
+           illustrative column name ("severity") is meant to vary per locale —
+           the operators and literals (`!=`, `""`, `null`) are expression syntax
+           and must be copied verbatim, so translators should leave them alone. -->
       <template #guidelines>
         <div
-          class="bg-[#f9f290] text-[#2d3748] w-full rounded-md p-3 mt-4 flex flex-col gap-2"
+          class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 mt-4 flex flex-col gap-2"
           data-test="workflow-condition-note"
         >
           <div class="text-sm font-bold">
@@ -41,21 +45,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1 text-sm">
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
               <span>
                 {{ t("workflow.node.conditionNoteEmpty") }}
-                <span class="font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">severity != ""</span>
+                <span class="font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{{ t("workflow.node.conditionExampleEmpty") }}</span>
               </span>
             </div>
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
               <span>
                 {{ t("workflow.node.conditionNoteNull") }}
-                <span class="font-mono py-[1px] px-[4px] rounded-[3px] bg-[rgba(0,0,0,0.06)] text-[#b30059]">severity != null</span>
+                <span class="font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{{ t("workflow.node.conditionExampleNull") }}</span>
               </span>
             </div>
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
               <span>{{ t("workflow.node.conditionNoteCustom") }}</span>
             </div>
           </div>

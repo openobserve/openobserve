@@ -520,7 +520,9 @@ fn dfs_traversal_check(
         // Ensure leaf nodes are Stream nodes
         if let Some(node_data) = node_map.get(current_id) {
             if !node_data.is_a_leaf_node() {
-                return Err(anyhow!("All leaf nodes must be StreamNode"));
+                return Err(anyhow!(
+                    "All terminal nodes must be stream nodes or destination nodes"
+                ));
             }
         } else {
             return Err(anyhow!("Node with id {} not found in node_map", current_id));
@@ -1303,7 +1305,7 @@ mod tests {
             result
                 .unwrap_err()
                 .to_string()
-                .contains("All leaf nodes must be StreamNode")
+                .contains("All terminal nodes must be stream nodes or destination nodes")
         );
     }
 

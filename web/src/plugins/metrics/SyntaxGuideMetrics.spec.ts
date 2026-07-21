@@ -527,7 +527,6 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    document.querySelectorAll(".q-menu").forEach((m) => m.remove());
     vi.clearAllTimers();
   });
 
@@ -587,7 +586,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-surface-subtle")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
   });
 });
 
@@ -615,7 +614,6 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    document.querySelectorAll(".q-menu").forEach((m) => m.remove());
     vi.clearAllTimers();
   });
 
@@ -692,11 +690,11 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-surface-subtle")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
   });
 });
 
-describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
+describe("SyntaxGuideMetrics — dropdown theme class binding", () => {
   let wrapper: any;
 
   const createWrapper = (propsData = {}) => {
@@ -721,14 +719,14 @@ describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
     vi.clearAllTimers();
   });
 
-  it("q-menu has theme-dark class when store theme is 'dark'", () => {
+  it("resolves the dark theme binding when store theme is 'dark'", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    // The menu renders as a portal; verify via vm that the binding resolves correctly
+    // The dropdown content renders as a portal; verify via vm that the binding resolves correctly
     expect(wrapper.vm.store.state.theme).toBe("dark");
   });
 
-  it("q-menu has theme-light class when store theme is 'light'", () => {
+  it("resolves the light theme binding when store theme is 'light'", () => {
     store.state.theme = "light";
     wrapper = createWrapper();
     expect(wrapper.vm.store.state.theme).toBe("light");
@@ -769,7 +767,6 @@ describe("SyntaxGuideMetrics — mode switching content swap", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    document.querySelectorAll(".q-menu").forEach((m) => m.remove());
     vi.clearAllTimers();
   });
 

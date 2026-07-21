@@ -56,7 +56,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Input -->
         <div class="flex flex-col h-full min-w-0 w-1/2">
           <div
-            class="text-text-primary text-sm mb-2 font-bold flex items-center justify-between"
+            class="text-text-body text-sm mb-2 font-bold flex items-center justify-between"
           >
             <div>{{ t("workflow.test.stepResult.input") }}</div>
             <div class="flex items-center gap-1">
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Test mode: input is EDITABLE and Replay re-runs from this step with
                it. History mode: read-only per-node input captured for the run. -->
           <div
-            class="flex-1 min-h-0 border border-border-default rounded overflow-hidden bg-code-bg"
+            class="flex-1 min-h-0 border border-border-default rounded-default overflow-hidden bg-code-bg"
           >
             <CodeQueryEditor
               editor-id="workflow-step-input"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Output -->
         <div class="flex flex-col h-full min-w-0 w-1/2">
           <div
-            class="text-text-primary text-sm mb-2 font-bold flex items-center justify-between"
+            class="text-text-body text-sm mb-2 font-bold flex items-center justify-between"
           >
             <div>{{ t("workflow.test.stepResult.output") }}</div>
             <div class="flex items-center gap-1">
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex-1 min-h-0 border border-border-default rounded overflow-hidden bg-code-bg"
+            class="flex-1 min-h-0 border border-border-default rounded-default overflow-hidden bg-code-bg"
           >
             <!-- The step errored — show the error message(s) as the output. -->
             <div

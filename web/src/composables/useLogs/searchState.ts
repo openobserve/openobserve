@@ -147,18 +147,10 @@ export const searchState = () => {
   /**
    * Initializes the logs state from cached store data.
    *
-   * This function restores the search object state from the Vuex store cache,
-   * including organization identifier, configuration, meta data, and search results.
-   * It performs deep cloning to prevent reference issues and resets specific properties
-   * like refresh interval and query results to ensure clean state initialization.
+   * Deep-clones from the Vuex cache and resets refresh interval + query
+   * results for a clean start.
    *
    * @returns Promise that resolves to true when initialization is complete
-   *
-   * @example
-   * ```typescript
-   * await initialLogsState();
-   * // Search state is now initialized from store cache
-   * ```
    */
   const initialLogsState = async (): Promise<boolean | undefined> => {
     if (!store.state.logs.isInitialized) {
@@ -252,18 +244,8 @@ export const searchState = () => {
   };
 
   /**
-   * Resets the search object to its default state.
-   *
-   * This function clears all search-related data including streams, query results,
-   * histogram data, queries, and various search configurations. It's typically used
-   * when switching organizations, handling errors, or performing a complete reset
-   * of the search interface.
-   *
-   * @example
-   * ```typescript
-   * resetSearchObj();
-   * // Search object is now reset to default state
-   * ```
+   * Resets the search object to its default state — streams, query results,
+   * histogram, queries, and search configuration.
    */
   const resetSearchObj = (): void => {
     // Reset error message and stream data
@@ -304,17 +286,7 @@ export const searchState = () => {
   };
 
   /**
-   * Resets histogram error state to default values.
-   *
-   * Clears all error messages, codes, and details related to histogram operations.
-   * This is typically called before new histogram data is loaded or when
-   * recovering from histogram-related errors.
-   *
-   * @example
-   * ```typescript
-   * resetHistogramError();
-   * // Histogram errors are now cleared
-   * ```
+   * Resets histogram error state (message, code, detail) to default values.
    */
   const resetHistogramError = (): void => {
     searchObj.data.histogram.errorMsg = "";
@@ -323,11 +295,7 @@ export const searchState = () => {
   };
 
   /**
-   * Resets log search error state to default values.
-   *
-   * Clears all error messages, code and details related to search logs operations.
-   * This is typically called before logs and patterns are loaded or when
-   * recovering from logs-related errors.
+   * Resets log search error state (messages, code, details) to default values.
    */
   const resetSearchError = (): void => {
     searchObj.data.errorMsg = "";
@@ -338,17 +306,8 @@ export const searchState = () => {
   };
 
   /**
-   * Resets query-related data and pagination state.
-   *
-   * Clears query results, resets pagination to first page, stops any running queries,
-   * and clears error messages. This function is commonly used before executing
-   * new queries or when switching between different query contexts.
-   *
-   * @example
-   * ```typescript
-   * resetQueryData();
-   * // Query data is now cleared and ready for new search
-   * ```
+   * Resets query-related data: clears results, resets pagination to page 1,
+   * stops any running query, and clears errors.
    */
   const resetQueryData = (): void => {
     searchObj.data.sortedQueryResults = [];
@@ -358,17 +317,8 @@ export const searchState = () => {
   };
 
   /**
-   * Resets search around data to default state.
-   *
-   * Clears the search around timestamp and size, effectively disabling
-   * any active search around context. Used when starting fresh searches
-   * or switching between different search modes.
-   *
-   * @example
-   * ```typescript
-   * resetSearchAroundData();
-   * // Search around context is now cleared
-   * ```
+   * Resets search-around data (timestamp + size), disabling any active
+   * search-around context.
    */
   const resetSearchAroundData = (): void => {
     searchObj.data.searchAround.indexTimestamp = -1;
@@ -376,17 +326,8 @@ export const searchState = () => {
   };
 
   /**
-   * Resets all function-related data and clears store.
-   *
-   * Dispatches store action to clear functions and resets local function
-   * data including transforms and stream functions. This ensures a clean
-   * state when switching contexts or organizations.
-   *
-   * @example
-   * ```typescript
-   * resetFunctions();
-   * // All function data is now cleared from store and local state
-   * ```
+   * Resets all function-related data (transforms + stream functions) and
+   * clears functions from the store.
    */
   const resetFunctions = (): void => {
     searchObj.data.transforms = [];
@@ -395,20 +336,9 @@ export const searchState = () => {
   };
 
   /**
-   * Comprehensively resets all stream-related data.
-   *
-   * This function performs a complete reset of stream state including:
-   * - Dispatches store action to reset streams
-   * - Clears selected streams and fields
-   * - Resets filter configurations
-   * - Sets stream type from route or defaults to 'logs'
-   * - Calls resetQueryData() and resetSearchAroundData() for related cleanup
-   *
-   * @example
-   * ```typescript
-   * resetStreamData();
-   * // All stream data, queries, and search around context are now reset
-   * ```
+   * Comprehensively resets all stream-related data: store streams, selections,
+   * fields, filters, stream type (from route, default 'logs'), plus
+   * resetQueryData() and resetSearchAroundData().
    */
   const resetStreamData = (): void => {
     // Reset store stream data

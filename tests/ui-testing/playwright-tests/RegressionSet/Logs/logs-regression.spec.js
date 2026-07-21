@@ -1482,7 +1482,7 @@ test.describe("Logs Regression Bugs", () => {
     // Compare that the classes from before expansion are still present
     expect(lastRowFinalClasses).toBeTruthy();
     // Filter out generic/transient table classes that don't indicate highlighting state
-    const ignoredClasses = new Set(['table-row', 'q-tr', 'cursor-pointer']);
+    const ignoredClasses = new Set(['table-row', 'cursor-pointer']);
     const originalClassSet = new Set(lastRowClasses.split(/\s+/).filter(c => c && !ignoredClasses.has(c)));
     const finalClassSet = new Set(lastRowFinalClasses.split(/\s+/).filter(c => c && !ignoredClasses.has(c)));
 

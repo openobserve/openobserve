@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-slot="{ isSubmitting }"
         >
           <!-- scape interval section -->
-          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.scrapintervalLabel") }}
             </span>
@@ -39,17 +39,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="scrape_interval"
               type="number"
               min="0"
-              class="ml-2"
+              class="ml-2 w-30!"
               data-test="general-settings-scrape-interval"
-              style="width: 120px"
             />
-            <span class="individual-setting-description text-[13px] opacity-70">
+            <span class="individual-setting-description text-compact opacity-70">
               {{ t("settings.scrapeIntervalDescription") }}
             </span>
           </div>
 
           <!-- Max Series Per Query section -->
-          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.maxSeriesPerQueryLabel") }}
             </span>
@@ -58,10 +57,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="number"
               :min="1000"
               :max="1000000"
-              class="ml-2"
+              class="ml-2 w-45!"
               :placeholder="'40000 (' + t('settings.systemDefault') + ')'"
               data-test="general-settings-max-series-per-query"
-              style="width: 180px"
             >
               <template v-slot:icon-right>
                 <OIcon name="info" size="sm" class="cursor-pointer">
@@ -69,71 +67,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OIcon>
               </template>
             </OFormInput>
-            <span class="individual-setting-description text-[13px] opacity-70">
+            <span class="individual-setting-description text-compact opacity-70">
               {{ t("settings.maxSeriesPerQueryDescription") }}
             </span>
           </div>
 
           <!-- Manage Theme section -->
-          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+          <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
             <span class="individual-setting-title text-sm font-medium leading-5">
               {{ t("settings.manageTheme") }}
             </span>
             <div
-              class="flex gap-2 items-center"
-              style="margin-left: -60px"
+              class="flex gap-2 items-center -ml-15"
             >
               <!-- Light Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-[6px] pr-3 pl-[6px] rounded-[20px] cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-(--o2-primary-color) hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover hover:border-accent hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
                 <div
-                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden"
+                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)] relative overflow-hidden"
                   :style="{ backgroundColor: customLightColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
+                    class="opacity-0 transition-opacity duration-200 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-[11px] font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.light") }}</span>
-                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-[11px] font-medium opacity-70 tracking-[-0.2px]">{{ customLightColor }}</span>
+                <span class="chip-label text-2xs font-semibold opacity-50 tracking-wider">{{ t("settings.light") }}</span>
+                <span class="chip-value font-mono text-2xs font-medium opacity-70 tracking-tight">{{ customLightColor }}</span>
               </div>
 
               <!-- Dark Mode Theme -->
               <div
-                class="group/chip inline-flex items-center gap-2 py-[6px] pr-3 pl-[6px] rounded-[20px] cursor-pointer transition-all duration-200 bg-[rgba(0,0,0,0.04)] border border-[rgba(0,0,0,0.1)] hover:bg-[rgba(0,0,0,0.06)] hover:border-(--o2-primary-color) hover:-translate-y-px hover:shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:bg-[rgba(255,255,255,0.05)] dark:border-[rgba(255,255,255,0.15)] dark:hover:bg-[rgba(255,255,255,0.08)] dark:hover:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+                class="group/chip inline-flex items-center gap-2 py-1.5 pr-3 pl-1.5 rounded-full cursor-pointer transition-all duration-200 bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover hover:border-accent hover:-translate-y-px hover:shadow-md"
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
                 <div
-                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.2)] relative overflow-hidden"
+                  class="color-circle w-6 h-6 rounded-full shrink-0 flex items-center justify-center shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)] relative overflow-hidden"
                   :style="{ backgroundColor: customDarkColor }"
                 >
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 transition-opacity duration-200 [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.3))] group-hover/chip:opacity-90"
+                    class="opacity-0 transition-opacity duration-200 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] group-hover/chip:opacity-90"
                   />
                 </div>
-                <span class="chip-label text-[11px] font-semibold opacity-50 tracking-[0.5px]">{{ t("settings.dark") }}</span>
-                <span class="chip-value font-['SF_Mono','Monaco','Menlo',monospace] text-[11px] font-medium opacity-70 tracking-[-0.2px]">{{ customDarkColor }}</span>
+                <span class="chip-label text-2xs font-semibold opacity-50 tracking-wider">{{ t("settings.dark") }}</span>
+                <span class="chip-value font-mono text-2xs font-medium opacity-70 tracking-tight">{{ customDarkColor }}</span>
               </div>
 
               <!-- Reset Button -->
               <div
-                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-[rgba(0,0,0,0.2)] opacity-60 hover:bg-[rgba(239,68,68,0.08)] hover:border-[rgba(239,68,68,0.4)] hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180 dark:border-[rgba(255,255,255,0.25)] dark:hover:bg-[rgba(239,68,68,0.15)] dark:hover:border-[rgba(239,68,68,0.5)]"
+                class="group/resetChip inline-flex items-center justify-center w-8 h-8 rounded-full cursor-pointer transition-all duration-200 bg-transparent border border-dashed border-border-default opacity-60 hover:bg-[color-mix(in_srgb,var(--color-error-500)_10%,transparent)] hover:border-error-400 hover:border-solid hover:opacity-100 hover:-translate-y-px hover:rotate-180"
                 @click="resetThemeColors"
                 data-test="reset-theme-colors-btn"
               >
-                <OIcon name="refresh" size="sm" class="group-hover/resetChip:text-[rgb(239,68,68)] dark:group-hover/resetChip:text-[rgb(248,113,113)]" />
+                <OIcon name="refresh" size="sm" class="group-hover/resetChip:text-error-500 dark:group-hover/resetChip:text-error-400" />
                 <OTooltip :content="t('settings.resetToDefaultColors')" side="top" />
               </div>
             </div>
-            <span class="individual-setting-description self-start text-[13px] opacity-70">
+            <span class="individual-setting-description self-start text-compact opacity-70">
               {{ t("settings.themeManagementDescription") }}
             </span>
           </div>
@@ -169,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div>
-        <div class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+        <div class="settings-grid-item no-border-bottom grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
           <span class="individual-setting-title text-sm font-medium leading-5">
             {{ t("settings.customLogoText") }}
           </span>
@@ -178,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex gap-2 items-center"
           >
             <OInput
-              class="w-[250px] mr-sm"
+              class="w-62.5 mr-sm"
               data-test="settings_ent_logo_custom_text"
               v-model="customText"
             />
@@ -202,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else class="flex items-center">
-            <span class="w-[190px] text-center truncate"
+            <span class="w-47.5 text-center truncate"
               >{{
                 store.state.zoConfig.custom_logo_text ||
                 t("settings.noTextAvailable")
@@ -226,12 +223,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="edit"
             />
           </div>
-          <span class="individual-setting-description text-[13px] opacity-70">
+          <span class="individual-setting-description text-compact opacity-70">
             {{ t("settings.customLogoTextDescription") }}
           </span>
         </div>
         <!-- Light Mode Logo -->
-        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
           <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
           </div>
@@ -248,8 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 `data:image; base64, ` + store.state.zoConfig.custom_logo_img
               "
               :alt="t('settings.logoLabel')"
-              style="max-width: 150px; max-height: 31px"
-              class="mx-3"
+              class="mx-3 max-w-37.5 max-h-7.75"
             />
             <OButton
               data-test="setting_ent_custom_logo_img_delete_btn"
@@ -295,13 +291,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-[5px] text-[13px] opacity-70">
+          <span class="individual-setting-description -translate-y-1.25 text-compact opacity-70">
               {{ t("settings.customLogoLightDescription") }}
             </span>
           </div>
 
         <!-- Dark Mode Logo -->
-        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-(--o2-border-color)">
+        <div class="settings-grid-item grid grid-cols-3 gap-4 items-center py-4 border-b border-card-glass-border">
           <div class="pt-2 individual-setting-title text-sm font-medium leading-5 w-full mb-5">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
           </div>
@@ -319,8 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.zoConfig.custom_logo_dark_img
               "
               :alt="t('settings.logoLabel')"
-              style="max-width: 150px; max-height: 31px"
-              class="mx-3"
+              class="mx-3 max-w-37.5 max-h-7.75"
             />
             <OButton
               data-test="setting_ent_custom_logo_dark_img_delete_btn"
@@ -366,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </div>
-          <span class="individual-setting-description -translate-y-[5px] text-[13px] opacity-70">
+          <span class="individual-setting-description -translate-y-1.25 text-compact opacity-70">
               {{ t("settings.customLogoDarkDescription") }}
             </span>
           </div>
@@ -380,14 +375,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       id="dangerZone"
       v-if="canDeleteOrg"
       data-test="general-settings-danger-zone"
-      class="mt-8 overflow-hidden rounded-lg border border-(--color-banner-error-soft-border)"
+      class="mt-8 overflow-hidden rounded-default border border-banner-error-soft-border"
     >
       <!-- Red-accented header signals this section is destructive. -->
       <div
-        class="flex items-center gap-2 border-b border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-5 py-3"
+        class="flex items-center gap-2 border-b border-banner-error-soft-border bg-banner-error-soft-bg px-5 py-3"
       >
-        <OIcon name="warning" size="sm" class="text-(--color-banner-error-soft-text)" />
-        <span class="text-base font-bold text-(--color-banner-error-soft-text)">
+        <OIcon name="warning" size="sm" class="text-banner-error-soft-text" />
+        <span class="text-base font-bold text-banner-error-soft-text">
           {{ t("settings.dangerZone") }}
         </span>
       </div>
@@ -396,7 +391,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            name is interpolated so the sentence names the thing being destroyed. -->
       <div class="flex items-start justify-between gap-6 bg-surface-base px-5 py-4">
         <div class="flex flex-col gap-1">
-          <span class="text-sm font-semibold text-text-primary">
+          <span class="text-sm font-semibold text-text-heading">
             {{ t("settings.deleteOrganizationTitle") }}
           </span>
           <i18n-t
@@ -405,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="max-w-3xl text-sm text-text-secondary"
           >
             <template #name>
-              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-body">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </div>
@@ -436,7 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex items-center gap-2">
             <OIcon :name="fact.icon" size="sm" class="shrink-0 text-text-muted" />
-            <span class="text-sm font-semibold text-text-primary">{{ fact.title }}</span>
+            <span class="text-sm font-semibold text-text-heading">{{ fact.title }}</span>
           </div>
           <span class="text-xs text-text-secondary">{{ fact.detail }}</span>
         </div>
@@ -487,7 +482,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="flex flex-col gap-3">
       <!-- What will happen -->
-      <p class="text-sm text-text-primary">
+      <p class="text-sm text-text-body">
         {{
           t("settings.deleteOrganizationConfirm", {
             name: deleteOrgName,
@@ -507,25 +502,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <p
         v-else-if="orgScope"
         data-test="general-delete-org-scope"
-        class="text-xs font-semibold text-text-primary"
+        class="text-xs font-semibold text-text-body"
       >
         {{ orgScope }}
       </p>
 
       <!-- Irreversible-action warning callout -->
       <div
-        class="flex items-start gap-2 rounded border border-(--color-banner-error-soft-border) bg-(--color-banner-error-soft-bg) px-3 py-2"
+        class="flex items-start gap-2 rounded-default border border-banner-error-soft-border bg-banner-error-soft-bg px-3 py-2"
       >
         <OIcon
           name="warning"
           size="sm"
-          class="mt-0.5 shrink-0 text-(--color-banner-error-soft-text)"
+          class="mt-0.5 shrink-0 text-banner-error-soft-text"
         />
         <div class="flex flex-col gap-1">
-          <p class="text-xs text-(--color-banner-error-soft-text)">
+          <p class="text-xs text-banner-error-soft-text">
             {{ t("settings.deleteOrganizationWarning") }}
           </p>
-          <p class="text-xs text-(--color-banner-error-soft-text)">
+          <p class="text-xs text-banner-error-soft-text">
             {{ t("settings.deleteOrganizationRecoverable") }}
           </p>
         </div>
@@ -536,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <label class="block text-xs text-text-secondary">
           <i18n-t keypath="settings.deleteOrganizationTypeToConfirm" tag="span">
             <template #name>
-              <span class="font-semibold text-text-primary">{{ deleteOrgName }}</span>
+              <span class="font-semibold text-text-body">{{ deleteOrgName }}</span>
             </template>
           </i18n-t>
         </label>
@@ -558,6 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, onActivated, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import organizations from "@/services/organizations";
 import usersService from "@/services/users";
@@ -567,7 +563,7 @@ import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
-import { applyThemeColors } from "@/utils/theme";
+import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -618,10 +614,9 @@ export default defineComponent({
     const { t } = useI18n();
 
     const store = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
 
-    // Schema-driven validation replaces the manual scrapeIntervalError /
-    // maxSeriesError refs + the imperative if-checks in onSubmit.
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     // Dynamic defaults (edit-prefill from the store) → a typed computed.
@@ -668,7 +663,7 @@ export default defineComponent({
     // Color picker dialog state
     const showColorPicker = ref(false); // Controls dialog visibility
     const currentPickerMode = ref<"light" | "dark">("light"); // Which mode is being edited
-    const tempColor = ref(DEFAULT_LIGHT_COLOR); // Bound to q-color component
+    const tempColor = ref(DEFAULT_LIGHT_COLOR); // Bound to the color picker component
 
     /**
      * Update theme colors from Vuex store
@@ -676,8 +671,6 @@ export default defineComponent({
      * Priority: Vuex store tempThemeColors > organizationSettings > defaults
      */
     const updateFromStore = () => {
-      // (scrape_interval is now form-owned via :default-values — no ref to sync.)
-
       // Get theme colors from store with priority order
       // 1. Check Vuex store for temporary preview colors (highest priority)
       // 2. Check organization settings for backend defaults
@@ -710,7 +703,7 @@ export default defineComponent({
 
       // Apply the theme colors if they changed
       if (shouldApply) {
-        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const currentMode = isDark.value ? "dark" : "light";
         const color = currentMode === "light" ? newLightColor : newDarkColor;
         const isDefault =
           color === DEFAULT_LIGHT_COLOR || color === DEFAULT_DARK_COLOR;
@@ -935,7 +928,7 @@ export default defineComponent({
         );
 
         // Apply the current mode's theme
-        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const currentMode = isDark.value ? "dark" : "light";
         const color =
           currentMode === "light"
             ? customLightColor.value
@@ -957,7 +950,7 @@ export default defineComponent({
       }
     };
 
-    const uploadImage = (fileList: any = null, theme: string = "light") => {
+    const uploadImage = (fileList: any = null, mode: string = "light") => {
       const selectedFiles = fileList || files.value;
       // Handle single file or file array
       //but mostly we will support single file because we only show one image at a time right
@@ -984,7 +977,7 @@ export default defineComponent({
           .createLogo(
             store.state.selectedOrganization?.identifier || orgIdentifier,
             formData,
-            theme,
+            mode,
           )
           .then(async (res) => {
             if (res.status == 200) {
@@ -992,7 +985,7 @@ export default defineComponent({
                 variant: "success",
                 message: t("settings.logoUpdatedSuccessfully", {
                   mode:
-                    theme === "dark"
+                    mode === "dark"
                       ? t("settings.darkMode")
                       : t("settings.lightMode"),
                 }),
@@ -1003,7 +996,7 @@ export default defineComponent({
               });
 
               // Clear the appropriate file ref
-              if (theme === "dark") {
+              if (mode === "dark") {
                 filesDark.value = null;
               } else {
                 filesLight.value = null;
@@ -1038,7 +1031,7 @@ export default defineComponent({
       }
     };
 
-    const deleteLogo = (theme: string = "light") => {
+    const deleteLogo = (mode: string = "light") => {
       loadingState.value = true;
       let orgIdentifier = "default";
       for (let item of store.state.organizations) {
@@ -1049,7 +1042,7 @@ export default defineComponent({
       settingsService
         .deleteLogo(
           store.state.selectedOrganization?.identifier || orgIdentifier,
-          theme,
+          mode,
         )
         .then(async (res: any) => {
           if (res.status == 200) {
@@ -1057,7 +1050,7 @@ export default defineComponent({
               variant: "success",
               message: t("settings.logoDeletedSuccessfully", {
                 mode:
-                  theme === "dark"
+                  mode === "dark"
                     ? t("settings.darkMode")
                     : t("settings.lightMode"),
               }),
@@ -1178,7 +1171,7 @@ export default defineComponent({
       // Apply the theme immediately for current mode.
       // isDefault=false so the default theme's (O2 Signature) actual colors are
       // applied rather than reverting to the base stylesheet palette.
-      const currentMode = store.state.theme === "dark" ? "dark" : "light";
+      const currentMode = isDark.value ? "dark" : "light";
       const color =
         currentMode === "light" ? DEFAULT_LIGHT_COLOR : DEFAULT_DARK_COLOR;
       applyThemeColors(color, currentMode, false);
@@ -1196,12 +1189,6 @@ export default defineComponent({
      * @param mode - 'light' or 'dark' theme mode to switch to
      */
     const toggleThemeMode = (mode: "light" | "dark") => {
-      // Update theme mode in store
-      store.dispatch("appTheme", mode);
-
-      // Update dark mode — this is critical for proper theme application
-      document.documentElement.classList.toggle("dark", mode === "dark");
-
       // Persist theme preference to localStorage
       localStorage.setItem("theme", mode);
 
@@ -1209,9 +1196,19 @@ export default defineComponent({
       const color =
         mode === "light" ? customLightColor.value : customDarkColor.value;
 
-      // Apply the theme color for the new mode. isDefault=false so the resolved
-      // color (including the O2 Signature default) is always applied directly.
-      applyThemeColors(color, mode, false);
+      // All DOM writes of the switch run inside switchThemeMode so the mode
+      // flip cross-fades as one frame.
+      switchThemeMode(mode, () => {
+        // Update theme mode in store
+        store.dispatch("appTheme", mode);
+
+        // Update dark mode — this is critical for proper theme application
+        document.documentElement.classList.toggle("dark", mode === "dark");
+
+        // Apply the theme color for the new mode. isDefault=false so the resolved
+        // color (including the O2 Signature default) is always applied directly.
+        applyThemeColors(color, mode, false);
+      });
     };
 
     const cancelLogoText = () => {
@@ -1296,7 +1293,7 @@ export default defineComponent({
 
         // Re-apply the correct (saved) colors for the current mode so the rest
         // of the app doesn't remain stuck with the preview's CSS variables.
-        const currentMode = store.state.theme === "dark" ? "dark" : "light";
+        const currentMode = isDark.value ? "dark" : "light";
         const defaultLight = store.state.defaultThemeColors?.light || "#3F7994";
         const defaultDark = store.state.defaultThemeColors?.dark || "#5B9FBE";
 
@@ -1388,18 +1385,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* The theme chips' dark background/border are set via `dark:*` utilities,
-   which don't apply in this app (dark mode is toggled by `body.body--dark`,
-   not the OS media query Tailwind's `dark:` variant targets). Restore them
-   with class-based rules so the chips keep their fill + border in dark mode. */
-.body--dark [data-test="theme-light-chip"],
-.body--dark [data-test="theme-dark-chip"] {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-.body--dark [data-test="reset-theme-colors-btn"] {
-  border-color: rgba(255, 255, 255, 0.25);
-}
-</style>

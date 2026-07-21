@@ -16,18 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <PageLayout
+    <OPageLayout bleed
       v-if="!showDestinationEditor"
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+      :title="t('pipeline_destinations.header')"
+      icon="person-pin-circle"
+      :subtitle="'External targets for pipeline output'"
     >
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-      <template #header>
-      <AppPageHeader
-        :title="t('pipeline_destinations.header')"
-        icon="person-pin-circle"
-        :subtitle="'External targets for pipeline output'"
-      >
         <template #actions>
           <OButton
             data-test="pipeline-destination-list-add-btn"
@@ -37,9 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t(`alert_destinations.add`) }}</OButton
           >
         </template>
-      </AppPageHeader>
-      </template>
-      <div class="card-container flex-1 min-h-0 overflow-hidden">
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
       <OTable
         :frame="false"
         data-test="alert-destinations-list-table"
@@ -58,6 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="settings-pipeline-destinations"
+        show-index
         :show-global-filter="false"
         @update:selected-ids="handleSelectedIdsUpdate"
       >
@@ -95,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="fieldTag"
             value="soft"
           >{{ row.destination_type_name }}</OTag>
-          <span v-else class="text-text-primary">—</span>
+          <span v-else class="text-text-body">—</span>
         </template>
 
         <template #cell-output_format="{ row }">
@@ -104,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="fieldTag"
             value="soft"
           >{{ formatOutputFormat(row.output_format) }}</OTag>
-          <span v-else class="text-text-primary">—</span>
+          <span v-else class="text-text-body">—</span>
         </template>
 
         <template #cell-actions="{ row }">
@@ -134,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="selectedDestinations.length > 0"
           #bottom
         >
-          <span class="text-xs text-text-primary font-medium">
+          <span class="text-xs text-text-secondary font-medium">
             {{ selectedDestinations.length }} selected
           </span>
           <OButton
@@ -149,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OTable>
       </div>
-    </PageLayout>
+    </OPageLayout>
     <div v-else>
       <PipelineDestinationEditor
         :destination="editingDestination"
@@ -206,13 +199,12 @@ import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
@@ -229,8 +221,7 @@ const formatOutputFormat = (val: any): string => {
 export default defineComponent({
   name: "PageAlerts",
   components: {
-    AppPageHeader,
-    PageLayout,
+    OPageLayout,
     PipelineDestinationEditor,
     OEmptyState,
     ConfirmDialog,
@@ -247,13 +238,6 @@ export default defineComponent({
     const { t } = useI18n();
     const { track } = useReo();
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         header: t("alert_destinations.name"),
@@ -378,10 +362,7 @@ export default defineComponent({
         })
         .then((res) => {
           resultTotal.value = res.data.length;
-          destinations.value = res.data.map((data: any, index: number) => ({
-            ...data,
-            "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-          }));
+          destinations.value = res.data;
           updateRoute();
         })
         .catch((err) => {

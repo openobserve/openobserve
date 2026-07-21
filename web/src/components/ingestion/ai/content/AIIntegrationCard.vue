@@ -35,8 +35,6 @@ const props = defineProps<{
 const store = useStore();
 const { endpoint } = useIngestion();
 
-const isDark = computed(() => store.state?.theme === "dark");
-
 // The {url}/{org}/{token} the snippets are substituted with. `token` is the
 // base64 of email:password (the same value used for ingest tokens), WITHOUT the
 // "Basic " prefix — the snippets add that themselves. Computed from the store so
@@ -109,8 +107,7 @@ const renderedSections = computed(() =>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
             v-if="seg.type === 'html'"
-            class="o2-card-md prose prose-sm max-w-none min-w-0"
-            :class="{ 'prose-invert': isDark }"
+            class="o2-card-md prose prose-sm max-w-none min-w-0 dark:prose-invert"
             v-html="seg.html"
           ></div>
           <OCodeBlock v-else :code="seg.code" :lang="seg.lang" data-test="ai-md-code" />
@@ -125,7 +122,7 @@ const renderedSections = computed(() =>
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-blue-500 hover:text-blue-600"
+          class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
           >here</a
         >
@@ -136,17 +133,20 @@ const renderedSections = computed(() =>
 </template>
 
 <style scoped lang="scss">
+/* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
+   :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
+   target nodes this template never writes, so they cannot be utilities. */
 .o2-card {
   padding: 1.5rem 1.75rem;
 }
 
 .o2-card-inner {
-  max-width: 980px;
+  max-width: 61.25rem;
 }
 
 .o2-section {
   padding: 1.25rem 0;
-  border-top: 1px solid rgba(136, 136, 136, 0.18);
+  border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {
     border-top: none;
@@ -155,7 +155,7 @@ const renderedSections = computed(() =>
 }
 
 .o2-section-title {
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   font-weight: 600;
   margin: 0 0 0.5rem;
   letter-spacing: 0.01em;
@@ -174,9 +174,9 @@ const renderedSections = computed(() =>
 }
 
 .o2-card-md :deep(:not(pre) > code) {
-  background: rgba(136, 136, 136, 0.16);
+  background: var(--color-code-bg);
   padding: 0.1rem 0.35rem;
-  border-radius: 4px;
+  border-radius: var(--radius-default);
   font-weight: 400;
 }
 
@@ -185,6 +185,6 @@ const renderedSections = computed(() =>
   display: block;
   width: 100%;
   overflow-x: auto;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
 }
 </style>

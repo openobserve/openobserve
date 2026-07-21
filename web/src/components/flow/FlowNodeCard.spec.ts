@@ -75,11 +75,18 @@ describe("FlowNodeCard", () => {
       expect(wrapper.findComponent({ name: "OSeparator" }).exists()).toBe(true);
     });
 
-    it("puts the shared node typography on the body container (15px / bold)", () => {
+    it("puts the shared node typography on the body container (text-sm / bold)", () => {
       wrapper = mountCard();
+      // Was an arbitrary 0.9375rem (15px). There is no 15px step in the type
+      // scale, so it was off-scale by definition and the design guard rejects it;
+      // text-sm (14px) is the nearest registered step and is what main picked for
+      // the same node label in the pipeline CustomNode, so both canvases agree.
+      // Pinned here because this card is shared — a change lands on EVERY node
+      // type at once.
       const classes = wrapper.find(".flow-node__container").classes();
-      expect(classes).toContain("text-[15px]!");
+      expect(classes).toContain("text-sm!");
       expect(classes).toContain("font-bold!");
+      expect(classes).toContain("text-left");
     });
   });
 

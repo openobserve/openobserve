@@ -169,6 +169,13 @@ pub async fn create_backfill(
         (status = 200, description = "List of backfill jobs", body = Vec<backfill::BackfillJobStatus>),
         (status = 500, description = "Internal server error"),
     ),
+    extensions(
+        ("x-o2-mcp" = json!({
+            "description": "List all backfill jobs",
+            "category": "pipelines",
+            "summary_fields": ["job_id", "pipeline_id", "pipeline_name", "status", "progress_percent", "enabled"]
+        }))
+    )
 )]
 pub async fn list_backfills(Path(org_id): Path<String>) -> Response {
     match backfill::list_backfill_jobs(&org_id).await {

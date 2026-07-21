@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-height">
+  <div class="h-full max-h-full overflow-hidden">
     <AddAlert
       v-if="destinations.length > 0"
       :isUpdated="isUpdated"

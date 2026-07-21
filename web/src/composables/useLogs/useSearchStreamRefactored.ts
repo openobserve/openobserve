@@ -14,25 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * REFACTORED VERSION OF useSearchStream
- *
- * This is a refactored version that demonstrates how to split the large useSearchStream
- * composable into smaller, more focused composables. The original file had 2100+ lines
- * and handled multiple responsibilities.
- *
- * STRUCTURE:
- * - Main orchestrator (this file) - coordinates between split composables
- * - useSearchQuery - handles SQL query building and validation
- * - useSearchConnection - manages WebSocket/HTTP streaming connections
+ * Search-stream orchestrator: coordinates the split composables that each own
+ * one responsibility.
+ * - useSearchQuery - SQL query building and validation
+ * - useSearchConnection - WebSocket/HTTP streaming connections
  * - useSearchResponseHandler - processes different response types
  * - useSearchHistogramManager - histogram-specific logic
  * - useSearchPagination - pagination calculations and state
- *
- * BENEFITS:
- * - Better separation of concerns
- * - Easier testing of individual components
- * - Improved maintainability
- * - Cleaner code organization
  */
 
 import { searchState } from "@/composables/useLogs/searchState";
@@ -198,7 +186,7 @@ export const useSearchStreamRefactored = () => {
     extractFilterColumns: queryBuilder.extractFilterColumns,
     constructErrorMessage: responseProcessor.constructErrorMessage,
 
-    // Backward compatibility - expose individual composables if needed
+    // Individual composables
     queryBuilder,
     connectionManager,
     responseProcessor,
@@ -206,28 +194,5 @@ export const useSearchStreamRefactored = () => {
     paginationManager,
   };
 };
-
-/**
- * How to migrate to the refactored version:
- *
- * 1. Replace imports:
- *    - Change: import useSearchStream from "@/composables/useLogs/useSearchStream";
- *    - To: import { useSearchStreamRefactored } from "@/composables/useLogs/useSearchStreamRefactored";
- *
- * 2. Update usage:
- *    - Change: const { getDataThroughStream } = useSearchStream();
- *    - To: const { getDataThroughStream } = useSearchStreamRefactored();
- *
- * 3. Test thoroughly to ensure all functionality works
- *
- * 4. If needed, access individual composables:
- *    - const { queryBuilder, connectionManager } = useSearchStreamRefactored();
- *
- * MIGRATION STRATEGY:
- * - Start with components that use simple methods from useSearchStream
- * - Gradually migrate more complex usage
- * - Keep the original file until all migrations are complete
- * - Add comprehensive tests for each split composable
- */
 
 export default useSearchStreamRefactored;

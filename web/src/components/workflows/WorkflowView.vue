@@ -65,6 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+// Shared, token-driven node/handle styling — this preview container carries
+// `o2vf_node`, so the same stylesheet applies here as on the live canvas.
+import "@/components/flow/flow-canvas.css";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { VueFlow, MarkerType } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
@@ -117,16 +120,11 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<style>
-/* The preview container already carries `o2vf_node`, so the shared, token-driven
-   node/handle styling in flow-canvas.css applies here too — this block used to
-   re-declare all of it at equal specificity, which was pure duplication. Only
-   the preview-specific rule is kept. */
-@import "@/components/flow/flow-canvas.css";
-
-/* Read-only: block all node interaction so hover-actions never appear. This is
-   also why the shared `cursor: grab` / `:hover` rules are inert here. */
-.workflow-view-tooltip .vue-flow__node {
+<style scoped>
+/* keep(lib-override:vue-flow): read-only preview — block all node interaction so
+   hover-actions never appear. `.vue-flow__node` is VueFlow's own DOM rendered by
+   a child, hence :deep(); the container class is this component's own root. */
+.workflow-view-tooltip :deep(.vue-flow__node) {
   pointer-events: none;
 }
 </style>

@@ -31,6 +31,7 @@ use config::{
     utils::time::now_micros,
 };
 use infra::table::workflows::{Workflow, WorkflowRunErrors};
+use openobserve_api_management::request::alerts::history::escape_like;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -553,8 +554,9 @@ pub async fn get_workflow_history(
          source_node, error \
          FROM \"{TRIGGERS_STREAM}\" \
          WHERE module = 'workflow' AND org = '{org_id}' \
-         AND key like '{workflow_id}/%'\
-         AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
+         AND key like '{}/%'\
+         AND _timestamp >= {start_time} AND _timestamp <= {end_time}",
+        escape_like(&workflow_id).replace("'", "''")
     );
 
     let data_req = SearchRequest {

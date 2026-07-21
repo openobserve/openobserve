@@ -137,6 +137,10 @@ mod m20260707_000004_create_synthetics_probe_tokens;
 mod m20260710_000001_add_alert_workflows_col;
 mod m20260714_000001_create_synthetics_locations;
 mod m20260714_000002_create_synthetics_agents;
+mod m20260720_000001_add_alert_workflows_col;
+mod m20260720_000001_create_workflow_errors_table;
+mod m20260720_000001_create_workflow_run_data_table;
+mod m20260720_000001_create_workflows_table;
 
 pub struct Migrator;
 
@@ -263,6 +267,10 @@ impl MigratorTrait for Migrator {
             Box::new(m20260707_000004_create_synthetics_probe_tokens::Migration),
             Box::new(m20260714_000001_create_synthetics_locations::Migration),
             Box::new(m20260714_000002_create_synthetics_agents::Migration),
+            Box::new(m20260720_000001_create_workflows_table::Migration),
+            Box::new(m20260720_000001_create_workflow_errors_table::Migration),
+            Box::new(m20260720_000001_create_workflow_run_data_table::Migration),
+            Box::new(m20260720_000001_add_alert_workflows_col::Migration),
         ]
     }
 }

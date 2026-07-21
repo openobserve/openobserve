@@ -172,9 +172,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Hides OTable's thead — deep structural override, must stay in CSS */
-.o2-table-hide-header thead {
-  display: none;
-}
-</style>

@@ -17,7 +17,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="feature-card mb-3"
-    :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
     v-if="showDeprecationWarning"
     role="region"
     aria-label="MySQL deprecation warning"
@@ -26,14 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center">
       <div class="flex flex-col">
         <span
-          class="text-base font-semibold leading-6 text-[var(--o2-text-primary)]"
+          class="text-base font-semibold leading-6 text-text-heading"
           data-test="database-deprecation-banner-title"
         >
           ⚠️ MySQL support is DEPRECATED and will be removed in future.
         </span>
         <br />
         <span
-          class="text-sm font-normal leading-5 text-[var(--o2-text-secondary)]"
+          class="text-sm font-normal leading-5 text-text-secondary"
           data-test="database-deprecation-banner-subtitle"
         >
           Please migrate to PostgreSQL to ensure continued support.

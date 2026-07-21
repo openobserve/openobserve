@@ -78,11 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- head (content, eyes closed) -->
       <g>
-        <ellipse cx="120" cy="166" rx="15" ry="16" fill="#f0c29a" transform="rotate(-28 120 166)" />
-        <path d="M106 156 Q108 140 124 141 Q140 144 136 160 Q135 152 127 150 Q131 155 129 161 Q122 151 114 154 Q108 156 107 164 Z" fill="#5b4a3a" />
-        <path d="M110 164 Q114 167 118 164" stroke="#3a2f25" stroke-width="1.7" stroke-linecap="round" fill="none" />
-        <path d="M122 161 Q126 164 130 160" stroke="#3a2f25" stroke-width="1.7" stroke-linecap="round" fill="none" />
-        <path d="M111 172 Q116 177 122 170" stroke="#b5764a" stroke-width="1.7" stroke-linecap="round" fill="none" />
+        <ellipse cx="120" cy="166" rx="15" ry="16" fill="var(--color-illustration-sand)" transform="rotate(-28 120 166)" />
+        <path d="M106 156 Q108 140 124 141 Q140 144 136 160 Q135 152 127 150 Q131 155 129 161 Q122 151 114 154 Q108 156 107 164 Z" fill="var(--color-illustration-umber)" />
+        <path d="M110 164 Q114 167 118 164" stroke="var(--color-illustration-espresso)" stroke-width="1.7" stroke-linecap="round" fill="none" />
+        <path d="M122 161 Q126 164 130 160" stroke="var(--color-illustration-espresso)" stroke-width="1.7" stroke-linecap="round" fill="none" />
+        <path d="M111 172 Q116 177 122 170" stroke="var(--color-illustration-clay)" stroke-width="1.7" stroke-linecap="round" fill="none" />
       </g>
     </g>
   </svg>
@@ -95,7 +95,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 .es-badge,
 .es-spark {
   transform-box: fill-box;

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center bg-[color-mix(in_srgb,currentColor_5%,transparent)] h-7.5 top-0 z-1999 sticky rounded-t-lg"
+    class="flex justify-start items-center bg-[color-mix(in_srgb,currentColor_5%,transparent)] h-7.5 top-0 z-1999 sticky rounded-t-default"
     data-test="trace-header"
     :style="
       isSidebarOpen && {
@@ -33,11 +33,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       {{ t('traces.traceHeader.operationName') }}
       <div
-        class="bg-(--o2-primary) inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
+        class="bg-accent inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
-        <OIcon name="drag-indicator" size="sm"  />
+        <OIcon name="drag-indicator" size="sm" class="text-white" />
       </div>
     </div>
     <div
@@ -77,10 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic absolute -top-0.75 w-px bg-[#cacaca] z-1 h-6.5"
+        class="trace-tic absolute -top-0.75 w-px bg-border-default z-1 h-6.5"
         :class="{
           'z-5 hidden': index === 0,
-          'bg-[#3c3c3c]': store.state.theme === 'dark',
         }"
         :key="tick.value + index"
         :style="{

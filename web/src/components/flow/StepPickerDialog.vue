@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OSearchInput
       v-model="search"
-      :placeholder="searchPlaceholder"
+      :placeholder="placeholderText"
       clearable
       class="mb-3"
       :data-test="testPrefix + '-search'"
@@ -51,18 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="item in filtered"
         :key="item.key"
         type="button"
-        class="flow-step-card flex items-start gap-3 p-3 border border-border-default rounded-lg bg-card-bg text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms]"
+        class="flow-step-card flex items-start gap-3 p-3 border border-border-default rounded-default bg-card-bg text-left cursor-pointer transition-[border-color,background,box-shadow] duration-[120ms] hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] hover:shadow-[0_0_0_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)]"
         :data-test="`${testPrefix}-${item.key}`"
         @click="emit('pick', item)"
       >
         <div
-          class="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-lg"
+          class="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-default"
           :class="item.iconTint"
         >
           <OIcon :name="item.icon || 'help'" size="md" />
         </div>
         <div class="min-w-0">
-          <div class="text-sm font-semibold text-text-primary">
+          <div class="text-sm font-semibold text-text-body">
             {{ item.title }}
           </div>
           <div v-if="item.description" class="text-xs text-text-secondary leading-snug">
@@ -73,13 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else class="py-8 text-center text-sm text-text-secondary">
-      {{ noMatchText }}
+      {{ emptyText }}
     </div>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -102,8 +103,11 @@ const props = withDefaults(
     testPrefix?: string;
   }>(),
   {
-    searchPlaceholder: "Search…",
-    noMatchText: "No matches",
+    // Empty, not English: t() cannot run at module scope (no setup context), so
+    // the locale fallback lives in the computeds below. A caller may still pass
+    // its own already-translated string.
+    searchPlaceholder: "",
+    noMatchText: "",
     testPrefix: "flow-step",
   },
 );
@@ -112,6 +116,15 @@ const emit = defineEmits<{
   (e: "pick", item: StepItem): void;
   (e: "close"): void;
 }>();
+
+const { t } = useI18n();
+
+const placeholderText = computed(
+  () => props.searchPlaceholder || (t("common.search") as string),
+);
+const emptyText = computed(
+  () => props.noMatchText || (t("common.noMatches") as string),
+);
 
 const search = ref("");
 const filtered = computed(() => {
@@ -124,15 +137,3 @@ const filtered = computed(() => {
   );
 });
 </script>
-
-<!--
-  Hover tint uses color-mix() over --color-* tokens (a computed blend Tailwind
-  can't express cleanly as a utility), so it stays a small scoped rule.
--->
-<style scoped>
-.flow-step-card:hover {
-  border-color: var(--color-primary-600);
-  background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-600) 12%, transparent);
-}
-</style>

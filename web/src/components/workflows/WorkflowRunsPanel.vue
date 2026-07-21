@@ -35,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="min-w-0">
         <div
-          class="text-[0.8125rem] font-semibold text-text-primary leading-tight"
+          class="text-sm font-semibold text-text-body leading-tight"
         >
           {{ t("workflow.history.title") }}
         </div>
         <div
           v-if="workflowName"
-          class="text-[0.6875rem] text-text-secondary truncate leading-tight"
+          class="text-xs text-text-secondary truncate leading-tight"
         >
           {{ workflowName }}
         </div>
@@ -103,8 +103,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-full h-full"
           @row-click="openRun"
         >
+          <!-- A failed fetch used to fall through to <NoData />, so "request
+               failed" and "this workflow has never run" looked identical and the
+               user had no way to retry. -->
           <template #empty>
-            <div class="py-10"><NoData /></div>
+            <div class="py-10">
+              <OEmptyState
+                v-if="loadError"
+                preset="load-error"
+                data-test="workflow-runs-load-error"
+                @action="fetchHistory"
+              />
+              <NoData v-else />
+            </div>
           </template>
 
           <template #cell-start_time="{ value }">
@@ -162,6 +173,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DateTime from "@/components/DateTime.vue";
 import WorkflowExecutionTimeline from "@/components/alerts/AlertHistoryTimeline.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import workflowService from "@/services/workflows";
 
@@ -180,6 +192,9 @@ const { t } = useI18n();
 const store = useStore();
 
 const loading = ref(false);
+// Distinguishes "the fetch failed" from "there are no runs" — the table's empty
+// slot renders a retryable error state for the former.
+const loadError = ref(false);
 const runs = ref<any[]>([]);
 
 // Default range: last 24 hours (user can widen it via the picker). Same shape as
@@ -197,15 +212,26 @@ const dateTimeValues = ref({
   endTime: now * 1000,
 });
 
-// mirrors AlertHistory.formatDuration (microseconds -> h/m/s).
+// mirrors AlertHistory.formatDuration (microseconds -> h/m/s). The unit
+// suffixes go through i18n rather than being concatenated, so a locale can
+// relabel or reorder them ("2h 5m" is not universal).
 const formatDuration = (microseconds: number) => {
-  if (!microseconds || microseconds <= 0) return "0s";
+  if (!microseconds || microseconds <= 0)
+    return t("workflow.history.durationZero");
   const seconds = Math.floor(microseconds / 1_000_000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
+  if (hours > 0)
+    return t("workflow.history.durationHoursMinutes", {
+      hours,
+      minutes: minutes % 60,
+    });
+  if (minutes > 0)
+    return t("workflow.history.durationMinutesSeconds", {
+      minutes,
+      seconds: seconds % 60,
+    });
+  return t("workflow.history.durationSeconds", { seconds });
 };
 
 // mirrors AlertHistory.getStatusVariant.
@@ -300,8 +326,12 @@ const fetchHistory = async () => {
       end_time: dateTimeValues.value.endTime,
     });
     runs.value = Array.isArray(res.data) ? res.data : [];
+    loadError.value = false;
   } catch (e: any) {
-    if (e?.response?.status !== 403) {
+    // 403 is "no permission", not a failure to load — keep the plain empty
+    // state for it rather than offering a retry that cannot succeed.
+    loadError.value = e?.response?.status !== 403;
+    if (loadError.value) {
       toast({ variant: "error", message: t("workflow.history.loadError") });
     }
     runs.value = [];

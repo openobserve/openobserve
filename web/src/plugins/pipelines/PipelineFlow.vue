@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div data-test="pipeline-flow-container" class="flex items-center justify-between">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-[#F5A623] border border-[#F5A623] rounded-sm flex items-center px-2 mr-3">
+     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-status-warning-text border border-status-warning-text rounded-default flex items-center px-2 mr-3">
       <OIcon name="info" class="mr-1 " size="sm" />
      Unsaved changes detected. Click "Save" to preserve your updates.
    </div>
 
    <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-white text-[#374151] py-[10px] px-4 rounded-lg text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-[#e5e7eb] flex items-center dark:bg-(--o2-primary-background) dark:text-[#f3f4f6] dark:border-[#374151] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] [animation:slideDown_0.3s_ease-out]">
+   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-default text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
      <OIcon name="info" class="mr-1" size="sm" />
      Press Backspace/Delete to remove the edge
    </div>
@@ -77,9 +77,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :is-in-view = false
       />
     </template>
+      <!-- Drag-over highlight: same role as OFile's drop target, so it shares
+           --color-file-drag-bg (theme-aware; the old raw blue had no dark step).
+           Stays a binding because the fill is driven by isDragOver at runtime. -->
       <DropzoneBackground
         :style="{
-          backgroundColor: isDragOver ? '#e7f3ff' : 'transparent',
+          backgroundColor: isDragOver
+            ? 'var(--color-file-drag-bg)'
+            : 'transparent',
           transition: 'background-color 0.2s ease',
         }"
       >
@@ -101,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         position="top-left">
     </Controls>
     </VueFlow>
-    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#888] text-[1.5em] text-center pointer-events-none z-10">
+    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-text-muted text-[1.5em] text-center pointer-events-none z-10">
       {{ t('pipeline.dragDropNodesHere') }}
     </div>
     <!-- Add UI elements or buttons to interact with the methods -->
@@ -229,11 +234,16 @@ function resetTransform() {
 };
 </script>
 
-<style>
-@keyframes slideDown {
+<style scoped>
+/* keep(keyframes): entry animation for the edge-deletion help toast; the animation reference must live in this scoped block (not a Tailwind utility) so Vue's scoped keyframe-name hashing resolves it */
+.edge-help-notification {
+  animation: pipeline-flow-slide-down 0.3s ease-out;
+}
+
+@keyframes pipeline-flow-slide-down {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-10px);
+    transform: translateX(-50%) translateY(-0.625rem);
   }
   to {
     opacity: 1;

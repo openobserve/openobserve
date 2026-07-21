@@ -1,6 +1,6 @@
 <template>
   <div data-test="promql-metric-selector" class="mb-2">
-    <div style="display: flex; flex-direction: row" class="pl-3">
+    <div class="pl-3 flex flex-row">
       <div
         data-test="promql-metric-selector-label"
         class="text-sm whitespace-nowrap flex items-center min-w-32.5"

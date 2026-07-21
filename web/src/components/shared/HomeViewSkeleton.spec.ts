@@ -17,7 +17,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import HomeViewSkeleton from "./HomeViewSkeleton.vue";
 import { createStore } from "vuex";
-import SkeletonBox from "./SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 
 describe("HomeViewSkeleton", () => {
@@ -36,7 +36,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -49,15 +49,15 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const featureCard = wrapper.find('[data-test="home-view-skeleton-streams-container"]');
-    expect(featureCard.exists()).toBe(true);
-    const firstChart = wrapper.find(".first-chart-container");
-    expect(firstChart.classes()).toContain("[--tile-bg:#ffffff]");
+    const streamsHeader = wrapper.find('[data-test="home-view-skeleton-streams-header"]');
+    expect(streamsHeader.exists()).toBe(true);
+    const firstChart = wrapper.findAll('[data-test="home-view-skeleton-chart"]')[0];
+    expect(firstChart.classes()).toContain("bg-card-glass-bg");
   });
 
   it("should render with dark theme", () => {
@@ -71,15 +71,16 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [darkStore],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const featureCard = wrapper.find('[data-test="home-view-skeleton-streams-container"]');
-    expect(featureCard.exists()).toBe(true);
-    const firstChart = wrapper.find(".first-chart-container");
-    expect(firstChart.classes()).toContain("[--tile-bg:#2b2c2d]");
+    const streamsHeader = wrapper.find('[data-test="home-view-skeleton-streams-header"]');
+    expect(streamsHeader.exists()).toBe(true);
+    const firstChart = wrapper.findAll('[data-test="home-view-skeleton-chart"]')[0];
+    // Glass surface uses a single semantic token; class is theme-independent now.
+    expect(firstChart.classes()).toContain("bg-card-glass-bg");
   });
 
   it("should render streams header", () => {
@@ -87,7 +88,7 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
@@ -101,15 +102,12 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const tilesGrid = wrapper.find(".tiles-grid");
-    expect(tilesGrid.exists()).toBe(true);
-
-    const tiles = tilesGrid.findAll('[data-test="home-view-skeleton-tile"]');
+    const tiles = wrapper.findAll('[data-test="home-view-skeleton-tile"]');
     expect(tiles).toHaveLength(5);
   });
 
@@ -118,15 +116,18 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
     const tiles = wrapper.findAll('[data-test="home-view-skeleton-tile"]');
+    expect(tiles).toHaveLength(5);
     tiles.forEach((tile) => {
-      const tileContent = tile.find(".tile-content");
-      expect(tileContent.exists()).toBe(true);
+      // Each tile is a vertical flex column carrying its skeleton placeholders.
+      expect(tile.classes()).toContain("flex");
+      expect(tile.classes()).toContain("flex-col");
+      expect(tile.findAll("o-skeleton-stub").length).toBe(3);
     });
   });
 
@@ -135,41 +136,42 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const chartsContainer = wrapper.find(".charts-main-container");
-    expect(chartsContainer.exists()).toBe(true);
+    const charts = wrapper.findAll('[data-test="home-view-skeleton-chart"]');
+    expect(charts).toHaveLength(2);
   });
 
-  it("should render functions and dashboards column", () => {
+  it("should render resources rail column", () => {
     const wrapper = mount(HomeViewSkeleton, {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const functionsColumn = wrapper.find(".functions-dashboards-column");
-    expect(functionsColumn.exists()).toBe(true);
+    const rail = wrapper.find('[data-test="home-view-skeleton-rail"]');
+    expect(rail.exists()).toBe(true);
+    expect(rail.classes()).toContain("bg-card-glass-bg");
   });
 
-  it("should render two tile wrappers in functions-dashboards column", () => {
+  it("should render two chart cards in the main region", () => {
     const wrapper = mount(HomeViewSkeleton, {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const tileWrappers = wrapper.findAll(".tile-wrapper");
-    expect(tileWrappers.length).toBeGreaterThanOrEqual(2);
+    const chartCards = wrapper.findAll('[data-test="home-view-skeleton-chart"]');
+    expect(chartCards).toHaveLength(2);
   });
 
   it("should render first chart container", () => {
@@ -177,12 +179,12 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const firstChart = wrapper.find(".first-chart-container");
+    const firstChart = wrapper.findAll('[data-test="home-view-skeleton-chart"]')[0];
     expect(firstChart.exists()).toBe(true);
   });
 
@@ -191,26 +193,26 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const secondChart = wrapper.find(".second-chart-container");
+    const secondChart = wrapper.findAll('[data-test="home-view-skeleton-chart"]')[1];
     expect(secondChart.exists()).toBe(true);
   });
 
-  it("should render SkeletonBox components", () => {
+  it("should render OSkeleton components", () => {
     const wrapper = mount(HomeViewSkeleton, {
       global: {
         plugins: [store],
         components: {
-          SkeletonBox,
+          OSkeleton,
         },
       },
     });
 
-    const skeletonBoxes = wrapper.findAllComponents(SkeletonBox);
+    const skeletonBoxes = wrapper.findAllComponents(OSkeleton);
     expect(skeletonBoxes.length).toBeGreaterThan(0);
   });
 
@@ -219,30 +221,34 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const firstChart = wrapper.find(".first-chart-container");
-    const secondChart = wrapper.find(".second-chart-container");
+    const charts = wrapper.findAll('[data-test="home-view-skeleton-chart"]');
+    expect(charts).toHaveLength(2);
 
-    expect(firstChart.classes()).toContain("[--tile-bg:#ffffff]");
-    expect(secondChart.classes()).toContain("[--tile-bg:#ffffff]");
+    expect(charts[0].classes()).toContain("bg-card-glass-bg");
+    expect(charts[1].classes()).toContain("bg-card-glass-bg");
   });
 
-  it("should render details container in chart sections", () => {
+  it("should render skeleton placeholders in each chart section", () => {
     const wrapper = mount(HomeViewSkeleton, {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    const detailsContainers = wrapper.findAll(".details-container");
-    expect(detailsContainers.length).toBeGreaterThanOrEqual(2);
+    const charts = wrapper.findAll('[data-test="home-view-skeleton-chart"]');
+    expect(charts).toHaveLength(2);
+    charts.forEach((chart) => {
+      // Header (3), stats row (4) and chart area (1) => 8 skeleton stubs each.
+      expect(chart.findAll("o-skeleton-stub").length).toBe(8);
+    });
   });
 
   it("should have correct structure for responsive layout", () => {
@@ -250,17 +256,16 @@ describe("HomeViewSkeleton", () => {
       global: {
         plugins: [store],
         stubs: {
-          SkeletonBox: true,
+          OSkeleton: true,
         },
       },
     });
 
-    // The skeleton intentionally has NO outer card-container border: it must
-    // match the loaded UsageTab content (which is borderless), otherwise a
-    // border flashes only while loading and disappears once data arrives.
-    expect(wrapper.find(".card-container").exists()).toBe(false);
+    // The skeleton mirrors the loaded UsageTab: KPI tiles, the resources rail
+    // and both chart cards all sit on the card-glass surface.
+    expect(wrapper.find(".bg-card-glass-bg").exists()).toBe(true);
 
-    const chartsContainer = wrapper.find(".charts-main-container");
-    expect(chartsContainer.exists()).toBe(true);
+    const charts = wrapper.findAll('[data-test="home-view-skeleton-chart"]');
+    expect(charts).toHaveLength(2);
   });
 });

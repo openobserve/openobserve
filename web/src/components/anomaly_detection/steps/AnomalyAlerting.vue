@@ -17,10 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="step-anomaly-alerting h-full"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
   >
     <div
-      class="step-content px-3 py-4 rounded-lg h-full overflow-y-auto border bg-[var(--color-surface-overlay)] border-[var(--color-border-default)]"
+      class="step-content px-3 py-4 rounded-default h-full overflow-y-auto border bg-surface-overlay border-border-default"
     >
       <!-- Enable Notifications toggle -->
       <div class="flex items-start mb-6!  pb-0!">
@@ -32,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="info"
             size="sm"
-            class="ml-1 cursor-pointer text-gray-400"
+            class="ml-1 cursor-pointer text-icon-color"
           >
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
@@ -56,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           style="width: 190px; height: 36px"
         >
           {{ t("alerts.destination") }}
-          <span class="text-red-500 ml-1">*</span>
+          <span class="text-status-error-text ml-1">*</span>
         </div>
         <div class="flex flex-col">
           <div class="flex items-center">
@@ -93,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index === visibleChipCount &&
                     config.alert_destination_ids.length > visibleChipCount
                   "
-                  class="text-[13px] text-gray-500 ml-1 whitespace-nowrap"
+                  class="text-compact text-text-secondary ml-1 whitespace-nowrap"
                 >
                   +{{ config.alert_destination_ids.length - visibleChipCount }}
                 </span>
@@ -135,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="!config.alert_enabled"
         class="flex items-start gap-2 text-xs mt-2"
-        :class="store.state.theme === 'dark' ? 'text-gray-400' : 'text-gray-400'"
+        :class="'text-text-secondary'"
       >
         <OIcon name="info" size="sm"
 class="mt-px flex-shrink-0" />

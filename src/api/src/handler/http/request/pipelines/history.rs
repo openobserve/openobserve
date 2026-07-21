@@ -428,6 +428,16 @@ pub async fn get_pipeline_history(
     {
         Ok(result) => result.total,
         Err(e) => {
+            // Triggers stream doesn't exist yet (no pipeline has ever fired in this org).
+            let msg = e.to_string().to_lowercase();
+            if msg.contains("stream not found") || msg.contains("not found") {
+                return MetaHttpResponse::json(PipelineHistoryResponse {
+                    total: 0,
+                    from,
+                    size,
+                    hits: vec![],
+                });
+            }
             log::error!("Failed to get pipeline history count: {}", e);
             return MetaHttpResponse::internal_error(format!(
                 "Failed to get pipeline history count: {e}"

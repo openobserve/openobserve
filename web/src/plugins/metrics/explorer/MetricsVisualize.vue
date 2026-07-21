@@ -18,10 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Visualize mode for the Metrics explorer — a query-driven workspace.
 
   This is the SAME dashboard PanelEditor the metrics editor route (plugins/metrics
-  /Index.vue) mounts in production, run in a constrained in-page configuration:
-  editMode, a metrics-appropriate allowedChartTypes set, and the metrics defaults
-  (line + promql + query bar on). So the chart the user builds here is exactly the
-  one they get on a dashboard, and it inherits right-click → Create Alert for free.
+  /Index.vue) mounts in production, run in-page with editMode and the metrics
+  defaults (line + promql + query bar on). Chart types are NOT restricted — the
+  same full set AddPanel offers, gated only by ChartSelection's own PromQL rules.
+  So the chart the user builds here is exactly the one they get on a dashboard,
+  and it inherits right-click → Create Alert for free.
 
   The Explore label-filter bar is hidden in this mode (the parent gates it): in
   Visualize the PromQL query carries its own matchers, so a separate filter bar is
@@ -36,7 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :dashboard-data="{}"
       :variables-data="{}"
       :selected-date-time="dashboardPanelData.meta.dateTime"
-      :allowed-chart-types="allowedChartTypes"
       @add-to-dashboard="onAddToDashboard"
       @chart-api-error="onChartApiError"
     />
@@ -106,18 +106,6 @@ export default defineComponent({
 
     const panelEditorRef = ref<any>(null);
     const showAddToDashboardDialog = ref(false);
-
-    // A metrics-appropriate subset — the chart types that make sense for a
-    // PromQL time series. Mirrors the logs visualize constraint.
-    const allowedChartTypes = [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "table",
-    ];
 
     // Same defaults the metrics editor route applies: a line chart driven by a
     // promql query, with the query bar shown so the user can type PromQL.
@@ -258,7 +246,6 @@ export default defineComponent({
       panelEditorRef,
       dashboardPanelData,
       showAddToDashboardDialog,
-      allowedChartTypes,
       onAddToDashboard,
       onChartApiError,
       runQuery,

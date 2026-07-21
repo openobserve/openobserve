@@ -361,9 +361,6 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
             "router-view": true
           }
         }
@@ -379,9 +376,6 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
             "router-view": true
           }
         }

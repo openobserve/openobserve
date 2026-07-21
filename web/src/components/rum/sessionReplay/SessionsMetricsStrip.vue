@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       type="button"
-      class="metric-card flex flex-col items-start gap-0.5 text-left rounded-lg border p-3 transition-colors"
+      class="metric-card flex flex-col items-start gap-0.5 text-left rounded-default border p-3 transition-colors bg-card-glass-bg enabled:cursor-pointer enabled:hover:border-accent disabled:cursor-default"
       :class="
         card.key === activeCard
-          ? 'border-[var(--o2-primary-color)]'
+          ? 'border-accent'
           : 'border-border-default'
       "
       :aria-pressed="card.key === activeCard"
@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="card.selectable && emit('select', card.key)"
     >
       <span
-        class="text-xs font-medium uppercase tracking-wide text-[var(--o2-text-label)]"
+        class="text-xs font-medium uppercase tracking-wide text-text-label"
         >{{ card.label }}</span
       >
       <span class="flex items-baseline gap-1.5">
@@ -48,11 +48,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
         <span
           v-if="card.rate"
-          class="text-sm text-[var(--o2-text-secondary)] tabular-nums"
+          class="text-sm text-text-secondary tabular-nums"
           >· {{ card.rate }}</span
         >
       </span>
-      <small :class="card.captionClass || 'text-[var(--o2-text-caption)]'">{{
+      <small :class="card.captionClass || 'text-text-secondary'">{{
         card.caption
       }}</small>
     </button>
@@ -128,10 +128,10 @@ const deltaCaption = (
     // More sessions is neutral; more errors/frustration is bad, fewer is good.
     captionClass:
       suffix === "%"
-        ? "text-[var(--o2-text-caption)]"
+        ? "text-text-secondary"
         : delta > 0
-          ? "text-[var(--o2-status-error-text)]"
-          : "text-[var(--o2-status-success-text)]",
+          ? "text-status-error-text"
+          : "text-status-success-text",
   };
 };
 
@@ -140,7 +140,7 @@ const cards = computed(() => [
     key: "sessions" as const,
     label: t("rum.sessions"),
     value: props.total.toLocaleString(),
-    valueClass: "text-[var(--o2-text-heading)]",
+    valueClass: "text-text-body",
     rate: "",
     ...deltaCaption(props.sessionsDeltaPct, t("rum.inTimeRange"), "%"),
     selectable: true,
@@ -151,8 +151,8 @@ const cards = computed(() => [
     value: props.errorSessions.toLocaleString(),
     valueClass:
       props.errorSessions > 0
-        ? "text-[var(--o2-severity-error-color)]"
-        : "text-[var(--o2-text-heading)]",
+        ? "text-severity-error-color"
+        : "text-text-body",
     rate: rate(props.errorSessions),
     ...deltaCaption(props.errorsDelta, t("rum.sessionsWithErrors")),
     selectable: true,
@@ -163,8 +163,8 @@ const cards = computed(() => [
     value: props.frustratedSessions.toLocaleString(),
     valueClass:
       props.frustratedSessions > 0
-        ? "text-[var(--o2-severity-warning-color)]"
-        : "text-[var(--o2-text-heading)]",
+        ? "text-severity-warning-color"
+        : "text-text-body",
     rate: rate(props.frustratedSessions),
     ...deltaCaption(props.frustratedDelta, t("rum.rageDeadClicks")),
     selectable: true,
@@ -173,7 +173,7 @@ const cards = computed(() => [
     key: "duration" as const,
     label: t("rum.avgDuration"),
     value: formatMs(props.avgDurationMs),
-    valueClass: "text-[var(--o2-text-heading)]",
+    valueClass: "text-text-body",
     rate: "",
     caption: `${t("rum.median")} ${formatMs(props.medianDurationMs)}`,
     captionClass: "",
@@ -183,7 +183,7 @@ const cards = computed(() => [
     key: "bounced" as const,
     label: t("rum.bounceRate"),
     value: bounceRate.value,
-    valueClass: "text-[var(--o2-text-heading)]",
+    valueClass: "text-text-body",
     rate: "",
     caption: t("rum.ofTotal", {
       count: props.bouncedSessions,
@@ -195,20 +195,3 @@ const cards = computed(() => [
 ]);
 </script>
 
-<style scoped lang="scss">
-.metric-card {
-  background: var(--o2-card-bg);
-
-  &:not(:disabled) {
-    cursor: pointer;
-
-    &:hover {
-      border-color: var(--o2-primary-color);
-    }
-  }
-
-  &:disabled {
-    cursor: default;
-  }
-}
-</style>

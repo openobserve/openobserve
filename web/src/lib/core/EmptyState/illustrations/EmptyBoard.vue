@@ -39,10 +39,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- drifting + confetti -->
-    <g class="es-cf es-cf-a [transform-box:fill-box] origin-center [animation:es-cf_5s_ease-in-out_infinite]" transform="translate(196 40)" stroke="var(--color-primary-400)" stroke-width="3" stroke-linecap="round">
+    <g class="es-cf es-cf-a [transform-box:fill-box] origin-center" transform="translate(196 40)" stroke="var(--color-primary-400)" stroke-width="3" stroke-linecap="round">
       <line x1="-5" y1="0" x2="5" y2="0" /><line x1="0" y1="-5" x2="0" y2="5" />
     </g>
-    <g class="es-cf es-cf-b [transform-box:fill-box] origin-center [animation:es-cf_6.2s_ease-in-out_infinite] [animation-delay:-2.4s]" transform="translate(40 56)" stroke="var(--color-primary-300)" stroke-width="3" stroke-linecap="round">
+    <g class="es-cf es-cf-b [transform-box:fill-box] origin-center" transform="translate(40 56)" stroke="var(--color-primary-300)" stroke-width="3" stroke-linecap="round">
       <line x1="-4" y1="0" x2="4" y2="0" /><line x1="0" y1="-4" x2="0" y2="4" />
     </g>
 
@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </g>
 
     <!-- sparkle near the slot -->
-    <g class="es-spark [transform-box:fill-box] origin-center [animation:es-twinkle_2.6s_ease-in-out_infinite] [animation-delay:-0.6s]" transform="translate(190 92)">
+    <g class="es-spark [transform-box:fill-box] origin-center" transform="translate(190 92)">
       <path d="M0 -6 L1.4 -1.4 L6 0 L1.4 1.4 L0 6 L-1.4 1.4 L-6 0 L-1.4 -1.4 Z" fill="var(--color-primary-400)" />
     </g>
   </svg>
@@ -81,7 +81,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose (W2.b): the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 @keyframes es-twinkle {
   0%,
   100% {
@@ -105,11 +111,34 @@ withDefaults(
   }
 }
 
-.es-static :where(.es-spark, .es-cf) {
+/* Animations MUST start from this block, not from a template arbitrary utility:
+   Vue's scoped compiler rewrites `@keyframes es-cf` -> `es-cf-<hash>` and rewrites
+   `animation:` in THIS block to match, but it cannot rewrite a class string in the
+   template — an `[animation:es-cf_5s_...]` utility there would reference a name
+   that no longer exists, silently killing the motion. */
+.es-cf-a {
+  animation: es-cf 5s ease-in-out infinite;
+}
+.es-cf-b {
+  animation: es-cf 6.2s ease-in-out infinite;
+  animation-delay: -2.4s;
+}
+.es-spark {
+  animation: es-twinkle 2.6s ease-in-out infinite;
+  animation-delay: -0.6s;
+}
+
+/* Gates must out-specify the rules above. `:where()` adds 0 specificity, so a
+   `:where(.es-spark, .es-cf)` gate would score only (0,1,0) from the scoped
+   attribute and LOSE to `.es-spark[data-v]` (0,2,0) — plain lists score (0,2,0)
+   / (0,3,0) and win. */
+.es-static .es-spark,
+.es-static .es-cf {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.es-spark, .es-cf) {
+  .es-spark,
+  .es-cf {
     animation: none;
   }
 }

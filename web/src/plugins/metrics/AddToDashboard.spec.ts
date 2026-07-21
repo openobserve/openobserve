@@ -164,17 +164,6 @@ const createWrapper = (props: Record<string, any> = {}) => {
             submit() { (this as any).$emit("submit", {}); },
           },
         },
-        QForm: {
-          template:
-            "<form class='q-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
-          emits: ["submit"],
-        },
-        QInput: {
-          template:
-            "<input class='q-input' :data-test='$attrs[\"data-test\"]' :value='modelValue' @input='$emit(\"update:modelValue\", $event.target.value)' />",
-          props: ["modelValue", "label", "rules", "lazyRules", "stackLabel"],
-          emits: ["update:modelValue"],
-        },
         SelectFolderDropdown: {
           template:
             "<div class='select-folder-dropdown' @click='$emit(\"folder-selected\", { value: \"folder-1\", label: \"Folder 1\" })'></div>",
@@ -320,8 +309,6 @@ describe("AddToDashboard — props", () => {
       global: {
         stubs: {
           ODialog: ODialogStub,
-          QForm: true,
-          QInput: true,
           SelectFolderDropdown: true,
           SelectDashboardDropdown: true,
           SelectTabDropdown: true,

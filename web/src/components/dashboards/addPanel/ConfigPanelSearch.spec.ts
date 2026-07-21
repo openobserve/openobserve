@@ -51,7 +51,7 @@ describe("ConfigPanelSearch", () => {
   // -------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("renders a q-input element", () => {
+    it("renders a search input element", () => {
       expect(wrapper.find("#dashboard-config-panel-search-input").exists()).toBe(true);
     });
 

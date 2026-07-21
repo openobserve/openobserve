@@ -595,7 +595,7 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         return;
     }
     match get_nats_lock(format!(
-        "workflow-trigger-{:?}-handler",
+        "/workflow-trigger-{:?}-handler",
         trigger.trigger_type
     ))
     .await

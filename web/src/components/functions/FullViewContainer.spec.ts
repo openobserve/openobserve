@@ -69,16 +69,16 @@ describe('FullViewContainer.vue', () => {
       expect(wrapper.text()).toContain('Custom Label');
     });
 
-    it('applies light theme styles by default', () => {
+    it('applies semantic header background by default', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      expect(container.classes()).toContain('bg-gray-200');
+      expect(container.classes()).toContain('bg-section-header-bg');
     });
 
-    it('applies dark theme styles when theme is dark', () => {
+    it('applies the same semantic header background when theme is dark', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
       const container = wrapper.find('div');
-      expect(container.classes()).toContain('bg-gray-500');
+      expect(container.classes()).toContain('bg-section-header-bg');
     });
 
     it('shows expand icon when showExpandIcon is true', () => {
@@ -170,34 +170,34 @@ describe('FullViewContainer.vue', () => {
 
     it('applies custom label class', () => {
       wrapper = createWrapper({ labelClass: 'text-red-500' });
-      const label = wrapper.find('.text-\\[14px\\]');
+      const label = wrapper.find('.text-sm.font-bold');
       expect(label.classes()).toContain('text-red-500');
     });
   });
 
   describe('Theme Handling', () => {
-    it('applies correct text color for light theme', () => {
+    it('applies semantic text color for light theme', () => {
       wrapper = createWrapper({}, { theme: 'light' });
-      const label = wrapper.find('.text-\\[14px\\]');
-      expect(label.classes()).toContain('text-gray-500');
+      const label = wrapper.find('.text-sm.font-bold');
+      expect(label.classes()).toContain('text-text-secondary');
     });
 
-    it('applies correct text color for dark theme', () => {
+    it('applies semantic text color for dark theme', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
-      const label = wrapper.find('.text-\\[14px\\]');
-      expect(label.classes()).toContain('text-gray-100');
+      const label = wrapper.find('.text-sm.font-bold');
+      expect(label.classes()).toContain('text-text-secondary');
     });
 
-    it('applies correct icon color for light theme', () => {
+    it('applies semantic icon color for light theme', () => {
       wrapper = createWrapper({}, { theme: 'light' });
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).toContain('text-gray-500');
+      expect(icon.classes()).toContain('text-text-secondary');
     });
 
-    it('applies correct icon color for dark theme', () => {
+    it('applies semantic icon color for dark theme', () => {
       wrapper = createWrapper({}, { theme: 'dark' });
       const icon = wrapper.find('.OIcon-stub');
-      expect(icon.classes()).toContain('text-gray-100');
+      expect(icon.classes()).toContain('text-text-secondary');
     });
   });
 
@@ -214,7 +214,7 @@ describe('FullViewContainer.vue', () => {
 
     it('emits update:isExpanded when label is clicked and showExpandIcon is true', async () => {
       wrapper = createWrapper({ isExpanded: false, showExpandIcon: true });
-      const label = wrapper.find('.text-\\[14px\\]');
+      const label = wrapper.find('.text-sm.font-bold');
 
       await label.trigger('click');
 
@@ -224,7 +224,7 @@ describe('FullViewContainer.vue', () => {
 
     it('does not emit update:isExpanded when label is clicked and showExpandIcon is false', async () => {
       wrapper = createWrapper({ isExpanded: false, showExpandIcon: false });
-      const label = wrapper.find('.text-\\[14px\\]');
+      const label = wrapper.find('.text-sm.font-bold');
 
       await label.trigger('click');
 
@@ -453,7 +453,7 @@ describe('FullViewContainer.vue', () => {
     it('applies correct base container classes', () => {
       wrapper = createWrapper();
       const container = wrapper.find('div');
-      expect(container.classes()).toContain('py-[2px]');
+      expect(container.classes()).toContain('py-0.5');
     });
 
     it('applies correct flex layout classes', () => {
@@ -464,7 +464,7 @@ describe('FullViewContainer.vue', () => {
 
     it('applies correct label styling classes', () => {
       wrapper = createWrapper();
-      const label = wrapper.find('.text-\\[14px\\]');
+      const label = wrapper.find('.text-sm.font-bold');
       expect(label.classes()).toContain('font-bold');
     });
 
@@ -486,7 +486,7 @@ describe('FullViewContainer.vue', () => {
     it('provides clickable elements for keyboard navigation', () => {
       wrapper = createWrapper();
       const icon = wrapper.find('.OIcon-stub');
-      const label = wrapper.find('.text-\\[14px\\]');
+      const label = wrapper.find('.text-sm.font-bold');
 
       expect(icon.classes()).toContain('cursor-pointer');
       // Label should be clickable when showExpandIcon is true

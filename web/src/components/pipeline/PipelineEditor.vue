@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="w-full h-full pr-[0.625rem]">
-    <div class="card-container h-[calc(100vh-50px)]">
+  <div class="w-full h-full pr-2.5">
+    <div class="bg-card-glass-bg h-[calc(100vh-50px)]">
       <!-- The shell (Functions.vue) renders the "Pipelines › <name>" breadcrumb
            header; we contribute the editor actions to it via the portal and the
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
@@ -79,8 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           id="pipelineChartContainer"
           ref="chartContainerRef"
-          class="relative-position pipeline-chart-container o2vf_node h-[82.6vh] rounded-xl w-[calc(100%-200px)]"
-          :class="store.state.theme === 'dark' ? '' : 'bg-gray-100'"
+          class="relative-position pipeline-chart-container o2vf_node h-[82.6vh] rounded-default w-[calc(100%-200px)] bg-surface-subtle dark:bg-transparent"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
         >
           <PipelineFlow />
@@ -130,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @close="closeStepPicker"
   />
   <ODrawer data-test="pipeline-editor-json-editor-drawer"
+    bleed
     v-model:open="showJsonEditorDialog"
     :width="70"
     :title="t('pipeline.editPipelineJSON')"
@@ -141,12 +141,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
         @click="toggleJsonEditorAIChat"
         data-test="menu-link-ai-item"
-        class="ai-hover-btn"
+        class="group [background:var(--color-gradient-ai-subtle)]! text-ai-accent! dark:text-white! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         :class="store.state.isAiChatEnabled ? 'ai-btn-active' : ''"
         @mouseenter="isJsonEditorAiHovered = true"
         @mouseleave="isJsonEditorAiHovered = false"
       >
-        <img :src="jsonEditorAiBtnLogo" class="header-icon ai-icon" style="width:20px;height:20px;" />
+        <img :src="jsonEditorAiBtnLogo" class="header-icon size-5 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" />
       </OButton>
     </template>
     <JsonEditor
@@ -191,6 +191,7 @@ import AssociateFunction from "@/components/pipeline/NodeForm/AssociateFunction.
 import functionsService from "@/services/jstransform";
 
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import pipelineService from "@/services/pipelines";
 import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -323,6 +324,7 @@ const pipeline = ref<Pipeline>({
 
 const router = useRouter();
 const store = useStore();
+const { isDark } = useTheme();
 
 const confirmDialogMeta: any = ref({
   show: false,
@@ -406,10 +408,12 @@ const stepItems = computed(() =>
       title: n.label,
       description: n.tooltip,
       icon: n.icon,
+      // Soft badge tokens, not raw hex: the old literals had no dark variant, so
+      // these tints stayed light-mode colours on a dark canvas.
       iconTint:
         n.io_type === "output"
-          ? "bg-[#e6f6ee] text-[#1f9d63]"
-          : "bg-[#fdf3e2] text-[#e0891d]",
+          ? "bg-badge-success-soft-bg text-badge-success-soft-text"
+          : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
       subtype: n.subtype,
       io_type: n.io_type,
     })),
@@ -471,7 +475,7 @@ const jsonEditorAiBtnLogo = computed(() => {
   if (isJsonEditorAiHovered.value || store.state.isAiChatEnabled) {
     return getImageURL('images/common/ai_icon_dark.svg');
   }
-  return store.state.theme === 'dark'
+  return isDark.value
     ? getImageURL('images/common/ai_icon_dark.svg')
     : getImageURL('images/common/ai_icon_gradient.svg');
 });
@@ -493,7 +497,7 @@ const validationErrors = ref<string[]>([]);
 
 const { track } = useReo();
 
-// ── Pipeline name: OForm-owned (migrated from the store-driven OInput) ───────
+// ── Pipeline name: OForm-owned ───────────────────────────────────────────────
 // The name input is a headless OForm so the teleported <OFormInput> validates
 // via the schema (submit-then-change timing; the inline error appears on the
 // first save attempt). `currentSelectedPipeline.name` stays the PERSISTED field
@@ -1244,17 +1248,25 @@ const cleanupPipelinesContextProvider = () => {
 </script>
 
 <style>
-/* Global rule to eliminate ALL transitions during any Vue Flow drag operation */
+/* keep(lib-override:vue-flow): every rule below reaches DOM this component does
+   not render. `.vue-flow__*` are Vue Flow's own internals, emitted inside the
+   async <PipelineFlow> child — and the two `.vue-flow.dragging` / `.vue-flow:has()`
+   rules target the canvas ROOT, which is not in this template at all, so neither
+   scoping nor :deep() can reach them. `o2vf_node_*` is the shared pipeline
+   node-type convention: the same class names are now produced by the shared
+   NodePalette (which replaced NodeSidebar.vue), so this block must stay unscoped
+   and keep riding those names rather than moving to colocated utilities.
+
+   The `transition: none` blocks kill drag lag; NOTE: never set `transform: none`
+   here — Vue Flow positions each node via an inline `transform: translate(x, y)`,
+   so zeroing it would snap the node to the canvas origin mid-drag and only
+   restore on release. */
 .vue-flow.dragging *,
 .vue-flow:has(.vue-flow__node:active) * {
   transition: none !important;
   animation: none !important;
 }
 
-/* Ensure dragging nodes have zero lag.
-   NOTE: never set `transform: none` here — Vue Flow positions each node via an
-   inline `transform: translate(x, y)`, so zeroing it would snap the node to the
-   canvas origin mid-drag and only restore on release. */
 .vue-flow__node.dragging,
 .vue-flow__node:active {
   transition: none !important;
@@ -1268,17 +1280,17 @@ const cleanupPipelinesContextProvider = () => {
 }
 
 .o2vf_node .vue-flow__node {
-  padding: 8px 16px;
+  padding: 0.5rem 1rem;
   width: auto;
-  min-height: 44px;
+  min-height: 2.75rem;
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-surface);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 8%, transparent);
   cursor: grab;
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
+  background: var(--color-surface-base);
+  backdrop-filter: blur(0.625rem);
 }
 
 .o2vf_node .vue-flow__node:active,
@@ -1294,15 +1306,15 @@ const cleanupPipelinesContextProvider = () => {
 
 .o2vf_node .o2vf_node_input,
 .o2vf_node .vue-flow__node-input {
-  border: 1px solid #60a5fa;
-  color: var(--color-grey-800);
-  border-radius: 12px;
-  background: rgba(239, 246, 255, 0.8);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+  border: 1px solid var(--color-status-info-text);
+  color: var(--color-text-body);
+  border-radius: var(--radius-surface);
+  background: var(--color-status-info-bg);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
-  min-height: 36px;
-  padding: 8px 16px;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
 }
 
 .o2vf_node .o2vf_node_input:active,
@@ -1322,20 +1334,20 @@ const cleanupPipelinesContextProvider = () => {
 
 .o2vf_node .vue-flow__node-output {
   cursor: grab;
-  min-height: 36px;
-  padding: 8px 16px;
-  border: 1px solid rgba(74, 222, 128, 0.4);
-  color: var(--color-grey-800);
-  border-radius: 8px;
-  background: rgba(240, 253, 244, 0.9);
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.1);
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--color-status-positive);
+  color: var(--color-text-body);
+  border-radius: var(--radius-surface);
+  background: var(--color-status-success-bg);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-status-positive) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .o2vf_node .vue-flow__node-output:hover {
-  background: rgba(240, 253, 244, 1);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2);
-  border-color: rgba(74, 222, 128, 0.6);
+  background: var(--color-status-success-bg);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-positive) 20%, transparent);
+  border-color: var(--color-status-positive);
 }
 
 .o2vf_node .vue-flow__node-output:active,
@@ -1351,22 +1363,22 @@ const cleanupPipelinesContextProvider = () => {
 
 .o2vf_node .o2vf_node_default,
 .o2vf_node .vue-flow__node-default {
-  border: 1px solid #f59e0b;
-  color: var(--color-grey-800);
-  border-radius: 12px;
-  background: rgba(255, 251, 235, 0.8);
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.1);
+  border: 1px solid var(--color-status-warning-text);
+  color: var(--color-text-body);
+  border-radius: var(--radius-surface);
+  background: var(--color-status-warning-bg);
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
   transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
   cursor: grab;
-  min-height: 36px;
-  padding: 8px 16px;
+  min-height: 2.25rem;
+  padding: 0.5rem 1rem;
 }
 
 .o2vf_node .o2vf_node_default:hover,
 .o2vf_node .vue-flow__node-default:hover {
-  border: 1px solid #f59e0b !important;
-  background: rgba(255, 251, 235, 0.95) !important;
-  box-shadow: 0 6px 16px rgba(217, 119, 6, 0.2) !important;
+  border: 1px solid var(--color-status-warning-text) !important;
+  background: var(--color-status-warning-bg) !important;
+  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-status-warning-text) 20%, transparent) !important;
 }
 
 .o2vf_node .o2vf_node_default:active,
@@ -1382,49 +1394,5 @@ const cleanupPipelinesContextProvider = () => {
 .o2vf_node .vue-flow__node-default:active *,
 .o2vf_node .vue-flow__node-default.dragging * {
   transition: none !important;
-}
-
-.dark .vue-flow__node-input,
-.dark .o2vf_node_input {
-  background: rgba(30, 58, 138, 0.2) !important;
-  border: 1px solid rgba(96, 165, 250, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
-}
-
-.dark .vue-flow__node-input:hover,
-.dark .o2vf_node_input:hover {
-  background: rgba(30, 58, 138, 0.3) !important;
-  border-color: rgba(96, 165, 250, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.2) !important;
-}
-
-.dark .vue-flow__node-output,
-.dark .o2vf_node_output {
-  background: rgba(20, 83, 45, 0.2) !important;
-  border: 1px solid rgba(74, 222, 128, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-.dark .vue-flow__node-output:hover,
-.dark .o2vf_node_output:hover {
-  background: rgba(20, 83, 45, 0.3) !important;
-  border-color: rgba(74, 222, 128, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.2) !important;
-}
-
-.dark .vue-flow__node-default,
-.dark .o2vf_node_default {
-  background: rgba(120, 53, 15, 0.2) !important;
-  border: 1px solid rgba(251, 146, 60, 0.3) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1) !important;
-}
-
-.dark .vue-flow__node-default:hover,
-.dark .o2vf_node_default:hover {
-  background: rgba(120, 53, 15, 0.3) !important;
-  border-color: rgba(251, 146, 60, 0.5) !important;
-  box-shadow: 0 6px 16px rgba(245, 158, 11, 0.2) !important;
 }
 </style>

@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <ODrawer data-test="dashboard-settings-drawer"
+    bleed
     :open="open"
     :width="74"
     :title="t('dashboard.setting')"
@@ -23,19 +24,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
   <div
     data-test="dashboard-settings-main-container"
-    class="p-0"
-    :class="store.state.theme == 'dark' ? 'dark-mode bg-surface-panel' : 'bg-white'"
-    style="min-height: inherit; height: 100%"
+    class="p-0 [min-height:inherit] h-full"
   >
 
-    <OSplitter
+    <OSplitter class="h-full"
       v-model="splitterModel"
       unit="px"
-      style="height: 100%"
       disabled
     >
       <template v-slot:before>
-        <div class="functions-tabs" style="width: 100%">
+        <div class="functions-tabs w-full">
           <OTabs
             v-model="activeTab"
             orientation="vertical"
@@ -146,35 +144,30 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.functions-tabs .o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label {
+<style scoped>
+/* keep(lib-override:o2-tabs.o2-splitter): vertical-tab label/active styling, the
+   splitter before-pane divider, and full-height tab panels — all target O2
+   component internals reached via :deep(). */
+.functions-tabs :deep(.o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label) {
   padding-left: 0.875rem;
   font-weight: 600;
 }
 
-.functions-tabs .o-tabs--vertical .o-tab--active {
-  color: var(--o2-tab-text-color);
-  background-color: var(--o2-tab-bg);
+.functions-tabs :deep(.o-tabs--vertical .o-tab--active) {
+  color: var(--color-tab-text-color);
+  background-color: var(--color-theme-tab-bg);
 }
 
-.o-splitter__before {
-  border-right: 1px solid var(--o2-border);
-}
-
-.dark-mode .o-splitter__before {
-  border-right-color: rgba(255, 255, 255, 0.12);
-}
-
-.o-splitter__separator {
-  display: none !important;
+:deep(.o-splitter__before) {
+  border-right: 1px solid var(--color-border-default);
 }
 
 /* Let the settings tab content fill the splitter's full height so panels with a
    sticky footer (e.g. Add Variable) can pin it to the bottom instead of leaving
    dead space when the form is shorter than the drawer. */
 .settings-content-scroll,
-.settings-content-scroll > .o-tab-panels,
-.settings-content-scroll > .o-tab-panels > .o-tab-panel {
+.settings-content-scroll > :deep(.o-tab-panels),
+.settings-content-scroll > :deep(.o-tab-panels > .o-tab-panel) {
   height: 100%;
 }
 </style>

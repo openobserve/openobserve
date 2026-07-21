@@ -18,13 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="w-full h-full flex flex-col overflow-y-auto [padding-right:0.625rem]"
+      class="w-full h-full flex flex-col overflow-y-auto px-page-edge pt-2 pb-1"
     >
-      <!-- Banners -->
-      <div class="banners-wrapper shrink-0 flex flex-col gap-2">
-        <div>
-          <TrialPeriod></TrialPeriod>
-        </div>
+      <!-- Banners — each component renders nothing when inactive, so this whole
+           block collapses to zero height (no reserved margin) when idle; the
+           gap below only appears when a banner is actually shown. -->
+      <div class="shrink-0 flex flex-col gap-2 empty:hidden not-empty:mb-3">
+        <TrialPeriod></TrialPeriod>
         <LicensePeriod
           v-if="!showUsageReportBanner"
           @update-license="goToLicensePage"
@@ -33,497 +33,365 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
       </div>
 
-      <!-- Streams overview section -->
-      <div
-        class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)]"
-        role="region"
-        aria-label="Streams overview section"
-      >
-        <div class="flex justify-between items-center mb-3">
-          <div class="flex items-center gap-2">
-            <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-              <OIcon name="window" size="md" />
-            </div>
-            <div class="text-(length:--text-lg) font-semibold [line-height:1.4]">{{ t("home.streams") }}</div>
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon-circle"
-            :class="
-              store.state.theme === 'dark'
-                ? 'view-button-dark'
-                : 'view-button-light'
-            "
-            aria-label="View all streams"
-            :title="t('home.viewButton')"
-            data-test="home-usage-tab-view-streams-btn"
+      <!-- Streams — data-volume metrics. Uniform, non-clickable stat tiles; the
+           list is reached from the section header so the row stays consistent. -->
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-2">
+          <span
+            class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+            aria-hidden="true"
           >
-            <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-            <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-            <router-link
-              exact
-              :to="{
-                name: 'logstreams',
-                query: {
-                  org_identifier:
-                    store.state.selectedOrganization?.identifier,
-                },
-              }"
-              class="absolute inset-0"
-              aria-label="Navigate to streams page"
-            ></router-link>
-          </OButton>
+            <OIcon name="window" size="sm" />
+          </span>
+          <span class="text-base font-semibold text-text-heading">{{ t("home.streams") }}</span>
         </div>
-
-        <!-- Tiles -->
-        <div class="grid [grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] gap-3">
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
-            <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
-              role="article"
-              aria-label="Streams count statistics"
-            >
-              <div class="flex flex-col justify-between">
-                <div class="flex justify-between">
-                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.streams") }}</div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="streamsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-streams-count"
-              >
-                {{ animatedStreamsCount || summary.streams_count }}
-              </div>
-            </div>
-          </div>
-
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
-            <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
-              role="article"
-              aria-label="Events count statistics"
-            >
-              <div class="flex flex-col justify-between">
-                <div class="flex justify-between">
-                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="recordsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-events-count"
-              >
-                {{ formattedAnimatedEventsCount }}
-              </div>
-            </div>
-          </div>
-
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]">
-            <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
-              role="article"
-              aria-label="Ingested data size statistics"
-            >
-              <div class="flex flex-col justify-between">
-                <div class="flex justify-between">
-                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
-                    {{ t("home.totalDataIngested") }}
-                  </div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="ingestedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-error-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-error-text)]"
-                >
-                  <OIcon name="arrow-downward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-ingested-size"
-              >
-                {{ formattedAnimatedIngestedSize }}
-              </div>
-            </div>
-          </div>
-
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
-            <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
-              role="article"
-              aria-label="Compressed data size statistics"
-            >
-              <div class="flex flex-col justify-between">
-                <div class="flex justify-between">
-                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">
-                    {{ t("home.totalDataCompressed") }}
-                  </div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="compressedSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-compressed-size"
-              >
-                {{ formattedAnimatedCompressedSize }}
-              </div>
-            </div>
-          </div>
-
-          <div class="[border-radius:0.325rem] border border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
-            <div
-              class="rounded-lg text-center flex flex-col justify-between h-full p-3 gap-1 [transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] [contain:layout_style_paint]"
-              role="article"
-              aria-label="Index size statistics"
-            >
-              <div class="flex flex-col justify-between">
-                <div class="flex justify-between">
-                  <div class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                    <img :src="indexSizeIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="rounded-[3.125rem] w-40 px-2 flex items-center text-xs! bg-[var(--o2-status-success-bg)] border border-[var(--o2-border-color)] text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 0.00% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-index-size"
-              >
-                {{ formattedAnimatedIndexSize }}
-              </div>
-            </div>
-          </div>
-        </div>
+        <OButton
+          v-if="canView('logstreams')"
+          variant="ghost"
+          size="icon-circle"
+          class="relative"
+          :aria-label="t('home.viewButton')"
+          :title="t('home.viewButton')"
+          data-test="home-usage-tab-view-streams-btn"
+        >
+          <OIcon name="arrow-forward" size="sm" />
+          <router-link
+            exact
+            :to="{ name: 'logstreams', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+            class="absolute inset-0"
+            :aria-label="t('home.viewButton')"
+          ></router-link>
+        </OButton>
       </div>
+      <KpiCardRow class="shrink-0 mb-4" min-width="12rem">
+        <!-- Streams -->
+        <KpiCard
+          :label="t('home.streams')"
+          icon="window"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
+        >
+          <template #value>
+            <span
+              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              aria-live="polite"
+              data-test="home-usage-tab-streams-count"
+            >{{ animatedStreamsCount || summary.streams_count }}</span>
+          </template>
+        </KpiCard>
 
-      <!-- Charts section -->
-      <div class="grid [grid-template-columns:minmax(min-content,max-content)_1fr_2fr] gap-3 mt-4 items-stretch flex-1 min-h-0">
-        <!-- Functions and Dashboards tiles -->
-        <div class="flex flex-col gap-4 w-full">
-          <div class="flex-1 flex min-w-0 w-full">
-            <div
-              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
-              role="article"
-              aria-label="Functions count statistics"
-            >
-              <div class="flex flex-col justify-between">
-                <div
-                  class="flex items-center gap-2 flex-nowrap w-full"
-                >
-                  <div
-                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
-                    aria-hidden="true"
-                  >
-                    <img :src="functionsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                  </div>
-                  <div
-                    class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
-                  >
-                    {{ t("home.functionTitle") }}
-                  </div>
-                  <OButton
-                    variant="ghost"
-                    size="icon-circle"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'view-button-dark'
-                        : 'view-button-light'
-                    "
-                    aria-label="View all functions"
-                    class="flex-shrink-0"
-                    :title="t('home.viewButton')"
-                    data-test="home-usage-tab-view-functions-btn"
-                  >
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                    <router-link
-                      exact
-                      :to="{
-                        name: 'functionList',
-                        query: {
-                          org_identifier:
-                            store.state.selectedOrganization?.identifier,
-                        },
-                      }"
-                      class="absolute inset-0"
-                      aria-label="Navigate to functions page"
-                    ></router-link>
-                  </OButton>
-                </div>
-              </div>
-              <div
-                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-functions-count"
+        <!-- Events -->
+        <KpiCard
+          :label="t('home.docsCountLbl')"
+          icon="bar-chart"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
+        >
+          <template #value>
+            <span
+              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              aria-live="polite"
+              data-test="home-usage-tab-events-count"
+            >{{ formattedAnimatedEventsCount }}</span>
+          </template>
+        </KpiCard>
+
+        <!-- Ingested size -->
+        <KpiCard
+          :label="t('home.totalDataIngested')"
+          icon="download"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
+        >
+          <template #value>
+            <span
+              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              aria-live="polite"
+              data-test="home-usage-tab-ingested-size"
+            >{{ formattedAnimatedIngestedSize }}</span>
+          </template>
+        </KpiCard>
+
+        <!-- Compressed size (self-hosted only) -->
+        <KpiCard
+          v-if="config.isCloud == 'false'"
+          :label="t('home.totalDataCompressed')"
+          icon="compress"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-success-bg text-icon-chip-success-text"
+        >
+          <template #value>
+            <span
+              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              aria-live="polite"
+              data-test="home-usage-tab-compressed-size"
+            >{{ formattedAnimatedCompressedSize }}</span>
+          </template>
+        </KpiCard>
+
+        <!-- Index size (self-hosted only) -->
+        <KpiCard
+          v-if="config.isCloud == 'false'"
+          :label="t('home.indexSizeLbl')"
+          icon="save"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
+        >
+          <template #value>
+            <span
+              class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
+              aria-live="polite"
+              data-test="home-usage-tab-index-size"
+            >{{ formattedAnimatedIndexSize }}</span>
+          </template>
+        </KpiCard>
+      </KpiCardRow>
+
+      <!-- Main region — a filled resources rail beside the two status charts, so
+           Functions/Dashboards live somewhere purposeful and the vertical space
+           is actually used. Rail carries counts + one-click access to every area. -->
+      <div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)] gap-3 flex-1 min-h-0">
+        <!-- Resources rail -->
+        <aside
+          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0 overflow-y-auto"
+          aria-label="Resources"
+        >
+          <!-- Resources — owned assets with live counts. Each row is gated to the
+               same route the left nav uses, so it hides when access is missing. -->
+          <template v-if="showResources">
+            <div class="text-sm font-semibold text-text-heading mb-1">{{ t("home.resources") }}</div>
+            <nav class="flex flex-col">
+              <router-link
+                v-if="canView('functionList')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'functionList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-functions-card"
               >
-                {{ animatedFunctionCount || summary.function_count }}
-              </div>
-            </div>
-          </div>
-
-          <div class="flex-1 flex min-w-0 w-full">
-            <div
-              class="rounded p-4 w-full bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] text-center flex flex-col justify-between"
-              role="article"
-              aria-label="Dashboards count statistics"
-            >
-              <div class="flex flex-col justify-between">
-                <div
-                  class="flex items-center gap-2 flex-nowrap w-full"
-                >
-                  <div
-                    class="bg-[rgba(238,95,38,0.2)] border border-[rgba(238,95,38,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg flex-shrink-0"
-                    aria-hidden="true"
-                  >
-                    <img :src="dashboardsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                  </div>
-                  <div
-                    class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis"
-                  >
-                    {{ t("home.dashboardTitle") }}
-                  </div>
-                  <OButton
-                    variant="ghost"
-                    size="icon-circle"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'view-button-dark'
-                        : 'view-button-light'
-                    "
-                    aria-label="View all dashboards"
-                    class="flex-shrink-0"
-                    :title="t('home.viewButton')"
-                    data-test="home-usage-tab-view-dashboards-btn"
-                  >
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                    <router-link
-                      exact
-                      :to="{
-                        name: 'dashboards',
-                        query: {
-                          org_identifier:
-                            store.state.selectedOrganization?.identifier,
-                        },
-                      }"
-                      class="absolute inset-0"
-                      aria-label="Navigate to dashboards page"
-                    ></router-link>
-                  </OButton>
-                </div>
-              </div>
-              <div
-                class="text-(length:--text-xl) font-semibold [line-height:1.3] flex items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-dashboards-count"
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+                  <OIcon name="function" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("home.functionTitle") }}</span>
+                <span class="text-sm font-semibold text-text-heading tabular-nums" data-test="home-usage-tab-functions-count">{{ animatedFunctionCount || summary.function_count }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+              <router-link
+                v-if="canView('dashboards')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'dashboards', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-dashboards-card"
               >
-                {{ animatedDashboardCount || summary.dashboard_count }}
-              </div>
-            </div>
-          </div>
-        </div>
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+                  <OIcon name="dashboard" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("home.dashboardTitle") }}</span>
+                <span class="text-sm font-semibold text-text-heading tabular-nums" data-test="home-usage-tab-dashboards-count">{{ animatedDashboardCount || summary.dashboard_count }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+            </nav>
+          </template>
 
-        <!-- Alerts chart -->
-        <div
-          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
-          role="region"
+          <div v-if="showResources && showExplore" class="h-px bg-border-default my-3" role="separator"></div>
+
+          <!-- Explore — data surfaces. Same per-route gating as above. -->
+          <template v-if="showExplore">
+            <div class="text-xs font-semibold text-text-secondary mb-1">{{ t("home.explore") }}</div>
+            <nav class="flex flex-col">
+              <router-link
+                v-if="canView('logs')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'logs', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-explore-logs"
+              >
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text" aria-hidden="true">
+                  <OIcon name="search" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.search") }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+              <router-link
+                v-if="canView('traces')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'traces', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-explore-traces"
+              >
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+                  <OIcon name="account-tree" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.traces") }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+              <router-link
+                v-if="canView('metrics')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'metrics', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-explore-metrics"
+              >
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text" aria-hidden="true">
+                  <OIcon name="bar-chart" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.metrics") }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+              <router-link
+                v-if="canView('RUM')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'RUM', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-explore-rum"
+              >
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+                  <OIcon name="devices" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.rum") }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+              <router-link
+                v-if="canView('incidentList')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'incidentList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-explore-incidents"
+              >
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+                  <OIcon name="notifications-active" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.incidents") }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+              <router-link
+                v-if="canView('reports')"
+                class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
+                :to="{ name: 'reports', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                data-test="home-usage-tab-explore-reports"
+              >
+                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+                  <OIcon name="description" size="sm" />
+                </span>
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.report") }}</span>
+                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+              </router-link>
+            </nav>
+          </template>
+        </aside>
+
+        <!-- Alerts -->
+        <section
+          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
           aria-label="Alerts overview section"
         >
-          <div class="gap-2 mb-3">
-            <div class="flex justify-between items-center">
-              <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
-                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                  <img :src="alertsIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                </div>
-                {{ t("home.alertTitle") }}
+          <div class="flex justify-between items-center gap-2">
+            <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
+              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+                <OIcon name="shield-alert-outline" size="md" />
               </span>
-              <OButton
-                variant="ghost"
-                size="icon-circle"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'view-button-dark'
-                    : 'view-button-light'
-                "
-                aria-label="View all alerts"
-                :title="t('home.viewButton')"
-                data-test="home-usage-tab-view-alerts-btn"
-              >
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                <router-link
-                  exact
-                  :to="{
-                    name: 'alertList',
-                    query: {
-                      org_identifier:
-                        store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  class="absolute inset-0"
-                  aria-label="Navigate to alerts page"
-                ></router-link>
-              </OButton>
+              {{ t("home.alertTitle") }}
+            </span>
+            <OButton
+              v-if="canView('alertList')"
+              variant="ghost"
+              size="icon-circle"
+              class="relative"
+              :aria-label="t('home.viewButton')"
+              :title="t('home.viewButton')"
+              data-test="home-usage-tab-view-alerts-btn"
+            >
+              <OIcon name="arrow-forward" size="sm" />
+              <router-link
+                exact
+                :to="{ name: 'alertList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                class="absolute inset-0"
+                :aria-label="t('home.viewButton')"
+              ></router-link>
+            </OButton>
+          </div>
+          <div class="flex pt-3 gap-4">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-text-secondary">{{ t("home.scheduledAlert") }}</span>
+              <span
+                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                aria-live="polite"
+                data-test="home-usage-tab-scheduled-alerts-count"
+              >{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
             </div>
-            <div class="flex pt-2 gap-[1em]">
-              <div class="flex flex-col">
-                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{
-                  t("home.scheduledAlert")
-                }}</span>
-                <span
-                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-scheduled-alerts-count"
-                >{{
-                  animatedScheduledAlerts || summary.scheduled_alerts
-                }}</span>
-              </div>
-              <OSeparator :vertical="true" />
-              <div class="flex flex-col">
-                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
-                <span
-                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-rt-alerts-count"
-                >{{
-                  animatedRtAlerts || summary.rt_alerts
-                }}</span>
-              </div>
+            <OSeparator :vertical="true" />
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-text-secondary">{{ t("home.rtAlert") }}</span>
+              <span
+                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                aria-live="polite"
+                data-test="home-usage-tab-rt-alerts-count"
+              >{{ animatedRtAlerts || summary.rt_alerts }}</span>
             </div>
           </div>
-          <div
-            class="custom-first-chart flex-1 min-h-[200px] w-full"
-          >
+          <div class="flex-1 min-h-50 w-full mt-3">
             <CustomChartRenderer
               :key="alertsPanelDataKey"
               :data="alertsPanelData"
               class="w-full h-full"
             />
           </div>
-        </div>
+        </section>
 
-        <!-- Pipelines chart -->
-        <div
-          class="rounded p-4 bg-[var(--o2-card-bg)] border border-[var(--o2-border-color)] flex flex-col min-h-0"
-          role="region"
+        <!-- Pipelines -->
+        <section
+          class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0"
           aria-label="Pipelines overview section"
         >
-          <div class="gap-2 mb-3">
-            <div class="flex justify-between items-center">
-              <span class="text-(length:--text-base) font-medium [line-height:1.4] [letter-spacing:0%] flex items-center gap-2">
-                <div class="bg-[rgba(57,126,246,0.2)] border border-[rgba(57,126,246,0.35)] opacity-80 flex items-center justify-center w-[2.5rem] h-[2.5rem] rounded-lg" aria-hidden="true">
-                  <img :src="pipelinesIcon" alt="" class="h-6 dark:[filter:brightness(1.5)]" />
-                </div>
-                {{ t("home.pipelineTitle") }}
+          <div class="flex justify-between items-center gap-2">
+            <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
+              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+                <OIcon name="lan" size="md" />
               </span>
-              <OButton
-                variant="ghost"
-                size="icon-circle"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'view-button-dark'
-                    : 'view-button-light'
-                "
-                aria-label="View all pipelines"
-                :title="t('home.viewButton')"
-                data-test="home-usage-tab-view-pipelines-btn"
-              >
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                <router-link
-                  exact
-                  :to="{
-                    name: 'pipelines',
-                    query: {
-                      org_identifier:
-                        store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  class="absolute inset-0"
-                  aria-label="Navigate to pipelines page"
-                ></router-link>
-              </OButton>
+              {{ t("home.pipelineTitle") }}
+            </span>
+            <OButton
+              v-if="canView('pipelines')"
+              variant="ghost"
+              size="icon-circle"
+              class="relative"
+              :aria-label="t('home.viewButton')"
+              :title="t('home.viewButton')"
+              data-test="home-usage-tab-view-pipelines-btn"
+            >
+              <OIcon name="arrow-forward" size="sm" />
+              <router-link
+                exact
+                :to="{ name: 'pipelines', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                class="absolute inset-0"
+                :aria-label="t('home.viewButton')"
+              ></router-link>
+            </OButton>
+          </div>
+          <div class="flex pt-3 gap-4">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-text-secondary">{{ t("home.schedulePipelineTitle") }}</span>
+              <span
+                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                aria-live="polite"
+                data-test="home-usage-tab-scheduled-pipelines-count"
+              >{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
             </div>
-            <div class="flex pt-2 gap-[1em]">
-              <div class="flex flex-col">
-                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">
-                  {{ t("home.schedulePipelineTitle") }}</span
-                >
-                <span
-                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-scheduled-pipelines-count"
-                >{{
-                  animatedScheduledPipelines || summary.scheduled_pipelines
-                }}</span>
-              </div>
-              <OSeparator :vertical="true" />
-              <div class="flex flex-col">
-                <span class="text-(length:--text-sm) font-normal [line-height:1.4] [letter-spacing:0%]">{{
-                  t("home.rtPipelineTitle")
-                }}</span>
-                <span
-                  class="text-(length:--text-md) font-semibold [line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-rt-pipelines-count"
-                >{{
-                  animatedRtPipelines || summary.rt_pipelines
-                }}</span>
-              </div>
+            <OSeparator :vertical="true" />
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-text-secondary">{{ t("home.rtPipelineTitle") }}</span>
+              <span
+                class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
+                aria-live="polite"
+                data-test="home-usage-tab-rt-pipelines-count"
+              >{{ animatedRtPipelines || summary.rt_pipelines }}</span>
             </div>
           </div>
-          <div
-            class="custom-second-chart flex-1 min-h-[200px] w-full"
-          >
+          <div class="flex-1 min-h-50 w-full mt-3">
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"
               :data="pipelinesPanelData"
               class="w-full h-full"
             />
           </div>
-        </div>
+        </section>
       </div>
     </div>
 
@@ -538,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoadingSummary" data-test="home-usage-tab-loading">
+    <div v-if="isLoadingSummary" class="h-full" data-test="home-usage-tab-loading">
       <HomeViewSkeleton />
     </div>
   </div>
@@ -553,7 +421,8 @@ import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
 import configService from "@/services/config";
 import config from "@/aws-exports";
-import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
+import { formatSizeFromMB } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
@@ -563,6 +432,8 @@ import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vu
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import KpiCard from "@/components/common/KpiCard.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
@@ -791,7 +662,7 @@ const alertsPanelData = computed(() => {
         textStyle: {
           fontSize: 16,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: chartColor("--color-text-secondary"),
         },
       },
     };
@@ -806,7 +677,7 @@ const alertsPanelData = computed(() => {
       textStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#D9D9D9" : "#262626",
+        color: chartColor("--color-text-heading"),
       },
     },
     tooltip: {
@@ -817,7 +688,7 @@ const alertsPanelData = computed(() => {
       orient: "vertical",
       left: "65%",
       textStyle: {
-        color: store.state.theme === "dark" ? "#DCDCDC" : "#232323",
+        color: chartColor("--color-text-heading"),
       },
     },
     series: [
@@ -832,7 +703,7 @@ const alertsPanelData = computed(() => {
           formatter: "{d}%",
           show: true,
           fontSize: 14,
-          color: store.state.theme === "dark" ? "#ffffff" : "#000000",
+          color: chartColor("--color-text-heading"),
         },
         labelLine: {
           show: true,
@@ -878,7 +749,7 @@ const pipelinesPanelData = computed(() => {
         textStyle: {
           fontSize: 16,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: chartColor("--color-text-secondary"),
         },
       },
     };
@@ -895,11 +766,11 @@ const pipelinesPanelData = computed(() => {
       nameTextStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       axisLabel: {
         fontSize: 14,
-        color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+        color: chartColor("--color-text-body"),
       },
     },
     yAxis: {
@@ -917,15 +788,15 @@ const pipelinesPanelData = computed(() => {
       nameTextStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       axisLabel: {
         fontSize: 12,
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       splitLine: {
         lineStyle: {
-          color: store.state.theme === "dark" ? "#444" : "#e0e0e0",
+          color: chartColor("--color-border-subtle"),
         },
       },
       offset: -20,
@@ -940,7 +811,7 @@ const pipelinesPanelData = computed(() => {
           position: "top",
           fontSize: 14,
           fontWeight: "bold",
-          color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+          color: chartColor("--color-text-body"),
         },
         itemStyle: {
           color: function (params: any) {
@@ -953,69 +824,14 @@ const pipelinesPanelData = computed(() => {
   };
 });
 
-const compressedSizeIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/compressed_size_dark.svg"
-      : "images/home/compressed_size.svg";
-  return getImageURL(icon);
-});
 
-const ingestedSizeIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/ingested_size_dark.svg"
-      : "images/home/ingested_size.svg";
-  return getImageURL(icon);
-});
 
-const indexSizeIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/index_size_dark.svg"
-      : "images/home/index_size.svg";
-  return getImageURL(icon);
-});
 
-const recordsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/records_dark.svg"
-      : "images/home/records.svg";
-  return getImageURL(icon);
-});
 
-const streamsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/streams_dark.svg"
-      : "images/home/streams.svg";
-  return getImageURL(icon);
-});
 
-const functionsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/function_tile_icon_dark.svg"
-      : "images/home/function_tile_icon.svg";
-  return getImageURL(icon);
-});
 
-const dashboardsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/dashboards_tile_icon.svg"
-      : "images/home/dashboards_tile_icon.svg";
-  return getImageURL(icon);
-});
 
-const alertsIcon = computed(() => {
-  return getImageURL("images/home/alerts.svg");
-});
 
-const pipelinesIcon = computed(() => {
-  return getImageURL("images/home/pipeline.svg");
-});
 
 const goToLicensePage = () => {
   router.push({ name: "license" });
@@ -1046,6 +862,20 @@ const formattedAnimatedIndexSize = computed(() => {
 });
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+
+// Rail visibility mirrors the left nav exactly: a route is only registered when
+// the user's edition/feature/RBAC gate allows it, so `hasRoute` is the same
+// signal the nav flyout filters its children by (see navGroups.ts). This keeps
+// the rail from ever offering a page the user has no way to reach.
+const canView = (name: string) => router.hasRoute(name);
+const showResources = computed(
+  () => canView("functionList") || canView("dashboards"),
+);
+const showExplore = computed(() =>
+  ["logs", "traces", "metrics", "RUM", "incidentList", "reports"].some((n) =>
+    canView(n),
+  ),
+);
 
 // Initial load
 const onThemeColorChanged = () => { themeVersion.value++; };
@@ -1086,149 +916,3 @@ watch(orgId, (newVal, oldVal) => {
   }
 });
 </script>
-
-<style scoped lang="scss">
-
-/*
- * UsageTab Styles
- *
- * Structure:
- * 1. CSS Variables
- * 2. Global Transitions
- * 3. Layout Components
- * 4. Interactive States
- * 5. Responsive Design
- */
-
-/* ===== 2. Global Transitions ===== */
-* {
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-*[class*="animation"],
-*[style*="animation"] {
-  transition: none;
-}
-
-/* ===== 3. Layout Components ===== */
-
-.banners-wrapper:has(> div) {
-  margin-bottom: 0.75rem;
-}
-
-.view-button-light {
-  cursor: pointer;
-  padding: 0;
-}
-.view-button-dark {
-  cursor: pointer;
-  padding: 0;
-  margin: 0;
-}
-.view-button-light,
-.view-button-dark {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-
-  .router-link-active,
-  a {
-    z-index: 10;
-    pointer-events: all;
-  }
-}
-
-.view-arrow-icon {
-  font-size: var(--text-md);
-  transition:
-    transform 0.4s ease-in-out,
-    opacity 0.4s ease-in-out;
-  pointer-events: none;
-  position: relative;
-  z-index: 1;
-}
-
-.view-button-light:hover .view-arrow-icon,
-.view-button-dark:hover .view-arrow-icon {
-  transform: translateX(1.25rem);
-  opacity: 0;
-}
-
-.view-arrow-icon-in {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) translateX(-1.25rem);
-  opacity: 0;
-  transition:
-    transform 0.4s ease-in-out,
-    opacity 0.4s ease-in-out;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.view-button-light:hover .view-arrow-icon-in,
-.view-button-dark:hover .view-arrow-icon-in {
-  transform: translate(-50%, -50%) translateX(0);
-  opacity: 1;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(1.25rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (max-width: 1400px) {
-  .functions-dashboards-column {
-    flex-direction: row;
-  }
-}
-
-@media (max-width: 768px) {
-  .functions-dashboards-column {
-    flex-direction: column;
-  }
-}
-
-/* ===== 4. Interactive States ===== */
-
-.view-button-light:focus-visible,
-.view-button-dark:focus-visible {
-  outline: 2px solid var(--o2-focus-ring);
-  outline-offset: 2px;
-  border-radius: 0.25rem;
-}
-
-a:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--o2-focus-ring);
-  outline-offset: 2px;
-}
-
-*:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* ===== 5. Responsive Design & Accessibility ===== */
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-</style>

@@ -317,71 +317,72 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* Remove border-radius from the shared scroll container (logs uses rounded corners) */
-.table-wrapper .o2-scroll-container {
+<style scoped>
+/* keep(lib-override:tenstack-table): overrides for TenstackTable / OScrollContainer
+   child DOM (pivot cells, td/th, scroll container) and print-layout fixes that
+   utilities can't target. All selectors are scoped under this component's
+   .table-wrapper root; child-rendered nodes are reached via :deep(). */
+
+/* Remove border-radius from the shared scroll container (logs keeps its corner radius) */
+.table-wrapper :deep(.o2-scroll-container) {
   border-radius: 0;
 }
 
 /* Dashboard table cells should not use the monospace font from tenstack-table.scss */
-.table-wrapper td {
+.table-wrapper :deep(td) {
   font-family: var(--font-sans);
 }
 
 /* Pivot table styles */
-.table-wrapper .pivot-total-row {
+.table-wrapper :deep(.pivot-total-row) {
   font-weight: bold;
   background-color: var(--color-table-row-striped-bg);
 }
 
-.table-wrapper .pivot-group-header {
+.table-wrapper :deep(.pivot-group-header) {
   font-weight: 600;
-  border-bottom: 2px solid var(--color-table-row-divider);
+  border-bottom: 0.125rem solid var(--color-table-row-divider);
 }
 
-.table-wrapper .pivot-section-border {
-  border-left: 2px solid rgba(0, 0, 0, 0.12) !important;
+.table-wrapper :deep(.pivot-section-border) {
+  border-left: 0.125rem solid var(--color-table-row-divider) !important;
 }
 
-.body--dark .table-wrapper .pivot-section-border {
-  border-left-color: rgba(255, 255, 255, 0.12) !important;
-}
-
-.table-wrapper .pivot-value-header {
+.table-wrapper :deep(.pivot-value-header) {
   font-weight: 500;
   font-size: 0.85em;
 }
 
 /* Sticky total row */
-.table-wrapper .pivot-sticky-total-row {
+.table-wrapper :deep(.pivot-sticky-total-row) {
   font-weight: bold;
 }
 
-.table-wrapper .pivot-sticky-total-row td {
-  border-top: 2px solid rgba(0, 0, 0, 0.12);
+.table-wrapper :deep(.pivot-sticky-total-row td) {
+  border-top: 0.125rem solid var(--color-table-row-divider);
 }
 
 /* Pivot header sort icons */
-.table-wrapper .pivot-sort-icon {
+.table-wrapper :deep(.pivot-sort-icon) {
   opacity: 0;
   transition: opacity 0.2s;
 }
 
-.table-wrapper th:hover .pivot-sort-icon {
+.table-wrapper :deep(th:hover .pivot-sort-icon) {
   opacity: 0.4;
 }
 
-.table-wrapper .pivot-sort-active {
+.table-wrapper :deep(.pivot-sort-active) {
   opacity: 1 !important;
 }
 
 /* Sticky total column visual separator */
-.table-wrapper .pivot-total-col {
-  box-shadow: inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+.table-wrapper :deep(.pivot-total-col) {
+  box-shadow: inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
 }
 
-.table-wrapper .sticky-column.pivot-total-col {
-  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.15), inset 4px 0 6px -2px rgba(0, 0, 0, 0.15) !important;
+.table-wrapper :deep(.sticky-column.pivot-total-col) {
+  box-shadow: 0.25rem 0 0.5rem var(--color-actions-column-shadow), inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
 }
 
 @media print {
@@ -392,32 +393,28 @@ export default defineComponent({
     overflow: hidden !important;
   }
 
-  .my-sticky-virtscroll-table {
+  .table-wrapper :deep(.my-sticky-virtscroll-table) {
     height: auto !important;
     overflow: visible !important;
   }
 
-  .my-sticky-virtscroll-table thead tr th {
+  .table-wrapper :deep(.my-sticky-virtscroll-table thead tr th) {
     position: static !important;
     top: auto !important;
   }
 
-  .my-sticky-virtscroll-table .table-container {
+  .table-wrapper :deep(.my-sticky-virtscroll-table .table-container) {
     overflow: visible !important;
     height: auto !important;
   }
 
-  .my-sticky-virtscroll-table [data-test="dashboard-table-pagination"] {
+  .table-wrapper :deep(.my-sticky-virtscroll-table [data-test="dashboard-table-pagination"]) {
     position: absolute !important;
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    background-color: #fff !important;
+    background-color: var(--color-surface-base) !important;
     z-index: 1 !important;
-  }
-
-  .body--dark .my-sticky-virtscroll-table [data-test="dashboard-table-pagination"] {
-    background-color: #1a1a2e !important;
   }
 }
 </style>

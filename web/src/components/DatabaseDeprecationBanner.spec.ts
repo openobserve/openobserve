@@ -268,7 +268,9 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find(".light-stream-container").exists()).toBe(true);
+    // Theming is now global (`.dark` on <html>), not a per-element class, so
+    // the banner renders the same regardless of theme.
+    expect(wrapper.find(".feature-card").exists()).toBe(true);
   });
 
   it("should apply dark theme class", async () => {
@@ -289,7 +291,9 @@ describe("DatabaseDeprecationBanner", () => {
 
     await wrapper.vm.$nextTick();
 
-    expect(wrapper.find(".dark-stream-container").exists()).toBe(true);
+    // Theming is now global (`.dark` on <html>), not a per-element class, so
+    // the banner renders the same regardless of theme.
+    expect(wrapper.find(".feature-card").exists()).toBe(true);
   });
 
   it("should handle invalid localStorage data gracefully", async () => {

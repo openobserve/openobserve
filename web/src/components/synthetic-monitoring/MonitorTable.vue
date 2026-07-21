@@ -122,7 +122,7 @@
             class="flex-1"
           />
           <span
-            :class="'font-mono text-sm font-semibold min-w-[2.75rem] text-right text-xs '
+            :class="'font-mono text-sm font-semibold min-w-11 text-right text-xs '
               + ((row as any).uptime >= 99 ? 'text-[var(--color-success-600)]' : (row as any).uptime >= 95 ? 'text-[var(--color-warning-600)]' : 'text-[var(--color-error-600)]')"
           >{{ (row as any).uptime }}%</span>
         </div>
@@ -134,7 +134,7 @@
     <template #cell-locations="{ row }">
       <div class="flex items-center gap-1 cursor-default" @mouseenter="showLoc($event, (row as any).locations)" @mouseleave="hideLoc">
         <span class="text-xs truncate max-w-[4.375rem]">{{ (row as any).locations[0] }}</span>
-        <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded bg-[var(--color-surface-subtle)] whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
+        <span v-if="(row as any).locations.length > 1" class="text-xs font-bold px-1 py-0.5 rounded-default bg-[var(--color-surface-subtle)] whitespace-nowrap shrink-0">+{{ (row as any).locations.length - 1 }}</span>
       </div>
     </template>
 
@@ -247,8 +247,10 @@
     <!-- Empty state -->
     <template #empty>
       <OEmptyState
-        size="hero"
+        size="block"
         preset="no-synthetic-monitors"
+        :filtered="props.hasFilters"
+        columns
         :description="t('synthetics.table.noResults')"
         :data-test="`${dataTest}-empty-state`"
         @action="(id: string) => emit('empty-action', id)"
@@ -376,6 +378,7 @@ const props = withDefaults(defineProps<{
   selectedIds?: string[]
   showFolderColumn?: boolean
   bulkActionLoading?: boolean
+  hasFilters?: boolean
 }>(), {
   loading: false,
   footerTitle: 'Checks',
@@ -386,6 +389,7 @@ const props = withDefaults(defineProps<{
   selectedIds: () => [],
   showFolderColumn: false,
   bulkActionLoading: false,
+  hasFilters: false,
 })
 
 const emit = defineEmits<{

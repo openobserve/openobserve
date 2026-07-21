@@ -17,19 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="chartPanelRef"
-    :class="store.state.theme !== 'dark' ? 'border border-[#e6e6e6]' : 'border border-[rgb(39,39,39)]'"
-    style="
-      height: 100%;
-      position: relative;
-      display: flex;
-      flex-direction: column;
-    "
+    class="border border-border-default h-full relative flex flex-col"
   >
     <!-- Chart -->
     <div
       data-test="alert-preview-chart"
-      class="preview-alert-chart"
-      style="flex: 1; min-height: 0; padding: 1rem"
+      class="preview-alert-chart flex-1 min-h-0 p-4"
     >
       <!-- Empty query placeholder -->
       <div
@@ -49,7 +42,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variablesData="{}"
         :searchType="searchTypeForPanel"
         :is_ui_histogram="shouldUseHistogram"
-        style="height: 100%; width: 100%"
         @result-metadata-update="handleChartDataUpdate"
         @series-data-update="handleSeriesDataUpdate"
       />
@@ -645,7 +637,7 @@ const fetchQuerySchema = async () => {
     clearFieldLabels(chartData.value);
     selectedTimeObj.value = { ...dashboardPanelData.meta.dateTime };
 
-    // Note: Alert status evaluation now happens via handleChartDataUpdate event from PanelSchemaRenderer
+    // Alert status evaluation happens via handleChartDataUpdate event from PanelSchemaRenderer
   } catch (error) {
     // Discard stale error fallback if a newer request has started.
     if (requestId !== schemaRequestId.value) return;
