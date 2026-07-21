@@ -126,15 +126,41 @@ export class EditionFeaturesPage {
 
   // Clicks a locator that triggers window.open and returns the popup's final URL
   // after the o2.ws short link redirects to openobserve.ai.
-  async clickAndCapturePopupUrl(locator) {
+  //
+  // Passing expectedPath keeps this fast: openobserve.ai loads GTM/PostHog/Segment,
+  // which beacon continuously, so waitForLoadState('networkidle') rarely settles and
+  // burns most of its timeout on every popup. Across 22 links that alone can exceed
+  // the test budget. Only a couple of links (sre_agent, ent_install_guide) actually
+  // perform a client-side redirect, so instead of paying a blanket idle wait we wait
+  // for the URL we expect — it resolves immediately when the link already landed
+  // correctly, and only waits for the ones that really do redirect.
+  async clickAndCapturePopupUrl(locator, expectedPath) {
     const [popup] = await Promise.all([
       this.page.context().waitForEvent('page', { timeout: 15000 }),
       locator.click(),
     ]);
     try {
       await popup.waitForURL(/openobserve\.ai/, { timeout: 30000 });
-      // Wait for any in-page JS redirects to settle before sampling the URL
-      await popup.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+      if (expectedPath) {
+        await popup
+          .waitForURL((url) => url.href.includes(expectedPath), { timeout: 10000 })
+          .catch(() => {});
+      }
+
+      // Safety net for a genuinely broken link: expectedPath never matched, so settle
+      // on a stable URL rather than sampling mid-redirect and reporting a misleading
+      // failure. Bounded to ~2s and skipped entirely on the happy path.
+      if (!expectedPath || !popup.url().includes(expectedPath)) {
+        let previous = popup.url();
+        for (let i = 0; i < 4; i++) {
+          await popup.waitForTimeout(500);
+          const current = popup.url();
+          if (current === previous) break;
+          previous = current;
+        }
+      }
+
       return popup.url();
     } catch (e) {
       testLogger.error('Popup never reached openobserve.ai — returning current URL', {
@@ -147,7 +173,7 @@ export class EditionFeaturesPage {
     }
   }
 
-  async captureFeatureLinkUrl(name) {
-    return this.clickAndCapturePopupUrl(this.getFeatureItem(name));
+  async captureFeatureLinkUrl(name, expectedPath) {
+    return this.clickAndCapturePopupUrl(this.getFeatureItem(name), expectedPath);
   }
 }
