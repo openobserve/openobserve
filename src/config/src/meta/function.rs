@@ -34,6 +34,9 @@ pub static RESULT_ARRAY_SKIP_VRL: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^#[ \s]*Result[ \s]*Array[ \s]*#[ \s]*Skip[ \s]*VRL[ \s]*#").unwrap()
 });
 
+/// Error label used by ingestion metrics when a JavaScript or VRL transform fails.
+pub const TRANSFORM_FAILED: &str = "document_failed_transform";
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Transform {

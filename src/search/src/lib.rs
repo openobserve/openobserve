@@ -26,14 +26,13 @@ pub mod tantivy;
 pub mod types;
 pub mod utils;
 
+pub use config::meta::search::CAPPED_RESULTS_MSG;
 use config::meta::{
     search::{Response, ScanStats},
     sql::OrderBy,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-
-pub const CAPPED_RESULTS_MSG: &str = "Warn: results are capped to meet default limit";
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Default)]
 pub struct CachedQueryResponse {

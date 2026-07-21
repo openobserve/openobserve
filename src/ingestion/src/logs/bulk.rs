@@ -19,6 +19,7 @@ use std::{
 };
 
 use axum::body::Bytes;
+pub use config::meta::function::TRANSFORM_FAILED;
 #[cfg(feature = "cloud")]
 use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
 use config::{
@@ -32,7 +33,6 @@ use config::{
     },
 };
 use infra::errors::Result;
-pub use openobserve_transform::TRANSFORM_FAILED;
 
 use super::{ingestion_log_enabled, log_failed_record};
 use crate::{

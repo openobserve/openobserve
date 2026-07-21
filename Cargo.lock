@@ -7140,7 +7140,6 @@ dependencies = [
  "log",
  "o2_enterprise",
  "promql",
- "search",
  "tracing",
 ]
 

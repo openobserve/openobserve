@@ -19,7 +19,8 @@ use std::{
     sync::{Arc, atomic::Ordering},
 };
 
-use config::meta::search::{PARTIAL_ERROR_RESPONSE_MESSAGE, ScanStats};
+use config::meta::search::ScanStats;
+pub use config::meta::search::is_permissable_function_error;
 use datafusion::physical_plan::{ExecutionPlan, ExecutionPlanVisitor};
 use infra::runtime::DATAFUSION_RUNTIME;
 use sqlparser::ast::{BinaryOperator, Expr};
@@ -207,65 +208,11 @@ pub fn is_default_query_limit_exceeded(num_rows: usize, sql: &Sql) -> bool {
     }
 }
 
-pub fn is_permissable_function_error(function_error: &[String]) -> bool {
-    if function_error.is_empty() {
-        return true;
-    }
-
-    function_error.iter().all(|error| {
-        // Empty or whitespace-only errors are cachable (no actual error)
-        let trimmed = error.trim();
-        if trimmed.is_empty() {
-            return true;
-        }
-
-        // Check if error contains only cachable messages
-        error.contains(CAPPED_RESULTS_MSG) || error.contains(PARTIAL_ERROR_RESPONSE_MESSAGE)
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use sqlparser::ast::{BinaryOperator, Expr, Ident, Value};
 
     use super::*;
-
-    #[test]
-    fn test_is_cachable_function_error() {
-        let error = vec![];
-        assert!(is_permissable_function_error(&error));
-
-        let error = vec!["".to_string()];
-        assert!(is_permissable_function_error(&error));
-
-        let error = vec![
-            CAPPED_RESULTS_MSG.to_string(),
-            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
-        ];
-        assert!(is_permissable_function_error(&error)); // only this is cachable
-
-        let error = vec![
-            CAPPED_RESULTS_MSG.to_string(),
-            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
-            "parquet not found".to_string(),
-        ];
-        assert!(!is_permissable_function_error(&error));
-
-        let error = vec![
-            "parquet not found".to_string(),
-            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
-        ];
-        assert!(!is_permissable_function_error(&error));
-
-        let error = vec!["parquet not found".to_string()];
-        assert!(!is_permissable_function_error(&error));
-
-        let error = vec![
-            "parquet not found".to_string(),
-            CAPPED_RESULTS_MSG.to_string(),
-        ];
-        assert!(!is_permissable_function_error(&error));
-    }
 
     #[test]
     fn test_split_conjunction() {

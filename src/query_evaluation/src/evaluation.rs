@@ -15,7 +15,7 @@ use config::{
             AggFunction, AlertConditionParams, Operator, QueryCondition, QueryType,
             TriggerCondition, TriggerEvalResults,
         },
-        search::{SearchEventContext, SearchEventType, SqlQuery},
+        search::{SearchEventContext, SearchEventType, SqlQuery, is_permissable_function_error},
         sql::resolve_stream_names,
         stream::StreamType,
     },
@@ -406,7 +406,7 @@ impl QueryConditionExt for QueryCondition {
         let resp = match resp {
             Ok(mut v) => {
                 // Check if function error is only query limit default error
-                if search::utils::is_permissable_function_error(&v.function_error) {
+                if is_permissable_function_error(&v.function_error) {
                     v.function_error.clear();
                     v.is_partial = false;
                 }

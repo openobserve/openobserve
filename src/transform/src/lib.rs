@@ -41,6 +41,7 @@ pub mod js;
 pub mod management;
 pub mod repository;
 
+pub use config::meta::function::TRANSFORM_FAILED;
 use enrichment::ENRICHMENT_TABLES;
 pub use js::{JSRuntimeConfig, apply_js_fn, compile_js_function, init_js_runtime};
 
@@ -220,9 +221,6 @@ pub fn compile_vrl_function(
         )),
     }
 }
-
-/// Error label used by ingestion metrics when a JavaScript or VRL transform fails.
-pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 
 /// Apply a previously compiled VRL transform and preserve the original row on failure.
 pub fn apply_vrl_fn(

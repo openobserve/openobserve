@@ -30,6 +30,20 @@ use crate::{
 
 pub const PARTIAL_ERROR_RESPONSE_MESSAGE: &str =
     "Please be aware that the response is based on partial data";
+pub const CAPPED_RESULTS_MSG: &str = "Warn: results are capped to meet default limit";
+
+pub fn is_permissable_function_error(function_error: &[String]) -> bool {
+    if function_error.is_empty() {
+        return true;
+    }
+
+    function_error.iter().all(|error| {
+        let trimmed = error.trim();
+        trimmed.is_empty()
+            || error.contains(CAPPED_RESULTS_MSG)
+            || error.contains(PARTIAL_ERROR_RESPONSE_MESSAGE)
+    })
+}
 
 /// To represent the query start and end time based of partition or cache
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1980,6 +1994,32 @@ impl StreamResponses {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_permissable_function_error() {
+        assert!(is_permissable_function_error(&[]));
+        assert!(is_permissable_function_error(&[String::new()]));
+        assert!(is_permissable_function_error(&[
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ]));
+        assert!(!is_permissable_function_error(&[
+            CAPPED_RESULTS_MSG.to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+            "parquet not found".to_string(),
+        ]));
+        assert!(!is_permissable_function_error(&[
+            "parquet not found".to_string(),
+            PARTIAL_ERROR_RESPONSE_MESSAGE.to_string(),
+        ]));
+        assert!(!is_permissable_function_error(&[
+            "parquet not found".to_string(),
+        ]));
+        assert!(!is_permissable_function_error(&[
+            "parquet not found".to_string(),
+            CAPPED_RESULTS_MSG.to_string(),
+        ]));
+    }
 
     #[test]
     fn test_response() {
