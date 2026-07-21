@@ -37,10 +37,9 @@ use {
 #[cfg(feature = "enterprise")]
 use crate::common::meta::user::AuthTokensExt;
 use crate::common::{
-    infra::config::{ORG_USERS, PASSWORD_HASH},
+    infra::config::PASSWORD_HASH,
     meta::{
         authz::Authz,
-        organization::DEFAULT_ORG,
         user::{AuthTokens, UserOrgRole},
     },
 };
@@ -156,12 +155,7 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-pub fn is_root_user(user_id: &str) -> bool {
-    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
-        Some(user) => user.role.eq(&UserRole::Root),
-        None => false,
-    }
-}
+pub use ::db::user::is_root_user;
 
 #[cfg(feature = "enterprise")]
 pub async fn save_org_tuples(org_id: &str) {
@@ -863,7 +857,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        common::meta::user::UserRequest,
+        common::meta::{organization::DEFAULT_ORG, user::UserRequest},
         service::{self, organization, users},
     };
 

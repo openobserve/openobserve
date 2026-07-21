@@ -21,6 +21,7 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use openobserve_core::http::destination_error_response;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "enterprise")]
@@ -291,7 +292,7 @@ pub async fn save_destination(
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
-        Err(e) => return e.into(),
+        Err(e) => return destination_error_response(e),
     };
     match destinations::save("", dest, true).await {
         Ok(v) => MetaHttpResponse::json(
@@ -299,7 +300,7 @@ pub async fn save_destination(
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
                 .with_name(v.name),
         ),
-        Err(e) => e.into(),
+        Err(e) => destination_error_response(e),
     }
 }
 
@@ -344,11 +345,11 @@ pub async fn update_destination(
 
     let dest = match dest.into(org_id, is_alert) {
         Ok(dest) => dest,
-        Err(e) => return e.into(),
+        Err(e) => return destination_error_response(e),
     };
     match destinations::save(&name, dest, false).await {
         Ok(_) => MetaHttpResponse::ok("Destination updated"),
-        Err(e) => e.into(),
+        Err(e) => destination_error_response(e),
     }
 }
 
@@ -483,7 +484,7 @@ pub async fn list_destinations(
 pub async fn delete_destination(Path((org_id, name)): Path<(String, String)>) -> Response {
     match destinations::delete(&org_id, &name).await {
         Ok(_) => MetaHttpResponse::ok("Alert destination deleted"),
-        Err(e) => e.into(),
+        Err(e) => destination_error_response(e),
     }
 }
 
@@ -605,12 +606,12 @@ pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response 
 
 #[cfg(test)]
 mod tests {
-    use axum::{http::StatusCode, response::Response};
+    use axum::http::StatusCode;
 
     use crate::service::db::alerts::destinations::DestinationError;
 
     fn status(err: DestinationError) -> StatusCode {
-        Response::from(err).status()
+        destination_error_response(err).status()
     }
 
     // 404 Not Found

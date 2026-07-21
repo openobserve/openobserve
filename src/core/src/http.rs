@@ -145,34 +145,30 @@ impl From<AlertError> for Response {
     }
 }
 
-impl From<DestinationError> for Response {
-    fn from(value: DestinationError) -> Self {
-        match &value {
-            DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
-                MetaHttpResponse::conflict(value)
-            }
-            DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            DestinationError::NotFound => MetaHttpResponse::not_found(value),
-            other_err => MetaHttpResponse::bad_request(other_err),
+pub fn destination_error_response(value: DestinationError) -> Response {
+    match &value {
+        DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
+            MetaHttpResponse::conflict(value)
         }
+        DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        DestinationError::NotFound => MetaHttpResponse::not_found(value),
+        other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
 
-impl From<TemplateError> for Response {
-    fn from(value: TemplateError) -> Self {
-        match value {
-            TemplateError::InfraError(e) => {
-                MetaHttpResponse::internal_error(TemplateError::InfraError(e))
-            }
-            TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
-            TemplateError::DeleteWithDestination(e) => {
-                MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
-            }
-            TemplateError::PrebuiltReadOnly(name) => {
-                MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
-            }
-            other_err => MetaHttpResponse::bad_request(other_err),
+pub fn template_error_response(value: TemplateError) -> Response {
+    match value {
+        TemplateError::InfraError(err) => {
+            MetaHttpResponse::internal_error(TemplateError::InfraError(err))
         }
+        TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
+        TemplateError::DeleteWithDestination(destination) => {
+            MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
+        }
+        TemplateError::PrebuiltReadOnly(name) => {
+            MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
+        }
+        other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
 
