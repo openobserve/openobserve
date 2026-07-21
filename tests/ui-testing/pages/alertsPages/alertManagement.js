@@ -37,11 +37,10 @@ export class AlertManagement {
         const operatorDropdown = this.page.locator(this.locators.operatorSelect).first();
         await expect(operatorDropdown).toBeVisible({ timeout: 15000 });
         await operatorDropdown.click();
-        // #13277 (shared component migration) moved this control to OFormSelect (reka
-        // OSelect), which renders an aria-hidden native <select><option>=</option>
-        // alongside the visible popover item. An unscoped getByText('=', {exact}) now
-        // matches BOTH nodes -> strict-mode violation (100% failure, not flaky). Scope
-        // the click to the popover and match by role so the hidden native select is
+        // The operator control is an OSelect: it renders an aria-hidden native
+        // <select><option>=</option> alongside the visible popover item, so an unscoped
+        // getByText('=', {exact}) matches BOTH nodes and trips a strict-mode violation.
+        // Scope the click to the popover and match by role so the hidden native select is
         // excluded, and gate on the popover's open/close state instead of hard waits.
         const operatorPopover = this.page.locator('[data-test="alert-conditions-operator-select-popover"]');
         await expect(operatorPopover).toBeVisible({ timeout: 10000 });
