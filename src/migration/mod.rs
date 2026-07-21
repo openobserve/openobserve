@@ -44,10 +44,8 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
         }
     };
     if db_schema_version == DB_SCHEMA_VERSION {
-        // Cloud migrations use an independent migration table and may still be pending.
-        #[cfg(feature = "cloud")]
-        o2_enterprise::enterprise::cloud::migrate().await?;
-        log::info!("DB_SCHEMA_VERSION match, skipping shared db upgrade");
+        // if version matches, we do not need to run update commands
+        log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
         return Ok(());
     }
     log::info!(

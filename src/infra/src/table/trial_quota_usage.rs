@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, EntityTrait, QueryFilter, QuerySelect,
+    ColumnTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
     sea_query::{Expr, Func, OnConflict},
 };
 
@@ -125,6 +125,8 @@ pub async fn load_all_usage_limits() -> Result<Vec<(String, i64)>, sea_orm::DbEr
 /// row is upserted first so organizations without prior usage can be configured.
 pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
+    let txn = db.begin().await?;
     let now = config::utils::time::now_micros();
     let active_model = trial_quota_usage::ActiveModel {
         org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
@@ -148,7 +150,7 @@ pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(
             .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
             .to_owned(),
         )
-        .exec(db)
+        .exec(&txn)
         .await?;
 
     trial_quota_usage::Entity::update_many()
@@ -158,8 +160,9 @@ pub async fn set_usage_limit_for_org(org_id: &str, usage_limit: i64) -> Result<(
             Expr::value(usage_limit),
         )
         .col_expr(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
-        .exec(db)
+        .exec(&txn)
         .await?;
+    txn.commit().await?;
     Ok(())
 }
 
@@ -215,6 +218,7 @@ pub async fn update_notified_checkpoint(
 
 pub async fn reset_notified_checkpoint(org_id: &str) -> Result<(), sea_orm::DbErr> {
     let db = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = super::get_lock().await;
     trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
         .col_expr(

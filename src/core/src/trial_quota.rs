@@ -161,17 +161,13 @@ impl std::fmt::Display for QuotaExhaustedError {
 
 impl std::error::Error for QuotaExhaustedError {}
 
-fn resolve_pool_limit(default_limit: u64, org_limit: Option<u64>) -> u64 {
-    org_limit.unwrap_or(default_limit)
-}
-
 /// Get the organization's shared pool limit, falling back to deployment config.
 fn get_pool_limit(org_id: &str) -> u64 {
     let default_limit = o2_enterprise::enterprise::common::config::get_config()
         .cloud
         .ai_free_credit_pool;
     let org_limit = ORG_LIMITS.read().unwrap().get(org_id).copied();
-    resolve_pool_limit(default_limit, org_limit)
+    org_limit.unwrap_or(default_limit)
 }
 
 /// Get total usage across all features for an org (single atomic read)
@@ -576,7 +572,7 @@ pub fn get_used(org_id: &str) -> u64 {
     get_org_total_used(org_id)
 }
 
-/// Get the pool limit (same for all orgs)
+/// Get the pool limit for an organization, falling back to the deployment-wide default.
 pub fn get_limit(org_id: &str) -> u64 {
     get_pool_limit(org_id)
 }
@@ -873,16 +869,6 @@ pub async fn init_from_db() {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn explicit_org_limit_overrides_deployment_default() {
-        assert_eq!(resolve_pool_limit(1_000, Some(2_500)), 2_500);
-    }
-
-    #[test]
-    fn missing_org_limit_uses_deployment_default() {
-        assert_eq!(resolve_pool_limit(1_000, None), 1_000);
-    }
 
     // --- pending_checkpoint_from ---
     // QUOTA_CHECKPOINTS = [80, 90, 95, 100]

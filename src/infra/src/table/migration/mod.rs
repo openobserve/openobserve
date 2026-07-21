@@ -133,7 +133,6 @@ mod m20260707_000003_create_synthetics_jobs;
 mod m20260707_000004_create_synthetics_probe_tokens;
 mod m20260714_000001_create_synthetics_locations;
 mod m20260714_000002_create_synthetics_agents;
-mod m20260717_000001_drop_trial_quota_usage_for_non_cloud;
 mod m20260720_000001_add_alert_workflows_col;
 mod m20260720_000001_create_workflow_errors_table;
 mod m20260720_000001_create_workflow_run_data_table;
@@ -260,7 +259,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20260707_000004_create_synthetics_probe_tokens::Migration),
             Box::new(m20260714_000001_create_synthetics_locations::Migration),
             Box::new(m20260714_000002_create_synthetics_agents::Migration),
-            Box::new(m20260717_000001_drop_trial_quota_usage_for_non_cloud::Migration),
             Box::new(m20260720_000001_create_workflows_table::Migration),
             Box::new(m20260720_000001_create_workflow_errors_table::Migration),
             Box::new(m20260720_000001_create_workflow_run_data_table::Migration),
