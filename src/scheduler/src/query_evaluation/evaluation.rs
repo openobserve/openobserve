@@ -88,7 +88,7 @@ impl QueryConditionExt for QueryCondition {
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         let trace_id = trace_id.unwrap_or_else(ider::generate_trace_id);
         // create context with trace_id
-        let eval_span = crate::setup_tracing_with_trace_id(
+        let eval_span = super::setup_tracing_with_trace_id(
             &trace_id,
             tracing::info_span!("service:alerts:evaluate_scheduled"),
         )
@@ -156,7 +156,7 @@ impl QueryConditionExt for QueryCondition {
                 let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
                     .super_cluster
                     .enabled;
-                let resp = match crate::promql_search(
+                let resp = match super::promql_search(
                     &trace_id,
                     org_id,
                     promql_query,
@@ -342,7 +342,7 @@ impl QueryConditionExt for QueryCondition {
             log::debug!(
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search_multi, {req:?}"
             );
-            crate::search_multi(&trace_id, org_id, stream_type, &req)
+            super::search_multi(&trace_id, org_id, stream_type, &req)
                 .instrument(eval_span)
                 .await
             // SearchService::search_multi(&trace_id, org_id, stream_type, None, &req).await
@@ -395,7 +395,7 @@ impl QueryConditionExt for QueryCondition {
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {req:?}"
             );
             // SearchService::search(&trace_id, org_id, stream_type, None, &req).await
-            crate::search(&trace_id, org_id, stream_type, &req)
+            super::search(&trace_id, org_id, stream_type, &req)
                 .instrument(eval_span)
                 .await
         };
@@ -412,7 +412,7 @@ impl QueryConditionExt for QueryCondition {
                 }
 
                 // the search request doesn't via cache layer, so need report usage separately
-                crate::report_search_metrics(
+                super::report_search_metrics(
                     req_start,
                     org_id,
                     stream_type,
