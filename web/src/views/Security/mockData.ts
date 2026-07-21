@@ -232,6 +232,168 @@ export const UEBA_PEER = [
   { user: "m.rossi@acme.com", metric: "RDP sessions initiated / day", user_val: "6", peer_med: "1", factor: "6×" },
 ];
 
+// ---- OSM field aliases (for the field picker) ----
+export const OSM_FIELDS = [
+  { group: "Identity", alias: "osm.user",    path: "actor.user.name",              desc: "Who performed the action" },
+  { group: "Identity", alias: "osm.target",  path: "user.name",                    desc: "Who the action was done to" },
+  { group: "Network",  alias: "osm.src",     path: "src_endpoint.ip",              desc: "Source IP address" },
+  { group: "Network",  alias: "osm.dst",     path: "dst_endpoint.ip",              desc: "Destination IP address" },
+  { group: "Network",  alias: "osm.src_geo", path: "src_endpoint.location.country",desc: "Source geo country" },
+  { group: "Asset",    alias: "osm.host",    path: "device.hostname",              desc: "Asset hostname" },
+  { group: "Asset",    alias: "osm.os",      path: "device.os.name",               desc: "Operating system" },
+  { group: "Event",    alias: "osm.action",  path: "activity_name",                desc: "Activity performed" },
+  { group: "Event",    alias: "osm.class",   path: "class_name",                   desc: "OCSF event class" },
+  { group: "Event",    alias: "osm.sev",     path: "severity_id",                  desc: "Severity 0–6" },
+  { group: "Event",    alias: "osm.status",  path: "status_id",                    desc: "Success/failure" },
+  { group: "Product",  alias: "osm.product", path: "metadata.product.name",        desc: "Source product" },
+  { group: "Product",  alias: "osm.vendor",  path: "metadata.product.vendor_name", desc: "Source vendor" },
+  { group: "Threat",   alias: "osm.ioc",     path: "observables[].value",          desc: "IOC observable value" },
+  { group: "Threat",   alias: "osm.ioc_type",path: "observables[].type_id",        desc: "IOC type" },
+  { group: "Auth",     alias: "osm.mfa",     path: "auth_protocol",                desc: "Auth method / MFA" },
+  { group: "Process",  alias: "osm.cmd",     path: "process.cmd_line",             desc: "Process command line" },
+  { group: "Process",  alias: "osm.pid",     path: "process.pid",                  desc: "Process ID" },
+];
+
+// ---- Saved hunt queries ----
+export const SAVED_QUERIES = [
+  { id: "sq1", name: "Impossible travel (Okta)", query: "osm.product = 'okta' AND activity_name = 'Logon' AND severity_id >= 5", created: "2d ago", author: "a.khan" },
+  { id: "sq2", name: "LSASS access attempts", query: "osm.cmd LIKE '%lsass%' AND osm.host IS NOT NULL", created: "5d ago", author: "m.rossi" },
+  { id: "sq3", name: "PowerShell encoded", query: "osm.product = 'sysmon' AND osm.cmd LIKE '%-enc%'", created: "1w ago", author: "a.khan" },
+  { id: "sq4", name: "S3 public ACL changes", query: "activity_name = 'PutBucketAcl' AND osm.product = 'aws-cloudtrail'", created: "1w ago", author: "system" },
+  { id: "sq5", name: "SSH brute force success", query: "class_name = 'Authentication' AND status_id = 1 AND src_endpoint.geo IN ('CN','RU','KP')", created: "2w ago", author: "m.rossi" },
+  { id: "sq6", name: "DNS C2 queries", query: "class_name = 'Network Activity' AND activity_name = 'DNS Query' AND osm.ioc IS NOT NULL", created: "2w ago", author: "system" },
+];
+
+// ---- Detection detail (with SQL query + backtest result) ----
+export const DETECTION_DETAIL: Record<string, any> = {
+  "rule-1042": {
+    sql: `SELECT
+  actor.user.name   AS osm_user,
+  src_endpoint.ip   AS osm_src,
+  src_endpoint.location.country AS country,
+  MIN(_timestamp)   AS first_seen,
+  MAX(_timestamp)   AS last_seen
+FROM security_events
+WHERE class_name = 'Authentication'
+  AND status_id  = 1
+  AND _timestamp >= NOW() - INTERVAL '15 minutes'
+GROUP BY osm_user, osm_src, country
+HAVING COUNT(DISTINCT country) > 1`,
+    sigma: `title: Impossible Travel - Sign-in from 2 Countries
+id: rule-1042
+status: stable
+description: >
+  Detects a user logging in from two different countries within 15 minutes,
+  suggesting account compromise or VPN abuse.
+logsource:
+  category: authentication
+detection:
+  selection:
+    class_name: Authentication
+    status_id: 1
+  timeframe: 15m
+  groupby:
+    - actor.user.name
+  condition: selection | count(src_endpoint.location.country) > 1
+falsepositives:
+  - Legitimate VPN usage
+  - Traveling with mobile hotspot
+level: critical
+tags:
+  - attack.initial_access
+  - attack.t1078`,
+    description: "Detects a user logging in from two different countries within 15 minutes — a strong signal of credential compromise or impossible-travel anomaly.",
+    tactic: "Initial Access",
+    tech: "T1078",
+    techName: "Valid Accounts",
+    type: "correlation",
+    backtest: { fires: 14, period: "last 30d", samples: [
+      { time: "7d ago", user: "j.torres@acme.com", countries: "DE→RU", status: "TP" },
+      { time: "18d ago", user: "a.nguyen@acme.com", countries: "US→FR", status: "FP (VPN)" },
+    ]},
+  },
+  "rule-0087": {
+    sql: `SELECT _timestamp, device.hostname, process.cmd_line, actor.user.name
+FROM security_events
+WHERE class_name = 'Process Activity'
+  AND process.file.path LIKE '%procdump%'
+  AND process.parent.name = 'lsass.exe'`,
+    sigma: `title: Credential Dumping via LSASS Access
+id: rule-0087
+status: stable
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    CommandLine|contains:
+      - 'procdump'
+      - 'mimikatz'
+    TargetImage|endswith: 'lsass.exe'
+  condition: selection
+level: critical
+tags:
+  - attack.credential_access
+  - attack.t1003.001`,
+    description: "Detects credential dumping tools (Mimikatz, procdump) accessing LSASS process memory on Windows endpoints.",
+    tactic: "Credential Access",
+    tech: "T1003.001",
+    techName: "LSASS Memory",
+    type: "streaming",
+    backtest: { fires: 7, period: "last 30d", samples: [
+      { time: "3d ago", user: "SYSTEM", host: "WIN-DC01", cmd: "procdump.exe -ma lsass.exe", status: "TP" },
+    ]},
+  },
+};
+
+// ---- Alert evidences and disposition timeline (for alert detail drawer) ----
+export const ALERT_DETAIL: Record<number, any> = {
+  0: {
+    findingUid: "FND-20260710-001042",
+    description: "User j.torres@acme.com signed in from DE (91.242.13.7) at 10:41:58 then from RU (185.220.101.44) at 10:42:11 — 13 seconds apart. Impossible travel detected.",
+    riskScore: 94,
+    evidences: [
+      { time: "10:42:11", cls: "Authentication", act: "Logon", sev: "crit", user: "j.torres@acme.com", src: "185.220.101.44", dst: "okta.com", product: "okta", msg: "Sign-in success from TOR exit node (RU)", geo: "RU", status: "success" },
+      { time: "10:41:58", cls: "Authentication", act: "Logon", sev: "info", user: "j.torres@acme.com", src: "91.242.13.7", dst: "okta.com", product: "okta", msg: "Sign-in success (DE)", geo: "DE", status: "success" },
+    ],
+    timeline: [
+      { dot: "err",  time: "10:42",  actor: "system",  msg: "Detection fired: impossible travel — 2 sign-ins 13s apart from DE and RU" },
+      { dot: "info", time: "10:44",  actor: "system",  msg: "Finding created · severity: critical · status: new" },
+      { dot: "info", time: "10:51",  actor: "a.khan",  msg: "Status changed: new → triage" },
+      { dot: "warn", time: "11:03",  actor: "a.khan",  msg: "Linked to CASE-2041: Suspected account takeover — j.torres" },
+      { dot: "ok",   time: "11:24",  actor: "a.khan",  msg: "Session revoked in Okta; password reset triggered via action" },
+    ],
+  },
+  1: {
+    findingUid: "FND-20260710-000087",
+    description: "procdump.exe accessed lsass.exe memory on WIN-DC01 (domain controller). Blocked by CrowdStrike but event captured for investigation.",
+    riskScore: 98,
+    evidences: [
+      { time: "10:35:07", cls: "Process Activity", act: "Launch", sev: "crit", user: "SYSTEM", src: "WIN-DC01", dst: "—", product: "crowdstrike", msg: "procdump.exe accessed lsass.exe memory", geo: "—", status: "blocked" },
+    ],
+    timeline: [
+      { dot: "err",  time: "10:35",  actor: "system",  msg: "Detection fired: LSASS memory access via procdump.exe" },
+      { dot: "err",  time: "10:35",  actor: "crowdstrike", msg: "Process blocked by CrowdStrike prevention policy" },
+      { dot: "info", time: "10:36",  actor: "system",  msg: "Finding created · severity: critical · status: new" },
+    ],
+  },
+  2: {
+    findingUid: "FND-20260710-000311",
+    description: "svc_web on web-prod-07 executed PowerShell with a base64-encoded command. High FP rate for this host due to deployment scripts — review before closing.",
+    riskScore: 62,
+    evidences: [
+      { time: "10:28:44", cls: "Process Activity", act: "Launch", sev: "high", user: "svc_web", src: "web-prod-07", dst: "—", product: "sysmon", msg: "powershell.exe -enc SQBFAFgA... (base64)", geo: "—", status: "success" },
+      { time: "10:28:39", cls: "Process Activity", act: "Launch", sev: "info", user: "svc_web", src: "web-prod-07", dst: "—", product: "sysmon", msg: "cmd.exe spawned powershell.exe", geo: "—", status: "success" },
+    ],
+    timeline: [
+      { dot: "warn", time: "10:28",  actor: "system",  msg: "Detection fired: encoded PowerShell command" },
+      { dot: "info", time: "10:29",  actor: "system",  msg: "Finding created · severity: high · status: new" },
+      { dot: "info", time: "10:31",  actor: "a.khan",  msg: "Status changed: new → triage" },
+      { dot: "info", time: "10:44",  actor: "a.khan",  msg: "Added note: may be deployment script — check CI/CD pipeline logs" },
+    ],
+  },
+};
+
 export const sevLabel = (s: string) =>
   ({ crit: "critical", high: "high", med: "medium", low: "low", info: "info" } as any)[s] || s;
 export const cap = (s: string) =>
