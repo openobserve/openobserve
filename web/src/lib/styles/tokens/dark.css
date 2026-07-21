@@ -6,6 +6,7 @@
 :root.dark,
 .dark :root,
 .dark {
+   
     /* Dark theme for native UI (date/time/color pickers, scrollbars,
        autofill); inherited by all descendants. Without it Chromium's
        calendar-picker icon stays dark gray and vanishes on dark inputs. */
