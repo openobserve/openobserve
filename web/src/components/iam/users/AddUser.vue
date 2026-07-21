@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('user.email')"
             required
             class="showLabelOnTop"
-            maxlength="100"
+            :maxlength="100"
             data-test="user-email-field"
           />
 
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="other_organization"
             :label="t('user.otherOrganization')"
             class="showLabelOnTop mt-2"
-            maxlength="100"
+            :maxlength="100"
           />
         </OForm>
     </div>
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onActivated, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount, watch, type PropType } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -269,7 +269,7 @@ export default defineComponent({
       default: "admin",
     },
     roles: {
-      type: Array,
+      type: Array as PropType<{ label: string; value: string }[]>,
       default: () => [
         {
           label: "Admin",
@@ -278,7 +278,7 @@ export default defineComponent({
       ],
     },
     customRoles: {
-      type: Array,
+      type: Array as PropType<string[]>,
       default: () => [],
     },
     isCloud: {

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="shouldShowTabs" class="mb-2 flex items-center justify-between">
         <OToggleGroup
           :model-value="localTab"
-          @update:model-value="updateTab($event as string)"
+          @update:model-value="updateTab($event as 'sql' | 'promql' | 'custom')"
           data-test="step2-query-tabs"
         >
           <OToggleGroupItem
@@ -663,7 +663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ref="inlineQueryEditorRef"
                       data-test-prefix="alert-inline-sql"
                       :languages="localTab === 'promql' ? ['promql'] : ['sql']"
-                      :default-language="localTab"
+                      :default-language="localTab === 'promql' ? 'promql' : 'sql'"
                       :query="localTab === 'sql' ? localSqlQuery : localPromqlQuery"
                       editor-height="100%"
                       :disable-ai="!streamName"
@@ -956,7 +956,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Query Editor Dialog -->
     <QueryEditorDialog
       v-model="viewSqlEditor"
-      :tab="localTab"
+      :tab="localTab === 'promql' ? 'promql' : 'sql'"
       :sqlQuery="localSqlQuery"
       :promqlQuery="localPromqlQuery"
       :vrlFunction="vrlFunctionContent"
@@ -1005,8 +1005,8 @@ import CustomConfirmDialog from "@/components/alerts/CustomConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1016,9 +1016,6 @@ import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import { type QueryConfigMeta } from "./QueryConfig.schema";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue")
-);
 const UnifiedQueryEditor = defineAsyncComponent(
   () => import("@/components/QueryEditor.vue")
 );
@@ -1027,14 +1024,12 @@ export default defineComponent({
   name: "Step2QueryConfig",
   components: {
     FilterGroup,
-    QueryEditor,
     QueryEditorDialog,
     CustomConfirmDialog,
     UnifiedQueryEditor,
     OButton,
     OToggleGroup,
     OToggleGroupItem,
-    OInput,
     OSelect,
     OSwitch,
     OTooltip,
@@ -1044,7 +1039,7 @@ export default defineComponent({
   },
   props: {
     tab: {
-      type: String,
+      type: String as PropType<"sql" | "promql" | "custom">,
       default: "custom",
     },
     multiTimeRange: {
@@ -1190,7 +1185,7 @@ export default defineComponent({
 
     // (No field-level error refs: every rule lives in the composed schema and is
     // surfaced by the OForm* wrapper bound to that field.)
-    const pendingTab = ref<string | null>(null);
+    const pendingTab = ref<"sql" | "promql" | "custom" | null>(null);
 
     // Field refs for focus manager
     const customPreviewRef = ref(null);
@@ -1508,7 +1503,7 @@ export default defineComponent({
 
     // Reactive views of the two group-by field arrays (form store) so the
     // template v-if / schema `_meta` stay live.
-    const logGroupByStore = form.useStore(
+    const logGroupByStore: Ref<string[]> = form.useStore(
       (s: any) => (s.values?.logGroupBy ?? []) as string[],
     );
     const metricGroupByStore = form.useStore(
@@ -1662,7 +1657,9 @@ export default defineComponent({
       { label: t('alerts.queryConfig.cron'), value: 'cron' },
     ]);
 
-    const onFrequencyUnitChange = (unit: string) => {
+    const onFrequencyUnitChange = (modelValue: SelectModelValue) => {
+      // Single-select of frequency units: value is a string at runtime.
+      const unit = typeof modelValue === "string" ? modelValue : "";
       const prevMode = frequencyMode.value;
       isUserTriggerChange.value = true;
       frequencyMode.value = unit as 'minutes' | 'hours' | 'cron';
@@ -1837,7 +1834,7 @@ export default defineComponent({
       return props.isRealTime === "false";
     });
 
-    const updateTab = (tab: string) => {
+    const updateTab = (tab: "sql" | "promql" | "custom") => {
       const hasComparisonWindow = props.multiTimeRange?.length > 0;
 
       // Check if switching to custom or promql while multi-windows are present
@@ -1974,7 +1971,9 @@ export default defineComponent({
     };
 
     // When metric function dropdown changes — handles count vs aggregation modes
-    const onMetricFunctionChange = (value: string) => {
+    const onMetricFunctionChange = (modelValue: SelectModelValue) => {
+      // Single-select of function names: value is a string at runtime.
+      const value = typeof modelValue === "string" ? modelValue : "";
       if (value === 'total_events') {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline
         localIsAggregationEnabled.value = false;
@@ -2007,7 +2006,9 @@ export default defineComponent({
     };
 
     // When log function mode changes (count / unique_count / avg / etc.)
-    const onLogFunctionChange = (value: string) => {
+    const onLogFunctionChange = (modelValue: SelectModelValue) => {
+      // Single-select of function names: value is a string at runtime.
+      const value = typeof modelValue === "string" ? modelValue : "";
       if (value === 'total_events') {
         // total_events (COUNT(*)) — no aggregation, trigger threshold shown inline.
         // threshold/operator are form-backed computeds (also drive the name= inputs).

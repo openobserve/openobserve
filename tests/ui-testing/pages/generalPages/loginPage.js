@@ -8,6 +8,31 @@ export class LoginPage {
     this.userIdInput = page.locator('[data-test="login-user-id-field"]');
     this.passwordInput = page.locator('[data-test="login-password-field"]');
     this.loginButton = page.locator('[data-test="login-sign-in"]');
+    // OInput renders a field's validation message as "<name>-error" (role="alert");
+    // its text content is the i18n message. Used by the login-validation specs.
+    this.userIdError = page.locator('[data-test="login-user-id-error"]');
+    this.passwordError = page.locator('[data-test="login-password-error"]');
+  }
+
+  // ── Login-form validation helpers ─────────────────────────────────────────
+  // Open the internal-user login form on a fresh (unauthenticated) page and wait
+  // until both fields are interactable. On enterprise/SSO builds this clicks
+  // "Login as internal user"; on single-org builds the form is already visible
+  // (loginAsInternalUser() no-ops gracefully).
+  async openInternalLoginForm() {
+    await this.gotoLoginPage();
+    await this.loginAsInternalUser();
+    await this.userIdInput.waitFor({ state: 'visible', timeout: 15000 });
+    await this.passwordInput.waitFor({ state: 'visible', timeout: 15000 });
+  }
+
+  async fillLoginForm(email, password) {
+    await this.userIdInput.fill(email);
+    await this.passwordInput.fill(password);
+  }
+
+  async submitLoginForm() {
+    await this.loginButton.click();
   }
   async gotoLoginPage() {
     // Force navigation to correct URL (overrides any app redirect to localhost)

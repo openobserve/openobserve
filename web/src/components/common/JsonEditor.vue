@@ -18,13 +18,13 @@
 
       <!-- Display validation errors -->
       <div
-        v-if="validationErrors.length > 0"
+        v-if="localValidationErrors.length > 0"
         data-test="common-json-editor-validation-errors"
         class="p-3 text-status-error-text shrink-0 max-h-50 overflow-y-auto"
       >
         <div class="font-bold mb-2">Please fix the following issues:</div>
         <ul class="ml-3">
-          <li v-for="(error, index) in validationErrors" :key="index">
+          <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
           </li>
         </ul>
@@ -66,8 +66,6 @@ import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
 import config from "@/aws-exports";
-import { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
-import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useTheme from "@/composables/useTheme";
 
@@ -110,8 +108,7 @@ export default defineComponent({
     const jsonContent = ref("");
     const isValidJson = ref(true);
     const queryEditorRef = ref();
-    const { pipelineObj } = useDragAndDrop();
-    const validationErrors = ref<any[]>(props.validationErrors || []);
+    const localValidationErrors = ref<any[]>(props.validationErrors || []);
     const storedFields = ref<any>({});
 
     // Define protected fields based on type
@@ -119,13 +116,14 @@ export default defineComponent({
       switch (type) {
         case 'pipelines':
           return ['pipeline_id', 'org', 'name'];
-        case 'alerts':
+        case 'alerts': {
           const baseFields = ['id', 'name', 'org_id', 'last_triggered_at', 'last_satisfied_at', 'owner', 'last_edited_by', 'createdAt', 'updatedAt'];
           // If editing an existing alert, also protect stream-related fields
           if (props.isEditing) {
             return [...baseFields, 'stream_name', 'stream_type', 'is_real_time'];
           }
           return baseFields;
+        }
         // Add more cases for other types
         default:
           return [];
@@ -148,8 +146,8 @@ export default defineComponent({
 
         if (protectedFieldChanges.length > 0) {
           // Add validation errors for changed protected fields
-          validationErrors.value = [
-            ...validationErrors.value.filter(err => !err.startsWith('Cannot modify')),
+          localValidationErrors.value = [
+            ...localValidationErrors.value.filter(err => !err.startsWith('Cannot modify')),
             ...protectedFieldChanges.map(field => `Cannot modify ${field} field directly , will be reverted to the original value`)
           ];
 
@@ -168,9 +166,9 @@ export default defineComponent({
         jsonContent.value = value;
 
         // Clear any previous protected field validation errors
-        validationErrors.value = validationErrors.value.filter(err => !err.startsWith('Cannot modify'));
+        localValidationErrors.value = localValidationErrors.value.filter(err => !err.startsWith('Cannot modify'));
       } catch (error) {
-        validationErrors.value = ['Invalid JSON format'];
+        localValidationErrors.value = ['Invalid JSON format'];
       }
     };
 
@@ -199,7 +197,7 @@ export default defineComponent({
 
           emit("saveJson", JSON.stringify(finalContent));
         } catch (error) {
-          validationErrors.value = ['Invalid JSON format'];
+          localValidationErrors.value = ['Invalid JSON format'];
         }
       };
 
@@ -221,7 +219,7 @@ export default defineComponent({
       watch(
         () => props.validationErrors,
         (newErrors) => {
-          validationErrors.value = newErrors;
+          localValidationErrors.value = newErrors;
         },
         { immediate: true, deep: true }
       );
@@ -245,7 +243,7 @@ export default defineComponent({
       store,
       jsonContent,
       isValidJson,
-      validationErrors,
+      localValidationErrors,
       queryEditorRef,
       handleEditorChange,
       getImageURL,

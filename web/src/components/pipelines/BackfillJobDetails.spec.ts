@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
@@ -326,32 +326,6 @@ describe("BackfillJobDetails – getStatusLabel", () => {
       failed: "error details",
     });
     expect(result).toBe("Deletion Failed");
-  });
-});
-
-describe("BackfillJobDetails – getProgressColor", () => {
-  let wrapper: ReturnType<typeof createWrapper>;
-
-  beforeEach(async () => {
-    vi.mocked(backfillService.getBackfillJob).mockResolvedValue(makeJob());
-    wrapper = createWrapper({ modelValue: true });
-    await flushPromises();
-  });
-
-  it("returns 'blue' when deletionStatus is 'pending'", () => {
-    expect((wrapper.vm as any).getProgressColor("pending")).toBe("blue");
-  });
-
-  it("returns 'blue' when deletionStatus is 'in_progress'", () => {
-    expect((wrapper.vm as any).getProgressColor("in_progress")).toBe("blue");
-  });
-
-  it("returns 'positive' when deletionStatus is undefined", () => {
-    expect((wrapper.vm as any).getProgressColor(undefined)).toBe("positive");
-  });
-
-  it("returns 'positive' when deletionStatus is 'completed'", () => {
-    expect((wrapper.vm as any).getProgressColor("completed")).toBe("positive");
   });
 });
 

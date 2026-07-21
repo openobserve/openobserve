@@ -488,37 +488,6 @@ describe("BackfillJobsList – canDeleteJob", () => {
   });
 });
 
-describe("BackfillJobsList – getProgressColor", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(backfillService.listBackfillJobs).mockResolvedValue([]);
-  });
-
-  it("returns 'blue' for deletionStatus 'pending'", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    expect((wrapper.vm as any).getProgressColor("pending")).toBe("blue");
-  });
-
-  it("returns 'blue' for deletionStatus 'in_progress'", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    expect((wrapper.vm as any).getProgressColor("in_progress")).toBe("blue");
-  });
-
-  it("returns 'positive' for undefined deletionStatus", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    expect((wrapper.vm as any).getProgressColor(undefined)).toBe("positive");
-  });
-
-  it("returns 'positive' for deletionStatus 'completed'", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    expect((wrapper.vm as any).getProgressColor("completed")).toBe("positive");
-  });
-});
-
 describe("BackfillJobsList – loadPipelineOptions", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -535,33 +504,6 @@ describe("BackfillJobsList – loadPipelineOptions", () => {
     expect(options.map((o: any) => o.value)).toEqual(
       expect.arrayContaining(["pipe-1", "pipe-2"])
     );
-  });
-});
-
-describe("BackfillJobsList – formatTimestamp", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(backfillService.listBackfillJobs).mockResolvedValue([]);
-  });
-
-  it("returns 'N/A' for falsy input (0)", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    expect((wrapper.vm as any).formatTimestamp(0)).toBe("N/A");
-  });
-
-  it("returns 'N/A' for undefined", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    expect((wrapper.vm as any).formatTimestamp(undefined)).toBe("N/A");
-  });
-
-  it("returns a string for a valid timestamp", async () => {
-    const wrapper = createWrapper();
-    await flushPromises();
-    const result = (wrapper.vm as any).formatTimestamp(1_700_000_000_000_000);
-    expect(typeof result).toBe("string");
-    expect(result.length).toBeGreaterThan(0);
   });
 });
 

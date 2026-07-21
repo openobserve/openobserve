@@ -38,7 +38,20 @@ async function fetchWithRetry(url, options, maxRetries = 3) {
     };
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-            return await fetch(url, requestOpts);
+            const response = await fetch(url, requestOpts);
+            // A 5xx is a transient backend blip, not a client error — alpha returns
+            // 503 Service Unavailable / 502 Bad Gateway on ingestion during load spikes,
+            // and a bare fetch treats those as a "successful" response so the caller threw
+            // on the first one (pipelines:180 hard-failed on a run with 4x 503 + 1x 502).
+            // Retry 5xx with backoff like a network error; a persistent 5xx still returns
+            // after maxRetries and the caller throws — nothing is masked.
+            if (response.status >= 500 && attempt < maxRetries) {
+                const backoffMs = 800 * (attempt + 1);
+                testLogger.warn('Transient 5xx from ingestion, retrying', { url, status: response.status, attempt: attempt + 1, maxRetries, backoffMs });
+                await new Promise((resolve) => setTimeout(resolve, backoffMs));
+                continue;
+            }
+            return response;
         } catch (err) {
             const message = String(err && err.message ? err.message : err);
             const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
@@ -367,19 +380,19 @@ export class PipelinesPage {
 
     // Methods from PipelinePage
     async openPipelineMenu() {
-        await openNavFlyoutChild(this.page, 'pipeline');
-        // openNavFlyoutChild navigates via a hover-flyout force-click that can
-        // intermittently miss (the flyout self-closes on settle), leaving us on the
-        // previous page. That was the dominant Pipelines-shard flake: the follow-up
-        // pipelineTab.click() then timed out at the 45s action timeout because the
-        // streamPipelines tab only exists on the pipeline list page. Confirm we
-        // actually landed; if not, navigate directly — a goto is deterministic and
-        // needs no flyout.
-        const onPipelinePage = await this.page.locator('[data-test="pipeline-list-page"]')
-            .waitFor({ state: 'visible', timeout: 15000 })
-            .then(() => true)
-            .catch(() => false);
-        if (!onPipelinePage) {
+        // Navigate straight to the pipeline list via goto — deterministic and fast.
+        // The left-nav flyout (openNavFlyoutChild) is a hover-reveal that self-closes on
+        // settle and, under concurrent cloud load, burns up to ~30s retrying to open
+        // before its goto-fallback even fires. A heavy condition test calls this twice,
+        // and that wasted time tipped pipeline-conditions:82 over the 180s test timeout
+        // (validated against alpha at --workers=5). The flyout adds no coverage here — we
+        // only need to land on the pipeline list page — so skip it. goto is already the
+        // proven fallback path; promoting it to primary removes the flake source.
+        // (Auth is safe: with the stored session, a goto to a list route boots the SPA
+        // with the existing token — unlike a reload of the unsaved /pipelines/add editor,
+        // which re-triggers the Dex callback.)
+        if (!(await this.page.locator('[data-test="pipeline-list-page"]')
+            .isVisible({ timeout: 3000 }).catch(() => false))) {
             await this.page.goto(
                 `${process.env.ZO_BASE_URL}/web/pipeline/pipelines?org_identifier=${process.env["ORGNAME"]}`
             );
@@ -394,14 +407,31 @@ export class PipelinesPage {
 
     async addPipeline() {
         // Wait for the add pipeline button to be visible.
-        // Reduced from 30s to 15s — slowMo:500 in serial mode amplifies
-        // cascading delays when the page doesn't load, and 15s is still
-        // generous enough for CI variance.
         await this.addPipelineButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addPipelineButton.click();
+        // Confirm the editor actually mounted: the NodeSidebar's stream-input button is the
+        // first thing every pipeline flow needs (selectStream/dragStreamToTarget). Under
+        // concurrent cloud load the route change + VueFlow/NodeSidebar mount can lag, or the
+        // add click can be dropped before navigation starts. If the button hasn't rendered
+        // and we're still on the list page (add button still visible), re-click to re-trigger
+        // navigation. This is NON-DESTRUCTIVE — no page.reload(): a reload here trips the
+        // editor's onBeforeRouteLeave unsaved-changes guard, bounces off the editor route,
+        // and stalls every downstream test (regressed the shard to 18 failed).
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            if (await this.streamButton.isVisible({ timeout: 15000 }).catch(() => false)) {
+                return;
+            }
+            if (await this.addPipelineButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await this.addPipelineButton.click().catch(() => {});
+            }
+        }
+        await this.streamButton.waitFor({ state: 'visible', timeout: 15000 });
     }
 
     async selectStream() {
+        // addPipeline() already confirms the editor + NodeSidebar mounted; just synchronise
+        // on the button being actionable before clicking (no reload — see addPipeline note).
+        await this.streamButton.waitFor({ state: 'visible', timeout: 30000 });
         await this.streamButton.click();
     }
 
@@ -1226,15 +1256,18 @@ export class PipelinesPage {
         // once navigation stopped failing earlier). Re-run the query until a row
         // appears instead of clicking into an empty table.
         const runQueryBtn = this.page.locator('[data-test="logs-search-bar-refresh-btn"]');
-        for (let attempt = 1; attempt <= 6; attempt++) {
-            if (await this.timestampColumnMenu.isVisible({ timeout: 10000 }).catch(() => false)) {
+        // ~10 attempts (~120s) not 6 (~78s): on a contended alpha the destination stream's
+        // first row routinely lands past 90s (pipeline-dynamic 72/97/113 flake at this step).
+        // Comfortably inside the 5-min CI test timeout.
+        for (let attempt = 1; attempt <= 10; attempt++) {
+            if (await this.timestampColumnMenu.isVisible({ timeout: 9000 }).catch(() => false)) {
                 break;
             }
             // Re-trigger the search so newly-indexed rows are picked up.
             await runQueryBtn.first().click({ timeout: 5000 }).catch(() => {});
             await this.page.waitForTimeout(3000);
         }
-        await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 15000 });
+        await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 20000 });
         await this.timestampColumnMenu.click();
     }
 
@@ -2572,7 +2605,10 @@ export class PipelinesPage {
      * Wait for query node to be visible
      * @param {number} timeout - Timeout in ms (default: 30000)
      */
-    async waitForQueryNodeVisible(timeout = 30000) {
+    async waitForQueryNodeVisible(timeout = 45000) {
+        // 45s (was 30s): under sustained full-shard load the query node's canvas render
+        // lags past 30s after saveQuery (pipelines:180 hard-failed on cloud but passes
+        // solo — a heavy-load render lag, not a missing node). Matches the CI actionTimeout.
         await this.queryNode.first().waitFor({ state: 'visible', timeout });
     }
 

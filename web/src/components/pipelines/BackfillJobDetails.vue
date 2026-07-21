@@ -436,13 +436,6 @@ const getStatusLabel = (status: string, deletionStatus?: any) => {
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
-const getProgressColor = (deletionStatus?: any) => {
-  if (deletionStatus && typeof deletionStatus === "string" && ["pending", "in_progress"].includes(deletionStatus)) {
-    return "blue";
-  }
-  return "positive";
-};
-
 const getDeletionStatusLabel = (status?: any) => {
   if (!status || status === "not_required") return "Not Required";
   if (typeof status === "object" && "failed" in status) return "Failed";

@@ -69,7 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <OIcon class="h-2.5! w-2.5! m-0.5!">
+          <!-- name="" → OIcon renders the slotted custom SVG -->
+          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
             <EqualIcon />
           </OIcon>
         </OButton>
@@ -82,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <OIcon class="h-2.5! w-2.5! m-0.5!">
+          <OIcon name="" class="h-2.5! w-2.5! m-0.5!">
             <NotEqualIcon />
           </OIcon>
         </OButton>
@@ -100,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              dim — and the scrim is 70% of surface-base (white), which on this
              panel's grey surface just reads as a white block. -->
         <OInnerLoading
-          :showing="fieldValues?.isLoading && !displayValues.length"
+          :showing="!!fieldValues?.isLoading && !displayValues.length"
           label="Fetching values..."
           size="xs"
           :scrim="false"
@@ -211,6 +212,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 
 interface FieldValues {
   isLoading: boolean;
@@ -318,7 +320,13 @@ const displayValues = computed(() => {
   // No API values — fall back to synthetic entries for each selected value so
   // they remain visible and removable (count: null signals no data available).
   if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
-    return selectedValues.value.map((v) => ({ key: v, count: null as unknown as number, synthetic: true }));
+    return selectedValues.value.map(
+      (v): { key: string; count: number; label?: string; synthetic: boolean } => ({
+        key: v,
+        count: null as unknown as number,
+        synthetic: true,
+      }),
+    );
   }
 
   return [];
@@ -389,7 +397,9 @@ watch(
  * Immediately emits the updated selection with the current filter mode,
  * or emits remove-field-filter when all values are unchecked.
  */
-const handleUserCheckboxChange = (newValues: string[]) => {
+const handleUserCheckboxChange = (value: CheckboxModelValue) => {
+  // Array (group) mode: OCheckbox emits the current selection as primitives.
+  const newValues = Array.isArray(value) ? value.map(String) : [];
   selectedValues.value = newValues;
   if (newValues.length === 0) {
     emit("remove-field-filter", props.fieldName);
@@ -439,16 +449,6 @@ watch(
     }
   },
 );
-
-/**
- * Returns the colour token for a value's checkbox.
- * Excluded values (!=) render red ("negative") to visually distinguish them
- * from included values (=) which render the default blue ("primary").
- */
-const checkboxColor = (key: string): string => {
-  if (props.activeExcludeValues?.includes(key)) return "negative";
-  return "primary";
-};
 
 /**
  * Resets the panel to match the current active filter state.

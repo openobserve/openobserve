@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
-import { useStore } from "vuex";
 import searchService from "@/services/search";
 
 export interface ValueDistribution {
@@ -70,7 +69,6 @@ export interface LatencyInsightsConfig {
 }
 
 export function useLatencyInsightsAnalysis() {
-  const store = useStore();
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -82,7 +80,10 @@ export function useLatencyInsightsAnalysis() {
     dimensionName: string,
     streamName: string,
     timeRange: { startTime: number; endTime: number },
-    durationFilter: { start: number; end: number } | null,
+    durationFilter:
+      | { start: number; end: number; timeStart?: number; timeEnd?: number }
+      | null
+      | undefined,
     baseFilter?: string,
     applyDurationFilter: boolean = true,
   ) => {
@@ -132,7 +133,10 @@ export function useLatencyInsightsAnalysis() {
     dimensionName: string,
     streamName: string,
     timeRange: { startTime: number; endTime: number },
-    durationFilter: { start: number; end: number } | null,
+    durationFilter:
+      | { start: number; end: number; timeStart?: number; timeEnd?: number }
+      | null
+      | undefined,
     baseFilter?: string,
     applyDurationFilter: boolean = true,
   ) => {

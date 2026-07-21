@@ -393,7 +393,7 @@ const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
   if (!frame?.source_info) return;
 
   // Calculate the relative line number within the displayed source snippet
-  const { stack_line, source_line_start, source_line_end } = frame.source_info;
+  const { stack_line, source_line_start } = frame.source_info;
 
   // Monaco editor is 1-indexed
   // The source snippet starts at source_line_start and the error is at stack_line
@@ -490,15 +490,6 @@ const translateStackTrace = async () => {
 
       // Store in cache
       setCachedTranslation(cacheKey, translatedData);
-
-
-      // Log each frame for debugging
-      translatedStackTrace.value.forEach((trace, idx) => {
-        trace.stack.forEach((frame, frameIdx) => {
-          if (frame.source_info) {
-          }
-        });
-      });
 
       // Highlight the first frame after the editors are mounted
       await nextTick();

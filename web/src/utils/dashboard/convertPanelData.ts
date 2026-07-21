@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
-import {
-  convertMultiSQLData,
-  convertSQLData,
-} from "@/utils/dashboard/convertSQLData";
+import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
 import {
   convertTableData,
   convertMultiQueryTableData,
@@ -247,6 +244,7 @@ export const convertPanelData = async (
           throw new Error("No data found");
       }
     }
+    // falls through — custom chart without data resolves to the default empty result
     default: {
       return {};
     }

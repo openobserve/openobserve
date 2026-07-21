@@ -41,7 +41,7 @@ class ResizeObserver {
     this.callback = callback;
   }
 
-  observe(element: Element, _options?: ResizeObserverOptions) {
+  observe(element: Element) {
     this.elements.add(element);
     const rect = element.getBoundingClientRect();
     this.callback(

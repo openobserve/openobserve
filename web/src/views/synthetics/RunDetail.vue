@@ -78,14 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-xs"
-            icon-left="chevron_left"
+            icon-left="chevron-left"
             :disabled="true"
             data-test="synthetics-run-detail-prev-btn"
           />
           <OButton
             variant="ghost"
             size="icon-xs"
-            icon-left="chevron_right"
+            icon-left="chevron-right"
             :disabled="true"
             data-test="synthetics-run-detail-next-btn"
           />
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
-          icon-left="open_in_new"
+          icon-left="open-in-new"
           data-test="synthetics-run-detail-trace-btn"
         >
           {{ t('synthetics.runDetail.openTrace') }}
@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                   <span class="flex-1" />
                   <span class="font-mono text-2xs text-text-secondary">
-                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep.id, total: steps.length }) }}
+                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep?.id, total: steps.length }) }}
                   </span>
                 </OCardSection>
                 <OSeparator />
@@ -439,7 +439,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="logs">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-logs-empty"
             >
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="traces">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-traces-empty"
             >
@@ -475,7 +475,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTabPanel name="rum">
           <div class="h-full flex items-center justify-center">
             <OEmptyState
-              preset="no-results"
+              preset="no-search-results"
               size="block"
               data-test="synthetics-run-detail-rum-empty"
             >
@@ -554,6 +554,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { computed, nextTick, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -598,7 +599,7 @@ const emit = defineEmits<{
   (
     e: "update-status",
     status: {
-      variant: string;
+      variant: BadgeVariant;
       icon: string;
       label: string;
       url: string;
@@ -927,6 +928,9 @@ const stepsWithTotal = computed(() => {
   return steps.value.map((s) => ({ ...s, _totalDuration: total }));
 });
 
+/** Current step shown in the session-replay panel (first step for now). */
+const selectedStep = computed<StepRow | null>(() => steps.value[0] ?? null);
+
 // ── Screenshot lightbox ──────────────────────────────────────────────────────
 const lightboxStepId = ref<number | null>(null);
 
@@ -1087,7 +1091,14 @@ const statusChip = computed(() => {
   };
 });
 
-const infoChips = computed(() => [
+interface InfoChip {
+  label: string;
+  value: string;
+  icon: string;
+  colorClass?: string;
+}
+
+const infoChips = computed<InfoChip[]>(() => [
   statusChip.value,
   { label: t('synthetics.results.duration'), value: fmtDur(currentRun.value.duration), icon: "schedule" },
   {

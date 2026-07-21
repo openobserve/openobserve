@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { ref, type Ref, defineComponent, computed } from "vue";
+import { ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -116,7 +116,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { OEmptyState, OTable, OUserCell, OButton, OTooltip, OSpinner, OCheckbox },
+  components: { OEmptyState, OTable, OUserCell, OButton, OTooltip },
   props: {
     rows: {
       type: Array,
@@ -145,8 +145,6 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { isMetaOrg } = useIsMetaOrg();
-    const resultTotal = ref<number>(0);
-
     const loadingState = ref(false);
 
     const deleteDialog = ref({

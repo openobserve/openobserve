@@ -30,9 +30,7 @@ import {
   watch,
   onUnmounted,
   nextTick,
-  onBeforeMount,
 } from "vue";
-import { useStore } from "vuex";
 
 import L from "leaflet";
 import "@/utils/dashboard/leaflet-echarts/index";
@@ -155,7 +153,6 @@ export default defineComponent({
       ? { ...props.data.options.lmap }
       : {};
 
-    const store = useStore();
     const windowResizeEventCallback = async () => {
       await nextTick();
       await nextTick();
@@ -221,7 +218,7 @@ export default defineComponent({
 
     watch(
       () => props.data.options,
-      async (newOptions) => {
+      async () => {
         await nextTick();
         chart?.resize();
         const options = {

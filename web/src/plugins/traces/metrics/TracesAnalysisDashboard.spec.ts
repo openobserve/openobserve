@@ -514,48 +514,6 @@ describe("TracesAnalysisDashboard", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Computed: isCustomSQLMode
-  // -------------------------------------------------------------------------
-  describe("computed isCustomSQLMode", () => {
-    it("should be false when baseFilter is a plain filter expression", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ baseFilter: "service_name = 'api'" });
-      await flushPromises();
-      expect(wrapper.vm.isCustomSQLMode).toBe(false);
-    });
-
-    it("should be true when baseFilter starts with SELECT", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        baseFilter: "SELECT * FROM stream WHERE env = 'prod'",
-      });
-      await flushPromises();
-      expect(wrapper.vm.isCustomSQLMode).toBe(true);
-    });
-
-    it("should be true when baseFilter starts with lowercase 'select'", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ baseFilter: "select * from stream" });
-      await flushPromises();
-      expect(wrapper.vm.isCustomSQLMode).toBe(true);
-    });
-
-    it("should be false when baseFilter is undefined", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ baseFilter: undefined });
-      await flushPromises();
-      expect(wrapper.vm.isCustomSQLMode).toBe(false);
-    });
-
-    it("should be false when baseFilter is an empty string", async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({ baseFilter: "" });
-      await flushPromises();
-      expect(wrapper.vm.isCustomSQLMode).toBe(false);
-    });
-  });
-
-  // -------------------------------------------------------------------------
   // Computed: availableTabs
   // -------------------------------------------------------------------------
   describe("computed availableTabs", () => {
@@ -959,27 +917,6 @@ describe("TracesAnalysisDashboard", () => {
       const before = wrapper.vm.selectedDimensions;
       wrapper.vm.toggleDimension("span_status");
       expect(wrapper.vm.selectedDimensions).not.toBe(before);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Method: getDimensionLabel
-  // -------------------------------------------------------------------------
-  describe("method getDimensionLabel", () => {
-    beforeEach(async () => {
-      wrapper.unmount();
-      wrapper = mountComponent({
-        streamFields: [{ name: "service_name" }, { name: "span_status" }],
-      });
-      await flushPromises();
-    });
-
-    it("should return the label when the dimension value exists in availableDimensions", () => {
-      expect(wrapper.vm.getDimensionLabel("service_name")).toBe("service_name");
-    });
-
-    it("should return the raw value as fallback when dimension is not in the list", () => {
-      expect(wrapper.vm.getDimensionLabel("unknown_field")).toBe("unknown_field");
     });
   });
 

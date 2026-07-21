@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   import { useI18n } from "vue-i18n";
   import { useStore } from "vuex";
   import { getImageURL } from "@/utils/zincutils";
-  import { moveDashboardToAnotherFolder, moveModuleToAnotherFolder } from "@/utils/commons";
+  import { moveModuleToAnotherFolder } from "@/utils/commons";
   import { useLoading } from "@/composables/useLoading";
   import useNotifications from "@/composables/useNotifications";
   import SelectFolderDropDown from "./SelectFolderDropDown.vue";
@@ -67,11 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       },
       moduleId: {
         type: Array,
-        default: [],
+        default: () => [],
       },
       anomalyConfigIds: {
         type: Array,
-        default: [],
+        default: () => [],
       },
       type: {
         type: String,

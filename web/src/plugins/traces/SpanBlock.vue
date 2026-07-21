@@ -81,15 +81,12 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
-  nextTick,
   watch,
-  onActivated,
 } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { b64EncodeStandard } from "@/utils/zincutils";
 
 // TODO(design-tokens): fallback bar colour for a span the trace colour allocator
 // never assigned. No semantic token fits — it is a categorical "unassigned span"
@@ -227,7 +224,7 @@ export default defineComponent({
 
     watch(
       () => spanBlockWidth.value + leftPosition.value + spanWidth.value,
-      (val) => {
+      () => {
         durationStyle.value = getDurationStyle();
       },
     );

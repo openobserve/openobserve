@@ -26,7 +26,7 @@
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
+import { computed, defineComponent, inject, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 

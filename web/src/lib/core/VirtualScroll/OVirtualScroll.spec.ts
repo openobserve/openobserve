@@ -1,8 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { defineComponent, h, ref, nextTick } from "vue";
+import { h, ref, nextTick } from "vue";
 import OVirtualScroll from "./OVirtualScroll.vue";
 
 // @tanstack/vue-virtual uses DOM measurements that jsdom doesn't support.

@@ -14,7 +14,7 @@ function replaceAbsoluteUrlsWithProxies(
   cssString,
   excludedDomains = []
 ) {
-  const urlRegex = /url\(\s*(['"]?)(https?:\/\/[^'"\)]+)\1\s*\)/g;
+  const urlRegex = /url\(\s*(['"]?)(https?:\/\/[^'")]+)\1\s*\)/g;
 
   function replaceWithProxy(match, t1, url) {
     const isExcluded = excludedDomains.some((domain) => url.includes(domain));

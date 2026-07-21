@@ -17,9 +17,45 @@ import { ref } from "vue";
 import patternsService from "@/services/patterns";
 import type { SearchRequestPayload } from "@/ts/interfaces";
 
+// A single UI-shaped pattern (raw backend fields + values derived in extractPatterns)
+export interface TransformedPattern {
+  template: string;
+  percentage: number;
+  count: number;
+  sample_logs: unknown[];
+  z_score: number;
+  avg_frequency: number;
+  wildcard_values: unknown[];
+  // preserves any additional raw backend fields spread onto the pattern
+  [key: string]: unknown;
+}
+
+// Aggregate stats returned alongside the extracted patterns
+export interface PatternStatistics {
+  total_patterns_found?: number;
+  total_logs_analyzed?: number;
+  extraction_time_ms?: number;
+  [key: string]: unknown;
+}
+
+// Full patterns payload stored in state: backend response.data plus transformed patterns
+export interface PatternsResult {
+  patterns: TransformedPattern[];
+  statistics?: PatternStatistics;
+  // response.data may carry extra fields beyond patterns/statistics
+  [key: string]: unknown;
+}
+
 // Separate state for patterns (completely isolated from logs state)
-export const patternsState = ref({
-  patterns: null as any,
+export const patternsState = ref<{
+  patterns: PatternsResult | null;
+  loading: boolean;
+  error: string | null;
+  lastQuery: SearchRequestPayload | null;
+  // Configurable pattern-extraction scan size; may be absent until set by UI
+  scanSize?: number;
+}>({
+  patterns: null,
   loading: false,
   error: null as string | null,
   lastQuery: null as SearchRequestPayload | null,
@@ -85,6 +121,13 @@ export default function usePatterns() {
           avg_frequency: pattern.avg_frequency ?? 0,
           // Per-wildcard value distributions for hover tooltips
           wildcard_values: pattern.wildcard_values ?? [],
+          // Per-pattern volume sparkline + dominant service (enterprise backend;
+          // absent on older backends → safe empty defaults).
+          time_buckets: pattern.time_buckets ?? [],
+          service: pattern.service ?? null,
+          service_other_count: pattern.service_other_count ?? 0,
+          // Dominant status/level read from the log's severity/level field.
+          level: pattern.level ?? null,
         }),
       );
 
@@ -140,7 +183,7 @@ export default function usePatterns() {
    * Check if patterns exist
    */
   const hasPatterns = () => {
-    return patternsState.value.patterns?.patterns?.length > 0;
+    return (patternsState.value.patterns?.patterns?.length ?? 0) > 0;
   };
 
   return {

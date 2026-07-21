@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
-import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 
@@ -54,7 +54,7 @@ vi.mock("@/utils/zincutils", async () => {
   return {
     ...actual,
     getImageURL: vi.fn(() => "mocked-image-url"),
-    mergeRoutes: vi.fn((route1: any, route2: any) => route1)
+    mergeRoutes: vi.fn((route1: any) => route1)
   };
 });
 

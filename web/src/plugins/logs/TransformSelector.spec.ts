@@ -14,7 +14,7 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import TransformSelector from "./TransformSelector.vue";
 
 // ── Mock vue-i18n ──────────────────────────────────────────────────────────────
@@ -506,7 +506,7 @@ describe("TransformSelector", () => {
   describe("Save button disabled state", () => {
     it("save button is enabled when transformType is 'function'", async () => {
       mockSearchObj.data.transformType = "function";
-      const wrapper = mountComponent();
+      mountComponent();
       await flushPromises();
       // The save button uses :disable="searchObj.data.transformType !== 'function'"
       // transformType is 'function' so disabled = false
@@ -517,46 +517,14 @@ describe("TransformSelector", () => {
 
     it("save button is disabled when transformType is 'action'", () => {
       mockSearchObj.data.transformType = "action";
-      const wrapper = mountComponent();
+      mountComponent();
       expect(mockSearchObj.data.transformType !== "function").toBe(true);
     });
 
     it("save button is disabled when no transformType", () => {
       mockSearchObj.data.transformType = null;
-      const wrapper = mountComponent();
+      mountComponent();
       expect(mockSearchObj.data.transformType !== "function").toBe(true);
-    });
-  });
-
-  // ── functionToggleIcon ───────────────────────────────────────────────────────
-  describe("functionToggleIcon computed", () => {
-    it("returns dark function icon when toggleFunction is true", () => {
-      mockSearchObj.meta.toggleFunction = true;
-      const wrapper = mountComponent();
-      expect(wrapper.vm.functionToggleIcon).toContain("function_dark.svg");
-    });
-
-    it("returns light function icon when toggleFunction is false", () => {
-      mockSearchObj.meta.toggleFunction = false;
-      const wrapper = mountComponent();
-      expect(wrapper.vm.functionToggleIcon).toContain("function.svg");
-      expect(wrapper.vm.functionToggleIcon).not.toContain("function_dark.svg");
-    });
-  });
-
-  // ── iconRight ────────────────────────────────────────────────────────────────
-  describe("iconRight computed", () => {
-    it("returns dark function icon in dark theme", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = mountComponent();
-      expect(wrapper.vm.iconRight).toContain("function_dark.svg");
-    });
-
-    it("returns light function icon in light theme", () => {
-      mockStore.state.theme = "light";
-      const wrapper = mountComponent();
-      expect(wrapper.vm.iconRight).toContain("function.svg");
-      expect(wrapper.vm.iconRight).not.toContain("function_dark.svg");
     });
   });
 

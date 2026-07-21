@@ -242,11 +242,11 @@ export function usePanelDownload({
 
           // Iterate through each response item (multiple queries can produce multiple responses)
           // Use filteredData to exclude hidden queries
-          filteredData?.value?.forEach((promData: any, queryIndex: number) => {
+          filteredData?.value?.forEach((promData: any) => {
             if (!promData?.result || !Array.isArray(promData.result)) return;
 
             // Iterate through each result (time series)
-            promData.result.forEach((series: any, seriesIndex: number) => {
+            promData.result.forEach((series: any) => {
               const metricLabels = series.metric || {};
 
               // Iterate through values array (timestamp, value pairs)
@@ -294,7 +294,7 @@ export function usePanelDownload({
           const flattenedData: any[] = [];
 
           // Iterate through all datasets/arrays in the response
-          data?.value?.forEach((dataset: any, datasetIndex: number) => {
+          data?.value?.forEach((dataset: any) => {
             // Skip if dataset is empty or not an array
             if (!dataset || !Array.isArray(dataset) || dataset.length === 0)
               return;
@@ -323,10 +323,10 @@ export function usePanelDownload({
 
           // Create CSV content with headers and data rows
           csvContent = [
-            headers?.join(","), // Headers row
-            ...flattenedData?.map((row: any) =>
+            headers.join(","), // Headers row
+            ...flattenedData.map((row: any) =>
               headers
-                ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
+                .map((header: any) => wrapCsvValue(row[header] ?? ""))
                 .join(","),
             ),
           ].join("\r\n");

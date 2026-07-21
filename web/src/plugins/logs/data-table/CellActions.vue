@@ -25,7 +25,7 @@
         :data-test="`log-details-include-field-${row[column.id]}`"
         :title="t('logs.cellActions.includeTerm')"
       >
-        <OIcon style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 8px; width: 8px">
           <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
@@ -40,7 +40,7 @@
         :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
-        <OIcon style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 8px; width: 8px">
           <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>

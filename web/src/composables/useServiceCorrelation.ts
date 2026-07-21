@@ -27,7 +27,6 @@ import type { TelemetryContext, TelemetryType, CorrelationResult } from "@/utils
 import {
   extractSemanticDimensions,
   generateCorrelationQueries,
-  findMatchingService,
   filterDimensionsForCorrelation,
 } from "@/utils/telemetryCorrelation";
 import { loadIdentityConfig, clearIdentityConfigCache, clearAllIdentityConfigCache } from "@/utils/identityConfig";

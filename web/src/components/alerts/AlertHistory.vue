@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-history-page"
     :title="t('alerts.history')"
     title-data-test="alerts-history-title"
-    :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
+    :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-history-back-btn' }"
     bleed
   >
       <template #actions>
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="w-1/2">
                   <div class="text-xs text-text-secondary mb-1">Timestamp</div>
                   <div class="text-sm">
-                    {{ formatDate(selectedRow.timestamp) }}
+                    {{ formatHistoryDate(selectedRow.timestamp) }}
                   </div>
                 </div>
                 <div class="w-1/2">
@@ -438,7 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -502,7 +502,8 @@ const dateTimeValues = ref({
 const detailsDialog = ref(false);
 const errorDialog = ref(false);
 const selectedRow = ref<any>(null);
-const errorMessage = ref("");
+// Holds the clicked history row (or ""/null when cleared) — see showErrorDialog.
+const errorMessage = ref<any>("");
 
 // Table columns
 const columns = ref<OTableColumnDef[]>([
@@ -618,11 +619,6 @@ const columns = ref<OTableColumnDef[]>([
 ]);
 
 // Computed
-const filteredRows = computed(() => {
-  // Removed client-side filtering as we're using server-side pagination
-  return rows.value;
-});
-
 // Methods
 const fetchAlertsList = async () => {
   try {
@@ -647,22 +643,13 @@ const fetchAlertsList = async () => {
           label: alert.name,
           value: alert.alert_id,
         }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
       filteredAlertOptions.value = [...allAlerts.value];
     }
   } catch (error: any) {
     console.error("Error fetching alerts list:", error);
     // Silently fail - user can still type alert names manually
   }
-};
-
-const filterAlertOptions = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredAlertOptions.value = allAlerts.value.filter((v) =>
-      v.label.toLowerCase().includes(needle),
-    );
-  });
 };
 
 const onAlertSelected = (val: any) => {
@@ -779,7 +766,7 @@ const refreshData = () => {
   fetchAlertHistory();
 };
 
-const formatDate = (timestamp: number) => {
+const formatHistoryDate = (timestamp: number) => {
   if (!timestamp) return "-";
   // Convert microseconds to milliseconds
   const dateObj = new Date(timestamp / 1000);

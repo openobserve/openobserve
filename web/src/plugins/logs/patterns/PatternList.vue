@@ -18,57 +18,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="flex flex-col h-full">
     <!-- Patterns Table — hidden during loading so skeleton always shows on re-run -->
     <div v-if="!loading && patterns?.length > 0" class="flex flex-col">
+      <!-- Severity filter chips (multi-select; none selected = all) -->
+      <div
+        class="flex items-center gap-2 px-3 py-2 border-b border-table-header-border flex-wrap"
+        data-test="pattern-list-severity-filter"
+      >
+        <OToggleGroup
+          type="multiple"
+          :model-value="activeSeverities"
+          @update:model-value="onSeverityFilterChange"
+        >
+          <OToggleGroupItem
+            v-for="sev in severityChips"
+            :key="sev.key"
+            :value="sev.key"
+            size="xs"
+            :data-test="`pattern-severity-chip-${sev.key}`"
+          >
+            <span :class="sev.colorClass">{{ sev.label }}</span>
+            <span class="ml-1 tabular-nums opacity-70">{{ sev.countLabel }}</span>
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </div>
+
       <!-- Table Header -->
       <div
-        class="flex items-center border-b border-table-header-border bg-table-header-bg min-w-full"
+        class="flex items-center gap-3 border-b border-table-header-border bg-table-header-bg min-w-full"
       >
-        <!-- Pattern Column Header -->
-        <div
-          class="flex-1 min-w-0 px-2 relative table-head text-ellipsis text-left"
-        >
-          <span
-            class="font-medium text-table-header-text text-xs"
-          >
-            {{ t("search.patternColumnHeader") }}
-          </span>
+        <div class="w-28 flex-shrink-0 pl-3 pr-1 table-head text-left">
+          <span class="font-medium text-table-header-text text-xs">{{ t("search.occurrenceColumnHeader") }}</span>
         </div>
-
-        <!-- Count & Percentage Column Header -->
-        <div
-          class="w-24 flex-shrink-0 px-2 relative table-head text-ellipsis text-right"
-        >
-          <span
-            class="font-medium text-table-header-text text-xs"
-          >
-            {{ t("search.occurrenceColumnHeader") }}
-          </span>
+        <div class="w-44 flex-shrink-0 table-head text-left">
+          <span class="font-medium text-table-header-text text-xs">{{ t("logs.patternList.volumeHeader") }}</span>
         </div>
-
-        <!-- Actions Column - No Header (width matches PatternCard's actions) -->
-        <div
-          class="w-20 flex-shrink-0 px-2 relative table-head"
-        ></div>
+        <div class="w-20 flex-shrink-0 table-head text-left">
+          <span class="font-medium text-table-header-text text-xs">{{ t("logs.patternList.statusHeader") }}</span>
+        </div>
+        <div class="w-32 flex-shrink-0 table-head text-left">
+          <span class="font-medium text-table-header-text text-xs">{{ t("logs.patternList.serviceHeader") }}</span>
+        </div>
+        <div class="flex-1 min-w-0 table-head text-left">
+          <span class="font-medium text-table-header-text text-xs">{{ t("search.patternColumnHeader") }}</span>
+        </div>
       </div>
 
       <!-- Patterns List: plain render when wrap is on (variable row heights break virtual scroll) -->
       <template v-if="wrap">
         <PatternCard
-          v-for="(pattern, index) in patterns"
+          v-for="(pattern, index) in filteredPatterns"
           :key="pattern.pattern_id ?? index"
           :pattern="pattern"
           :index="index"
           :wrap="wrap"
-          @click="$emit('open-details', pattern, index)"
-          @include="$emit('add-to-search', pattern, 'include')"
-          @exclude="$emit('add-to-search', pattern, 'exclude')"
-          @create-alert="$emit('create-alert', pattern)"
+          :max-frequency="maxFrequency"
+          @click="openDetails(pattern, index)"
         />
       </template>
 
       <!-- Patterns List with Virtual Scroll (wrap off) -->
       <OVirtualScroll
         v-else
-        :items="patterns"
+        :items="filteredPatterns"
         :overscan="5"
         :scroll-target="scrollTarget ?? null"
         :dynamic-row-height="true"
@@ -78,10 +88,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :pattern="pattern"
             :index="index"
             :wrap="wrap"
-            @click="$emit('open-details', pattern, index)"
-            @include="$emit('add-to-search', pattern, 'include')"
-            @exclude="$emit('add-to-search', pattern, 'exclude')"
-            @create-alert="$emit('create-alert', pattern)"
+            :max-frequency="maxFrequency"
+            @click="openDetails(pattern, index)"
           />
         </template>
       </OVirtualScroll>
@@ -106,7 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-24 flex-shrink-0 px-2 flex justify-end">
           <span class="pattern-skel-pill inline-block h-3 w-14 rounded-default" aria-hidden="true" />
         </div>
-        <div class="w-20 flex-shrink-0 px-2" />
       </div>
 
       <!-- Skeleton rows mimicking PatternCard layout -->
@@ -126,15 +133,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="w-24 flex-shrink-0 px-2 flex flex-col items-end gap-1">
           <span class="pattern-skel-pill inline-block h-3 w-12 rounded-default" aria-hidden="true" />
           <span class="pattern-skel-pill inline-block h-2 w-10 rounded-default" aria-hidden="true" />
-        </div>
-        <!-- Actions column — 3 icon-sized circles -->
-        <div class="w-20 flex-shrink-0 px-2 flex items-center justify-center gap-1">
-          <span
-            v-for="i in 3"
-            :key="i"
-            class="pattern-skel-pill inline-block w-7 h-7 rounded-full shrink-0"
-            aria-hidden="true"
-          />
         </div>
       </div>
     </div>
@@ -191,7 +189,15 @@ import useWildcardHover from "./useWildcardHover";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
-import { computed } from "vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import {
+  patternSeverityKeyForPattern,
+  severityTextClass,
+  compactCount,
+  type PatternSeverityKey,
+} from "./patternUtils";
+import { computed, ref, watch } from "vue";
 import { DateTime } from "luxon";
 
 const SKELETON_WIDTHS = [
@@ -228,12 +234,15 @@ const props = defineProps<{
   streamDocTimeRange?: { min: number; max: number };
   /** Resolved current query window (µs) — from the logs Index. */
   queryWindowUs?: { start: number; end: number };
+  /** Exact event count for the window, owned by SearchResult so the "N events"
+   * chip and these severity chips are scaled by the same number. */
+  windowTotal?: number | null;
 }>();
 
 const emit = defineEmits<{
-  (e: "open-details", pattern: any, index: number): void;
-  (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
-  (e: "create-alert", pattern: any): void;
+  // The visible (severity-filtered) list is passed so the details drawer's
+  // Next/Prev and "X of Y" navigate the same collection the index came from.
+  (e: "open-details", pattern: any, index: number, visiblePatterns: any[]): void;
   (e: "filter-value", value: string, action: "include" | "exclude"): void;
   (e: "jump-to-stream-data", fromUs: number, toUs: number): void;
 }>();
@@ -241,11 +250,120 @@ const emit = defineEmits<{
 const store = useStore();
 const { t } = useI18n();
 
+// Severity chips scale the sample's share up to the window's real total, which
+// SearchResult owns — one count query feeds both that chip row and its
+// "N events" chip, so the two can never disagree.
+//
+// Deliberately not the sum of per-pattern volumes: those come from match_all()
+// on a template's constant text, which matches a superset of that pattern's own
+// logs and can be identical for two different templates, so summing them
+// double-counts. Shares stay on the sample, which IS a clean partition.
+
+/** Scale a sample-derived share to the whole window when the total is known. */
+const scaleToWindow = (sampleCount: number): number | null => {
+  const analyzed = props.totalLogsAnalyzed ?? 0;
+  const total = props.windowTotal ?? null;
+  if (!total || analyzed <= 0) return null;
+  return Math.round((sampleCount / analyzed) * total);
+};
+
+const openDetails = (pattern: any, index: number) => {
+  emit(
+    "open-details",
+    pattern,
+    index,
+    filteredPatterns.value,
+  );
+};
+
 const {
   hoveredToken,
   onPopoverEnter,
   onPopoverLeave,
 } = useWildcardHover();
+
+// --- Severity filter (multi-select; empty = show all) -----------------------
+const SEVERITY_ORDER: PatternSeverityKey[] = [
+  "error",
+  "warning",
+  "info",
+  "debug",
+  "uncategorized",
+];
+const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
+  error: "logs.patternList.severityError",
+  warning: "logs.patternList.severityWarning",
+  info: "logs.patternList.severityInfo",
+  debug: "logs.patternList.severityDebug",
+  uncategorized: "logs.patternList.severityUncategorized",
+};
+
+const activeSeverities = ref<PatternSeverityKey[]>([]);
+
+const onSeverityFilterChange = (value: unknown) => {
+  activeSeverities.value = Array.isArray(value)
+    ? (value as PatternSeverityKey[])
+    : [];
+};
+
+// Chip counts come from the extraction sample, which is a clean partition
+// (every analyzed log belongs to exactly one pattern). They're then scaled to
+// the window's true total so the chips read in real magnitudes.
+const severityCounts = computed<Record<PatternSeverityKey, number>>(() => {
+  const counts: Record<PatternSeverityKey, number> = {
+    error: 0,
+    warning: 0,
+    info: 0,
+    debug: 0,
+    uncategorized: 0,
+  };
+  for (const p of props.patterns ?? []) {
+    counts[patternSeverityKeyForPattern(p)] += p?.frequency ?? 0;
+  }
+  return counts;
+});
+
+// Only surface chips for severities actually present, in fixed severity order.
+const severityChips = computed(() =>
+  SEVERITY_ORDER.filter((key) => severityCounts.value[key] > 0).map((key) => {
+    const scaled = scaleToWindow(severityCounts.value[key]);
+    return {
+      key,
+      label: t(SEVERITY_LABEL_KEY[key]),
+      countLabel:
+        scaled !== null
+          ? `~${compactCount(scaled)}`
+          : severityCounts.value[key].toLocaleString(),
+      colorClass: severityTextClass(key),
+    };
+  }),
+);
+
+// Drop any active severity that no longer exists in the current result set
+// (e.g. after a re-run returns patterns of different severities). Without this
+// the chip disappears while the filter stays applied, stranding the user on an
+// empty list with no chip to clear. Since every surviving chip has count>0
+// (≥1 pattern), pruning also guarantees filteredPatterns is never empty here.
+watch(severityChips, (chips) => {
+  const available = new Set(chips.map((c) => c.key));
+  const pruned = activeSeverities.value.filter((k) => available.has(k));
+  if (pruned.length !== activeSeverities.value.length) {
+    activeSeverities.value = pruned;
+  }
+});
+
+const filteredPatterns = computed(() => {
+  const all = props.patterns ?? [];
+  if (!activeSeverities.value.length) return all;
+  const active = new Set(activeSeverities.value);
+  return all.filter((p) => active.has(patternSeverityKeyForPattern(p)));
+});
+
+// Share bars scale against sample frequencies — the same clean partition the
+// percentages use, so bars and percentages stay consistent with each other.
+const maxFrequency = computed(() =>
+  filteredPatterns.value.reduce((max, p) => Math.max(max, p?.frequency ?? 0), 0),
+);
 
 // --- "jump to latest data" (parity with the logs search empty state) --------
 const FIFTEEN_MINS_US = 15 * 60 * 1_000_000;

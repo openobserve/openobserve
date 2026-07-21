@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "netflow";
-const store = useStore();
-const { endpoint, networkingContent, networkingDocURLs } = useIngestion();
+const { networkingContent, networkingDocURLs } = useIngestion();
 const content = networkingContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = networkingDocURLs[name];
 </script>

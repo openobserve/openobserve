@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
 
-        <template #expansion="{ row }">
+        <template #expansion="{ row }: { row: PipelineRow }">
           <div
             v-if="row?.sql_query"
             data-test="scheduled-pipeline-expanded-content"
@@ -446,7 +446,6 @@ import pipelineService from "@/services/pipelines";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 
-import NoData from "../shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -475,6 +474,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 const { t } = useI18n();
 const router = useRouter();
 
+// Row original data rendered by the pipelines table. Only the fields read in the
+// expansion slot are declared here; scheduled rows carry the derived SQL query.
+interface PipelineRow {
+  sql_query?: string;
+}
 
 const filterQuery = ref("");
 
@@ -483,7 +487,6 @@ const showCreatePipeline = ref(false);
 const pipelines = ref([]);
 
 const store = useStore();
-const isEnabled = ref(false);
 
 const shouldStartfromNow = ref(true);
 const resumePipelineDialogMeta: any = ref({
@@ -587,7 +590,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
       newState,
       from_now,
     )
-    .then(async (response) => {
+    .then(async () => {
       row.enabled = newState;
       const message = row.enabled
         ? `${row.name} state resumed successfully`
@@ -1158,7 +1161,7 @@ const openBackfillDialog = (pipeline: any) => {
   };
 };
 
-const onBackfillSuccess = (jobId: string) => {
+const onBackfillSuccess = () => {
   // Navigate to backfill jobs page after successful creation
   goToBackfillJobs();
 };

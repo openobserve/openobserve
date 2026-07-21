@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alerts.insights.title')"
-    :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+    :back="{ label: t('menu.alerts'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
     tabs-below
     bleed
   >
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >= {{ formatFilterValue(filter.start) }}
               </span>
               <span v-else-if="filter.end !== null">
-                <= {{ formatFilterValue(filter.end) }}
+                &lt;= {{ formatFilterValue(filter.end) }}
               </span>
             </span>
             <OIcon
@@ -275,6 +275,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
 
 const router = useRouter();
 const route = useRoute();
@@ -310,7 +311,14 @@ const alertsList = ref<any[]>([]); // Cache alerts list
 provide("selectedTabId", currentTab);
 
 // Context menu
-const contextMenu = reactive({
+const contextMenu = reactive<{
+  show: boolean;
+  x: number;
+  y: number;
+  value: number | string;
+  panelTitle: string;
+  panelId: string;
+}>({
   show: false,
   x: 0,
   y: 0,
@@ -450,7 +458,7 @@ const updateDateTime = (value: any) => {
   refreshDashboard();
 };
 
-const updateTimezone = (value: any) => {
+const updateTimezone = () => {
   // Handle timezone changes if needed
   // Currently the date-time component manages timezone internally
   // This is here for compatibility with the logs date picker
@@ -654,11 +662,12 @@ const formatFilterValue = (value: number): string => {
 
 // Action button methods
 const openDedupConfig = () => {
+  // `caption` predates OToast and is not rendered; cast keeps the object untouched.
   toast({
     variant: "info",
     message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page with dedup section focused",
-  });
+  } as ToastOptions);
 
   // TODO: Navigate to alert edit page with dedup section
   // router.push({
@@ -673,7 +682,7 @@ const editAlert = () => {
     variant: "info",
     message: `Editing alert: ${selectedAlertForAction.value}`,
     caption: "This would navigate to alert edit page",
-  });
+  } as ToastOptions);
 
   // TODO: Navigate to alert edit page
   // router.push({
@@ -681,7 +690,6 @@ const editAlert = () => {
   //   params: { alertName: selectedAlertForAction.value }
   // });
 };
-const org = 'default'
 const viewHistory = () => {
   // Navigate to alert history with filter
   router.push({

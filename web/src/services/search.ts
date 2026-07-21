@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { generateTraceContext, getWebSocketUrl } from "@/utils/zincutils";
+import { generateTraceContext } from "@/utils/zincutils";
 import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
-import stream from "./stream";
 
 const search = {
   search: (
@@ -270,7 +269,6 @@ const search = {
   metrics_query: ({
     org_identifier,
     query,
-    start_time,
     end_time,
   }: {
     org_identifier: string;
@@ -415,13 +413,8 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
     const url = `/api/${org_identifier}/search_jobs/${jobId}/cancel`;
     return http({ headers: { traceparent } }).post(url);
   },
@@ -435,13 +428,8 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
     const url = `/api/${org_identifier}/search_jobs/${jobId}/retry`;
     return http({ headers: { traceparent } }).post(url);
   },
@@ -455,13 +443,8 @@ const search = {
       jobId: string;
       traceparent?: string;
     },
-    search_type: string = "ui",
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
     const url = `/api/${org_identifier}/search_jobs/${jobId}`;
     return http({ headers: { traceparent } }).delete(url);
   },

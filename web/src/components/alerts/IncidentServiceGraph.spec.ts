@@ -17,7 +17,6 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentServiceGraph from "./IncidentServiceGraph.vue";
 import { nextTick } from "vue";
-import store from "@/test/unit/helpers/store";
 
 // Mock ChartRenderer component
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({
@@ -315,17 +314,6 @@ describe("IncidentServiceGraph.vue", () => {
     });
 
     it("should allow clicking empty state refresh button", async () => {
-      const emptyGraphData = {
-        incident_service: "service-a",
-        nodes: [],
-        edges: [],
-        stats: {
-          total_services: 0,
-          total_alerts: 0,
-          services_with_alerts: 0,
-        },
-      };
-
       wrapper = mountComponent();
       await flushPromises();
 
@@ -441,25 +429,6 @@ describe("IncidentServiceGraph.vue", () => {
 
     it("should prioritize root cause color over high alerts", async () => {
       // First node with high alert count should be red (root cause takes priority)
-      const mixedData = {
-        nodes: [
-          {
-            alert_id: "alert_high",
-            alert_name: "High Load",
-            service_name: "service-d",
-            alert_count: 10, // High alert count
-            first_fired_at: 1000000,
-            last_fired_at: 2000000,
-          },
-        ],
-        edges: [],
-        stats: {
-          total_services: 1,
-          total_alerts: 10,
-          services_with_alerts: 1,
-        },
-      };
-
       wrapper = mountComponent();
       await flushPromises();
 

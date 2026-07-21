@@ -97,7 +97,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -282,7 +281,7 @@ const saveGroupChanges = () => {
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
-    .then((res) => {
+    .then(() => {
       toast({
         variant: "success",
         message: t('iam.editGroup.updateSuccess'),

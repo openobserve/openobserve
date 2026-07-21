@@ -3,7 +3,7 @@
 
 import { provide, inject, watch } from "vue";
 import { FORM_CONTEXT_KEY, FORM_SUBMIT_STATE_KEY } from "./OForm.types";
-import { useOForm, type OFormInstance } from "./useOForm";
+import { useOForm } from "./useOForm";
 
 const props = defineProps<{
   /**
@@ -46,7 +46,7 @@ const props = defineProps<{
    * rendering. When absent, OForm creates its own form from
    * `defaultValues`/`schema`/`onSubmit`.
    */
-  form?: OFormInstance;
+  form?: ReturnType<typeof useOForm<T>>;
 }>();
 
 const emit = defineEmits<{
@@ -59,12 +59,10 @@ const emit = defineEmits<{
 // onSubmit), so handleSubmit() below runs whichever form's onSubmit.
 const form =
   props.form ??
-  useOForm<Record<string, unknown>>({
-    defaultValues: (props.defaultValues ?? {}) as Record<string, unknown>,
+  useOForm<T>({
+    defaultValues: (props.defaultValues ?? {}) as T,
     schema: props.schema,
-    onSubmit: props.onSubmit as
-      | ((values: Record<string, unknown>) => unknown | Promise<unknown>)
-      | undefined,
+    onSubmit: props.onSubmit,
   });
 
 provide(FORM_CONTEXT_KEY, form);

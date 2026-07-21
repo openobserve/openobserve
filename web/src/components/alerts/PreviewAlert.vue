@@ -60,7 +60,6 @@ import { useI18n } from "vue-i18n";
 import searchService from "@/services/search";
 import {
   b64EncodeUnicode,
-  b64DecodeUnicode,
   smartDecodeVrlFunction,
 } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -244,7 +243,7 @@ const evaluationStatus = ref<{
   wouldTrigger: boolean;
   reason: string;
 } | null>(null);
-const { t } = useI18n();
+useI18n();
 
 const store = useStore();
 
@@ -462,9 +461,6 @@ const fetchQuerySchema = async () => {
   const requestId = ++schemaRequestId.value;
 
   try {
-    const startTime = dashboardPanelData.meta.dateTime.start_time;
-    const endTime = dashboardPanelData.meta.dateTime.end_time;
-
     // ── Aggregation path ─────────────────────────────────────────────────────
     // Skip result_schema entirely. The backend SQL already follows a known
     // structure:  histogram(_timestamp) AS zo_sql_key, fn(...) AS zo_sql_val,
@@ -1040,7 +1036,12 @@ const refreshData = () => {
     },
   ];
 
-  let yAxis = [];
+  let yAxis: Array<{
+    label: string;
+    alias: string;
+    column: string;
+    color: string | null;
+  }> = [];
 
   // Handle SQL mode and custom mode with aggregations - use result_schema API to intelligently determine chart type
   if (

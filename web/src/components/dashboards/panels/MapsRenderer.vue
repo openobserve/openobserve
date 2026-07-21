@@ -25,7 +25,6 @@ import {
   onUnmounted,
   nextTick,
 } from "vue";
-import { useStore } from "vuex";
 import * as echarts from "echarts/core";
 import { MapChart } from "echarts/charts";
 import worldMap from "@/assets/dashboard/maps/map.json";

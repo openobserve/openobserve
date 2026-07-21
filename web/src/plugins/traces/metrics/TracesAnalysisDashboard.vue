@@ -62,15 +62,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
           <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
-              selectedTimeRangeDisplay.startTime,
-              selectedTimeRangeDisplay.endTime,
+              selectedTimeRangeDisplay!.startTime,
+              selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
           <span class="opacity-70 text-3xs">→</span>
           <span class="whitespace-nowrap text-2xs">{{
             formatSmartTimestamp(
-              selectedTimeRangeDisplay.startTime,
-              selectedTimeRangeDisplay.endTime,
+              selectedTimeRangeDisplay!.startTime,
+              selectedTimeRangeDisplay!.endTime,
             ).end
           }}</span>
         </div>
@@ -319,7 +319,6 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
-import { formatTimeWithSuffix } from "@/utils/zincutils";
 import {
   useLatencyInsightsAnalysis,
   type LatencyInsightsConfig,
@@ -345,6 +344,8 @@ const RenderDashboardCharts = defineAsyncComponent(
 interface DurationFilter {
   start: number;
   end: number;
+  timeStart?: number;
+  timeEnd?: number;
 }
 
 interface RateFilter {
@@ -396,12 +397,18 @@ const { isDark } = useTheme();
 const chipColors = computed(() =>
   isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,
 );
-const { loading, error, analyzeAllDimensions } = useLatencyInsightsAnalysis();
+const { loading, error } = useLatencyInsightsAnalysis();
 const { generateDashboard } = useLatencyInsightsDashboard();
 
 // Variables manager will be initialized by RenderDashboardCharts
 // and we'll receive a reference to it via the @variablesManagerReady event
-const variablesManager = ref(null);
+interface VariablesManager {
+  hasUncommittedChanges?: boolean | { value: boolean };
+  committedVariablesData?: {
+    global?: Array<{ name: string; value?: string }>;
+  };
+}
+const variablesManager = ref<VariablesManager | null>(null);
 
 const isOpen = ref(true);
 
@@ -420,7 +427,7 @@ const dimensionSearchText = ref("");
 
 // Splitter configuration for dimension selector sidebar (using percentage)
 const splitterModel = ref(25); // 25% width for dimension selector (default)
-const splitterLimits = [0, 30]; // Min 0% (allow full collapse), Max 30%
+const splitterLimits: [number, number] = [0, 30]; // Min 0% (allow full collapse), Max 30%
 const lastSplitterPosition = ref(25); // Remember last position before collapse
 
 // Percentile change tracking - use variables manager's hasUncommittedChanges
@@ -444,11 +451,6 @@ const showRefreshButton = computed(() => {
   }
 
   return false;
-});
-
-// Detect custom SQL mode
-const isCustomSQLMode = computed(() => {
-  return props.baseFilter?.trim().toUpperCase().startsWith("SELECT") || false;
 });
 
 // Active tab management
@@ -586,14 +588,6 @@ const toggleDimension = (dimensionValue: string) => {
     // Add dimension - create new array to trigger reactivity
     selectedDimensions.value = [...selectedDimensions.value, dimensionValue];
   }
-};
-
-// Get dimension label from value
-const getDimensionLabel = (dimensionValue: string): string => {
-  const dimension = availableDimensions.value.find(
-    (d) => d.value === dimensionValue,
-  );
-  return dimension?.label || dimensionValue;
 };
 
 // Handle panel deletion - extract dimension name from panel and remove from selection
@@ -810,7 +804,7 @@ const getCurrentPercentile = (): string => {
     // committedVariablesData has structure: { global: [], tabs: {}, panels: {} }
     // Percentile is likely a global variable
     const percentileVar = manager.committedVariablesData.global?.find(
-      (v: any) => v.name === "percentile",
+      (v: { name: string; value?: string }) => v.name === "percentile",
     );
     if (percentileVar && percentileVar.value !== undefined) {
       return percentileVar.value;
@@ -831,37 +825,6 @@ const refreshAfterPercentileChange = () => {
 
 const onClose = () => {
   emit("close");
-};
-
-// Helper functions for formatting
-const formatTimestamp = (microseconds: number) => {
-  const date = new Date(microseconds / 1000);
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
-};
-
-const formatFullTimestamp = (microseconds: number) => {
-  const date = new Date(microseconds / 1000);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-};
-
-const formatCompactTimestamp = (microseconds: number) => {
-  const date = new Date(microseconds / 1000);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  // Format as MM/DD HH:MM:SS (more compact)
-  return `${month}/${day} ${hours}:${minutes}:${seconds}`;
 };
 
 // Smart timestamp formatter - shows date only once if same day
@@ -1091,7 +1054,7 @@ watch(
 // Reload when active analysis type (tab) changes
 watch(
   () => activeAnalysisType.value,
-  (newTab, oldTab) => {
+  () => {
     if (isOpen.value && !loading.value) {
       loadAnalysis();
     }

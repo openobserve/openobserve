@@ -6,7 +6,7 @@
  * Used for "load more" functionality in log detail views.
  */
 
-import { ref, computed } from "vue";
+import { ref } from "vue";
 
 interface ChunkState {
   [fieldKey: string]: {

@@ -415,7 +415,6 @@ describe("IncidentDetailDrawer.vue", () => {
         data: { status: "acknowledged", updated_at: 1700000001000000 },
       });
 
-      const originalStatus = wrapper.vm.incidentDetails.status;
       await wrapper.vm.acknowledgeIncident();
 
       expect(wrapper.vm.incidentDetails.status).toBe("acknowledged");

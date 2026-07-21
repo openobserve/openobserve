@@ -229,6 +229,13 @@ considering the UI done:
 - [ ] Zero `px` values (except a `1px` hairline) — including inside class
       arbitrary values (`w-[320px]`, `text-[13px]`). Sizes use rem / % / vh / vw
       or Tailwind's rem scale.
+- [ ] **Spacing copies a sibling, never invented per page** — padding/margins/
+      gaps and card surface classes are taken verbatim from the sibling panel
+      family the screen joins (`card-container` alone styles nothing — cards
+      need explicit `bg-* border-* rounded-*` classes). A page of stacked
+      panels uses the full-height split (`flex-1 min-h-0` cards + fill-height
+      tables) so the page itself never scrolls — see
+      [conventions § Cards & stacked-panel pages](references/conventions.md).
 - [ ] Corner radius is `rounded-default` / `rounded-surface` / `rounded-full`
       only — no bare `rounded`, no `rounded-[..]`, no retired
       `rounded-{sm,md,lg,xl}`.

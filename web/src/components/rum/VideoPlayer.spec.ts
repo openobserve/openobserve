@@ -73,7 +73,7 @@ global.Worker = MockWorker as any;
 
 class MockURL {
   href: string;
-  constructor(url: string, _base?: string) {
+  constructor(url: string) {
     this.href = url;
   }
   static createObjectURL = vi.fn(() => "blob:test");

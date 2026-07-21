@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { flushPromises } from "@vue/test-utils";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -239,7 +238,7 @@ describe("useStreams Composable", () => {
       };
       mockStore.state.streams.streamsIndexMapping.logs["test-stream"] = 0;
       
-      const result = await streamsInstance.getStream("test-stream", "logs", true);
+      await streamsInstance.getStream("test-stream", "logs", true);
       
       expect(StreamService.schema).toHaveBeenCalledWith("test-org", "test-stream", "logs");
     });

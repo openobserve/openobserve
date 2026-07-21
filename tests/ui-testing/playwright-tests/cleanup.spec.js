@@ -39,7 +39,9 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite destinations)
         'test_fv_alerts_dest_',    // alerts-form-validation.spec.js (custom destinations created by the test cases)
         'test_fv_alerts_slack_',   // alerts-form-validation.spec.js (slack destination created by the test cases)
-        /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
+        /^destination\d{1,3}$/,    // destination4, destination44, destination444, etc.
+        'wf_auto_dest_',           // Workflows v1 test destinations
+        'wf_auto_'                 // Workflows v1 generic test destinations
       ],
       // Template prefixes to clean up
       [
@@ -66,8 +68,18 @@ test.describe("Pre-Test Cleanup", () => {
         'test_fv_alerts_tmpl_'     // alerts-form-validation.spec.js (templates created by the test cases)
       ],
       // Folder prefixes to clean up
-      ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ']
+      ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ', 'wf_auto_']
+      // NOTE: 4th arg (workflowPrefixes) defaults to ['wf_auto_'] inside completeCascadeCleanup;
+      // STEP 5 there deletes workflows AFTER their linked alerts are removed (delete-protection).
     );
+
+    // Clean up Workflows-feature functions & streams in the ACTIVE org (ORGNAME).
+    // Workflows E2E specs run in their own org; completeCascadeCleanup already handled
+    // alerts/destinations/folders/workflows there, but functions & streams need explicit sweeps.
+    const { getOrgIdentifier } = require('./utils/cloud-auth.js');
+    const activeOrg = getOrgIdentifier();
+    await pm.apiCleanup.cleanupFunctionsInOrg(activeOrg, [/^wf_auto_fn_/, /^wf_auto_/]);
+    await pm.apiCleanup.cleanupStreams([/^wf_auto_stream_/, /^wf_auto_sink_/], ['default']);
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
