@@ -412,14 +412,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>
               <span class="node-type text-xs px-2.5 py-1 rounded-default bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium">{{ nodeError.node_type }}</span>
             </div>
+            <!-- The API field is `errors`, not `error_messages` — this block
+                 read a key the response never carries, so the dialog listed
+                 node names with no messages under them. `errors` also arrives
+                 in two shapes (legacy strings / [message, payload] tuples),
+                 which normalizeNodeErrorMessages reconciles. -->
             <div
-              v-if="
-                nodeError.error_messages && nodeError.error_messages.length > 0
-              "
+              v-if="nodeErrorMessages(nodeError).length > 0"
               class="node-error-messages flex flex-col gap-2"
             >
               <div
-                v-for="(msg, idx) in nodeError.error_messages"
+                v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
                 class="error-message p-3 rounded-default bg-banner-error-soft-bg border-l-[3px] border-l-status-negative font-mono text-xs leading-[1.5] whitespace-pre-wrap wrap-break-word text-banner-error-soft-text"
               >
@@ -434,6 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
+import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -528,6 +532,12 @@ const errorDialog = ref({
   show: false,
   data: null as any,
 });
+
+// Node errors ship as either plain strings (rows written before the NodeErrors
+// shape change) or [message, payload] tuples (rows written after). The backend
+// read path is untyped passthrough, so both reach the UI as-is.
+const nodeErrorMessages = (nodeError: any): string[] =>
+  normalizeNodeErrorMessages(nodeError?.errors);
 
 const backfillDialog = ref({
   show: false,

@@ -23,6 +23,7 @@ import { useStore } from "vuex";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constants";
 import { getTruncatedConditions as getTruncatedConditionsUtil } from "@/utils/conditionPreview";
+import { formatNodeErrorText } from "@/utils/pipelines/nodeErrors";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -132,26 +133,15 @@ const getNodeErrorInfo = computed(() => {
   if (!nodeError) return null;
 
   // node_errors is an object with structure: { node_id: { errors: [...], error_count: N, ... } }
-  if (
-    nodeError.errors &&
-    Array.isArray(nodeError.errors) &&
-    nodeError.errors.length > 0
-  ) {
-    // Relies on the API returning `errors` as a flat array of message strings.
-    // `NodeErrors.errors` is `HashSet<(String, Option<Value>)>` server-side and is
-    // persisted as JSON, so pre-upgrade rows and tuple rows would BOTH reach us
-    // raw — a bare join() renders those as "msg,[object Object]". The backend
-    // normalizes `node_errors` on read so this stays a single shape; if that ever
-    // stops being true, normalize here (map entry => Array.isArray(e) ? e[0] : e).
-    const errorText = nodeError.errors.join("\n\n");
-    const errorCount = nodeError.error_count ?? 0;
-    if (errorCount > nodeError.errors.length) {
-      return `${errorText}\n\n... and ${errorCount - nodeError.errors.length} more errors`;
-    }
-    return errorText;
-  }
-
-  return null;
+  //
+  // `errors` arrives in two shapes at once — legacy rows hold plain strings,
+  // rows written after the NodeErrors change hold [message, payload] tuples —
+  // and the backend read path is untyped passthrough, so neither is converted
+  // server-side. formatNodeErrorText owns that reconciliation; a bare join()
+  // here rendered the tuple shape as "msg,[object Object]".
+  return formatNodeErrorText(nodeError, (count) =>
+    t("pipeline.moreErrors", { count }),
+  );
 });
 
 // Edge color mapping for different node types.

@@ -524,7 +524,7 @@ describe("AlertSettings — combined destinations + workflows target control", (
     await flushPromises();
 
     expect(step.emitted("refresh:destinations")).toBeTruthy();
-    if ((findTargets(host).props("isEnterprise") as boolean)) {
+    if ((findTargets(host).props("workflowsEnabled") as boolean)) {
       expect(listWorkflowsMock).toHaveBeenCalled();
     }
   });

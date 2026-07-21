@@ -32,6 +32,11 @@ const i18n = createI18n({
       common: {
         delete: "Delete",
       },
+      // Kept byte-identical to en-US.json — the overflow assertion below checks
+      // rendered text, so a drifting stub would silently weaken it.
+      pipeline: {
+        moreErrors: "... and {count} more errors",
+      },
     },
   },
 });
@@ -622,6 +627,49 @@ describe("CustomNode.vue", () => {
       });
       const vm = wrapper.vm as any;
       expect(vm.getNodeErrorInfo).toContain("and 4 more errors");
+    });
+
+    // `NodeErrors.errors` went from HashSet<String> to
+    // HashSet<(String, Option<Value>)>. The column is untyped JSON and the read
+    // path is passthrough, so a single deployment serves BOTH shapes forever —
+    // pre-upgrade rows as strings, post-upgrade rows as [message, payload].
+    const errorsFixture = (errors: unknown[], error_count = errors.length) => ({
+      currentSelectedPipeline: {
+        nodes: [],
+        edges: [],
+        last_error: { node_errors: { "node-1": { errors, error_count } } },
+      },
+    });
+
+    it("renders legacy plain-string errors", () => {
+      wrapper = createWrapper(
+        { id: "node-1" },
+        errorsFixture(["error one", "error two"]),
+      );
+      expect((wrapper.vm as any).getNodeErrorInfo).toBe("error one\n\nerror two");
+    });
+
+    it("🔑 renders [message, payload] tuple errors without leaking the payload", () => {
+      // Regression: a bare .join() over this shape produced
+      // "error one,\n\nerror two,[object Object]" in the node tooltip.
+      wrapper = createWrapper(
+        { id: "node-1" },
+        errorsFixture([
+          ["error one", null],
+          ["error two", { detail: 1 }],
+        ]),
+      );
+      const text = (wrapper.vm as any).getNodeErrorInfo;
+      expect(text).toBe("error one\n\nerror two");
+      expect(text).not.toContain("[object Object]");
+    });
+
+    it("survives a row that mixes both shapes", () => {
+      wrapper = createWrapper(
+        { id: "node-1" },
+        errorsFixture(["error one", ["error two", null]]),
+      );
+      expect((wrapper.vm as any).getNodeErrorInfo).toBe("error one\n\nerror two");
     });
   });
 

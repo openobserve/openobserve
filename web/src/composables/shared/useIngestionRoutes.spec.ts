@@ -38,6 +38,7 @@ vi.mock("@/components/ingestion/recommended/AzureConfig.vue", () => ({ default: 
 vi.mock("@/components/ingestion/logs/FileBeat.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/traces/OpenTelemetry.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/PrometheusConfig.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/metrics/NightingaleConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/OtelCollector.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/TelegrafConfig.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/metrics/CloudWatchMetrics.vue", () => ({ default: {} }));
@@ -217,6 +218,7 @@ describe("useIngestionRoutes", () => {
       
       expect(metricRouteNames).toContain("prometheus");
       expect(metricRouteNames).toContain("vmagent");
+      expect(metricRouteNames).toContain("nightingale");
       expect(metricRouteNames).toContain("otelCollector");
       expect(metricRouteNames).toContain("telegraf");
       expect(metricRouteNames).toContain("cloudwatchMetrics");

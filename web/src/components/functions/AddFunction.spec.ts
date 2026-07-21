@@ -658,4 +658,48 @@ describe('AddFunction.vue Branch Coverage', () => {
       expect(wrapper.emitted('sendToAiChat')?.[0]).toEqual([testValue]);
     });
   });
+
+  // The typewriter placeholder is the only affordance telling a user what to
+  // write in an empty function editor. It used to be suppressed whenever
+  // `forcedLanguage` was set — but BOTH flow hosts force a language, so the
+  // pipeline Function node (forces vrl, seeds no code) rendered a blank editor
+  // with no hint at all. Workflows hid the regression because they seed
+  // `defaultCode`, which fills the editor.
+  describe('typewriter placeholder with a host-forced language', () => {
+    const placeholder = (wrapper: any) =>
+      wrapper.find('.pointer-events-none.select-none');
+
+    it('🔑 still renders for a forced language when no defaultCode is seeded', () => {
+      // the pipeline Function node's exact props
+      const wrapper = mountAddFunction({
+        ...defaultProps,
+        forcedLanguage: 'vrl',
+      });
+      expect(placeholder(wrapper).exists()).toBe(true);
+    });
+
+    it('renders for a forced JS language too', () => {
+      (config as any).isEnterprise = 'true';
+      const wrapper = mountAddFunction({
+        ...defaultProps,
+        forcedLanguage: 'javascript',
+      });
+      expect(placeholder(wrapper).exists()).toBe(true);
+    });
+
+    it('is hidden once a host seeds defaultCode (the workflow case)', () => {
+      // `!formData.function` — not `!forcedLanguage` — is what suppresses it.
+      (config as any).isEnterprise = 'true';
+      const wrapper = mountAddFunction({
+        ...defaultProps,
+        forcedLanguage: 'javascript',
+        defaultCode: '// do something\n',
+      });
+      expect(placeholder(wrapper).exists()).toBe(false);
+    });
+
+    it('renders with no forced language at all (unchanged behaviour)', () => {
+      expect(placeholder(mountAddFunction()).exists()).toBe(true);
+    });
+  });
 });

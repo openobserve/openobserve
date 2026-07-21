@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :workflows="workflows"
                 :destination-options="formattedDestinations"
                 :workflow-options="workflowOptions"
-                :is-enterprise="isEnterprise"
+                :workflows-enabled="workflowsEnabled"
                 :error="!!destinationsError"
                 @update:destinations="$emit('update:destinations', $event)"
                 @update:workflows="$emit('update:workflows', $event)"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :workflows="workflows"
                 :destination-options="formattedDestinations"
                 :workflow-options="workflowOptions"
-                :is-enterprise="isEnterprise"
+                :workflows-enabled="workflowsEnabled"
                 :error="!!destinationsError"
                 @update:destinations="$emit('update:destinations', $event)"
                 @update:workflows="$emit('update:workflows', $event)"
@@ -387,12 +387,20 @@ export default defineComponent({
     // chain like destinations. In OSS the group is never built, no list is
     // fetched, and — since `workflows` stays [] — the "destination OR workflow"
     // rule reduces to the original "destination required".
-    const isEnterprise = computed(
-      () => config.isEnterprise === "true" || config.isCloud === "true",
+    // "Are workflows available here" — the only thing this flag has ever gated
+    // in this component (the picker's Workflows group + the list fetch below).
+    // It was build-only; it now also respects the backend /config flag
+    // `workflows_enabled`, via the same shared gate the sidebar and routes use.
+    // Renamed from `workflowsEnabled` because it no longer means "enterprise build":
+    // on an enterprise deployment with workflows switched off this is false.
+    const workflowsEnabled = computed(
+      () =>
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        store.state.zoConfig?.workflows_enabled === true,
     );
     const workflowOptions = ref<{ label: string; value: string }[]>([]);
     const fetchWorkflows = async () => {
-      if (!isEnterprise.value) return;
+      if (!workflowsEnabled.value) return;
       try {
         const res = await workflowService.listWorkflows(
           store.state.selectedOrganization.identifier,
@@ -489,7 +497,7 @@ export default defineComponent({
       periodError,
       silenceError,
       destinationsError,
-      isEnterprise,
+      workflowsEnabled,
       workflowOptions,
       fetchWorkflows,
       refreshTargets,
