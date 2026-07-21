@@ -14,30 +14,26 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="p-0 o2-custom-bg"
-    style="height: calc(100vh - 48px); min-height: inherit"
+  <OPageLayout
+    class="overflow-hidden"
+    :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
+    title-data-test="add-template-title"
+    :back="{
+      label: t('alert_templates.header'),
+      onClick: () => emit('cancel:hideform'),
+    }"
+    bleed
   >
-    <AppPageHeader
-      :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
-      title-data-test="add-template-title"
-      :back="{
-        label: t('alert_templates.header'),
-        onClick: () => emit('cancel:hideform'),
-      }"
-      class="px-3 border-b border-border-default"
-    />
-
-    <OSplitter
+    <OSplitter class="h-full"
       v-model="splitterModel"
       unit="%"
       :horizontal="false"
-      style="height: calc(100vh - 106px)"
     >
       <template v-slot:before>
         <OForm
           :form="form"
           v-slot="{ isSubmitting }"
-          class="card-container h-full flex flex-col"
+          class="bg-card-glass-bg h-full flex flex-col"
         >
           <div class="p-3 overflow-auto">
             <div class="w-full pb-2 pt-2 o2-input">
@@ -88,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="bodyLanguage"
               data-test="template-body-editor"
               editor-id="template-body-editor"
-              class="w-full min-h-[310px]! rounded-[5px] border border-(--o2-border-color) resize-y overflow-auto mb-3"
+              class="w-full min-h-77.5! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"
               :language="bodyLanguage"
               :query="body"
               @update:query="onBodyChange"
@@ -96,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div
-            class="flex justify-end gap-2 px-4 py-4 w-full bg-[var(--q-card-background)] border-t border-border-default"
+            class="flex justify-end gap-2 px-4 py-4 w-full bg-surface-base border-t border-border-default"
           >
             <OButton
               v-close-popup
@@ -118,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="px-2 pt-2 h-full overflow-auto card-container border-l border-border-default"
+          class="px-2 pt-2 h-full overflow-auto bg-card-glass-bg border-l border-border-default"
         >
           <div class="font-bold py-2 px-1 text-sm font-medium">
             {{ t("alert_templates.variable_guide_header") }}
@@ -160,9 +156,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 data-test="add-template-sample-template-text"
-                class="bg-black/[0.07] px-2 rounded"
+                class="bg-black/[0.07] px-2 rounded-default"
               >
-                <pre class="text-[10px] my-0">
+                <pre class="text-3xs my-0">
                     {{ template.body }}
                   </pre
                 >
@@ -172,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
     </OSplitter>
-  </div>
+  </OPageLayout>
 </template>
 <script lang="ts" setup>
 import {
@@ -195,7 +191,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import type { TemplateData } from "@/ts/interfaces/index";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import {
   validateTemplateBody,

@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflow-runs-page"
     class="flex flex-col h-full min-h-0"
   >
-    <AppPageHeader
+    <OPageHeader
       :title="workflowName || t('workflow.runs.title')"
       :back="{
         label: t('workflow.header'),
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("workflow.runs.edit") }}
         </OButton>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
 
     <div class="flex-1 flex min-h-0 pt-3 px-2 gap-2">
       <!-- Read-only canvas (per-node run status overlay). -->
@@ -99,7 +99,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";

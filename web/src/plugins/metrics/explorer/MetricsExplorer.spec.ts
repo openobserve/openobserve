@@ -148,7 +148,7 @@ const mountExplorer = (stubOverrides: Record<string, any> = {}) =>
   mount(MetricsExplorer, {
     global: {
       stubs: {
-        AppPageHeader: true,
+        OPageHeader: true,
         DateTimePickerDashboard: true,
         AutoRefreshInterval: true,
         MetricCard: true,

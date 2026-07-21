@@ -166,7 +166,6 @@ describe("SpanBlock", () => {
           store: mockStore,
         },
         stubs: {
-          "q-resize-observer": true,
         },
       },
     });
@@ -274,7 +273,6 @@ describe("SpanBlock", () => {
             store: mockStore,
           },
           stubs: {
-            "q-resize-observer": true,
           },
         },
       });
@@ -578,7 +576,7 @@ describe("SpanBlock", () => {
         global: {
           plugins: [i18n, router],
           provide: { store: mockStore },
-          stubs: { "q-resize-observer": true },
+          stubs: {},
         },
       });
 

@@ -167,25 +167,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('flow.function.flatten')"
             data-test="associate-function-after-flattening-toggle"
           />
-          <!-- Same theme-aware Note Container tokens the workflow Condition note
-               uses (component.css: --color-note-*), so the two match and both
-               work in dark mode — the old #f9f290/#2d3748 were light-only. -->
-          <div class="bg-(--color-note-bg) text-(--color-note-text) w-full rounded-md p-3 flex flex-col gap-2">
+          <!-- Same theme-aware banner tokens the pipeline + workflow Condition
+               notes use, so all three match and work in dark mode (the old
+               #f9f290/#2d3748 were light-only). These were --color-note-* until
+               #13173 removed that set; banner-warning-* is its replacement. -->
+          <div class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2">
             <div class="text-sm">
               {{ t("flow.function.guidelinesTitle") }}
             </div>
             <div class="flex flex-col gap-1 text-sm">
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
-                  <span class="font-bold text-(--color-note-highlight)">{{ t("flow.function.rbf") }}</span>
+                  <span class="font-bold text-text-link">{{ t("flow.function.rbf") }}</span>
                   {{ t("flow.function.rbfDesc") }}
                 </span>
               </div>
               <div class="flex items-start gap-2">
-                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+                <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
                 <span>
-                  <span class="font-bold text-(--color-note-highlight)">{{ t("flow.function.raf") }}</span>
+                  <span class="font-bold text-text-link">{{ t("flow.function.raf") }}</span>
                   {{ t("flow.function.rafDesc") }}
                 </span>
               </div>

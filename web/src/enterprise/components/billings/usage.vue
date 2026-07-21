@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div class="p-3 " style="height: calc(100vh - 130px); width: 100%;" >
+    <div class="p-3 w-full" style="height: calc(100vh - 130px);" >
       <!-- Billing usage tiles (always shown). When self-usage reporting is
            enabled, the calendar in the toolbar drives the range and a daily
            chart is appended below. -->
       <div>
         <div v-if="Object.keys(usageData).length === 0" >
-          <div class="text-xl font-semibold text-weight-medium text-center">
+          <div class="text-xl font-semibold font-medium text-center">
             {{ t("billing.messageDataNotFound") }}
           </div>
         </div>
@@ -31,59 +31,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
-            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
-              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
+              <div class="flex flex-col justify-between rounded-default h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left"> Action Scripts</div>
-                  <div style="opacity: 0.8;">
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left"> Action Scripts</div>
+                  <div class="opacity-80">
                     <img :src="actionScriptIcon" />
                   </div>
                 </div>
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
               2
             </div>
             </div>
             </div>
-            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
-              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
+              <div class="flex flex-col justify-between rounded-default h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left">Error Tracking</div>
-                  <div style="opacity: 0.8;">
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left">Error Tracking</div>
+                  <div class="opacity-80">
                     <img :src="errorTrackingIcon" />
                   </div>
                 </div>
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
               300
             </div>
             </div>
             </div>
-            <div class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out hover:shadow-sm">
-              <div class="flex flex-col justify-between rounded-[0.325rem] h-full gap-4 ">
+            <div class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 min-h-32 flex flex-col justify-between transition-shadow duration-200 ease-in-out">
+              <div class="flex flex-col justify-between rounded-default h-full gap-4 ">
               <!-- Top Section (60%) -->
               <div class="flex flex-col justify-between">
                 <!-- Title row -->
                 <div class="flex justify-between items-center">
-                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-(--color-text-heading) text-left" data-test="billings-usage-tile-title">RUM Session</div>
-                  <div style="opacity: 0.8;">
+                  <div class="text-(length:--text-sm) font-semibold leading-(--leading-base) tracking-normal text-text-heading text-left" data-test="billings-usage-tile-title">RUM Session</div>
+                  <div class="opacity-80">
                     <img :src="rumSessionIcon" />
                   </div>
                 </div>
               </div>
 
             <!-- Bottom Section (40%) -->
-            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-(--color-text-heading) text-left flex items-end ">
+            <div class="text-(length:--text-2xl) font-semibold leading-(--leading-xl) tracking-normal text-text-body text-left flex items-end ">
               20
             </div>
             </div>
@@ -101,31 +101,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-for="tile in usageTiles"
             :key="tile.key"
             data-test="billings-usage-tile"
-            class="usage-tile bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out hover:shadow-sm"
+            class="usage-tile bg-card-glass-bg border border-card-glass-border rounded-default px-3 py-3 flex flex-col gap-2 transition-shadow duration-200 ease-in-out"
           >
             <div class="flex items-center justify-between gap-2">
               <div
-                class="text-(length:--text-xs) font-medium text-(--o2-text-secondary) truncate"
+                class="text-(length:--text-xs) font-medium text-text-secondary truncate"
                 data-test="billings-usage-tile-title"
                 :title="tile.label"
               >
                 {{ tile.label }}
               </div>
-              <div class="usage-tile__icon shrink-0 flex items-center justify-center rounded-lg">
+              <div class="h-7 w-7 bg-bg-gray shrink-0 flex items-center justify-center rounded-default">
                 <img :src="tile.icon" class="h-4 w-4" />
               </div>
             </div>
             <div class="flex items-baseline gap-1 whitespace-nowrap">
-              <span class="text-(length:--text-xl) font-bold text-(--color-text-heading) leading-none">
+              <span class="text-(length:--text-xl) font-bold text-text-body leading-none">
                 {{ tile.value }}
               </span>
-              <span class="text-(length:--text-xs) font-medium text-(--o2-text-secondary)">
+              <span class="text-(length:--text-xs) font-medium text-text-secondary">
                 {{ tile.unit }}
               </span>
             </div>
             <div
               v-if="usageCost[tile.key]"
-              class="text-(length:--text-xs) font-medium text-(--o2-text-secondary)"
+              class="text-(length:--text-xs) font-medium text-text-secondary"
             >
               ${{ usageCost[tile.key] }}
             </div>
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         </div>
       </div>
-      <div v-if="dataLoading" class="text-xl font-semibold text-weight-medium text-center">
+      <div v-if="dataLoading" class="text-xl font-semibold font-medium text-center">
         <OSpinner size="md" class="mx-auto block text-center mt-3" />
       </div>
 
@@ -145,16 +145,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="usageStreamEnabled"
         data-test="usage-daily-chart"
-        class="bg-(--o2-card-bg) border border-(--o2-border-color) rounded-lg p-4 mt-4"
+        class="bg-card-glass-bg border border-card-glass-border rounded-default p-4 mt-4"
       >
-        <div class="text-(length:--text-sm) font-semibold text-(--color-text-heading) mb-2">
+        <div class="text-(length:--text-sm) font-semibold text-text-heading mb-2">
           {{ t("billing.usageTrends.dailyUsage") }}
         </div>
-        <div class="usage-daily-chart__body w-full">
+        <div class="h-90 relative w-full">
           <PanelSchemaRenderer
             v-if="combinedSchema && dailyTimeObj"
             :key="'chart-r-' + dailyChartKey"
-            class="usage-daily-chart__renderer"
+            class="h-full w-full"
             :panelSchema="combinedSchema"
             :selectedTimeObj="dailyTimeObj"
             :variablesData="{}"
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="usageStreamMissing"
             data-test="usage-waiting-for-data"
-            class="usage-daily-chart__waiting absolute inset-0 bg-(--o2-card-bg)"
+            class="flex items-center justify-center z-2 absolute inset-0 bg-card-glass-bg"
           >
             <OEmptyState
               size="block"
@@ -188,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OEmptyState
         v-else
         data-test="usage-enable-cta"
-        class="mt-4 border border-(--o2-border-color) rounded-lg bg-(--o2-card-bg)"
+        class="mt-4 border border-card-glass-border rounded-default bg-card-glass-bg"
         size="block"
         illustration="wave-bars"
         :title="t('billing.usageTrends.enableTitle')"
@@ -214,6 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <script lang="ts">
   import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick, inject } from "vue";
   import { useStore } from "vuex";
+  import useTheme from "@/composables/useTheme";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
   import organizations from "@/services/organizations";
@@ -229,9 +230,8 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 
-  let currentDate = new Date(); // Get the current date and time
+  let currentDate = new Date();
 
-  // Subtract 30 days from the current date
   let thirtyDaysAgo = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   export default defineComponent({
@@ -249,6 +249,7 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
     setup() {
       const { t } = useI18n();
       const store = useStore();
+      const { isDark } = useTheme();
       const router = useRouter();
       const dataLoading = ref(false);
       const lastUsageUpdated = ref(0);
@@ -488,7 +489,7 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
       const remotePipelineIcon = getImageURL("images/usage/remote_pipeline.svg");
       const dataRetentionIcon = getImageURL("images/usage/data_retention.svg");
       const aiIcon = computed(() =>
-        store.state.theme === "dark"
+        isDark.value
           ? getImageURL("images/common/ai_icon_dark.svg")
           : getImageURL("images/common/ai_icon_gradient.svg")
       );
@@ -1149,30 +1150,3 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
   });
   </script>
 
-<style lang="scss" scoped>
-/* Compact stat cards (six across): label + icon badge, then the value. */
-.usage-tile__icon {
-  height: 1.75rem;
-  width: 1.75rem;
-  background: var(--o2-bg-gray);
-}
-
-/* PanelSchemaRenderer fills its container and needs an explicit height, or the
-   echarts canvas collapses to a sliver. */
-.usage-daily-chart__body {
-  height: 22.5rem;
-  position: relative;
-}
-.usage-daily-chart__renderer {
-  height: 100%;
-  width: 100%;
-}
-/* "Waiting for usage data" overlay sits over the (still-mounted) chart until
-   the org's usage stream exists and the search stops erroring. */
-.usage-daily-chart__waiting {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
-}
-</style>

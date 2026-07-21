@@ -119,8 +119,8 @@ const ConfirmDialogStub = {
 
 const globalStubs = {
   ConfirmDialog: ConfirmDialogStub,
-  AppPageHeader: {
-    name: "AppPageHeader",
+  OPageHeader: {
+    name: "OPageHeader",
     props: ["title", "back"],
     template:
       '<div class="app-page-header" :data-title="title">' +
@@ -1144,9 +1144,9 @@ describe("WorkflowEditor", () => {
 
   describe("theme", () => {
     // The canvas inset used to be `:class="theme === 'dark' ? '' : 'bg-gray-100'"`.
-    // That class was DEAD: Tailwind emitted `.bg-gray-100{background-color:
-    // var(--color-gray-100)}` but this repo only defines `--color-grey-*` (with an
-    // "e"), so the light-mode grey never actually rendered — and these tests
+    // That class was DEAD: Tailwind emitted a rule pointing at a "gray"-spelled
+    // custom property, but this repo only defines the "grey"-spelled ones (with
+    // an "e"), so the light-mode grey never actually rendered — and these tests
     // passed anyway, because they only checked that the class ATTRIBUTE was
     // present. It is now a single token utility with no theme branch, so the
     // surface follows the theme through the token instead of a JS conditional.

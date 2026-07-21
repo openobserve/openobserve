@@ -20,14 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="flex flex-col scroll card-container bg-surface-panel! border-r border-border-default"
-          style="
-            overflow-y: auto;
-            overflow-x: hidden;
-            height: 100%;
-            min-width: 100px;
-            max-width: 100px;
-          "
+          class="flex flex-col scroll bg-surface-panel! border-r border-border-default overflow-y-auto overflow-x-hidden h-full min-w-25 max-w-25"
         >
           <ChartSelection
             v-model:selectedChartType="dashboardPanelData.data.type"
@@ -50,10 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start card-container bg-surface-panel!"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! border-r border-border-default w-12.5 h-full shrink-0"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
-          style="width: 50px; height: 100%; flex-shrink: 0"
         >
           <OIcon
             name="expand-all"
@@ -71,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="dashboardPanelData.layout.splitter"
           :limits="splitterLimits"
           :style="splitterStyle"
+          :disable="!dashboardPanelData.layout.showFieldList"
           separatorClass="field-list-separator"
           :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
@@ -79,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div :class="fieldListWrapperClass">
               <div
                 v-if="dashboardPanelData.layout.showFieldList"
-                class="flex flex-col card-container bg-surface-panel!"
+                class="flex flex-col bg-surface-panel!"
                 :style="fieldListContainerStyle"
               >
                 <div class="flex flex-col" :style="fieldListInnerStyle">
@@ -98,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @scroll.passive="onBuilderScroll"
               >
                 <div
-                  class="layout-panel-container flex flex-col w-full h-full"
+                  class="flex flex-col w-full h-full"
                   :style="layoutPanelContainerStyle"
                 >
                   <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.
@@ -145,6 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.meta.dateTime.start_time &&
                           dashboardPanelData.meta.dateTime.end_time))
                     "
+                    class="pl-3"
                     :variablesConfig="dashboardData?.variables"
                     :showDynamicFilters="
                       dashboardData?.variables?.showDynamicFilters
@@ -167,17 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="p-2"
                   >
                     <div
-                      :style="{
-                        borderColor: '#c3920d',
-                        borderWidth: '1px',
-                        borderStyle: 'solid',
-                        backgroundColor:
-                          store.state.theme === 'dark' ? '#2a1f03' : '#faf2da',
-                        padding: '1%',
-                        borderRadius: '5px',
-                      }"
+                      class="border border-banner-warning-border bg-banner-warning-bg p-[1%] rounded-default"
+                     
                     >
-                      <div style="font-weight: 700">
+                      <div class="font-bold">
                         Your chart is not up to date
                       </div>
                       <div>
@@ -320,8 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Errors Component -->
                   <DashboardErrorsComponent
                     :errors="errorData"
-                    class="col-auto"
-                    style="flex-shrink: 0"
+                    class="col-auto shrink-0"
                   />
                 </div>
 
@@ -370,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="card-container h-full flex flex-col">
+        <div class="bg-card-glass-bg h-full flex flex-col">
           <!-- Variables Selector for HTML (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -385,9 +371,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabId="tabId"
             :panelId="panelId"
           />
-          <CustomHTMLEditor
+          <CustomHTMLEditor class="flex-1 min-h-0"
             v-model="dashboardPanelData.data.htmlContent"
-            style="flex: 1; min-height: 0"
             :initialVariableValues="liveVariablesData"
             :tabId="tabId"
             :panelId="panelId"
@@ -405,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex flex-col column"
         :style="{ height: contentHeight, flex: 1 }"
       >
-        <div class="card-container h-full flex flex-col">
+        <div class="bg-card-glass-bg h-full flex flex-col">
           <!-- Variables Selector for Markdown (dashboard mode only) -->
           <VariablesValueSelector
             v-if="resolvedConfig.showVariablesSelector"
@@ -420,9 +405,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabId="tabId"
             :panelId="panelId"
           />
-          <CustomMarkdownEditor
+          <CustomMarkdownEditor class="flex-1 min-h-0"
             v-model="dashboardPanelData.data.markdownContent"
-            style="flex: 1; min-height: 0"
             :initialVariableValues="liveVariablesData"
             :tabId="tabId"
             :panelId="panelId"
@@ -443,10 +427,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start card-container bg-surface-panel!"
+          class="cursor-pointer overflow-y-auto flex flex-col items-center justify-start bg-surface-panel! border-r border-border-default w-12.5 h-full shrink-0"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
-          style="width: 50px; height: 100%; flex-shrink: 0"
         >
           <OIcon
             name="expand-all"
@@ -463,6 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSplitter
           v-model="dashboardPanelData.layout.splitter"
           :limits="[0, 20]"
+          :disable="!dashboardPanelData.layout.showFieldList"
           :style="{
             width: dashboardPanelData.layout.showFieldList
               ? '100%'
@@ -473,20 +457,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
         >
           <!-- Field List for custom chart -->
+          <!-- Mirror the normal field-list block above: a fixed-height wrapper
+               with NO overflow of its own, so PanelFieldList's inner OFieldList
+               is the single scroller and its stream selectors (before-list)
+               stay sticky above the scrolling field rows. Wrapping it in an
+               overflow-y-auto container stacked a second scrollbar and let the
+               dropdowns scroll away. -->
           <template #before>
-            <div class="w-full h-full">
+            <div :class="fieldListWrapperClass">
               <div
-                class="flex flex-col scroll card-container"
-                :style="{ height: contentHeight, overflowY: 'auto' }"
+                v-if="dashboardPanelData.layout.showFieldList"
+                class="flex flex-col bg-surface-panel!"
+                :style="fieldListContainerStyle"
               >
-                <div
-                  v-if="dashboardPanelData.layout.showFieldList"
-                  class="column"
-                  style="height: 100%"
-                >
-                  <div class="flex flex-col" style="width: 100%">
-                    <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
-                  </div>
+                <div class="flex flex-col" :style="fieldListInnerStyle">
+                  <PanelFieldList :editMode="editMode" @collapse="collapseFieldList" />
                 </div>
               </div>
             </div>
@@ -495,38 +480,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Custom chart content area -->
           <template #after>
             <div
-              class="flex card-container"
+              class="flex bg-card-glass-bg"
               :style="{ height: contentHeight, overflow: 'hidden' }"
             >
               <div
                 class="flex flex-col scroll flex-1 min-w-0 h-full"
               >
                 <!-- Editor/Preview splitter -->
-                <div style="height: 500px; flex-shrink: 0; overflow: hidden">
+                <div class="h-125 shrink-0 overflow-hidden">
                   <OSplitter
-                    class="query-editor-splitter"
+                    class="query-editor-splitter h-full"
                     v-model="splitterModel"
-                    style="height: 100%"
                     @update:model-value="layoutSplitterUpdated"
                   >
                     <!-- Custom Chart Editor -->
                     <template #before>
-                      <div
-                        style="position: relative; width: 100%; height: 100%"
-                      >
-                        <CustomChartEditor
+                      <div class="relative w-full h-full">
+                        <CustomChartEditor class="w-full h-full"
                           v-model="dashboardPanelData.data.customChartContent"
-                          style="width: 100%; height: 100%"
                         />
                         <!-- Example Charts button (dashboard mode only) -->
                         <div
                           v-if="pageType === 'dashboard'"
-                          style="
-                            position: absolute;
-                            bottom: 10px;
-                            right: 10px;
-                            z-index: 10;
-                          "
+                          class="absolute bottom-2.5 right-2.5 z-10"
                         >
                           <OButton
                             variant="primary"
@@ -534,8 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="showCustomChartTypeSelector = true"
                             data-test="custom-chart-type-selector-btn"
                           >
-                            <template #icon-left
-                              ><OIcon name="bar-chart" size="sm"
+                            <template #icon-left><OIcon name="bar-chart" size="sm"
                             /></template>
                             Example Charts
                           </OButton>
@@ -556,7 +531,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Splitter separator -->
                     <template #separator>
-                      <div class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-orange-500"></div>
+                      <div class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-table-resize-handle"></div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -619,11 +594,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Errors Component -->
-                <div class="col-auto" style="flex-shrink: 0">
+                <div class="col-auto shrink-0">
                   <DashboardErrorsComponent
                     :errors="errorData"
-                    class="col-auto"
-                    style="flex-shrink: 0"
+                    class="col-auto shrink-0"
                   />
                 </div>
 
@@ -917,9 +891,9 @@ const contentHeight = computed(() => {
 // Chart area class based on page type
 const chartAreaClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "h-[calc(100%-36px)] min-h-[140px]";
+    return "h-[calc(100%-36px)] min-h-35";
   }
-  return "min-h-[140px] mt-[40px]";
+  return "min-h-35 mt-10";
 });
 
 // Chart area style based on page type (uses CSS var for dynamic navbar height)
@@ -936,9 +910,9 @@ const chartAreaStyle = computed(() => {
 // Main content area class - logs needs flat background without card styling
 const mainContentAreaClass = computed(() => {
   if (props.pageType === "logs") {
-    return "flex card-container";
+    return "flex bg-card-glass-bg";
   }
-  return "flex card-container h-full overflow-y-hidden";
+  return "flex bg-card-glass-bg h-full overflow-y-hidden";
 });
 
 // Row style - logs/build needs height: 100%, others need overflow-y: auto
@@ -1291,25 +1265,3 @@ defineExpose({
   errorMessage,
 });
 </script>
-
-<style>
-.field-list-separator::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  background-color: transparent;
-  transition: background-color 0.3s;
-}
-
-.field-list-separator:hover::after {
-  background-color: orange;
-}
-
-.query-editor-splitter .o-splitter__separator {
-  background-color: transparent !important;
-}
-</style>

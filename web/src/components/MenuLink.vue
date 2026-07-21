@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="nav-menu-item-avatar flex flex-col items-center gap-0.5 w-full">
       <div
-        class="icon-wrapper relative inline-flex items-center justify-center rounded-lg p-0.5 transition-colors duration-250"
+        class="icon-wrapper relative inline-flex items-center justify-center rounded-default p-0.5 transition-colors duration-250"
         :class="isActive
           ? activeIconClass
           : 'text-tabs-inactive-text group-hover:text-primary-600'"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] border-2 border-[#0f172a] rounded-full text-[9px] font-bold text-white flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
+          class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[image:var(--color-gradient-notification)] border-2 border-[var(--color-grey-900)] rounded-full text-3xs font-bold text-text-inverse flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="nav-menu-item-label text-[0.71875rem] tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
+        class="nav-menu-item-label text-xs tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
         :class="isActive
           ? activeLabelClass
           : 'font-medium text-tabs-inactive-text group-hover:text-primary-600'"
@@ -72,10 +72,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, inject } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
+import { useTheme } from "@/composables/useTheme";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
@@ -121,7 +123,6 @@ export default defineComponent({
       default: false,
     },
 
-    // Phase 4: Badge support
     badge: {
       type: Number,
       default: 0,
@@ -180,12 +181,27 @@ export default defineComponent({
     // with primary-coloured text/icon; DARK uses the tinted "selected" pill
     // (matching the dashboard-folder selection) with white text/icon — because
     // surface-base is black in dark mode, a white pill there would vanish.
-    const isDark = computed(() => store.state.theme === "dark");
-    const activePillClass = computed(() =>
-      isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg shadow-sm border-l-2 border-primary-400"
-        : "text-primary-700 bg-surface-base shadow-sm border-l-2 border-primary-600",
-    );
+    const { isDark } = useTheme();
+
+    // When the rail draws a single sliding pill (ONavbar provides this), an active
+    // tile defers its fill (background + coloured left accent) to that pill and
+    // keeps only its active text colour — the transparent left border stays so
+    // there is no width shift between states. Falls back to the self-painted pill
+    // when the indicator isn't active (default `false` off the rail, or before it
+    // is positioned), so the nav always shows a selection.
+    const railIndicatorActive = inject(RailIndicatorActiveKey, undefined);
+    const slideActive = computed(() => Boolean(railIndicatorActive?.value));
+
+    const activePillClass = computed(() => {
+      if (slideActive.value) {
+        return isDark.value
+          ? "text-tabs-active-text border-l-2 border-transparent"
+          : "text-primary-700 border-l-2 border-transparent";
+      }
+      return isDark.value
+        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-primary-400"
+        : "text-primary-700 bg-surface-base border-l-2 border-primary-600";
+    });
     const activeIconClass = computed(() =>
       isDark.value ? "text-tabs-active-text!" : "text-primary-700!",
     );
@@ -195,7 +211,7 @@ export default defineComponent({
         : "font-semibold text-primary-600!",
     );
 
-    // Phase 5: Accessibility - compute ARIA label with fallback
+    // Compute ARIA label with fallback
     const ariaLabel = computed(() => {
       let label = props.title || "Navigation link";
       if (props.badge && props.badge > 0) {
@@ -255,7 +271,9 @@ export default defineComponent({
 
     const rootClass = computed(() => [
       "nav-menu-item",
-      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-lg transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1",
+      // Sit above the rail's sliding pill so icon/label stay readable.
+      slideActive.value ? "z-10" : "",
       isActive.value
         ? activePillClass.value
         : "text-tabs-inactive-text border-l-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",

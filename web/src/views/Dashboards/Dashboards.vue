@@ -17,20 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <PageLayout
+  <OPageLayout bleed
     :key="store.state.selectedOrganization.identifier"
-    :main-panel="false"
-    :header-class="'shrink-0 px-4 border-b border-border-default'"
-  >
-    <!-- ── Page header (row 1) ──────────────────────────────────────
-         The breadcrumb path now lives in the top chrome bar (published
-         below); this row carries the page title + description + actions. -->
-    <template #header>
-      <AppPageHeader
-        :title="t('dashboard.header')"
-        icon="dashboard"
-        :subtitle="t('dashboard.subtitle')"
-      >
+    :title="t('dashboard.header')"
+    icon="dashboard"
+    :subtitle="t('dashboard.subtitle')"
+    :main-panel="false"  >
       <template #actions>
         <!-- Org home dashboard shortcut: shows which dashboard is pinned to
              the home page and jumps straight to it. -->
@@ -97,13 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t(`dashboard.add`) }}
         </OButton>
       </template>
-      </AppPageHeader>
-    </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
     <div class="flex-1 flex min-h-0">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="shrink-0 h-full" :style="{ width: 230 + 'px' }">
+      <div class="shrink-0 h-full w-rail">
         <div class="h-full">
           <FolderList
             type="dashboards"
@@ -114,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- Right: dashboards table -->
       <div class="flex-1 min-w-0 h-full">
-        <div class="h-full card-container">
-          <OTable
+        <div class="h-full bg-card-glass-bg">
+          <OTable class="w-full h-full"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -123,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             :frame="false"
             :default-columns="false"
+            show-index
             :global-filter="filterQuery"
             :show-global-filter="false"
             :footer-title="t('dashboard.header')"
@@ -135,7 +126,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="dashboards-dashboard-list"
             @row-click="onRowClick"
             data-test="dashboard-table"
-            style="width: 100%; height: 100%"
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
@@ -207,9 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     isFavorite(row.id) ? 'favorite' : 'favorite-border'
                   "
                   :class="
-                    isFavorite(row.id)
-                      ? 'text-favorite shrink-0'
-                      : 'text-text-secondary shrink-0'
+                    isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'
                   "
                   :title="
                     isFavorite(row.id)
@@ -220,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.stop="toggleFavorite(row)"
                 />
                 <span
-                  class="text-text-primary"
+                  class="text-text-body"
                   :data-test="`dashboard-name-cell-${value}`"
                   :title="value"
                   >{{ value }}</span
@@ -243,14 +231,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-identifier="{ value }">
               <span
-                class="font-mono text-xs text-text-primary"
+                class="font-mono text-xs text-text-body"
                 :title="value"
                 >{{ value }}</span
               >
             </template>
             <template #cell-description="{ value }">
               <span
-                class="text-text-primary"
+                class="text-text-body"
                 :title="value"
                 >{{ value || "—" }}</span
               >
@@ -268,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-primary text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-primary focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-body text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -372,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="flex w-full justify-between items-center py-1"
               >
                 <div
-                  class="o2-table-footer-title flex items-center shrink-0"
+                  class="text-xs font-normal flex items-center shrink-0"
                 >
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
@@ -381,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="bulk-action-bar flex items-center gap-2"
                 >
                   <span
-                    class="text-sm text-text-primary mr-1"
+                    class="text-sm text-text-body mr-1"
                     >{{ t('dashboard.dashboards.selected', { count: selectedIds.length }) }}</span
                   >
                   <OButton
@@ -505,11 +493,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:cancel="confirmBulkDelete = false"
             v-model="confirmBulkDelete"
           />
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -541,8 +529,7 @@ import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -592,8 +579,7 @@ export default defineComponent({
   components: {
     OUserCell,
     OTimeCell,
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     OButton,
     OIcon,
@@ -773,14 +759,6 @@ export default defineComponent({
     const columns = computed(() => {
       const baseColumns = [
         {
-          id: "#",
-          header: "#",
-          accessorKey: "#",
-          sortable: false,
-          size: TABLE_INDEX_COL_SIZE,
-          meta: { align: "left" },
-        },
-        {
           id: "name",
           header: t("dashboard.name"),
           accessorKey: "name",
@@ -875,7 +853,7 @@ export default defineComponent({
       // explicit: the folder watcher stamps it into the URL on every ordinary
       // visit, so honoring it would defeat the favorites-first landing on
       // every reload. With no (effective) deep link, land on Favorites when
-      // the user has any, else on the default folder exactly as before.
+      // the user has any, else on the default folder.
       activeFolderId.value = null;
       if (route.query.folder === FAVORITES_FOLDER_ID) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
@@ -1179,7 +1157,6 @@ export default defineComponent({
       index: number,
       folderInfo?: { name: string; id: string },
     ) => ({
-      "#": index < 9 ? `0${index + 1}` : index + 1,
       id: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
       ...(folderInfo && {
         folder: folderInfo.name,
@@ -1216,7 +1193,6 @@ export default defineComponent({
             (board: any) => board.dashboardId === fav.dashboardId,
           );
           return {
-            "#": index < 9 ? `0${index + 1}` : index + 1,
             id: fav.dashboardId,
             folder: folderNames.get(fav.folderId) ?? fav.folderId,
             folder_id: fav.folderId,

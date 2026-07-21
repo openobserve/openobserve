@@ -663,10 +663,11 @@ describe("Usage Component", () => {
 
   // Test 46: Component container styling
   it("should have correct container styling", () => {
-    const container = wrapper.find('[style="height: calc(100vh - 130px); width: 100%;"]');
+    const container = wrapper.find('[style="height: calc(100vh - 130px);"]');
     expect(container.exists()).toBe(true);
     expect(container.attributes('style')).toContain('height: calc(100vh - 130px)');
-    expect(container.attributes('style')).toContain('width: 100%');
+    // width is now applied via the w-full utility class rather than inline style
+    expect(container.classes()).toContain('w-full');
   });
 
 

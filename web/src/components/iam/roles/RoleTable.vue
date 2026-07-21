@@ -8,7 +8,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { useI18n } from "vue-i18n";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 
@@ -38,15 +37,6 @@ const onEmptyStateAction = (id?: string) => {
 
 const columns: OTableColumnDef[] = [
   {
-    id: "#",
-    header: "#",
-    accessorFn: (row: any) => row["#"],
-    size: TABLE_INDEX_COL_SIZE,
-    minSize: 32,
-    maxSize: 50,
-    meta: { compactPadding: true, align: "left" },
-  },
-  {
     id: "role_name",
     header: t("iam.roleName"),
     accessorKey: "role_name",
@@ -61,7 +51,7 @@ const columns: OTableColumnDef[] = [
     size: 80,
     minSize: 64,
     maxSize: 100,
-    meta: { align: "left", actionCount: 2 },
+    meta: { align: "center", actionCount: 2 },
   },
 ];
 </script>
@@ -84,6 +74,7 @@ const columns: OTableColumnDef[] = [
     row-key="role_name"
     filter-mode="client"
     :default-columns="false"
+    show-index
     @update:selected-ids="emit('update:selectedIds', $event)"
     @update:global-filter="emit('update:globalFilter', $event)"
   >
@@ -137,7 +128,7 @@ const columns: OTableColumnDef[] = [
     </template>
 
     <template #bottom>
-      <span class="o2-table-footer-title">{{ data.length }} {{ t("iam.roles") }}</span>
+      <span class="text-xs font-normal">{{ data.length }} {{ t("iam.roles") }}</span>
       <OButton
         v-if="(selectedIds?.length ?? 0) > 0"
         data-test="iam-roles-bulk-delete-btn"

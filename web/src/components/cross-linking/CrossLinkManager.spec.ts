@@ -47,13 +47,7 @@ describe("CrossLinkManager Component", () => {
       global: {
         plugins: [i18n],
         provide: { store },
-        stubs: {
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\')" :data-test="$attrs[\'data-test\']" :disabled="$attrs.disable"><slot />{{ $attrs.label }}</button>',
-            emits: ["click"],
-          },
-        },
+        stubs: {},
       },
     });
   };

@@ -1,6 +1,6 @@
 // Quality page data composable.
 // Queries `_llm_scores` (Logs) and `_evaluator` (Traces) system streams
-// for Tier 1 KPI values. Each refresh runs current-window and prev-window
+// for KPI values. Each refresh runs current-window and prev-window
 // aggregates in parallel; one stream's failure doesn't break the page.
 
 import { computed, ref, type Ref } from "vue";
@@ -126,7 +126,7 @@ function emptyKpis(): KpiCard[] {
 }
 
 // Org-wide KPI aggregate over `_llm_scores`. Only the evaluated-spans count
-// is surfaced here — per-config unhealthy counts live on the Tier 2 table
+// is surfaced here — per-config unhealthy counts live on the table
 // in `useQualityScoreConfigs`. Scores are written per-span (each evaluated
 // span produces one row per scorer), so distinct span_id is the right unit
 // for "evaluated"; a single trace can have many evaluated spans.

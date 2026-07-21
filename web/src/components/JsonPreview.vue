@@ -17,7 +17,7 @@
     </div>
     {
     <div
-      class="log_json_content flex"
+      class="whitespace-pre-wrap font-mono text-xs flex"
       v-for="(key, index) in Object.keys(value)"
       :key="key"
     >
@@ -33,13 +33,13 @@
             data-test="json-preview-field-dropdown-btn"
             size="xs"
             variant="ghost"
-            class="ml-2 log-json-field-dropdown-btn"
+            class="ml-2 h-5! w-5! min-h-5! min-w-5! p-0! align-middle"
             aria-label="Add icon"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
           </OButton>
         </template>
-        <div class="logs-table-list min-w-[180px]">
+        <div class="logs-table-list min-w-45">
           <slot name="field-dropdown"
 :field="key"
 :value="value[key]" />
@@ -47,9 +47,8 @@
       </ODropdown>
 
       <span
-        class="pl-[0.625rem]"
+        class="pl-2.5"
         :data-test="`json-preview-key-${key}`"
-        :class="store.state.theme === 'dark' ? 'dark' : ''"
       >
         <span class="log-key">{{ key }}</span
         ><span class="log-separator">: </span

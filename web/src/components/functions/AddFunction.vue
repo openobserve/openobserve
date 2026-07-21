@@ -53,10 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[30, 100]"
           class="overflow-hidden w-full"
           :horizontal="false"
-          separator-class="w-[0.0625rem] bg-[var(--o2-border-color)]"
+          separator-class="w-[0.0625rem] bg-card-glass-border"
         >
           <template v-slot:before>
-            <div class="px-2 pt-2 pb-3 card-container h-full flex flex-col min-h-0">
+            <div class="px-2 pt-2 pb-3 bg-card-glass-bg h-full flex flex-col min-h-0">
               <div class="pb-2 o2-input flex flex-col flex-1 min-h-0">
                   <FullViewContainer
                     name="function"
@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <div
                     v-show="expandState.functions"
-                    class="mb-[0.375rem] relative flex-1 min-h-0"
+                    class="mb-1.5 relative flex-1 min-h-0"
                   >
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!formData.function && functionEditorPlaceholderFlag && !forcedLanguage"
                       class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                     >
-                      <span class="[font-family:monospace] text-[var(--text-base)] [line-height:1.3125rem] text-[#a0aec0] dark:text-[#718096] whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
+                      <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
                         transType === '1' ? jsPlaceholder : vrlPlaceholder
                       }}</span>
                     </div>
@@ -106,19 +106,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         name="function"
                         v-model:is-expanded="expandState.functionError"
                         :label="transType === '1' ? t('function.jsErrorDetails') : t('function.errorDetails')"
-                        labelClass="text-red-600 font-semibold"
+                        labelClass="text-status-error-text font-semibold"
                       />
                       <div
                         v-if="expandState.functionError"
                         data-test="function-error-details"
-                        class="px-2 pb-2 border-l-4 border-red-500"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'bg-gray-800'
-                            : 'bg-gray-100'
-                        "
+                        class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
                       >
-                        <pre class="my-0 text-red-700" :class="store.state.theme === 'dark' ? 'text-red-400' : 'text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
+                        <pre class="my-0 text-status-error-text whitespace-pre-wrap" style="font-family: var(--font-mono); font-size: var(--text-compact);">{{
                           vrlFunctionError
                         }}</pre>
                       </div>
@@ -128,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template v-slot:after>
-            <div class="px-2 pt-2 pb-3 h-full overflow-y-auto card-container">
+            <div class="px-2 pt-2 pb-3 h-full overflow-y-auto bg-card-glass-bg">
               <TestFunction
                 ref="testFunctionRef"
                 :vrlFunction="vrlFunctionData"
@@ -144,9 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="[
-          'w-1/4 max-w-full min-w-[75px]',
-          heightOffset ? 'ai-chat-with-offset' : '',
-          store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container',
+          'w-1/4 max-w-full min-w-19',
+          heightOffset ? '[--ai-chat-offset:4.6875rem]' : '',
         ]"
       >
         <O2AIChat
@@ -331,15 +325,13 @@ export default defineComponent({
 
     const beingUpdated = computed(() => props.isUpdated);
 
-    // OWNER pattern (Rule ③): AddFunction OWNS the <OForm>, but it also needs to
-    // READ form state (transType drives the Monaco editor language + placeholder)
-    // and WRITE it (the editor's language toggle). The owner cannot inject the
-    // form it renders, so it CREATES the form here with useOForm, reads it
-    // reactively with form.useStore (the ONE source of truth — NO mirror, NO
-    // copy), and hands it to <OForm :form="addFunctionForm">. Defaults are seeded
-    // from modelValue (edit-prefill); the VRL/JS body + `params` stay in
-    // `formData` (the bare Monaco editor lives OUTSIDE the form and is merged in
-    // at @submit).
+    // AddFunction OWNS the <OForm> but also reads form state (transType drives
+    // the Monaco editor language + placeholder) and writes it (the editor's
+    // language toggle). The owner cannot inject the form it renders, so it
+    // creates the form here with useOForm, reads it reactively via form.useStore,
+    // and hands it to <OForm :form="addFunctionForm">. Defaults are seeded from
+    // modelValue (edit-prefill); the VRL/JS body + `params` stay in `formData`
+    // (the bare Monaco editor lives outside the form and is merged in at @submit).
     const addFunctionForm = useOForm<AddFunctionForm>({
       defaultValues: {
         name: props.modelValue?.name ?? "",
@@ -568,8 +560,8 @@ export default defineComponent({
 
     // Unified Query Editor: Handle language change
     const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
-      // transType is form-owned — write it straight to the ONE form; the
-      // useStore reads above make the editor + tooltip react (no mirror).
+      // transType is form-owned — write it straight to the form; the useStore
+      // reads above make the editor + tooltip react.
       const tt = newLanguage === 'javascript' ? '1' : '0';
       addFunctionForm.setFieldValue('transType', tt);
     };
@@ -697,9 +689,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.ai-chat-with-offset {
-  --ai-chat-offset: 75px;
-}
-</style>

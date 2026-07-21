@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            and must be copied verbatim, so translators should leave them alone. -->
       <template #guidelines>
         <div
-          class="bg-(--color-note-bg) text-(--color-note-text) w-full rounded-md p-3 mt-4 flex flex-col gap-2"
+          class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 mt-4 flex flex-col gap-2"
           data-test="workflow-condition-note"
         >
           <div class="text-sm font-bold">
@@ -45,21 +45,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1 text-sm">
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
               <span>
                 {{ t("workflow.node.conditionNoteEmpty") }}
-                <span class="font-mono py-[0.0625rem] px-1 rounded-[0.1875rem] bg-[color-mix(in_srgb,var(--color-black)_6%,transparent)] text-(--color-note-code)">{{ t("workflow.node.conditionExampleEmpty") }}</span>
+                <span class="font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{{ t("workflow.node.conditionExampleEmpty") }}</span>
               </span>
             </div>
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
               <span>
                 {{ t("workflow.node.conditionNoteNull") }}
-                <span class="font-mono py-[0.0625rem] px-1 rounded-[0.1875rem] bg-[color-mix(in_srgb,var(--color-black)_6%,transparent)] text-(--color-note-code)">{{ t("workflow.node.conditionExampleNull") }}</span>
+                <span class="font-mono py-px px-1 rounded-default bg-code-bg text-code-text">{{ t("workflow.node.conditionExampleNull") }}</span>
               </span>
             </div>
             <div class="flex items-start gap-2">
-              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-amber-500" />
+              <OIcon name="info" size="sm" class="shrink-0 mt-0.5 text-status-warning-text" />
               <span>{{ t("workflow.node.conditionNoteCustom") }}</span>
             </div>
           </div>

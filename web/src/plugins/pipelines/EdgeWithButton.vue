@@ -46,9 +46,6 @@ const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } =
 const path = computed(() => getBezierPath(props))
 
 let clickTimeout = null
-
-// Edge click handling moved to PipelineFlow.vue using VueFlow events
-// These handlers are no longer used but kept for backwards compatibility
 </script>
 
 <script>
@@ -68,7 +65,6 @@ export default {
 
   <!-- Use the `EdgeLabelRenderer` to escape the SVG world of edges and render your own custom label in a `<div>` ctx -->
   <EdgeLabelRenderer>
-    <!-- Edge delete button removed - use keyboard delete instead -->
   </EdgeLabelRenderer>
 </template>
 

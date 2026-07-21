@@ -80,9 +80,9 @@ const silenceMinutes = computed({
 </script>
 
 <template>
-  <div class="rounded-lg border border-border-default mb-4">
-    <div class="flex items-center border-b border-border-default py-[0.625rem] px-3">
-      <div class="w-[0.1875rem] h-4 rounded-sm mr-2 shrink-0 bg-primary-600" />
+  <div class="rounded-default border border-border-default mb-4">
+    <div class="flex items-center border-b border-border-default py-2.5 px-3">
+      <div class="w-[0.1875rem] h-4 rounded-default mr-2 shrink-0 bg-primary-600" />
       <h3 class="text-base font-semibold text-text-heading">
         {{ t('synthetics.scheduleAlert.alerts') }}
       </h3>
@@ -139,7 +139,7 @@ const silenceMinutes = computed({
             :options="destinations"
             multiple
             :error="destinationError"
-            class="min-w-[180px] max-w-[300px]"
+            class="min-w-45 max-w-75"
             data-test="synthetics-check-alerts-destinations-select"
             @update:model-value="onDestinationsChange"
           >
@@ -174,7 +174,7 @@ const silenceMinutes = computed({
           {{ t('synthetics.scheduleAlert.cooldownPeriod') }} *
         </label>
         <div class="flex items-center">
-          <div class="w-[87px]">
+          <div class="w-21.75">
             <OInput
               v-model="silenceMinutes"
               type="number"

@@ -568,12 +568,12 @@ describe("CustomNode.vue", () => {
           },
         },
       });
-      expect(wrapper.find(".error-badge").exists()).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-node-error-badge"]').exists()).toBe(true);
     });
 
     it("does NOT render error badge when hasNodeError is false", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".error-badge").exists()).toBe(false);
+      expect(wrapper.find('[data-test="pipeline-node-error-badge"]').exists()).toBe(false);
     });
   });
 

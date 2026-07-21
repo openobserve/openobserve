@@ -127,8 +127,8 @@ export function queryToExplorerFilters(
     .filter((f): f is LabelFilter => f !== null);
   if (labelFilters.length) out.labelFilters = labelFilters;
 
-  // `favorites` is intentionally no longer read from the URL — the mode drives
-  // showFavoritesOnly now (see explorerFiltersToQuery).
+  // `favorites` is intentionally not read from the URL — the mode drives
+  // showFavoritesOnly (see explorerFiltersToQuery).
   if (query.show_empty === "true") out.hideEmptyPanels = false;
   if (query.sort === "z-a") out.sortBy = "z-a";
   if (query.view === "rows") out.viewMode = "rows";

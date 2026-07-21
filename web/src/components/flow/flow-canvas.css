@@ -177,7 +177,7 @@
 }
 
 .dark .o2vf_node .vue-flow__node-default {
-  background: color-mix(in srgb, var(--color-amber-900) 20%, transparent) !important;
+  background: color-mix(in srgb, var(--color-warning-900) 20%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-orange-400) 30%, transparent) !important;
   color: color-mix(in srgb, var(--color-white) 90%, transparent) !important;
 }
@@ -195,7 +195,7 @@
 }
 
 .dark .o2vf_node .vue-flow__node-default:hover {
-  background: color-mix(in srgb, var(--color-amber-900) 30%, transparent) !important;
+  background: color-mix(in srgb, var(--color-warning-900) 30%, transparent) !important;
   border-color: color-mix(in srgb, var(--color-orange-400) 50%, transparent) !important;
   box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-amber-500) 20%, transparent) !important;
 }

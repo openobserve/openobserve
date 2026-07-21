@@ -29,10 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflow-editor-page"
     class="flex flex-col h-full min-h-0"
   >
-    <!-- Toolbar — the shared AppPageHeader (same as the pipeline editor): a
+    <!-- Toolbar — the shared OPageHeader (same as the pipeline editor): a
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
-    <AppPageHeader
+    <OPageHeader
       :title="headerTitle"
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
       class="px-4 border-b border-border-default"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("common.save") }}
         </OButton>
       </template>
-    </AppPageHeader>
+    </OPageHeader>
 
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
@@ -207,7 +207,7 @@ import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getUUID } from "@/utils/zincutils";

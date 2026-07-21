@@ -51,8 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-base">{{ t("ingestion.awsSetup.noResults") }}</div>
     </div>
 
-    <!-- Responsive columns via utilities — replaces an unscoped <style> block
-         whose px media queries leaked to every page in the app. -->
+    <!-- Responsive columns via Tailwind utilities — replaces a scoped-style
+         block whose px media queries leaked to every page in the app. -->
     <div
       class="integrations-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
       v-else

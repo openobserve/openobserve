@@ -15,19 +15,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="swatch-row" :data-test="dataTest">
-    <!-- None -->
+  <div class="flex flex-wrap items-center gap-1.5" :data-test="dataTest">
+    <!-- None — checkerboard tint with a diagonal strike -->
     <button
       type="button"
-      class="swatch swatch--none"
-      :class="{ 'swatch--active': !modelValue }"
+      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)]"
+      :class="!modelValue ? 'border-primary-600 ring-2 ring-focus-ring' : ''"
       :title="t('dashboard.colorNone')"
       :aria-label="t('dashboard.colorNone')"
       :aria-pressed="!modelValue"
       :data-test="dataTest ? `${dataTest}-none` : undefined"
       @click.stop="select(null)"
     >
-      <span class="swatch-slash" />
+      <span
+        class="absolute inset-x-px top-1/2 h-px origin-center -rotate-45 bg-status-negative"
+      />
     </button>
 
     <!-- Curated swatches -->
@@ -35,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="c in swatches"
       :key="c"
       type="button"
-      class="swatch"
-      :class="{ 'swatch--active': isActive(c) }"
+      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
+      :class="isActive(c) ? 'border-primary-600 ring-2 ring-focus-ring' : ''"
       :style="{ background: c }"
       :title="c"
       :aria-label="c"
@@ -51,10 +53,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </button>
 
-    <!-- Custom (native color input) -->
+    <!-- Custom (native color input) — rainbow wheel until a colour is chosen -->
     <label
-      class="swatch swatch--custom"
-      :class="{ 'swatch--active': isCustomActive }"
+      class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[conic-gradient(from_0deg,var(--color-error-500),var(--color-warning-400),var(--color-success-500),var(--color-blue-500),var(--color-purple-500),var(--color-error-500))]"
+      :class="isCustomActive ? 'border-primary-600 ring-2 ring-focus-ring' : ''"
       :style="isCustomActive ? { background: modelValue } : {}"
       :title="t('dashboard.customColor')"
     >
@@ -72,8 +74,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <input
         type="color"
-        class="swatch-native"
-        :value="modelValue || '#1976d2'"
+        class="absolute inset-0 h-full w-full cursor-pointer border-none p-0 opacity-0"
+        :value="modelValue || DEFAULT_CUSTOM_COLOR"
         @input="(e) => select((e.target as HTMLInputElement).value)"
       />
     </label>
@@ -85,6 +87,10 @@ import { defineComponent, computed, PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
+
+// Native <input type="color"> only accepts a literal hex — it cannot resolve a
+// CSS custom property — so this seed value has to stay a concrete string.
+const DEFAULT_CUSTOM_COLOR = "#1976d2";
 
 export default defineComponent({
   name: "ColorSwatchPicker",
@@ -110,90 +116,15 @@ export default defineComponent({
 
     const select = (c: string | null) => emit("update:modelValue", c);
 
-    return { t, isActive, isCustomActive, isDark: isColorDark, select };
+    return {
+      t,
+      isActive,
+      isCustomActive,
+      isDark: isColorDark,
+      select,
+      DEFAULT_CUSTOM_COLOR,
+    };
   },
 });
 </script>
 
-<style lang="scss" scoped>
-.swatch-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-}
-
-.swatch {
-  position: relative;
-  width: 20px;
-  height: 20px;
-  border-radius: 5px;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-  cursor: pointer;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.1s, box-shadow 0.1s, border-color 0.1s;
-
-  &:hover {
-    transform: scale(1.12);
-  }
-
-  &--active {
-    border-color: var(--color-primary-600, #1976d2);
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.28);
-  }
-}
-
-// "No color" — checkerboard with a diagonal strike
-.swatch--none {
-  background: repeating-linear-gradient(
-    45deg,
-    rgba(128, 128, 128, 0.12),
-    rgba(128, 128, 128, 0.12) 2px,
-    transparent 2px,
-    transparent 6px
-  );
-
-  .swatch-slash {
-    position: absolute;
-    inset: 0;
-    &::after {
-      content: "";
-      position: absolute;
-      top: 50%;
-      left: 1px;
-      right: 1px;
-      height: 1.5px;
-      background: #e53935;
-      transform: rotate(-45deg);
-      transform-origin: center;
-    }
-  }
-}
-
-.swatch--custom {
-  background:
-    conic-gradient(
-      from 0deg,
-      #f44336,
-      #ffeb3b,
-      #4caf50,
-      #2196f3,
-      #9c27b0,
-      #f44336
-    );
-}
-
-.swatch-native {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  border: none;
-  padding: 0;
-}
-</style>

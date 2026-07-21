@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div ref="rootEl" class="min-h-4">
   <small
     v-if="isBounce"
-    class="italic text-[var(--o2-text-muted)]"
+    class="italic text-text-muted"
     data-test="rum-session-activity-bounced"
   >{{ t("rum.noActivityBounced") }}</small>
 
@@ -42,21 +42,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <span
           v-if="bucket.errors > 0 || bucket.frustrations > 0"
-          class="spark-dot mb-[0.0938rem]"
+          class="w-1 h-1 rounded-full shrink-0 mb-[0.0938rem]"
           :class="
-            bucket.errors > 0 ? 'spark-dot--error' : 'spark-dot--frustration'
+            bucket.errors > 0
+              ? 'bg-severity-error-color'
+              : 'bg-severity-warning-color'
           "
           :data-test="`rum-session-activity-dot-${bucket.index}`"
         />
         <span
-          class="spark-bar w-full"
-          :class="bucket.events > 0 ? 'spark-bar--filled' : 'spark-bar--empty'"
+          class="rounded-default w-full"
+          :class="
+            bucket.events > 0
+              ? 'bg-accent opacity-40'
+              : 'bg-card-glass-border opacity-60'
+          "
           :style="{ height: barHeight(bucket.events) }"
         />
       </div>
     </div>
     <small
-      class="text-[var(--o2-text-caption)]"
+      class="text-text-secondary"
       data-test="rum-session-activity-events-text"
     >{{ t("rum.eventsCount", { count: activity.totalEvents }) }}</small>
   </div>
@@ -72,14 +78,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span
       v-for="index in 24"
       :key="index"
-      class="spark-bar spark-bar--empty w-1.5"
+      class="rounded-default bg-card-glass-border opacity-60 w-1.5"
       :style="{ height: `${20 + ((index * 7) % 60)}%` }"
     />
   </div>
 
   <span
     v-else
-    class="text-[var(--o2-text-muted)]"
+    class="text-text-muted"
     data-test="rum-session-activity-empty"
   >—</span>
   </div>
@@ -176,33 +182,3 @@ const ariaLabel = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
-.spark-bar {
-  border-radius: 0.0625rem;
-
-  &--filled {
-    background: var(--o2-primary-color);
-    opacity: 0.4;
-  }
-
-  &--empty {
-    background: var(--o2-border-color);
-    opacity: 0.6;
-  }
-}
-
-.spark-dot {
-  width: 0.25rem;
-  height: 0.25rem;
-  border-radius: 9999px;
-  flex-shrink: 0;
-
-  &--error {
-    background: var(--o2-severity-error-color);
-  }
-
-  &--frustration {
-    background: var(--o2-severity-warning-color);
-  }
-}
-</style>

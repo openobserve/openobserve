@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div>
     <div class="setup-card max-w-225 mx-auto">
       <!-- Header -->
-      <div class="mb-6 p-4 rounded-lg" :class="quickInstallBgClass">
+      <div class="mb-6 p-4 rounded-default" :class="quickInstallBgClass">
         <div class="flex items-start gap-3">
           <OIcon
             name="rocket-launch"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Deployment Mode Toggle -->
       <div class="mb-6">
-        <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment mode</div>
+        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment mode</div>
         <OToggleGroup
           v-model="deploymentMode"
           data-test="aws-deployment-mode-toggle"
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step: Services -->
       <div class="mb-6">
         <div
-          class="flex items-center justify-between cursor-pointer py-2 px-3 rounded"
+          class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
           :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
               color="primary"
             />
-            <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">Select services to monitor</div>
+            <div class="font-semibold text-sm" :class="stepLabelClass">Select services to monitor</div>
             <OTag type="countChip" value="accent">
               {{ enabledServices.length }} /
               {{ QUICK_SETUP_SERVICES.length }} selected
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Single Region: region picker -->
       <div v-if="deploymentMode === 'single'" class="mb-6">
-        <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment region</div>
+        <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment region</div>
         <OSelect
           v-model="selectedRegion"
           :options="AWS_REGIONS"
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- StackSets: admin + target regions -->
       <template v-else>
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">
+          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">
             Admin region
             <span class="font-normal text-xs text-text-muted"
               >(where the StackSet is managed)</span
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mb-6">
           <div
-            class="flex items-center justify-between cursor-pointer py-2 px-3 rounded"
+            class="flex items-center justify-between cursor-pointer py-2 px-3 rounded-default"
           :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="showTargetRegions ? 'expand-less' : 'expand-more'" size="sm"
                 color="primary"
               />
-              <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">
+              <div class="font-semibold text-sm" :class="stepLabelClass">
                 Target regions
                 <span class="font-normal text-xs text-text-muted"
                   >(where stacks will be deployed)</span
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div class="mb-6">
-          <div class="mb-3 font-semibold text-[0.9rem]" :class="stepLabelClass">Deployment model</div>
+          <div class="mb-3 font-semibold text-sm" :class="stepLabelClass">Deployment model</div>
           <OToggleGroup
             v-model="stackSetModel"
             data-test="aws-stackset-model-toggle"
@@ -294,9 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="overflow-hidden min-h-0">
         <div>
           <OSeparator class="mb-4" />
-          <div class="rounded-lg p-4" :class="paramHelperClass">
+          <div class="rounded-default p-4" :class="paramHelperClass">
             <div class="flex items-center justify-between mb-3">
-              <div class="font-semibold text-[0.9rem]" :class="stepLabelClass">
+              <div class="font-semibold text-sm" :class="stepLabelClass">
                 Parameters to enter in the AWS wizard
               </div>
               <OButton
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="param in stackSetParams"
                 :key="param.key"
-                class="flex items-center gap-3 py-1.5 px-2.5 rounded text-xs font-mono"
+                class="flex items-center gap-3 py-1.5 px-2.5 rounded-default text-compact font-mono"
                 :class="paramRowClass"
               >
                 <div class="min-w-60 font-semibold shrink-0" :class="paramKeyClass">{{ param.key }}</div>
@@ -399,19 +399,18 @@ export default defineComponent({
     const showTargetRegions = ref(false);
     const showServices = ref(false);
 
-    // Design tokens resolve per-theme on their own, so none of these branch on
-    // store.state.theme any more — they were eight computeds returning hardcoded
-    // hex/palette colors (plus a banned --o2-border) for exactly that reason.
-    const quickInstallBgClass = "bg-status-info-bg border border-border-default";
-    const descriptionClass = "text-text-secondary";
-    const stepLabelClass = "text-text-heading";
-    const hintTextClass = "text-text-secondary";
+    // Colors resolve via theme-aware design tokens, so these class strings are
+    // theme-independent (dark handled automatically by dark.css).
+    const quickInstallBgClass = 'bg-banner-info-bg border border-banner-info-border';
+    const descriptionClass = 'text-text-secondary';
+    const stepLabelClass = 'text-text-body';
+    const hintTextClass = 'text-text-secondary';
     const collapsibleHeaderClass =
-      "bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover";
-    const paramHelperClass = "bg-surface-subtle";
-    const paramRowClass = "bg-surface-base border border-border-default";
-    const paramKeyClass = "text-text-heading";
-    const paramValTextClass = "text-text-secondary";
+      'bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover';
+    const paramHelperClass = 'bg-surface-subtle';
+    const paramRowClass = 'bg-surface-base border border-border-default';
+    const paramKeyClass = 'text-text-body';
+    const paramValTextClass = 'text-text-secondary';
 
     let endpoint: any = null;
     try {

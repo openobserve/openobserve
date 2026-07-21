@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="handleDrawerClose"
     :title="t('pipeline.associateFunction')"
     :width="creating ? 97 : 30"
+    :bleed="creating"
     @keydown.stop
     :primaryButtonLabel="!creating ? t('alerts.save') : undefined"
     :secondaryButtonLabel="!creating ? t('alerts.cancel') : undefined"
@@ -46,12 +47,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Padding drops away once the inline editor expands, so it can run
          full-bleed and the picker's toggle row supplies its own spacing —
-         same contract WorkflowNodeDrawer follows. Padding here unconditionally
-         double-pads the toggle against that row. -->
+         same contract WorkflowNodeDrawer follows. That is now expressed with
+         ODrawer's `bleed` prop above rather than a manual px-3 here: the drawer
+         pads its own body (bodyPaddingClass), so padding here would double up. -->
     <div
       data-test="add-function-node-routing-section"
-      class="flex flex-col h-full"
-      :class="creating ? '' : 'px-3 pt-3 pb-3'"
+      class="flex flex-col h-full bg-surface-base"
     >
       <!-- NOTE: `is-updating` is deliberately NOT bound to pipelineObj.isEditNode.
            That flag means "editing the NODE"; the picker's isUpdating means

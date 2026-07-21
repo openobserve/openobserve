@@ -275,7 +275,7 @@ const useSqlSuggestions = () => {
       open: (val: string) => {},
       close: (val: string) => {},
     },
-    // [NEW] Stream context — set by SearchBar.vue when a stream is selected.
+    // Stream context — set by SearchBar.vue when a stream is selected.
     // Required to build the composite IDB key: "org|streamType|streamName|fieldName".
     // Without these three, getFieldValuesForSuggestion cannot look up stored values.
     org: "",
@@ -445,14 +445,14 @@ const useSqlSuggestions = () => {
     if (sqlWhereClause.meta.label) {
       const fieldName = sqlWhereClause.meta.label;
 
-      // [EXISTING] In-session values — collected from the current session's
+      // In-session values — collected from the current session's
       // search result hits and stored in the reactive fieldValues prop.
       // These are available immediately (no async) but disappear on page reload.
       const inSessionValues = Array.from(
         autoCompleteData.value.fieldValues[fieldName] || new Set(),
       ) as string[];
 
-      // [NEW] Persisted values — read from IndexedDB (via in-memory cache).
+      // Persisted values — read from IndexedDB (via in-memory cache).
       // These survive page reloads and accumulate across multiple searches.
       // Guard: only query IDB if stream context is set — without org/streamType/
       // streamName we cannot build the composite key and would get empty results.

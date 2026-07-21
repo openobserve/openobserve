@@ -15,8 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col gap-[0.15rem] w-full min-w-0">
-    <span class="text-[0.75rem] leading-none tabular-nums truncate">
+  <!-- Inline: number vertically centered on the row's shared baseline, with the
+       bar pinned as a thin underline at the cell's bottom. Use when the column
+       sits alongside single-line numeric columns so the numbers line up. -->
+  <div
+    v-if="inline"
+    class="relative flex items-center h-full w-full min-w-0 min-h-7"
+    :class="align === 'right' ? 'justify-end' : 'justify-start'"
+  >
+    <span class="text-xs leading-none tabular-nums truncate min-w-0">
+      {{ label }}
+      <OTooltip v-if="tooltip" :content="tooltip" />
+    </span>
+    <!-- Bar wrapped in an absolute div: OProgressBar's own root is `relative w-full`,
+         so positioning it directly would keep it in flow and crush the number. -->
+    <div class="pointer-events-none absolute inset-x-0 bottom-0.5">
+      <OProgressBar :value="ratio" :variant="variant" size="xs" />
+    </div>
+  </div>
+  <!-- Stacked (default): number above a full-width bar. -->
+  <div v-else class="flex flex-col gap-[0.15rem] w-full min-w-0">
+    <span
+      class="text-xs leading-none tabular-nums truncate"
+      :class="align === 'right' ? 'text-right' : 'text-left'"
+    >
       {{ label }}
       <OTooltip v-if="tooltip" :content="tooltip" />
     </span>
@@ -36,6 +58,10 @@ const props = defineProps<{
   label: string;
   variant?: ProgressBarVariant;
   tooltip?: string;
+  align?: "left" | "right";
+  /** Render the number inline (row-baseline) with the bar as a bottom underline,
+   *  so it aligns with single-line numeric columns in the same table row. */
+  inline?: boolean;
 }>();
 
 const ratio = computed(() =>

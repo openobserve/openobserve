@@ -19,13 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="flex py-1 px-1.5 text-xs"
     :class="[
       showBorder
-        ? 'border-b border-solid border-[var(--o2-border-color)]'
+        ? 'border-b border-solid border-card-glass-border'
         : '',
     ]"
     :data-test="dataTest"
   >
     <div
-      class="w-[100px] font-medium text-[var(--o2-text-secondary)] shrink-0"
+      class="w-25 font-medium text-text-secondary shrink-0"
     >
       {{ label }}:
     </div>

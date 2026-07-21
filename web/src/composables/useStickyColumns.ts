@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, watch, onMounted, onBeforeUnmount } from "vue";
+import { chartColor } from "@/utils/chartTheme";
 
 export function useStickyColumns(props: any, store: any) {
   const stickyColumnOffsets = ref<{ [key: string]: number }>({});
@@ -55,7 +56,7 @@ export function useStickyColumns(props: any, store: any) {
       position: "sticky",
       left: `${leftOffset}px`,
       "z-index": 2,
-      "background-color": store.state.theme === "dark" ? "#1a1a1a" : "#fff",
+      "background-color": chartColor("--color-surface-base"),
       "box-shadow": "4px 0 8px rgba(0, 0, 0, 0.15)",
     };
   };
@@ -71,7 +72,7 @@ export function useStickyColumns(props: any, store: any) {
     styleElement.setAttribute("data-sticky-styles", "true");
 
     const columns = (props.columns || []) as any[];
-    const bgColor = store.state.theme === "dark" ? "#1a1a1a" : "#fff";
+    const bgColor = chartColor("--color-surface-base");
     let css = "";
 
     const stickyColTotals = !!props.stickyColTotals;
@@ -96,7 +97,7 @@ export function useStickyColumns(props: any, store: any) {
             position: sticky !important;
             left: ${offset}px !important;
             z-index: 4 !important;
-            background-color: var(--o2-sticky-col-header-bg) !important;
+            background-color: var(--color-sticky-col-header-bg) !important;
             box-shadow: ${shadow} !important;
           }
           ${scope} tbody td:nth-child(${colIndex + 1}).sticky-column {
@@ -116,7 +117,7 @@ export function useStickyColumns(props: any, store: any) {
             right: ${rightOffset}px !important;
             z-index: 4 !important;
             min-width: ${TOTAL_COL_WIDTH}px !important;
-            background-color: var(--o2-sticky-col-header-bg) !important;
+            background-color: var(--color-sticky-col-header-bg) !important;
             box-shadow: ${shadow} !important;
           }
         `;

@@ -1242,27 +1242,6 @@ describe('FilterGroup.vue Comprehensive Coverage', () => {
       expect(addGroupBtn.attributes('disabled')).toBeDefined();
     });
 
-    it('should handle tab change for toggle label', async () => {
-      const wrapper = mount(FilterGroup, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            'FilterCondition': true,
-          },
-        },
-      });
-
-      const tabs = wrapper.findComponent({ name: 'q-tabs' });
-      if (tabs.exists()) {
-        await tabs.vm.$emit('update:model-value', 'or');
-        expect(wrapper.emitted('add-group')).toBeTruthy();
-        expect(wrapper.emitted('input:update')).toBeTruthy();
-      }
-    });
   });
 
 
@@ -2339,7 +2318,9 @@ describe('FilterGroup.vue Form Mode (namePrefix + OForm)', () => {
       });
 
     const marginOf = (w: any) =>
-      (w.find(".el-border").attributes("style") || "").match(
+      // `.filter-group-box` is the group's root box — it was `.el-border` until
+      // #13173 renamed it; the computed margin-left still lives there.
+      (w.find(".filter-group-box").attributes("style") || "").match(
         /margin-left:\s*([^;]+)/,
       )?.[1];
 

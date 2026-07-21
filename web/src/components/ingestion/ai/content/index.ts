@@ -100,10 +100,3 @@ export function getAICardLogos(slug: string | undefined): {
 export function availableCardSlugs(): string[] {
   return Object.keys(rawBySlug).sort();
 }
-
-
-
-
-// glob refresh 1781587701
-
-// glob refresh 1781587777

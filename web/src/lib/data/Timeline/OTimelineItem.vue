@@ -51,7 +51,7 @@ const isOIcon = computed<boolean>(() =>
         />
         <span
           v-else-if="icon"
-          class="material-icons text-[14px] leading-none text-timeline-dot-fg select-none"
+          class="material-icons text-sm leading-none text-timeline-dot-fg select-none"
         >{{ icon }}</span>
       </div>
 
@@ -69,7 +69,7 @@ const isOIcon = computed<boolean>(() =>
     <div class="flex-1 min-w-0 pt-0.5 pb-1">
       <p
         v-if="title"
-        class="m-0 text-sm font-medium leading-snug text-text-primary"
+        class="m-0 text-sm font-medium leading-snug text-text-heading"
       >
         {{ title }}
       </p>

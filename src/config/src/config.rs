@@ -111,6 +111,17 @@ pub const TIMESTAMP_COL_NAME: &str = "_timestamp";
 pub const ID_COL_NAME: &str = "_o2_id";
 pub const ORIGINAL_DATA_COL_NAME: &str = "_original";
 pub const ALL_VALUES_COL_NAME: &str = "_all_values";
+
+/// Internal columns are implicitly part of every user-defined schema:
+/// never persisted in `defined_schema_fields` and exempt from the UDS limit.
+pub fn is_uds_internal_column(name: &str) -> bool {
+    name == TIMESTAMP_COL_NAME
+        || name == ID_COL_NAME
+        || name == ORIGINAL_DATA_COL_NAME
+        || name == ALL_VALUES_COL_NAME
+        || name == get_config().common.column_all
+}
+
 pub const MESSAGE_COL_NAME: &str = "message";
 pub const STREAM_NAME_LABEL: &str = "o2_stream_name";
 pub const STREAM_NAME_LABEL_OLD: &str = "stream_name";
@@ -1609,6 +1620,8 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
+    #[env_config(name = "ZO_FILE_DOWNLOAD_MIN_RECORDS", default = 100)]
+    pub file_download_min_records: i64,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
@@ -2386,6 +2399,10 @@ pub struct Prometheus {
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
+    /// Max `le` labels (buckets + gap markers + inf) a native histogram sample may
+    /// expand to; over-limit samples are downscaled (adjacent buckets merged).
+    #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 16)]
+    pub native_histogram_max_buckets: usize,
 }
 
 #[derive(Serialize, Debug, EnvConfig, Default)]

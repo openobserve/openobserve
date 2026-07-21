@@ -56,9 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <path d="M96 150 L144 150 L120 128 Z" fill="var(--color-warning-400)" />
 
     <!-- falling grains -->
-    <circle class="es-grain es-grain-a [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite]" cx="120" cy="96" r="2.4" fill="var(--color-warning-500)" />
-    <circle class="es-grain es-grain-b [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite] [animation-delay:-0.5s]" cx="120" cy="96" r="2" fill="var(--color-warning-500)" />
-    <circle class="es-grain es-grain-c [transform-box:view-box] [animation:es-grain_1.5s_linear_infinite] [animation-delay:-1s]" cx="120" cy="96" r="2.4" fill="var(--color-warning-600)" />
+    <circle class="es-grain es-grain-a [transform-box:view-box]" cx="120" cy="96" r="2.4" fill="var(--color-warning-500)" />
+    <circle class="es-grain es-grain-b [transform-box:view-box]" cx="120" cy="96" r="2" fill="var(--color-warning-500)" />
+    <circle class="es-grain es-grain-c [transform-box:view-box]" cx="120" cy="96" r="2.4" fill="var(--color-warning-600)" />
   </svg>
 </template>
 
@@ -69,7 +69,13 @@ withDefaults(
 );
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): SVG illustration animation. Scoped on purpose: the
+   20 illustrations reused generic keyframe names (es-pulse, es-twinkle, …) with
+   DIFFERENT bodies from unscoped blocks — a global name collision where the
+   last-loaded illustration hijacked the others' animations. Vue rewrites scoped
+   keyframe names per component, which ends the collision. All selectors and the
+   es-static gate live in this file's own template. */
 @keyframes es-grain {
   0% {
     transform: translateY(0);
@@ -87,11 +93,30 @@ withDefaults(
   }
 }
 
-.es-static :where(.es-grain) {
+/* Animations MUST start from this block, not from a template arbitrary utility:
+   Vue's scoped compiler rewrites `@keyframes es-grain` -> `es-grain-<hash>` and
+   rewrites `animation:` in THIS block to match, but it cannot rewrite a class
+   string in the template — an `[animation:es-grain_1.5s_...]` utility there would
+   reference a name that no longer exists, silently killing the motion. */
+.es-grain {
+  animation: es-grain 1.5s linear infinite;
+}
+.es-grain-b {
+  animation-delay: -0.5s;
+}
+.es-grain-c {
+  animation-delay: -1s;
+}
+
+/* Gates must out-specify the rules above. `:where()` adds 0 specificity, so a
+   `:where(.es-grain)` gate would score only (0,1,0) from the scoped attribute and
+   LOSE to `.es-grain[data-v]` (0,2,0) — plain selectors score (0,2,0) / (0,3,0)
+   and win. */
+.es-static .es-grain {
   animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  :where(.es-grain) {
+  .es-grain {
     animation: none;
   }
 }

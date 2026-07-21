@@ -4,7 +4,7 @@
     <div class="flex justify-between items-center mb-3">
       <div>
         <div class="text-base font-bold">{{ title }}</div>
-        <div v-if="subtitle" class="text-xs" style="color: var(--o2-text-muted)">
+        <div v-if="subtitle" class="text-xs text-text-muted">
           {{ subtitle }}
         </div>
       </div>
@@ -25,16 +25,15 @@
       <div
         v-for="(link, idx) in links"
         :key="link.name"
-        class="cross-link-item el-border rounded-md mb-1 p-2"
+        class="cross-link-item border border-card-glass-border rounded-default mb-1 p-2"
         :data-test="`cross-link-item-${idx}`"
       >
         <div class="flex justify-between items-start">
           <div class="flex-1 min-w-0">
             <!-- Name -->
             <div
-              class="text-sm font-medium font-bold truncate"
+              class="text-sm font-medium font-bold truncate text-text-heading"
               :title="link.name"
-              style="color: var(--o2-text-primary)"
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
@@ -47,9 +46,8 @@
             </div>
             <!-- URL -->
             <div
-              class="text-xs truncate mt-1"
+              class="text-xs truncate mt-1 text-text-muted"
               :title="link.url"
-              style="color: var(--o2-text-muted)"
               :data-test="`cross-link-item-url-${idx}`"
             >
               {{ link.url }}
@@ -60,7 +58,7 @@
                 v-for="(field, fIdx) in link.fields"
                 :key="fIdx"
                 type="fieldTag"
-                class="max-w-[200px]"
+                class="max-w-50"
                 :data-test="`cross-link-field-chip-${fIdx}`"
               >
                 <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
@@ -91,8 +89,7 @@
     <!-- Empty State -->
     <div
       v-else
-      class="text-center py-4 text-sm"
-      style="color: var(--o2-text-muted)"
+      class="text-center py-4 text-sm text-text-muted"
       data-test="cross-link-empty"
     >
       {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}

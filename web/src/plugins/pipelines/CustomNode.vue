@@ -94,12 +94,21 @@ const getNodeErrorInfo = computed(() => {
   return null;
 });
 
-// Edge color mapping for different node types
+// Edge color mapping for different node types.
+//
+// TODO(design-tokens): these are the same three node-TYPE roles the handle CSS
+// below now takes from --color-status-{info,positive,warning} — but they CANNOT
+// be CSS custom-property references here. vue-flow builds its arrowhead marker
+// id from this value (getMarkerId → `color=<value>&type=…`) and then references
+// it as `url(#<id>)`; a custom-property reference puts parentheses inside that
+// url(), which terminates it early and breaks the arrowhead. Resolving the token
+// to a literal (getComputedStyle on :root) at call time is the fix, and would
+// also give these edges the dark-mode step they currently lack.
 const getNodeColor = (ioType) => {
   const colorMap = {
-    input: "#3b82f6", // Blue
-    output: "#22c55e", // Green
-    default: "#f59e0b", // Orange/Amber
+    input: "#3b82f6", // Blue    — pairs with --color-status-info-text
+    output: "#22c55e", // Green   — pairs with --color-status-positive
+    default: "#f59e0b", // Amber   — pairs with --color-status-warning-text
   };
   return colorMap[ioType] || "var(--color-grey-500)";
 };
@@ -488,9 +497,9 @@ function getIcon(data, ioType) {
 }
 
 .node_handle_custom {
-  width: 16px !important;
-  height: 16px !important;
-  border: 3px solid rgba(255, 255, 255, 0.9);
+  width: 1rem !important;
+  height: 1rem !important;
+  border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);
   border-radius: 50% !important;
   background: var(--color-grey-500);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -503,114 +512,50 @@ function getIcon(data, ioType) {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 8px;
-  height: 8px;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
   background: var(--color-grey-700);
   transition: all 0.3s ease;
 }
 
-/* Input nodes - Blue theme */
+/* Input nodes - info theme */
 .handle_input {
-  background: #dbeafe !important;
+  background: var(--color-status-info-bg) !important;
 }
 
 .handle_input::before {
-  background: #3b82f6 !important;
+  background: var(--color-status-info-text) !important;
 }
 
-/* Output nodes - Green theme */
+/* Output nodes - success theme */
 .handle_output {
-  background: #dcfce7 !important;
+  background: var(--color-status-success-bg) !important;
 }
 
 .handle_output::before {
-  background: #22c55e !important;
+  background: var(--color-status-positive) !important;
 }
 
-/* Transform nodes (default) - Orange theme */
+/* Transform nodes (default) - warning theme */
 .handle_default {
-  background: #fef3c7 !important;
+  background: var(--color-status-warning-bg) !important;
 }
 
 .handle_default::before {
-  background: #f59e0b !important;
+  background: var(--color-status-warning-text) !important;
 }
 
-.vue-flow__node-custom {
-  padding: 10px;
-  border-radius: 3px;
-  width: 150px;
-  font-size: 12px;
+:global(.vue-flow__node-custom) {
+  padding: 0.625rem;
+  border-radius: 0.1875rem;
+  width: 9.375rem;
+  font-size: var(--text-xs);
   text-align: center;
   border-width: 1px;
   border-style: solid;
   color: var(--vf-node-text);
   background-color: var(--vf-node-bg);
   border-color: var(--vf-node-color);
-}
-
-.node-action-btn:hover {
-  background: var(--node-color) !important;
-  color: white !important;
-  transform: scale(1.1) !important;
-}
-
-.delete-btn:hover {
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3) !important;
-  background: #ef4444 !important;
-  border-color: #ef4444 !important;
-}
-
-.error-badge:hover {
-  transform: scale(1.2);
-  box-shadow: 0 3px 10px rgba(239, 68, 68, 0.7);
-  z-index: 20;
-}
-
-/* Pipeline error tooltip styling - increased specificity to override global theme styles */
-.body--dark .pipeline-error-tooltip,
-.body--light .pipeline-error-tooltip,
-.pipeline-error-tooltip {
-  background-color: #ef4444 !important;
-  color: white !important;
-  font-size: 12px !important;
-  white-space: pre-wrap !important;
-  word-wrap: break-word !important;
-  line-height: 1.5 !important;
-  padding: 10px 14px !important;
-}
-
-.body--dark .pipeline-error-tooltip div,
-.body--light .pipeline-error-tooltip div,
-.pipeline-error-tooltip div {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar,
-.pipeline-error-tooltip div::-webkit-scrollbar {
-  width: 6px;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-track,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-track,
-.pipeline-error-tooltip div::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb,
-.pipeline-error-tooltip div::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-}
-
-.body--dark .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
-.body--light .pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover,
-.pipeline-error-tooltip div::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
 }
 </style>

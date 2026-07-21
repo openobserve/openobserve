@@ -89,28 +89,6 @@ const ODialogStub = {
   `,
 };
 
-const QInputStub = {
-  name: "QInput",
-  props: ["modelValue", "dense", "borderless", "placeholder"],
-  emits: ["update:modelValue"],
-  template: `
-    <div data-test="q-input-stub">
-      <slot name="prepend" />
-      <input
-        data-test="q-input-stub-input"
-        :value="modelValue"
-        @input="$emit('update:modelValue', $event.target.value)"
-      />
-      <slot name="append" />
-    </div>
-  `,
-  methods: {
-    focus() {
-      /* no-op for tests */
-    },
-  },
-};
-
 const QIconStub = {
   name: "QIcon",
   props: ["name", "size", "color"],
@@ -162,7 +140,6 @@ function mountDialog(props: Record<string, unknown> = {}) {
         ODialog: ODialogStub,
         OButton: OButtonStub,
         OInput: OInputStub,
-        "q-input": QInputStub,
         "OIcon": QIconStub,
         OBadge: OBadgeStub,
       },
@@ -253,7 +230,6 @@ describe("TestModelMatchDialog", () => {
             ODialog: ODialogStub,
             OButton: OButtonStub,
             OInput: OInputStub,
-            "q-input": QInputStub,
             "OIcon": QIconStub,
             OBadge: OBadgeStub,
           },

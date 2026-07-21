@@ -16,27 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="step-alert-conditions w-full rounded-lg mx-auto bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)]"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
+    class="step-alert-conditions w-full rounded-default mx-auto bg-surface-overlay border border-border-default"
   >
     <!-- Section header -->
     <div
-      class="flex items-center py-2.5 px-3"
-      :class="store.state.theme === 'dark' ? 'border-b border-[#343434]' : 'border-b border-[#eeeeee]'"
+      class="flex items-center py-2.5 px-3 border-b border-border-default"
     >
-      <div class="w-0.75 h-4 rounded-xs mr-2 shrink-0 bg-[var(--q-primary)]" />
+      <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
       <span
-        class="text-[13px] font-semibold tracking-[0.01em] text-[var(--color-text-primary)]"
+        class="text-compact font-semibold tracking-[0.01em] text-text-heading"
       >{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
     </div>
 
-    <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE <OForm>
-         and provides FORM_CONTEXT_KEY. The OForm* fields below inject that form
-         and bind by nested `name=` (trigger_condition.*, destinations,
-         creates_incident); the composed schema in AddAlert.schema.ts validates
-         them on save. -->
+    <!-- The AddAlert orchestrator owns the ONE <OForm> and provides
+         FORM_CONTEXT_KEY. The OForm* fields below inject that form and bind by
+         nested `name=` (trigger_condition.*, destinations, creates_incident); the
+         composed schema in AddAlert.schema.ts validates them on save. -->
     <div class="px-3 py-2">
       <div>
         <!-- For Real-Time Alerts -->
@@ -44,8 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Silence Notification (Cooldown) -->
           <div class="flex justify-start items-start pb-3 mb-4">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -54,9 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
               />
             </div>
-            <div class="flex flex-col gap-1 mr-2" style="width: fit-content">
+            <div class="flex flex-col gap-1 mr-2 w-fit">
               <div class="flex items-center">
-                <div style="width: 87px">
+                <div class="w-21.75">
                   <OFormInput
                     name="trigger_condition.silence"
                     type="number"
@@ -68,11 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  style="min-width: 90px; height: 2.125rem; font-size: 13px"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -91,8 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations -->
           <div class="flex items-start pb-4 mb-4">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -135,8 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Period -->
           <div ref="periodFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.period") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -145,9 +135,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
               />
             </div>
-            <div class="flex flex-col gap-1 mr-2" style="width: fit-content">
+            <div class="flex flex-col gap-1 mr-2 w-fit">
               <div class="flex items-center">
-                <div style="width: 87px">
+                <div class="w-21.75">
                   <OFormInput
                     name="trigger_condition.period"
                     type="number"
@@ -161,11 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  style="min-width: 90px; height: 2.125rem; font-size: 13px"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -184,8 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
           <div ref="silenceFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.silenceNotification") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -194,9 +179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
               />
             </div>
-            <div class="flex flex-col gap-1 mr-2" style="width: fit-content">
+            <div class="flex flex-col gap-1 mr-2 w-fit">
               <div class="flex items-center">
-                <div style="width: 87px">
+                <div class="w-21.75">
                   <OFormInput
                     name="trigger_condition.silence"
                     type="number"
@@ -209,11 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OFormInput>
                 </div>
                 <div
-                  style="min-width: 90px; height: 2.125rem; font-size: 13px"
-                  :class="
-                    store.state.theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                  "
-                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text"
+                  class="flex justify-center items-center bg-input-addon-bg text-input-addon-text min-w-22.5 h-8.5 text-compact"
                 >
                   {{ t("alerts.minutes") }}
                 </div>
@@ -232,8 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Destinations -->
           <div ref="destinationsFieldRef" class="flex items-start mr-2 mb-4!">
             <div
-              class="font-semibold flex items-center"
-              style="width: 190px; height: 28px"
+              class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
             >
               {{ t("alerts.destination") + " *" }}
               <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -274,8 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Creates Incident toggle — shown for all alert types -->
         <div class="flex items-start mb-4!">
           <div
-            class="font-semibold flex items-center"
-            style="width: 190px; height: 28px"
+            class="font-semibold flex items-center w-47.5 h-7 text-text-heading"
           >
             {{ t("alerts.alertSettings.createsIncident") }}
             <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
@@ -377,7 +356,7 @@ export default defineComponent({
     const router = useRouter();
 
     // Field refs consumed by the parent's AlertFocusManager (registered off the
-    // step ref). Scheduled-only, mirroring the pre-migration template.
+    // step ref). Scheduled-only.
     const periodFieldRef = ref<any>(null);
     const silenceFieldRef = ref<any>(null);
     const destinationsFieldRef = ref<any>(null);
@@ -456,13 +435,13 @@ export default defineComponent({
       }
     };
 
-    // Period typed → the pre-migration cross-step CASCADE (period drives
-    // frequency / cron / timezone / silence). The ancestor AddAlert listens to
-    // @update:trigger (updateTriggerCondition → setFieldValue) and writes the
-    // whole trigger_condition into the ONE form, so the visible silence field
-    // auto-fills like before. The period field value itself is already written
-    // into the form by its own OFormInput binding; it rides on the emit so the
-    // parent write does not revert it.
+    // Period typed → cross-step CASCADE (period drives frequency / cron /
+    // timezone / silence). The ancestor AddAlert listens to @update:trigger
+    // (updateTriggerCondition → setFieldValue) and writes the whole
+    // trigger_condition into the ONE form, so the visible silence field
+    // auto-fills. The period field value itself is already written into the form
+    // by its own OFormInput binding; it rides on the emit so the parent write
+    // does not revert it.
     const handlePeriodChange = (val: unknown) => {
       const periodValue = Number(val);
       // Spread the FRESH form value, not `props.formData.trigger_condition`.
@@ -470,10 +449,7 @@ export default defineComponent({
       // render, and the parent's @update:trigger handler is a WHOLE-OBJECT
       // `setFieldValue("trigger_condition", …)` — so spreading the stale prop
       // round-trips a pre-write snapshot and silently clobbers any field written
-      // earlier in the same tick. Today only `period` is written in this tick and
-      // line below re-sets it, so nothing was lost; reading fresh makes that
-      // structural instead of an invariant someone has to remember to maintain.
-      // (Same bug, same fix as QueryConfig's emitTriggerUpdate.)
+      // earlier in the same tick.
       const currentTrigger =
         form?.getFieldValue?.("trigger_condition") ??
         props.formData.trigger_condition;

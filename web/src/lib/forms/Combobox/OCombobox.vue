@@ -199,8 +199,8 @@ const hasInsideLabel = computed(
       v-if="(hasLabel || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label text-sm font-semibold leading-tight flex items-center gap-1',
-        disabled && 'o-input-label--disabled',
+        'o-input-label text-compact leading-tight flex items-center gap-1',
+        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -225,7 +225,7 @@ const hasInsideLabel = computed(
         <!-- Inside label -->
         <span
           v-if="hasInsideLabel"
-          class="absolute top-1 start-3 text-[10px] leading-none text-input-placeholder select-none pointer-events-none z-10"
+          class="absolute top-1 start-3 text-3xs leading-none text-input-placeholder select-none pointer-events-none z-10"
         >
           <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
@@ -237,7 +237,7 @@ const hasInsideLabel = computed(
           :tabindex="inputTabindex"
           auto-complete="off"
           :class="[
-            'w-full rounded-md border ps-3 pe-3',
+            'w-full rounded-default border ps-3 pe-3',
             'bg-input-bg text-input-text',
             'placeholder:text-input-placeholder',
             'outline-none transition-[border-color,box-shadow] duration-150',
@@ -261,7 +261,7 @@ const hasInsideLabel = computed(
           :class="[
             'z-10001 min-w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) w-(--reka-combobox-trigger-width)',
             'max-h-60 overflow-hidden',
-            'rounded-md border shadow-lg',
+            'rounded-default border shadow-lg',
             'bg-select-content-bg border-select-content-border',
             'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
@@ -289,7 +289,7 @@ const hasInsideLabel = computed(
               :class="[
                 'relative flex items-start gap-2 w-full',
                 'ps-3 pe-8 py-1.5 text-sm',
-                'text-select-item-text rounded-sm',
+                'text-select-item-text rounded-default',
                 'cursor-pointer select-none outline-none',
                 'transition-colors duration-100',
                 'data-highlighted:bg-select-item-hover-bg',

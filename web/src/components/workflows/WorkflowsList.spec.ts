@@ -137,8 +137,8 @@ const globalStubs = {
     template: '<div data-test="confirm-dialog-stub" :data-open="String(modelValue)" />',
   },
   PageLayout: { name: "PageLayout", template: '<div class="page-layout"><slot name="header" /><slot /></div>' },
-  AppPageHeader: {
-    name: "AppPageHeader",
+  OPageHeader: {
+    name: "OPageHeader",
     props: ["title", "subtitle", "icon"],
     template:
       '<div class="app-page-header"><slot name="title" /><slot name="actions" /></div>',

@@ -43,7 +43,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="handleCancel"
     @click:neutral="openDeleteDialog"
   >
-    <div class="w-full pt-3 pb-3 px-3">
+    <!-- No padding here: ODrawer now pads its own body (bodyPaddingClass). -->
+    <div class="w-full">
       <DestinationPicker
         ref="picker"
         :initial-name="initialDestinationName"

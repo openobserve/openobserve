@@ -34,7 +34,7 @@ export type BadgeVariant =
   | "success-soft"
   | "warning-soft"
   | "error-soft"
-  // NEW: Extended color families for correlation dimensions (8 colors × 3 variants = 24 new variants)
+  // Extended color families for correlation dimensions.
   | "teal" | "teal-outline" | "teal-soft"
   | "orange" | "orange-outline" | "orange-soft"
   | "lime" | "lime-outline" | "lime-soft"
@@ -50,7 +50,7 @@ export type BadgeSize = "xs" | "sm" | "md";
 /**
  * Corner shape:
  *   pill    — fully rounded (rounded-full). The default; classic status pill.
- *   rounded — small radius (rounded-md). For code/identifier-style chips.
+ *   rounded — small radius (rounded-default). For code/identifier-style chips.
  *   square  — no radius (rounded-none).
  */
 export type BadgeShape = "pill" | "rounded" | "square";
@@ -70,18 +70,18 @@ export interface BadgeProps {
   /**
    * Numeric count rendered in a trailing segment on the right.
    * Overridden by the `#trailing` slot when provided.
-   * NOTE: `count: 0` still renders the `0` chip (different from q-badge which
-   * hid empty counts). To hide an empty count, pass `count: undefined` or use
+   * NOTE: `count: 0` still renders the `0` chip (different from the previous badge
+   * which hid empty counts). To hide an empty count, pass `count: undefined` or use
    * `hideZeroCount`.
    */
   count?: number;
   /**
    * When true and `count` is 0, the trailing segment is suppressed
-   * (q-badge-compatible behavior).
+   * (matches the previous badge behavior).
    */
   hideZeroCount?: boolean;
   /**
-   * Renders a 7px solid status dot before the label (HANDOFF §11). The dot
+   * Renders a 7px solid status dot before the label. The dot
    * inherits the badge's foreground colour (`currentColor`), so a `success`
    * badge gets a green dot, an `error` badge a red dot, etc. Use for live
    * status pills like "active" / "suspended".

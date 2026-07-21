@@ -17,8 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Workflows list page (todo #3).
 
-  Mirrors the Pipelines/Alerts list patterns: PageLayout + AppPageHeader chrome,
-  an OTable body with search toolbar + preset empty state + per-row actions.
+  Mirrors the Pipelines/Alerts list patterns: OPageLayout chrome (it owns the
+  OPageHeader), an OTable body with search toolbar + preset empty state +
+  per-row actions.
 
   Enable/disable is a per-row action (pause/resume); the standalone Status column
   is intentionally NOT shown (state is conveyed by the pause/resume action icon).
@@ -30,38 +31,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="workflows-list-page"
     class="flex flex-col h-full min-h-0"
   >
-    <PageLayout
-      :main-panel="false"
-      :header-class="'shrink-0 px-4 border-b border-border-default'"
+    <!-- OPageLayout owns the header now (it renders OPageHeader from these props
+         and forwards #title/#actions), so there is no nested header component and
+         no header-class: it draws its own bottom border. `bleed` keeps the table
+         flush to the page edge, as the old main-panel=false layout did. -->
+    <OPageLayout
+      :title="t('workflow.header')"
+      :subtitle="t('workflow.subtitle')"
+      icon="schema"
+      bleed
     >
-      <template #header>
-        <AppPageHeader
-          :title="t('workflow.header')"
-          :subtitle="t('workflow.subtitle')"
-          icon="schema"
+      <!-- Beta tag rides INSIDE the title line. `#title-trail` would place it
+           after the whole title+subtitle column — i.e. past the subtitle's
+           width — leaving it stranded far from the word "Workflows". -->
+      <template #title>
+        <span class="inline-flex items-center gap-2">
+          {{ t("workflow.header") }}
+          <BetaBadge />
+        </span>
+      </template>
+      <template #actions>
+        <!-- v1: only the Alert Fired trigger exists, so New Workflow goes
+             straight to the editor (which pre-places the Alert Trigger). -->
+        <OButton
+          data-test="workflow-list-add-btn"
+          variant="primary"
+          size="sm"
+          @click="openCreateEditor()"
         >
-          <!-- Beta tag rides INSIDE the title line. `#title-trail` would place it
-               after the whole title+subtitle column — i.e. past the subtitle's
-               width — leaving it stranded far from the word "Workflows". -->
-          <template #title>
-            <span class="inline-flex items-center gap-2">
-              {{ t("workflow.header") }}
-              <BetaBadge />
-            </span>
-          </template>
-          <template #actions>
-            <!-- v1: only the Alert Fired trigger exists, so New Workflow goes
-                 straight to the editor (which pre-places the Alert Trigger). -->
-            <OButton
-              data-test="workflow-list-add-btn"
-              variant="primary"
-              size="sm"
-              @click="openCreateEditor()"
-            >
-              {{ t("workflow.create") }}
-            </OButton>
-          </template>
-        </AppPageHeader>
+          {{ t("workflow.create") }}
+        </OButton>
       </template>
 
       <div class="flex-1 min-h-0 overflow-hidden">
@@ -205,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTable>
         </div>
       </div>
-    </PageLayout>
+    </OPageLayout>
   </div>
 
   <!-- Editor (add/edit) renders here as a child route. On a successful save it
@@ -229,8 +228,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";

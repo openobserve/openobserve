@@ -2,7 +2,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // OCodeCell — monospace rendering for identifiers / SQL / tokens with an
-// optional copy-on-hover affordance (audit §3). Truncates with ellipsis and
+// optional copy-on-hover affordance. Truncates with ellipsis and
 // exposes the full value via a native title tooltip.
 //
 //   <OCodeCell :value="row.trace_id" />
@@ -44,7 +44,7 @@ async function handleCopy(e: MouseEvent) {
 <template>
   <span
     v-if="text === null"
-    class="text-text-primary text-xs"
+    class="text-text-muted text-xs"
   >{{ emptyLabel }}</span>
   <span
     v-else
@@ -57,7 +57,7 @@ async function handleCopy(e: MouseEvent) {
     <button
       v-if="copy"
       type="button"
-      class="shrink-0 opacity-0 group-hover/code:opacity-60 hover:opacity-100! cursor-pointer text-text-primary transition-opacity leading-none"
+      class="shrink-0 opacity-0 group-hover/code:opacity-60 hover:opacity-100! cursor-pointer text-text-body transition-opacity leading-none"
       :title="copied ? 'Copied!' : 'Copy'"
       @click="handleCopy"
     >

@@ -904,6 +904,7 @@
   },
   "rum": {
     "title": "Real User Monitoring",
+    "subtitle": "Monitor real-user sessions, errors, and frontend performance",
     "issueColumn": "Issue",
     "trendColumn": "Trend",
     "usersColumn": "Users",
@@ -973,6 +974,7 @@
     "getStartedTitle": "Get Started with Real User Monitoring",
     "getStartedLabel": "Get Started",
     "performanceSummaryLabel": "Performance Summary",
+    "performanceSummarySubtitle": "Core Web Vitals, page load, and API performance for your frontend",
     "webVitalsLabel": "Web Vitals",
     "errorLabel": "Errors",
     "sessionLabel": "Sessions",
@@ -4007,7 +4009,9 @@
     "tabOverview": "Overview",
     "tabUsage": "Usage",
     "removeHomeDashboard": "Remove home dashboard",
-    "subtitle": "Your observability workspace at a glance"
+    "subtitle": "Your observability workspace at a glance",
+    "resources": "Resources",
+    "explore": "Explore"
   },
   "overview": {
     "title": "System Overview",
@@ -4021,6 +4025,8 @@
     "colErrorRate": "Error rate",
     "colLatency": "Latency",
     "colReqs": "Reqs",
+    "scrollLeft": "Scroll services left",
+    "scrollRight": "Scroll services right",
     "untitledIncident": "Untitled Incident",
     "viewLatencyCharts": "View latency & RED charts",
     "elevatedErrorRate": "Elevated error rate",
@@ -5495,11 +5501,14 @@
         "selectedCount": "{count} selected",
         "searchPrefixes": "Search prefixes",
         "searchSuffixes": "Search suffixes",
+        "searchTypes": "Search types",
         "searchPrefixesAria": "Search prefix filters",
         "searchSuffixesAria": "Search suffix filters",
+        "searchTypesAria": "Search type filters",
         "facetAria": "{label}, {count} metrics",
         "noPrefixMatch": "No prefixes match.",
-        "noSuffixMatch": "No suffixes match."
+        "noSuffixMatch": "No suffixes match.",
+        "noTypeMatch": "No types match."
       }
     },
     "index": {
@@ -6510,6 +6519,11 @@
     "addToTable": "Add to table",
     "timestamp": "Timestamp",
     "noErrorPresent": "No error present for this span",
+    "noEventsPresent": "No events for this span",
+    "noLinksPresent": "No links for this span",
+    "loadingTraceDag": "Loading trace DAG...",
+    "loadingServiceGraph": "Loading service graph...",
+    "loadingMetrics": "Loading metrics...",
     "httpStatusCode": "HTTP Status Code",
     "grpcStatusCode": "gRPC Status Code",
     "dbResponseStatusCode": "DB Response Status Code",

@@ -51,11 +51,6 @@ describe("CustomMarkdownEditor", () => {
         stubs: {
           'CodeQueryEditor': true,
           'MarkdownRenderer': true,
-          'q-splitter': {
-            template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
-          },
         },
         mocks: {
           $t: (key: string) => key
@@ -75,11 +70,11 @@ describe("CustomMarkdownEditor", () => {
       wrapper = createWrapper();
 
       const container = wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]');
-      const style = container.element.getAttribute('style');
 
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: hidden');
+      // Sizing/overflow moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain('h-full');
+      expect(container.classes()).toContain('overflow-hidden');
     });
 
     it("should render inner container with correct dimensions", () => {
@@ -87,9 +82,9 @@ describe("CustomMarkdownEditor", () => {
 
       const innerContainer = wrapper.find('[data-test="dashboard-custom-markdown-editor-inner"]');
       expect(innerContainer.exists()).toBe(true);
-      const style = innerContainer.attributes('style');
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(innerContainer.classes()).toContain('w-full');
+      expect(innerContainer.classes()).toContain('h-full');
     });
 
     it("should render splitter component", () => {
@@ -168,11 +163,6 @@ describe("CustomMarkdownEditor", () => {
             stubs: {
               'CodeQueryEditor': true,
               'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
             },
             mocks: {
               $t: (key: string) => key
@@ -218,11 +208,6 @@ describe("CustomMarkdownEditor", () => {
             stubs: {
               'CodeQueryEditor': true,
               'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
             },
             mocks: {
               $t: (key: string) => key
@@ -414,10 +399,9 @@ console.log('Hello World');
       wrapper = createWrapper();
 
       const splitter = wrapper.find('[data-test="dashboard-markdown-editor-splitter"]');
-      const style = splitter.attributes('style');
-      
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(splitter.classes()).toContain('w-full');
+      expect(splitter.classes()).toContain('h-full!');
     });
   });
 
@@ -463,9 +447,9 @@ console.log('Hello World');
 
       const flexCol = wrapper.find('[data-test="dashboard-custom-markdown-editor-flex-col"]');
       expect(flexCol.exists()).toBe(true);
-      const style = flexCol.attributes('style');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('flex-direction: column');
+      // Sizing/direction moved from an inline style to Tailwind utilities.
+      expect(flexCol.classes()).toContain('h-full');
+      expect(flexCol.classes()).toContain('flex-col');
     });
   });
 
@@ -600,11 +584,10 @@ console.log('Hello World');
 
       const container = wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]');
 
-      // Check the actual style attribute
-      const style = container.element.getAttribute('style');
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: hidden');
+      // Sizing/overflow moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain('w-full');
+      expect(container.classes()).toContain('h-full');
+      expect(container.classes()).toContain('overflow-hidden');
     });
 
     it("should apply splitter classes correctly", () => {
@@ -614,14 +597,14 @@ console.log('Hello World');
       expect(separator.exists()).toBe(true);
     });
 
-    it("should render the editor container with card-container class", () => {
+    it("should render the editor container with bg-card-glass-bg class", () => {
       wrapper = createWrapper();
 
       const container = wrapper.find(
         '[data-test="dashboard-custom-markdown-editor-container"]',
       );
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain('card-container');
+      expect(container.classes()).toContain('bg-card-glass-bg');
     });
   });
 
@@ -845,11 +828,6 @@ And some more content.
             stubs: {
               'CodeQueryEditor': true,
               'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
             },
             mocks: {
               $t: (key: string) => key
