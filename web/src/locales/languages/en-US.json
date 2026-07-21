@@ -2402,7 +2402,8 @@
     "save": "Save",
     "evalTemplates": "Evaluation Templates",
     "selectStream": "Select a stream ...",
-    "queryEditorPlaceholder": "Select a stream or write SQL query here..."
+    "queryEditorPlaceholder": "Select a stream or write SQL query here...",
+    "moreErrors": "... and {count} more errors"
   },
   "evalTemplate": {
     "header": "Evaluation Templates",
