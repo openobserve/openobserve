@@ -46,15 +46,15 @@
         <OIcon
           :name="signalIcon"
           size="sm"
-          class="mt-[0.1rem] shrink-0"
+          class="mt-0.5 shrink-0"
           :class="signalIconColor"
         />
-        <div class="flex flex-col gap-[0.25rem]">
-          <p class="m-0 text-compact leading-normal text-(--color-text-heading)">
+        <div class="flex flex-col gap-1">
+          <p class="m-0 text-compact leading-normal text-text-heading">
             {{ headline }}
           </p>
           <p
-            class="m-0 text-2xs leading-normal text-(--color-text-secondary)"
+            class="m-0 text-2xs leading-normal text-text-secondary"
           >
             {{ explanation }}
           </p>
@@ -64,15 +64,15 @@
       <!-- FAILURE: the real error messages (the "read it, know the fix" section) -->
       <section
         v-if="signalType === 'failure'"
-        class="card-container py-3 px-[0.875rem] pb-[0.875rem] bg-(--color-surface-base) border border-(--color-border-default) rounded-surface"
+        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
       >
-        <header class="mb-[0.375rem] flex items-center gap-1.5">
+        <header class="mb-1.5 flex items-center gap-1.5">
           <OIcon
             name="error-outline"
             size="xs"
-            class="text-(--color-badge-error-soft-text)"
+            class="text-badge-error-soft-text"
           />
-          <h4 class="m-0 text-compact font-semibold text-(--color-text-heading)">
+          <h4 class="m-0 text-compact font-semibold text-text-heading">
             {{ t("aiObservability.behavior.detail.errorsTitle") }}
           </h4>
         </header>
@@ -89,14 +89,16 @@
           <template #cell-message="{ row }">
             <div class="flex flex-col gap-1 py-0.5">
               <span
-                class="text-xs leading-normal text-(--color-text-heading) whitespace-pre-wrap break-words"
+                class="text-xs leading-normal text-text-heading whitespace-pre-wrap break-words"
               >
                 {{ expandedErrors.has(row.full) ? row.full : row.message }}
               </span>
-              <button
+              <OButton
                 v-if="row.full && row.full !== row.message"
-                type="button"
-                class="self-start text-2xs text-(--color-text-link) hover:underline"
+                variant="ghost-primary"
+                size="chip"
+                class="self-start"
+                data-test="agent-signal-detail-toggle-error-btn"
                 @click.stop="toggleError(row.full)"
               >
                 {{
@@ -104,7 +106,7 @@
                     ? t("aiObservability.behavior.detail.showLess")
                     : t("aiObservability.behavior.detail.showFull")
                 }}
-              </button>
+              </OButton>
             </div>
           </template>
         </OTable>
@@ -117,13 +119,13 @@
 
       <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
       <section
-        class="card-container py-3 px-[0.875rem] pb-[0.875rem] bg-(--color-surface-base) border border-(--color-border-default) rounded-surface"
+        class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
       >
-        <header class="mb-[0.375rem] flex items-center justify-between gap-2">
-          <h4 class="m-0 text-compact font-semibold text-(--color-text-heading)">
+        <header class="mb-1.5 flex items-center justify-between gap-2">
+          <h4 class="m-0 text-compact font-semibold text-text-heading">
             {{ tracesTitle }}
           </h4>
-          <span class="text-2xs text-(--color-text-secondary)">
+          <span class="text-2xs text-text-secondary">
             {{ t("aiObservability.behavior.detail.tracesHint") }}
           </span>
         </header>
@@ -141,7 +143,7 @@
                row opens the trace in a new browser tab, not in place. -->
           <template #cell-trace_id="{ row }">
             <span
-              class="inline-flex items-center gap-1 text-(--color-text-link) hover:underline"
+              class="inline-flex items-center gap-1 text-text-link hover:underline"
               :title="t('aiObservability.behavior.detail.openInNewTab')"
             >
               <OIcon name="open-in-new" size="xs" class="opacity-70" />
@@ -169,6 +171,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import searchService from "@/services/search";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 
@@ -235,16 +238,16 @@ const signalIcon = computed(() => {
   return "warning"; // failure
 });
 const signalIconColor = computed(() => {
-  if (signalType.value === "loop") return "text-(--color-badge-warning-soft-text)";
-  if (signalType.value === "cost") return "text-(--color-badge-primary-soft-text)";
-  return "text-(--color-badge-error-soft-text)";
+  if (signalType.value === "loop") return "text-badge-warning-soft-text";
+  if (signalType.value === "cost") return "text-badge-primary-soft-text";
+  return "text-badge-error-soft-text";
 });
 const signalIconWrap = computed(() => {
   if (signalType.value === "loop")
-    return "bg-(--color-badge-warning-soft-bg) text-(--color-badge-warning-soft-text)";
+    return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
   if (signalType.value === "cost")
-    return "bg-(--color-badge-primary-soft-bg) text-(--color-badge-primary-soft-text)";
-  return "bg-(--color-badge-error-soft-bg) text-(--color-badge-error-soft-text)";
+    return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
+  return "bg-badge-error-soft-bg text-badge-error-soft-text";
 });
 
 const title = computed(() => {

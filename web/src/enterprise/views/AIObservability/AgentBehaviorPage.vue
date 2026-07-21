@@ -35,13 +35,13 @@
           }"
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
           data-test="ai-agent-behavior-date-time"
-          class="h-[2rem]"
+          class="h-8"
           @on:date-change="onDateChange"
         />
         <!-- Last-refresh + refresh control, consistent with LLM Insights /
              Sessions page headers. -->
         <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-[2rem] overflow-hidden"
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
         >
           <ORefreshButton
             :last-run-at="behaviorLastRunAt"

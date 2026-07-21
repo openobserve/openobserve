@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="showBehaviorTab"
                 name="behavior"
                 :label="t('aiObservability.behavior.node.tabLabel')"
-                style="text-transform: capitalize"
+                class="capitalize"
                 data-test="service-graph-node-panel-tab-behavior"
               />
               <OTab
