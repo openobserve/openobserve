@@ -612,7 +612,11 @@ pub async fn correlate_alert_to_incident(
                 );
             }
             Err(_) => {
-                if crate::service::trial_quota::org_has_active_subscription(&alert.org_id).await {
+                let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                    &alert.org_id,
+                )
+                .await;
+                if policy.allows_metered_overage() {
                     crate::service::trial_quota::record_billable_ai_usage(
                         &alert.org_id,
                         &usage_ctx,
@@ -1688,7 +1692,11 @@ pub async fn trigger_rca_for_incident(
                 );
             }
             Err(e) => {
-                if crate::service::trial_quota::org_has_active_subscription(&org_id).await {
+                let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                    &org_id,
+                )
+                .await;
+                if policy.allows_metered_overage() {
                     crate::service::trial_quota::record_billable_ai_usage(
                         &org_id,
                         &usage_ctx,

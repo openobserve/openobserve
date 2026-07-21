@@ -29,7 +29,7 @@ use {
     crate::common::meta::organization::{
         AllOrgListDetails, AllOrganizationResponse, CreateExternalContractRequest,
         EnableOrgStorageRequest, ExtendExternalContractRequest, ExtendTrialPeriodRequest,
-        OrganizationInviteUserRecord,
+        OrganizationInviteUserRecord, SetAiUsageLimitRequest,
     },
     axum::body::Body,
     axum::http::StatusCode,
@@ -239,6 +239,8 @@ pub async fn all_organizations(
             plan: billing_info
                 .map(|(st, ..)| i16::from(*st) as i32)
                 .unwrap_or_default(),
+            credits_used: crate::service::trial_quota::get_used(&org.identifier),
+            credits_limit: crate::service::trial_quota::get_limit(&org.identifier),
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -623,6 +625,41 @@ pub async fn extend_trial_period(
     let key = format!("{ORG_KEY_PREFIX}{}", req.org_id);
     let _ = infra::db::put_into_db_coordinator(&key, Default::default(), true, None).await;
     ret
+}
+
+/// SetAiUsageLimit
+#[cfg(feature = "cloud")]
+#[utoipa::path(
+    put,
+    path = "/{org_id}/ai/usage_limit",
+    context_path = "/api",
+    tag = "Organizations",
+    operation_id = "SetAiUsageLimit",
+    summary = "Set an organization's lifetime AI credit limit",
+    security(("Authorization" = [])),
+    request_body(content = inline(SetAiUsageLimitRequest), content_type = "application/json"),
+    responses(
+        (status = 200, description = "Updated AI credit usage", body = crate::service::trial_quota::AiUsageResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Organization not found"),
+    ),
+    extensions(("x-o2-mcp" = json!({"enabled": false})))
+)]
+pub async fn set_ai_usage_limit(
+    Path(org_id): Path<String>,
+    Json(req): Json<SetAiUsageLimitRequest>,
+) -> Response {
+    if org_id != "_meta" {
+        return MetaHttpResponse::unauthorized("not authorized to access this resource");
+    }
+    if infra::table::organizations::get(&req.org_id).await.is_err() {
+        return MetaHttpResponse::not_found("organization not found");
+    }
+
+    if let Err(err) = crate::service::trial_quota::set_limit(&req.org_id, req.credits_limit).await {
+        return MetaHttpResponse::internal_error(err);
+    }
+    MetaHttpResponse::json(crate::service::trial_quota::get_usage(&req.org_id).await)
 }
 
 /// CreateExternalContract
