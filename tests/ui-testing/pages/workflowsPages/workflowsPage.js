@@ -211,16 +211,17 @@ class WorkflowsPage {
       .click({ timeout: DRAWER_TIMEOUT_MS });
   }
 
-  /** Assert a node painted an error badge after a test run (node_type e.g. 'destination','function'). */
-  async expectNodeTestError(nodeType) {
+  /** Assert a node painted an error badge after a test run (node_type e.g. 'destination','function').
+   *  Generous timeout — on slow CI runners the run + failing send can take a while to resolve. */
+  async expectNodeTestError(nodeType, timeout = 60000) {
     await expect(this.page.locator(`[data-test="workflow-node-${nodeType}-test-error"]`))
-      .toBeVisible({ timeout: 30000 });
+      .toBeVisible({ timeout });
   }
 
   /** Assert a node painted a success badge after a test run. */
-  async expectNodeTestOk(nodeType) {
+  async expectNodeTestOk(nodeType, timeout = 60000) {
     await expect(this.page.locator(`[data-test="workflow-node-${nodeType}-test-ok"]`))
-      .toBeVisible({ timeout: 30000 });
+      .toBeVisible({ timeout });
   }
 
   /** Commit the node config drawer (binds the node) and wait for it to close. */

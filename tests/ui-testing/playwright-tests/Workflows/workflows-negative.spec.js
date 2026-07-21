@@ -139,7 +139,7 @@ test.describe(
         await pm.workflowsPage.buildTriggerToDestinationAndSave({
           name,
           destName: `wf_auto_dest_${id}`,
-          url: 'http://10.255.255.1:9/dead', // non-routable -> send fails
+          url: 'http://127.0.0.1:1/dead', // closed port -> immediate connection-refused (fast, not a hang)
         });
         await pm.workflowsPage.goToList();
         await pm.workflowsPage.openEdit(name);
