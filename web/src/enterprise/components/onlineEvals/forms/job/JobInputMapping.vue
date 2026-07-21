@@ -126,6 +126,39 @@
             }}
           </span>
         </div>
+        <!-- The binding is per SCORER, not per variable: the backend's
+             validate_for_activation() requires one for EVERY trace scorer,
+             whether or not its prompt uses {{ spans }}. Rendering it inside the
+             `spans` row made it unreachable for scorers without that variable,
+             so activation could be blocked with no way to satisfy it. -->
+        <div
+          v-if="targetScope === 'trace'"
+          class="flex flex-col gap-1 border-b border-dialog-header-border py-2 px-3"
+          :data-test="`job-input-mapping-span-selector-${entityId(scorer)}`"
+        >
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span class="text-2xs font-semibold text-text-secondary">
+              {{ t("onlineEvals.job.spanSelector.editorTitle") }}
+              <span aria-hidden="true">*</span>
+            </span>
+            <SpanSelectorBinding
+              :scorer-id="entityId(scorer)"
+              :selectors="spanSelectors"
+              :binding="spanSelectorBindings[entityId(scorer)]"
+              :stream-fields="streamFields"
+              @update:selectors="emit('update:spanSelectors', $event)"
+              @update:binding="
+                updateSpanSelectorBinding(entityId(scorer), $event)
+              "
+            />
+          </div>
+          <!-- Required with no explanation is why this read as arbitrary: say
+               what a selector does and why a trace needs one. -->
+          <span class="text-2xs leading-[1.4] text-text-secondary">
+            {{ t("onlineEvals.job.spanSelector.bindingHelp") }}
+          </span>
+        </div>
+
         <div
           v-if="variablesFor(scorer).length"
           class="grid gap-1.5 py-2.5 px-3"
@@ -144,31 +177,15 @@
               class="flex min-h-7 flex-wrap items-center gap-x-2 gap-y-1 px-1 py-1.5"
               :data-test="`job-input-mapping-system-provided-${entityId(scorer)}-${variable}`"
             >
-              <SpanSelectorBinding
-                v-if="targetScope === 'trace' && variable === 'spans'"
-                :scorer-id="entityId(scorer)"
-                :selectors="spanSelectors"
-                :binding="spanSelectorBindings[entityId(scorer)]"
-                :stream-fields="streamFields"
-                @update:selectors="emit('update:spanSelectors', $event)"
-                @update:binding="
-                  updateSpanSelectorBinding(entityId(scorer), $event)
-                "
-              />
               <!-- Auto-filled rows stay quiet: an icon plus where the value
                    comes from. A badge on every row shouted the one thing that
                    is true of most rows, which is what made the list read as
-                   noise rather than as a list. -->
-              <template v-else>
-                <OIcon
-                  name="bolt"
-                  size="xs"
-                  class="shrink-0 text-text-tertiary"
-                />
-                <span class="text-2xs leading-[1.4] text-text-secondary">
-                  {{ systemProvidedDescription(variable) }}
-                </span>
-              </template>
+                   noise rather than as a list. `spans` reads the same way — the
+                   selector that fills it is bound once per scorer above. -->
+              <OIcon name="bolt" size="xs" class="shrink-0 text-text-tertiary" />
+              <span class="text-2xs leading-[1.4] text-text-secondary">
+                {{ systemProvidedDescription(variable) }}
+              </span>
             </div>
             <OInput
               v-else

@@ -123,11 +123,13 @@ describe("JobInputMapping", () => {
           .exists(),
       ).toBe(false);
     }
+    // The Span Selector is bound once per scorer (card level), not inside the
+    // {{ spans }} row — the backend requires one for EVERY trace scorer.
     expect(
       wrapper
-        .find('[data-test="job-input-mapping-system-provided-scorer-1-spans"]')
-        .text(),
-    ).toContain("Span Selector required");
+        .find('[data-test="job-input-mapping-span-selector-scorer-1"]')
+        .exists(),
+    ).toBe(true);
     expect(
       wrapper
         .find('[data-test="job-input-mapping-input-scorer-1-custom"]')
@@ -226,6 +228,38 @@ describe("JobInputMapping", () => {
     expect(
       wrapper.find('[data-test="span-selector-binding-scorer-1"]').exists(),
     ).toBe(true);
+  });
+
+  // Regression: the Span Selector control used to render only inside the
+  // {{ spans }} variable row, but the backend's validate_for_activation()
+  // demands a binding for EVERY trace scorer. A scorer without {{ spans }} was
+  // therefore blocked from activation with no control to satisfy it.
+  it("offers a Span Selector for a trace scorer that has no {{ spans }}", () => {
+    const wrapper = mountMapping("trace", [autoFilledScorer]);
+
+    // autoFilledScorer declares only input/output — no spans variable.
+    expect(
+      wrapper
+        .find('[data-test="job-input-mapping-system-provided-scorer-2-spans"]')
+        .exists(),
+    ).toBe(false);
+    // ...yet it must still be bindable, because activation requires it.
+    const row = wrapper.find(
+      '[data-test="job-input-mapping-span-selector-scorer-2"]',
+    );
+    expect(row.exists()).toBe(true);
+    // And it must say what a selector is for — "required" alone reads arbitrary.
+    expect(row.text()).toContain("Pick the ones this scorer should look at");
+  });
+
+  it("offers no Span Selector outside trace scope", () => {
+    const wrapper = mountMapping("span");
+
+    expect(
+      wrapper
+        .find('[data-test="job-input-mapping-span-selector-scorer-1"]')
+        .exists(),
+    ).toBe(false);
   });
 
   // The section keeps ONE shape regardless of what the scorer declares — only

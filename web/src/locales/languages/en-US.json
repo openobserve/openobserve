@@ -8743,6 +8743,7 @@
       },
       "spanSelector": {
         "select": "Select Span Selector",
+        "bindingHelp": "Traces can have hundreds of spans. Pick the ones this scorer should look at.",
         "createForScorer": "Create for scorer",
         "createForScorerTitle": "Create a Span Selector for this scorer",
         "editorTitle": "Span Selector",

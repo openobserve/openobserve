@@ -831,6 +831,10 @@ async function onSubmit(value: JobForm) {
     );
     return;
   }
+  // Mirrors the backend's validate_for_activation(): EVERY trace scorer needs a
+  // Span Selector binding, whether or not its prompt uses {{ spans }}. Keep this
+  // in step with online_eval_jobs.rs — relaxing it here just trades a clear
+  // client-side message for a server rejection.
   if (
     value.targetScope === "trace" &&
     (activateOnSave.value ||
