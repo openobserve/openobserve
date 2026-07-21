@@ -5,7 +5,7 @@ import { computed, getCurrentInstance, nextTick, onBeforeUnmount, onMounted, pro
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
 import { FlexRender } from "@tanstack/vue-table";
-import { TABLE_CHECKBOX_COL_SIZE, type OTableProps, type OTableEmits, type OTableSlots } from "./OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, OTableCellActionsKey, type OTableProps, type OTableEmits, type OTableSlots } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
 import { useTablePagination } from "./composables/useTablePagination";
@@ -27,6 +27,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTableEmpty from "./sub-components/OTableEmpty.vue";
 import OTableLoading from "./sub-components/OTableLoading.vue";
 import OTableError from "./sub-components/OTableError.vue";
+import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 
 const props = withDefaults(defineProps<OTableProps<TData>>(), {
   pagination: "client",
@@ -222,6 +223,46 @@ provide(OTableTreeContextKey, tree.context);
 // Expose horizontalScroll to descendant cells without prop-drilling.
 provide("o2TableHorizontalScroll", computed(() => !!props.horizontalScroll));
 
+// Pivot: expose stickyColTotals so body cells of `_isTotalColumn` columns can
+// pin right in step with the header + grand-total footer (P1-A3).
+provide("o2TableStickyColTotals", computed(() => !!props.stickyColTotals));
+
+// ── Cell hover-actions (G13) ────────────────────────────────────
+// Single-active-cell model: hovering a cell marks it active (after a short
+// debounce), so a `#cell-actions` overlay renders for only one cell at a time —
+// consumers gate their (heavy) action menus on `active` to mount them lazily.
+const activeCellKey = ref<string | null>(null);
+let cellActionTimer: ReturnType<typeof setTimeout> | null = null;
+function setActiveCell(key: string | null): void {
+  if (cellActionTimer) {
+    clearTimeout(cellActionTimer);
+    cellActionTimer = null;
+  }
+  if (key === null) {
+    // Small delay on leave so moving the pointer INTO the overlay (which sits on
+    // top of the cell) doesn't flicker it away between the two mouse events.
+    cellActionTimer = setTimeout(() => {
+      activeCellKey.value = null;
+      cellActionTimer = null;
+    }, 120);
+  } else if (activeCellKey.value === key) {
+    // already active — no debounce needed
+  } else {
+    cellActionTimer = setTimeout(() => {
+      activeCellKey.value = key;
+      cellActionTimer = null;
+    }, 200);
+  }
+}
+onBeforeUnmount(() => {
+  if (cellActionTimer) clearTimeout(cellActionTimer);
+});
+provide(OTableCellActionsKey, {
+  activeCellKey,
+  setActiveCell,
+  enabled: computed(() => !!slots["cell-hover-actions"]),
+});
+
 // ── Core table instance ─────────────────────────────────────────
 const {
   table,
@@ -349,24 +390,135 @@ const displayRows = computed(() => {
   return table.getRowModel().rows;
 });
 
+// ── Pivot: row-field cell merge (fake rowspan, G17) ─────────────
+// Consecutive rows sharing the same leading row-field values collapse into one
+// visual cell: the first row shows the value; the rest hide their content (and
+// the group's inner borders) so the group reads as a single merged cell.
+// Active only when `pivotRowColumns` is supplied (dashboard pivot); a no-op — and
+// zero cost — for every other table. Keyed by each row-field column's `name`
+// (which must equal the OTable column id for that field).
+const PIVOT_ROW_KEY_SEP = "\u0000";
+const pivotMergeMap = computed(() => {
+  const map = new Map<
+    string,
+    Record<string, { hideContent: boolean; hideBorder: boolean }>
+  >();
+  const rowCols = (props.pivotRowColumns ?? []) as any[];
+  if (!rowCols.length) return map;
+  const rows = displayRows.value
+    .map((r) => r.original as any)
+    .filter((r: any) => !r.__isTotalRow);
+  if (!rows.length) return map;
+  const rowKey = (row: any) =>
+    rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_ROW_KEY_SEP);
+  for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
+    const col = rowCols[colIdx];
+    let groupStart = 0;
+    for (let i = 0; i <= rows.length; i++) {
+      let sameGroup = i < rows.length;
+      if (sameGroup) {
+        for (let p = 0; p <= colIdx; p++) {
+          if (rows[i][rowCols[p].name] !== rows[groupStart][rowCols[p].name]) {
+            sameGroup = false;
+            break;
+          }
+        }
+      }
+      if (!sameGroup) {
+        if (i - groupStart > 1) {
+          for (let r = groupStart; r < i; r++) {
+            const key = rowKey(rows[r]);
+            if (!map.has(key)) map.set(key, {});
+            map.get(key)![col.name] = {
+              hideContent: r !== groupStart,
+              hideBorder: r < i - 1,
+            };
+          }
+        }
+        groupStart = i;
+      }
+    }
+  }
+  return map;
+});
+function getPivotMerge(
+  row: any,
+  columnId: string,
+): { hideContent: boolean; hideBorder: boolean } | null {
+  const rowCols = (props.pivotRowColumns ?? []) as any[];
+  if (!rowCols.length) return null;
+  const key = rowCols
+    .map((c: any) => String(row[c.name] ?? ""))
+    .join(PIVOT_ROW_KEY_SEP);
+  return pivotMergeMap.value.get(key)?.[columnId] ?? null;
+}
+
+// Grand-total row value for a column (pivot sticky tfoot).
+function pivotTotalCell(col: OTableColumnDef<TData>): any {
+  const row = props.stickyTotalRow;
+  if (!row) return "";
+  const key = (col.accessorKey ?? col.id) as string;
+  const val = row[key];
+  if (val === undefined || val === null) return "";
+  const fmt = (col.meta as any)?.format as
+    | ((v: any, r: any) => any)
+    | undefined;
+  return fmt ? fmt(val, row) : val;
+}
+
+// Right-pinned total-column style for the grand-total tfoot cell (pixel math
+// matches the header/body sticky total columns).
+function pivotTotalColumnStyle(col: OTableColumnDef<TData>): Record<string, any> {
+  const m = col.meta as any;
+  if (!props.stickyColTotals || !m?._isTotalColumn) return {};
+  const rightOffset = (m._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    zIndex: 2,
+    width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+  };
+}
+
 // ── Virtual scroll ──────────────────────────────────────────────
+// Variable-height virtual rows (G8): only when a virtual table also wraps its
+// content (logs `wrap`), so fixed-height virtual tables (traces grid) keep the
+// cheaper fixed-stride path unchanged.
+const useDynamicRowHeight = computed(
+  () => !!props.virtualScroll && !!props.wrap,
+);
+
 const {
   virtualRows,
   totalSize,
   baseOffset,
   measure: virtualMeasure,
+  measureRowElement,
 } = useTableVirtualization({
   rows: displayRows,
   parentRef: scrollContainerRef,
-  scrollEl: props.scrollEl ?? scrollContainerRef.value ?? undefined,
+  // Reactive getter (G10): `props.scrollEl` and the internal scroll container are
+  // both often null at setup; a getter lets the virtualizer rebind once either
+  // resolves after mount instead of freezing on the setup-time snapshot.
+  scrollEl: () => props.scrollEl ?? scrollContainerRef.value ?? null,
   scrollMargin: props.scrollMargin ?? 0,
   // Keep this in sync with the --table-row-height-* tokens (dense = 38px) so the
   // virtualizer's measured height matches the actual rendered row height.
   rowHeight: props.rowHeight ?? (props.dense ? 38 : 54),
   overscan: 100,
+  dynamicRowHeight: () => useDynamicRowHeight.value,
 });
 
 const isVirtual = computed(() => props.virtualScroll && displayRows.value.length > 0);
+
+// ── Delegated scroll ────────────────────────────────────────────
+// When the caller passes an external `scrollEl` (e.g. the logs/traces grid
+// shares ONE scroll container with the histogram/RED charts above it), OTable
+// must NOT create its own scroll container — otherwise a second, nested
+// scrollbar appears. In that mode the inner container is `overflow-visible` and
+// height-auto so the whole table flows into the external element, which owns
+// the scroll (the virtualizer already targets that element via G10).
+const isDelegatedScroll = computed(() => !!props.scrollEl);
 
 // ── Per-column CSS size-var overrides ──────────────────────────
 // Override channel the table style/sums read from, overriding the nominal sizes
@@ -872,7 +1024,13 @@ defineExpose({
     <!-- ── Scrollable table area ────────────────────────────── -->
     <div
       ref="scrollContainerRef"
-      :class="['flex flex-col overflow-y-auto min-h-0 relative', allowHorizontalScroll ? 'overflow-x-auto' : 'overflow-x-hidden', props.fillHeight ? 'flex-1' : '']"
+      :class="[
+        'flex flex-col min-h-0 relative',
+        isDelegatedScroll
+          ? 'overflow-visible'
+          : ['overflow-y-auto', allowHorizontalScroll ? 'overflow-x-auto' : 'overflow-x-hidden'],
+        (props.fillHeight && !isDelegatedScroll) ? 'flex-1' : '',
+      ]"
       :style="{
         maxHeight: props.maxHeight
           ? typeof props.maxHeight === 'number'
@@ -887,7 +1045,10 @@ defineExpose({
         :class="[
           props.horizontalScroll ? 'min-w-max' : ((useComputedWidth && frozen) ? '' : 'w-full'),
           props.horizontalScroll || props.defaultColumns ? 'table-auto' : 'table-fixed',
-          (props.bordered && !props.columns.some((c) => c.pinned || c.isAction)) ? '' : 'border-separate border-spacing-0',
+          // border-separate is required whenever cells are sticky (pinned/action
+          // columns, OR pivot sticky headers/total columns) so their borders +
+          // shadows travel with them; border-collapse renders those inconsistently.
+          (props.bordered && !props.columns.some((c) => c.pinned || c.isAction) && !(props.pivotHeaderLevels && props.pivotHeaderLevels.length) && !props.stickyColTotals) ? '' : 'border-separate border-spacing-0',
           // Symmetric edge inset (SPACING_AUDIT.md §7): the first and last cell
           // content sit --spacing-table-edge (14px) from the table edges on EVERY
           // table, while the per-cell row dividers still span the full width
@@ -940,6 +1101,7 @@ defineExpose({
           @drag-start="columnMgmt.onDragStart"
           @drag-end="columnMgmt.onDragEnd"
           @resize-start="freezeFlexColumns"
+          @close-column="(col: any) => emit('close-column', col)"
         />
 
         <!-- ── Skeleton Body (loading with no existing data) ───── -->
@@ -979,6 +1141,7 @@ defineExpose({
           :enable-cell-copy="props.enableCellCopy"
           :loading="props.loading"
           :get-cell-style="(props.getCellStyle as any)"
+          :get-pivot-merge="props.pivotRowColumns && props.pivotRowColumns.length ? getPivotMerge : undefined"
           :enable-row-reorder="props.enableRowReorder"
           :disable-row-reorder="props.disableRowReorder"
           :global-filter-active="!!globalFilterLocal"
@@ -987,6 +1150,8 @@ defineExpose({
           :total-size="isVirtual ? totalSize : undefined"
           :base-offset="isVirtual ? baseOffset : undefined"
           :measure-element="isVirtual ? measureElement : undefined"
+          :measure-row-element="isVirtual && useDynamicRowHeight ? measureRowElement : undefined"
+          :dynamic-row-height="isVirtual && useDynamicRowHeight"
           @toggle-selection="selection.toggleRow"
           @toggle-expansion="expansion.toggleRow"
           @row-click="(row: TData, evt: MouseEvent) => {
@@ -1024,6 +1189,17 @@ defineExpose({
           <!-- Tree-mode warning row slot -->
           <template v-if="slots['tree-warning']" #tree-warning="warnSlotProps">
             <slot name="tree-warning" :row="warnSlotProps.row" />
+          </template>
+
+          <!-- Per-cell hover-action overlay slot (G13) -->
+          <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
+            <slot
+              name="cell-hover-actions"
+              :row="caProps.row"
+              :column="caProps.column"
+              :value="caProps.value"
+              :active="caProps.active"
+            />
           </template>
         </OTableBody>
 
@@ -1082,6 +1258,29 @@ defineExpose({
                 :props="header.getContext()"
               />
             </th>
+          </tr>
+        </tfoot>
+
+        <!-- ── Pivot grand-total row (sticky <tfoot>, G16/G17) ── -->
+        <tfoot
+          v-if="props.stickyTotalRow"
+          data-test="o2-table-pivot-total-foot"
+          :class="props.stickyRowTotals ? 'sticky bottom-0 z-10 o2-pivot-total-sticky' : ''"
+        >
+          <tr class="bg-table-header-bg">
+            <td
+              v-for="col in props.columns"
+              :key="`pivot-total-${col.id}`"
+              :data-test="`o2-table-pivot-total-cell-${col.id}`"
+              class="px-2 py-1 text-xs text-text-body bg-table-header-bg border-t border-table-header-border"
+              :class="[
+                (col.meta as any)?.align === 'right' ? 'text-right' : (col.meta as any)?.align === 'center' ? 'text-center' : 'text-left',
+                (props.stickyColTotals && (col.meta as any)?._isTotalColumn) ? 'font-semibold' : '',
+              ]"
+              :style="pivotTotalColumnStyle(col)"
+            >
+              {{ pivotTotalCell(col) }}
+            </td>
           </tr>
         </tfoot>
       </table>
@@ -1177,6 +1376,29 @@ defineExpose({
         />
       </template>
     </OTablePagination>
+
+    <!-- Standalone #bottom slot: when pagination is disabled but the caller
+         still provides a `#bottom` (e.g. dashboard legend footer, or a pager
+         that hides itself), render it so it is never dropped. -->
+    <div
+      v-else-if="slots.bottom"
+      data-test="o2-table-bottom"
+    >
+      <slot
+        name="bottom"
+        :current-page="pagination.currentPage.value"
+        :page-size="pagination.pageSize.value"
+        :total-pages="pagination.totalPages.value"
+        :total-rows="pagination.totalCount.value"
+        :is-first-page="pagination.isFirstPage.value"
+        :is-last-page="pagination.isLastPage.value"
+        :set-page-size="pagination.setPageSize"
+        :first-page="pagination.firstPage"
+        :prev-page="pagination.prevPage"
+        :next-page="pagination.nextPage"
+        :last-page="pagination.lastPage"
+      />
+    </div>
     </div> <!-- /bordered wrapper -->
   </div>
 </template>

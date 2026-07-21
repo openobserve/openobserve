@@ -17,10 +17,12 @@
 </template>
 
 <style scoped>
-/* keep(lib-override:o2-button): `.ai-btn` is this component's row-button modifier — it is
-   passed in through `props.class` by plugins/logs/TenstackTable.vue and
-   components/TenstackTable.vue, and every element it styles (the OButton root and
-   the <img class="ai-icon"> above) is rendered HERE, so this is the owning scope.
+/* keep(lib-override:o2-button): `.ai-btn` is this component's row-button modifier,
+   an absolute-positioning variant a caller can opt into via `props.class`. Every
+   element it styles (the OButton root and the <img class="ai-icon"> above) is
+   rendered HERE, so this is the owning scope. (The logs/traces tables migrated to
+   OTable now position the button via OTable's `#cell-hover-actions` overlay, so
+   they no longer pass `.ai-btn`; it is retained for any other caller.)
    Why the !important: OButton's own base `relative` outranks the positioning
    passed via props. `translate` (not `transform`) is the property to override —
    Tailwind v4 emits -translate-y-1/2 through the CSS `translate` shorthand. */

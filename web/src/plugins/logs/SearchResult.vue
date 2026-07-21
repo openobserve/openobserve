@@ -468,25 +468,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
-          <tenstack-table
+          <!-- Missing-stream warning banner (was rendered inside the legacy table) -->
+          <div
+            v-if="!searchObj.loading && searchObj.data.missingStreamMessage"
+            class="flex items-center gap-2 px-page-edge py-2 text-xs text-status-warning-text bg-status-warning-bg"
+          >
+            <OIcon name="warning" size="sm" />
+            <span>{{ searchObj.data.missingStreamMessage }}</span>
+          </div>
+          <!-- VRL function-error banner (collapsible) -->
+          <div
+            v-if="!searchObj.loading && searchObj?.data?.functionError"
+            data-test="log-search-result-function-error"
+            class="px-page-edge py-2 bg-status-warning-bg text-xs"
+          >
+            <button
+              type="button"
+              class="flex items-center gap-1 text-status-warning-text bg-transparent border-0 cursor-pointer"
+              data-test="table-row-expand-menu"
+              @click="isFunctionErrorOpen = !isFunctionErrorOpen"
+            >
+              <OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="sm" />
+              {{ t("search.functionErrorLabel") }}
+            </button>
+            <pre
+              v-if="isFunctionErrorOpen"
+              class="mt-1 whitespace-pre-wrap break-words text-status-warning-text"
+            >{{ searchObj?.data?.functionError }}</pre>
+          </div>
+
+          <OTable
             ref="searchTableRef"
             :columns="getColumns || []"
-            :rows="searchObj.data.queryResults?.hits || []"
+            :data="searchObj.data.queryResults?.hits || []"
             :wrap="searchObj.meta.toggleSourceWrap"
-            :width="getTableWidth"
-            :err-msg="searchObj.data.missingStreamMessage"
             :loading="searchObj.loading"
-            :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
-            :functionErrorMsg="searchObj?.data?.functionError"
-            :expandedRows="expandedLogs"
-            :highlight-timestamp="searchObj.data?.searchAround?.indexTimestamp"
-            :selected-stream-fts-keys="selectedStreamFullTextSearchKeys"
-            :highlight-query="searchObj.data.highlightQuery"
-            :default-columns="!searchObj.data.stream.selectedFields.length"
-            class="w-full"
-            :selectedStreamFields="searchObj.data.stream.selectedStreamFields"
+            :row-key="logsTimestampCol"
+            :row-height="24"
+            virtual-scroll
+            :fill-height="false"
             :scroll-el="scrollContainerRef"
             :scroll-margin="0"
+            :default-columns="false"
+            :show-global-filter="false"
+            :frame="false"
+            pagination="none"
+            sorting="none"
+            :enable-column-reorder="true"
+            :enable-column-resize="true"
+            :get-row-status-color="getLogRowStatusColor"
+            :row-class="getLogRowClass"
+            expansion="multiple"
+            :expanded-ids="expandedLogIds"
+            data-test="logs-search-result-logs-table"
+            class="w-full"
             :class="[
               !searchObj.meta.showHistogram ||
               (searchObj.meta.showHistogram &&
@@ -495,17 +530,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 : 'min-h-[calc(100%-6.25rem)]!',
             ]"
             @update:columnSizes="handleColumnSizesUpdate"
-            @update:columnOrder="handleColumnOrderUpdate"
-            @copy="copyLogToClipboard"
-            @add-field-to-table="addFieldToTable"
-            @add-search-term="addSearchTerm"
+            @column-order-change="handleColumnOrderUpdate"
             @close-column="closeColumn"
-            @click:data-row="openLogDetails"
-            @expand-row="expandLog"
-            @send-to-ai-chat="sendToAiChat"
-            @view-trace="redirectToTraces"
-            @show-correlation="openLogDetailsWithCorrelation"
-          />
+            @row-click="openLogDetailsByRow"
+            @update:expandedIds="onExpandedLogIdsChange"
+          >
+            <!-- FTS-highlighted cell content (chunked colorized HTML from the
+                 shared useLogsHighlighter; falls back to the plain value). -->
+            <template
+              v-for="col in (getColumns || [])"
+              :key="col.id"
+              #[`cell-${col.id}`]="{ row, value }"
+            >
+              <span
+                v-if="logsCellHtml(col.id, row)"
+                class="log-cell-html"
+                v-html="logsCellHtml(col.id, row)"
+              />
+              <span v-else>{{ value }}</span>
+            </template>
+
+            <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
+                 add-search-term on closable field cells (G13). -->
+            <template #cell-hover-actions="{ row, column, active }">
+              <O2AIContextAddBtn
+                v-if="active && column.id === logsTimestampCol"
+                data-test="logs-search-result-ai-btn"
+                @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
+              />
+              <CellActions
+                v-else-if="active && column.meta?.closable && row[column.id] != null"
+                :column="column"
+                :row="row"
+                :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
+                :hide-search-term-actions="false"
+                @copy="copyLogToClipboard"
+                @add-search-term="addSearchTerm"
+                @send-to-ai-chat="sendToAiChat"
+              />
+            </template>
+
+            <!-- Expanded row → JSON preview (copy / add-field / add-search-term /
+                 view-trace / show-correlation / send-to-ai). -->
+            <template #expansion="{ row }">
+              <JsonPreview
+                :value="row"
+                :index="logsRowIndex(row)"
+                mode="expanded"
+                :highlight-query="searchObj.data.highlightQuery"
+                :hide-search-term-actions="false"
+                @copy="copyLogToClipboard"
+                @add-field-to-table="addFieldToTable"
+                @add-search-term="addSearchTerm"
+                @view-trace="redirectToTraces"
+                @show-correlation="openLogDetailsWithCorrelation"
+                @send-to-ai-chat="sendToAiChat"
+              />
+            </template>
+          </OTable>
         </template>
 
         <!-- Patterns View -->
@@ -705,6 +787,10 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { extractStatusFromLog } from "@/utils/logs/statusParser";
 
 export default defineComponent({
   name: "SearchResult",
@@ -723,7 +809,9 @@ export default defineComponent({
       () => import("@/components/dashboards/panels/ChartRenderer.vue"),
     ),
     SanitizedHtmlRenderer,
-    TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
+    OTable: defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue")),
+    CellActions,
+    O2AIContextAddBtn,
     JsonPreview: defineAsyncComponent(() => import("./JsonPreview.vue")),
     EqualIcon,
     NotEqualIcon,
@@ -770,6 +858,14 @@ export default defineComponent({
   },
   methods: {
     handleColumnSizesUpdate(newColSizes: any) {
+      // OTable emits sizes keyed by column id; the logs persistence stores them
+      // in the legacy CSS-var format (`--col-{id}-size` / `--header-{id}-size`)
+      // so saved views load back correctly (see useStreamFields column build).
+      const cssVarSizes: Record<string, number> = {};
+      for (const [id, size] of Object.entries(newColSizes || {})) {
+        cssVarSizes[`--col-${id}-size`] = size as number;
+        cssVarSizes[`--header-${id}-size`] = size as number;
+      }
       const prevColSizes =
         this.searchObj.data.resultGrid?.colSizes[
           this.searchObj.data.stream.selectedStream
@@ -779,7 +875,7 @@ export default defineComponent({
       ] = [
         {
           ...prevColSizes,
-          ...newColSizes,
+          ...cssVarSizes,
         },
       ];
     },
@@ -1918,6 +2014,104 @@ export default defineComponent({
       return [...new Set([...defaultFTSKeys, ...selectedStreamFTSKeys])];
     });
 
+    // ── OTable logs-grid rendering (migrated from the logs TenstackTable) ──────
+    // FTS highlighting keeps the exact legacy pipeline: `processHitsInChunks`
+    // builds a per-(column,rowIndex) map of colorized HTML which the cell slots
+    // render via v-html (source column → full JSON with braces; FTS columns →
+    // semantic colors; else plain highlight). Chunked/async + AbortController
+    // behaviour is preserved by reusing useLogsHighlighter unchanged.
+    const { processedResults, processHitsInChunks } = useLogsHighlighter();
+
+    // Collapsible VRL function-error banner (was internal to the legacy table).
+    const isFunctionErrorOpen = ref(false);
+
+    const logsTimestampCol = computed(
+      () => store.state.zoConfig.timestamp_column || "_timestamp",
+    );
+
+    // row object → its ORIGINAL index in hits (the highlight cache + the detail
+    // sidebar + expansion are all keyed by original index — G7).
+    const logsHitIndexMap = computed(() => {
+      const m = new Map<any, number>();
+      (searchObj.data.queryResults?.hits || []).forEach((h: any, i: number) =>
+        m.set(h, i),
+      );
+      return m;
+    });
+    const logsRowIndex = (row: any): number =>
+      logsHitIndexMap.value.get(row) ?? -1;
+    const logsCellHtml = (columnId: string, row: any): string | null => {
+      const idx = logsRowIndex(row);
+      if (idx < 0) return null;
+      return (processedResults.value as any)[`${columnId}_${idx}`] ?? null;
+    };
+
+    const reprocessLogsHighlight = (clearCache: boolean) => {
+      processHitsInChunks(
+        searchObj.data.queryResults?.hits || [],
+        (getColumns.value as any[]) || [],
+        clearCache,
+        searchObj.data.highlightQuery || "",
+        100,
+        selectedStreamFullTextSearchKeys.value,
+      );
+    };
+    // Columns change → clear cache and reprocess; new hits → reprocess (keep
+    // cache). `immediate` so a mount with results already present (restored /
+    // cached state) still highlights instead of showing plain values.
+    watch(() => getColumns.value, () => reprocessLogsHighlight(true), {
+      immediate: true,
+    });
+    watch(
+      () => searchObj.data.queryResults?.hits,
+      () => reprocessLogsHighlight(false),
+    );
+
+    // Severity status spine (4px left border), same source as the legacy table.
+    const getLogRowStatusColor = (row: any): string | undefined =>
+      extractStatusFromLog(row)?.color;
+
+    // "Search around" highlight — the target row keeps the selected background.
+    // Applied as a CLASS (not inline style) so the row-hover utility still wins
+    // on hover (an inline background would suppress hover feedback).
+    const getLogRowClass = (row: any): string => {
+      const ts = searchObj.data?.searchAround?.indexTimestamp;
+      if (ts != null && ts !== -1 && row[logsTimestampCol.value] === ts) {
+        return "bg-table-row-selected-bg";
+      }
+      return "";
+    };
+
+    // Expansion (G7): the parent tracks `expandedLogs` as ORIGINAL indices;
+    // OTable keys expansion by rowKey (_timestamp). Map indices → rowKeys, and on
+    // a toggle resolve the changed row back to its index and emit `expandlog`
+    // (which toggles that index in the parent) — preserving the index contract.
+    const expandedLogIds = computed<string[]>(() =>
+      ((props.expandedLogs as number[]) || [])
+        .map((idx) => {
+          const hit = searchObj.data.queryResults?.hits?.[idx];
+          return hit != null ? String(hit[logsTimestampCol.value]) : "";
+        })
+        .filter(Boolean),
+    );
+    const onExpandedLogIdsChange = (newIds: string[]) => {
+      const prev = new Set(expandedLogIds.value);
+      const next = new Set(newIds);
+      let toggled: string | null = null;
+      for (const k of next) if (!prev.has(k)) { toggled = k; break; }
+      if (toggled == null)
+        for (const k of prev) if (!next.has(k)) { toggled = k; break; }
+      if (toggled == null) return;
+      const hits = searchObj.data.queryResults?.hits || [];
+      const idx = hits.findIndex(
+        (h: any) => String(h?.[logsTimestampCol.value]) === toggled,
+      );
+      if (idx !== -1) expandLog(idx);
+    };
+
+    const openLogDetailsByRow = (row: any) =>
+      openLogDetails(row, logsRowIndex(row));
+
     return {
       isDark,
       t,
@@ -1936,6 +2130,15 @@ export default defineComponent({
       searchAroundData,
       addSearchTerm,
       removeSearchTerm,
+      logsTimestampCol,
+      logsCellHtml,
+      logsRowIndex,
+      getLogRowStatusColor,
+      getLogRowClass,
+      expandedLogIds,
+      onExpandedLogIdsChange,
+      openLogDetailsByRow,
+      isFunctionErrorOpen,
       histogramChart,
       pinnedTooltip,
       closePinnedTooltip,

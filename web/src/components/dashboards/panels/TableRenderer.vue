@@ -16,31 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="table-wrapper h-full w-full relative" data-test="dashboard-table-renderer-wrapper">
-    <TenstackTable
+    <OTable
       ref="tableRef"
-      :rows="sortedRows"
-      :columns="tableColumns"
+      :data="sortedRows"
+      :columns="otableColumns"
+      sorting="server"
       :sort-by="localSortBy"
-      :sort-order="localSortOrder"
-      @sort-change="handleSortChange"
-      :use-virtual-scroll="false"
+      :sort-order="localSortOrder || undefined"
+      @sort-change="onOTableSortChange"
       :pivot-header-levels="data.pivotHeaderLevels || []"
+      :pivot-row-columns="pivotRowColumns"
       :sticky-total-row="data.stickyTotalRow || null"
       :sticky-row-totals="!!data.stickyRowTotals"
       :sticky-col-totals="!!data.stickyColTotals"
       :get-cell-style="cellStyleFn"
       :wrap="wrapCells"
-      :show-pagination="showPagination"
-      :rows-per-page="rowsPerPage"
+      :pagination="showPagination ? 'client' : 'none'"
+      :page-size="rowsPerPage"
+      :row-height="22"
+      :default-columns="false"
+      :show-global-filter="false"
       :enable-column-reorder="false"
       :enable-cell-copy="true"
-      :enable-text-highlight="false"
-      :enable-row-expand="false"
-      :enable-status-bar="false"
-      :enable-ai-context-button="false"
-      :enable-column-filter="enableFiltering"
       data-test="dashboard-panel-table"
-      @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
+      @row-click="(row: any, evt: MouseEvent) => $emit('row-click', evt ?? null, row, sortedRows.indexOf(row))"
     >
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
       <template #bottom="scope">
@@ -50,13 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex-1" />
             <TablePaginationControls
               :show-pagination="showPagination"
-              :pagination="scope.pagination"
-              :pagination-options="scope.paginationOptions"
+              :pagination="{ page: scope.currentPage, rowsPerPage: scope.pageSize }"
               :total-rows="scope.totalRows"
-              :pages-number="scope.pagesNumber"
+              :pages-number="scope.totalPages"
               :is-first-page="scope.isFirstPage"
               :is-last-page="scope.isLastPage"
-              @update:rows-per-page="scope.setRowsPerPage"
+              @update:rows-per-page="scope.setPageSize"
               @first-page="scope.firstPage()"
               @prev-page="scope.prevPage()"
               @next-page="scope.nextPage()"
@@ -65,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </slot>
       </template>
-    </TenstackTable>
+    </OTable>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import TenstackTable from "@/components/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
@@ -85,7 +83,7 @@ import { useStore } from "vuex";
 export default defineComponent({
   name: "TableRenderer",
   components: {
-    TenstackTable,
+    OTable,
     TablePaginationControls,
   },
   props: {
@@ -129,6 +127,37 @@ export default defineComponent({
       () => (props.data?.columns as any[]) || [],
     );
 
+    // Map the pivot column config → OTableColumnDef. Original fields (name,
+    // field, format, align, _isRowField, _isTotalColumn, …) are kept at the top
+    // level (some tests + CSV export read them there) AND mirrored into `meta` so
+    // OTable's cell/tfoot/merge engine can read them. `_col` carries the whole
+    // config for the cell-style engine (cellStyleFn reads meta._col).
+    const otableColumns = computed(() =>
+      (tableColumns.value as any[]).map((col: any) => ({
+        ...col,
+        // Use the data-key (`field`) as the column id, matching the legacy table:
+        // `name` is the display LABEL, so two columns sharing a label would
+        // collide to the same TanStack column id and overwrite each other.
+        id: col.field ?? col.name,
+        header: col.header ?? col.label ?? col.name ?? col.field,
+        accessorKey: col.field ?? col.name,
+        meta: {
+          ...(col.meta ?? {}),
+          _col: col,
+          format: col.format,
+          align: col.align,
+          _isRowField: col._isRowField,
+          _isTotalColumn: col._isTotalColumn,
+          _totalColRightIndex: col._totalColRightIndex,
+        },
+      })),
+    );
+
+    // Row-field columns drive the pivot header row-field cells + body cell-merge.
+    const pivotRowColumns = computed(() =>
+      (tableColumns.value as any[]).filter((c: any) => c._isRowField),
+    );
+
     /**
      * Computes the inline style for a given TanStack cell.
      * Handles auto-color mode (stable palette per distinct value) and
@@ -155,62 +184,87 @@ export default defineComponent({
       }
     };
 
-    const cellStyleFn = computed(() => (cell: any): string => {
-      const col = (cell.column.columnDef.meta as any)?._col;
-      const value = cell.getValue();
-
-      // 1) Auto color mode — stable palette per distinct string value.
-      if (col?.colorMode === "auto") {
-        const palette = getColorForTable(store.state.theme);
-        const key = String(value);
-        const colKey = col.field ?? col.name;
-        if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
-        const map = autoColorCache.get(colKey)!;
-        if (!map.has(key))
-          map.set(key, palette[map.size % palette.length]);
-        const hex = map.get(key) as string;
-        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
+    // Look up the original pivot column config by its OTable column id (col.name).
+    const colById = computed(() => {
+      const m = new Map<string, any>();
+      for (const c of (tableColumns.value as any[]) || []) {
+        m.set(c.name ?? c.field, c);
       }
-
-      // 2) Value-mapping color (valid hex only; else fall through).
-      const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
-      if (
-        found?.color &&
-        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)
-      ) {
-        const hex = found.color;
-        return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
-      }
-
-      // 3) Conditional styling rules — last matching rule wins, so later rules
-      // override earlier ones (e.g. >1000 takes precedence over >400 for 2301).
-      const conditionalRules = col?.conditionalRules as any[] | undefined;
-      if (conditionalRules?.length) {
-        const numVal = parseFloat(String(value));
-        if (!isNaN(numVal)) {
-          let matched: any = null;
-          for (const rule of conditionalRules) {
-            if (evalCondition(numVal, rule.operator, rule.threshold)) matched = rule;
-          }
-          if (matched) {
-            const parts: string[] = [];
-            if (matched.bgColor) parts.push(`background-color: ${matched.bgColor}`);
-            if (matched.textColor) parts.push(`color: ${matched.textColor}`);
-            if (parts.length) return parts.join("; ");
-          }
-        }
-      }
-
-      // 4) Column-level text / background color override.
-      if (col?.bgColor || col?.textColor) {
-        const parts: string[] = [];
-        if (col.bgColor) parts.push(`background-color: ${col.bgColor}`);
-        if (col.textColor) parts.push(`color: ${col.textColor}`);
-        return parts.join("; ");
-      }
-
-      return "";
+      return m;
     });
+
+    // OTable calls getCellStyle with `{ columnId, row, value }` and expects a
+    // style OBJECT (not the legacy raw-CSS string). Same colour engine as before:
+    // auto-color palette → value-mapping → conditional rules → column override.
+    const cellStyleFn = computed(
+      () =>
+        (params: { columnId: string; row: any; value: any }): Record<string, any> => {
+          const col = colById.value.get(params.columnId);
+          const value = params.value;
+
+          // 1) Auto color mode — stable palette per distinct string value.
+          if (col?.colorMode === "auto") {
+            const palette = getColorForTable(store.state.theme);
+            const key = String(value);
+            const colKey = col.field ?? col.name;
+            if (!autoColorCache.has(colKey))
+              autoColorCache.set(colKey, new Map<string, string>());
+            const map = autoColorCache.get(colKey)!;
+            if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
+            const hex = map.get(key) as string;
+            return {
+              backgroundColor: hex,
+              color: isColorDark(hex) ? "#ffffff" : "#000000",
+            };
+          }
+
+          // 2) Value-mapping color (valid hex only; else fall through).
+          const found = lookupValueMappingFull(
+            value,
+            valueMappingCache.value,
+            "color",
+          );
+          if (
+            found?.color &&
+            /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)
+          ) {
+            const hex = found.color;
+            return {
+              backgroundColor: hex,
+              color: isColorDark(hex) ? "#ffffff" : "#000000",
+            };
+          }
+
+          // 3) Conditional styling rules — last matching rule wins.
+          const conditionalRules = col?.conditionalRules as any[] | undefined;
+          if (conditionalRules?.length) {
+            const numVal = parseFloat(String(value));
+            if (!isNaN(numVal)) {
+              let matched: any = null;
+              for (const rule of conditionalRules) {
+                if (evalCondition(numVal, rule.operator, rule.threshold))
+                  matched = rule;
+              }
+              if (matched) {
+                const style: Record<string, any> = {};
+                if (matched.bgColor) style.backgroundColor = matched.bgColor;
+                if (matched.textColor) style.color = matched.textColor;
+                if (Object.keys(style).length) return style;
+              }
+            }
+          }
+
+          // 4) Column-level text / background color override.
+          if (col?.bgColor || col?.textColor) {
+            const style: Record<string, any> = {};
+            if (col.bgColor) style.backgroundColor = col.bgColor;
+            if (col.textColor) style.color = col.textColor;
+            return style;
+          }
+
+          return {};
+        },
+    );
 
     // ── Dashboard sort state (parent-managed, passed into TenstackTable) ──────
     const localSortBy = ref<string>("");
@@ -301,14 +355,22 @@ export default defineComponent({
       URL.revokeObjectURL(url);
     };
 
+    // Adapt OTable's server-sort `{ column, order }` (3-state, clear = empty
+    // column) to the local (by, order) sort state.
+    const onOTableSortChange = (params: { column: string; order: "asc" | "desc" }) =>
+      handleSortChange(params.column ?? "", params.order ?? "asc");
+
     return {
       tableRef,
       tableColumns,
+      otableColumns,
+      pivotRowColumns,
       cellStyleFn,
       sortedRows,
       localSortBy,
       localSortOrder,
       handleSortChange,
+      onOTableSortChange,
       getTableCsvString,
       downloadTableAsCSV,
       downloadTableAsJSON,

@@ -45,6 +45,11 @@ const props = defineProps<{
   baseOffset?: number;
   /** Virtual scroll: ref callback for measuring elements */
   measureElement?: (el: any) => void;
+  /** Variable-height mode (G8): ref callback each row invokes so the virtualizer
+   *  measures its real DOM height. Only supplied when the table wraps content. */
+  measureRowElement?: (el: Element | null) => void;
+  /** Variable-height mode flag (G8) — drives per-row measurement + data-index. */
+  dynamicRowHeight?: boolean;
   /** Status bar color function per row */
   getStatusBarColor?: (row: any) => string | undefined;
   /** Enable click-to-copy on cell values */
@@ -55,6 +60,11 @@ const props = defineProps<{
     row: any;
     value: any;
   }) => Record<string, any>;
+  /** Pivot row-field cell merge (G17): returns hide flags for a merged cell. */
+  getPivotMerge?: (
+    row: any,
+    columnId: string,
+  ) => { hideContent: boolean; hideBorder: boolean } | null;
 }>();
 
 const emit = defineEmits<{
@@ -172,6 +182,7 @@ function getRowForItem(item: any): Row<any> {
       :status-bar-color="getStatusBarColor?.(item)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
+      :get-pivot-merge="getPivotMerge"
       :enable-row-reorder="true"
       :row-draggable="isRowDraggable(item)"
       @toggle-selection="emit('toggle-selection', $event)"
@@ -226,6 +237,7 @@ function getRowForItem(item: any): Row<any> {
       :status-bar-color="getStatusBarColor?.(row.original)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
+      :get-pivot-merge="getPivotMerge"
       :enable-row-reorder="props.enableRowReorder"
       :row-draggable="false"
       @toggle-selection="emit('toggle-selection', $event)"
@@ -269,6 +281,9 @@ function getRowForItem(item: any): Row<any> {
       :key="virtualRow.key"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
+      :measure-row-element="measureRowElement"
+      :dynamic-row-height="dynamicRowHeight"
+      :virtual-index="virtualRow.index"
       :table="table"
       :clickable="clickable"
       :selection-enabled="selectionEnabled"
@@ -288,6 +303,8 @@ function getRowForItem(item: any): Row<any> {
       :row-class-fn="rowClass"
       :status-bar-color="getStatusBarColor?.(getRowForIndex(virtualRow.index)?.original)"
       :enable-cell-copy="enableCellCopy"
+      :get-cell-style="getCellStyle"
+      :get-pivot-merge="getPivotMerge"
       :row-style-fn="rowStyleFn"
       @toggle-selection="emit('toggle-selection', $event)"
       @toggle-expansion="emit('toggle-expansion', $event)"

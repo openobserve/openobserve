@@ -42,6 +42,9 @@ const emit = defineEmits<{
   "drag-start": [event: any];
   "drag-end": [];
   "resize-start": [];
+  /** Per-column close ("x") — remove-column affordance (G4). Emits the column
+   *  definition so the consumer can drop the field (distinct from hide). */
+  "close-column": [column: any];
 }>();
 
 // Notify the parent BEFORE the resize begins so it can freeze any flex columns
@@ -101,7 +104,10 @@ function headerSizeVar(header: any): string {
 
 function getPivotRowColStyle(colId: string): Record<string, any> {
   const col = props.table.getColumn(colId);
-  if (!col) return {};
+  // Only make the row-field header sticky when the column is genuinely pinned
+  // left; otherwise header + (non-sticky) body cells would misalign on
+  // horizontal scroll. Row-field columns aren't pinned today, so this returns {}.
+  if (!col || col.getIsPinned?.() !== "left") return {};
   const leftOffset = col.getStart("left");
   return {
     position: "sticky",
@@ -144,16 +150,20 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
       :key="'pivot-hl-' + levelIdx"
       class="h-7"
     >
-      <!-- Row-field column headers: first row only, rowspan all levels -->
+      <!-- Row-field column headers: first row only, rowspan all levels.
+           Raw pivot row-field columns carry `name`/`field` but no `id`, so key +
+           sort + style must use `name` (=== the table column id for pivot). Using
+           `col.id` produced `undefined` for every one → duplicate Vue keys + dead
+           sort (P0-A1). -->
       <th
         v-if="levelIdx === 0"
         v-for="col in pivotRowColumns"
-        :key="'pivot-rh-' + col.id"
+        :key="'pivot-rh-' + (col.name ?? col.id)"
         :rowspan="pivotHeaderLevels.length"
-        :data-test="`o2-table-pivot-th-${col.id}`"
+        :data-test="`o2-table-pivot-th-${col.name ?? col.id}`"
         class="px-2 text-left cursor-pointer font-medium text-secondary text-xs"
-        :style="getPivotRowColStyle(col.id)"
-        @click="handleSort(col.id)"
+        :style="getPivotRowColStyle(col.name ?? col.id)"
+        @click="handleSort(col.name ?? col.id)"
       >
         <div class="flex items-center gap-1">
           <FlexRender
@@ -161,15 +171,15 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             :render="col.header"
             :props="{}"
           />
-          <span v-else>{{ col.label ?? col.id }}</span>
+          <span v-else>{{ col.label ?? col.name ?? col.id }}</span>
           <OIcon
-            v-if="getSortIcon?.(col.id) === 'asc'"
+            v-if="getSortIcon?.(col.name ?? col.id) === 'asc'"
             name="arrow-upward"
             size="sm"
             class="text-table-sort-icon-active"
           />
           <OIcon
-            v-else-if="getSortIcon?.(col.id) === 'desc'"
+            v-else-if="getSortIcon?.(col.name ?? col.id) === 'desc'"
             name="arrow-downward"
             size="sm"
             class="text-table-sort-icon-active"
@@ -392,6 +402,19 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
             />
           </div>
 
+          <!-- Column close ("x") — remove-column affordance (G4). Shown on hover
+               for columns whose meta marks them closable; emits close-column so
+               the consumer can drop the field (distinct from columnVisibility). -->
+          <button
+            v-if="(header.column.columnDef.meta as any)?.closable"
+            type="button"
+            :data-test="`o2-table-th-remove-${header.id}-btn`"
+            class="shrink-0 opacity-0 group-hover:opacity-100 inline-flex items-center justify-center p-0.5 rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg transition-opacity cursor-pointer bg-transparent border-0"
+            aria-label="Remove column"
+            @click.stop="emit('close-column', header.column.columnDef)"
+          >
+            <OIcon name="close" size="xs" />
+          </button>
         </div>
 
         <!-- Column resize handle -->
@@ -540,6 +563,18 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
               :props="header.getContext()"
             />
           </div>
+
+          <!-- Column close ("x") — remove-column affordance (G4), hover-revealed. -->
+          <button
+            v-if="(header.column.columnDef.meta as any)?.closable"
+            type="button"
+            :data-test="`o2-table-th-remove-${header.id}-btn`"
+            class="shrink-0 opacity-0 group-hover:opacity-100 inline-flex items-center justify-center p-0.5 rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg transition-opacity cursor-pointer bg-transparent border-0"
+            aria-label="Remove column"
+            @click.stop="emit('close-column', header.column.columnDef)"
+          >
+            <OIcon name="close" size="xs" />
+          </button>
         </div>
         <div
           v-if="header.column.getCanResize()"

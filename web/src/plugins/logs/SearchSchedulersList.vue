@@ -277,7 +277,6 @@ import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
-import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
@@ -319,7 +318,6 @@ export default defineComponent({
     OTimeCell,
     OUserCell,
     OTag,
-    TenstackTable,
     ConfirmDialog,
     AppTabs,
     JsonPreview,

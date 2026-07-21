@@ -194,34 +194,33 @@ const globalStubs = {
       "initialTimelineExpanded",
     ],
   },
-  // Fix 7: stub TenstackTable so we can trigger row clicks and inspect
+  // Stub OTable (post-migration) so we can trigger row clicks and inspect
   // scoped-slot content (route, duration) without mounting the real component.
-  TenstackTable: {
-    name: "TenstackTable",
+  // OTable uses `data` (not `rows`), emits `row-click` (not `click:dataRow`),
+  // and its cell slots are scoped `{ row, value, column }` (not `{ item, cell }`).
+  OTable: {
+    name: "OTable",
     props: [
-      "rows",
+      "data",
       "columns",
       "rowHeight",
-      "enableRowExpand",
-      "enableTextHighlight",
-      "enableStatusBar",
       "defaultColumns",
       "enableColumnReorder",
-      "enableAiContextButton",
       "rowClass",
     ],
-    emits: ["click:dataRow"],
+    emits: ["row-click"],
     template: `
-      <div data-test="rum-player-traces-tab-table">
+      <div>
         <div
-          v-for="(row, i) in rows"
+          v-for="(row, i) in data"
           :key="i"
           :data-test="'table-row-' + i"
-          @click="$emit('click:dataRow', row)"
+          @click="$emit('row-click', row)"
         >
-          <slot name="cell-route"    :item="row" :cell="{ column: { getSize: () => 100 } }" />
-          <slot name="cell-duration" :item="row" :cell="{ column: { getSize: () => 100 } }" />
-          <slot name="cell-status"   :item="row" :cell="{ column: { getSize: () => 100 } }" />
+          <slot name="cell-timestamp" :row="row" :value="null" :column="{}" />
+          <slot name="cell-route"     :row="row" :value="null" :column="{}" />
+          <slot name="cell-duration"  :row="row" :value="null" :column="{}" />
+          <slot name="cell-status"    :row="row" :value="null" :column="{}" />
         </div>
       </div>
     `,

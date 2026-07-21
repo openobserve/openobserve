@@ -2,12 +2,16 @@
 
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, useSlots } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
+import { OTableCellActionsKey } from "../OTable.types";
+import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
+
+const slots = useSlots();
 
 const { sanitize } = useSanitizedHtml();
 
@@ -43,6 +47,9 @@ const props = defineProps<{
     row: any;
     value: any;
   }) => Record<string, any>;
+  /** Pivot row-field cell merge (G17): hide the cell's content / inner border so
+   *  a group of equal row-field values reads as one merged cell. */
+  pivotMerge?: { hideContent: boolean; hideBorder: boolean } | null;
 }>();
 
 const emit = defineEmits<{
@@ -78,6 +85,15 @@ const slotAlignClass = computed(() => {
   return "flex items-center w-full min-w-0";
 });
 
+// Slotted cell content truncates to one line by default, but in `wrap` mode it
+// must wrap (multi-line) — otherwise a slotted logs cell would clip instead of
+// growing the row height. Mirrors the default (non-slot) wrap behaviour.
+const slotContentClass = computed(() =>
+  props.wrap
+    ? "min-w-0 flex-1 break-words whitespace-normal"
+    : "truncate min-w-0 flex-1",
+);
+
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
 const pinOffset = computed(() => {
@@ -95,15 +111,36 @@ const displayValue = computed(() => {
   const formatFn = meta.value?.format as
     | ((value: any, row: any) => any)
     | undefined;
-  if (rawValue.value === null || rawValue.value === undefined)
-    return rawValue.value;
-  return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
+  // Call `format` even for null/undefined — dashboard format fns turn empty
+  // cells into the configured `no_value_replacement` (they'd render blank
+  // otherwise). When no format fn is set, pass the raw value through unchanged.
+  if (!formatFn) return rawValue.value;
+  return formatFn(rawValue.value, props.row.original);
 });
 
 const horizontalScroll = inject<{ value: boolean } | null>(
   "o2TableHorizontalScroll",
   null,
 );
+
+// Pivot: right-pinned total columns (P1-A3) — keep body total cells in step with
+// the sticky header + grand-total footer on horizontal scroll.
+const stickyColTotals = inject<{ value: boolean } | null>(
+  "o2TableStickyColTotals",
+  null,
+);
+const pivotTotalStyle = computed<Record<string, any>>(() => {
+  if (!stickyColTotals?.value || !meta.value?._isTotalColumn) return {};
+  const rightOffset =
+    (meta.value._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    zIndex: 2,
+    width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    backgroundColor: "var(--color-table-cell-bg)",
+  };
+});
 
 const isAutoWidth = computed(() => meta.value?.autoWidth === true);
 
@@ -143,7 +180,9 @@ const cellStyle = computed(() => {
     row: props.row.original,
     value: rawValue.value,
   });
-  return extra ? { ...base, ...extra } : base;
+  const merged = extra ? { ...base, ...extra } : base;
+  // Right-pinned pivot total columns win (sticky position + fixed width).
+  return { ...merged, ...pivotTotalStyle.value };
 });
 
 const highlightedHtml = computed(() => {
@@ -193,6 +232,24 @@ function handleClick() {
     value: props.cell.getValue(),
   });
 }
+
+// ── Cell hover-actions (G13) ──────────────────────────────────────
+// A `#cell-actions` overlay renders inside every data cell; the shared
+// single-active-cell context (provided by OTable) tracks which cell the pointer
+// is over so the consumer's overlay can mount its (heavy) menu for only that one
+// cell. TanStack's `cell.id` is already `${row.id}_${column.id}`, so it uniquely
+// keys the cell.
+const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
+const cellActionsCtx = inject(OTableCellActionsKey, null);
+const isCellActionActive = computed(
+  () => cellActionsCtx?.activeCellKey.value === props.cell.id,
+);
+function onCellActionsEnter() {
+  if (hasCellActions.value) cellActionsCtx?.setActiveCell(props.cell.id);
+}
+function onCellActionsLeave() {
+  if (hasCellActions.value) cellActionsCtx?.setActiveCell(null);
+}
 </script>
 
 <template>
@@ -205,7 +262,7 @@ function handleClick() {
       // links/badges override this with their own color.
       'text-text-body',
       meta?.spacer ? 'px-0 align-middle' : (meta?.compactPadding ? 'px-1 align-middle' : 'px-2 align-middle'),
-      bordered ? 'border-b border-table-row-divider' : '',
+      (bordered && !pivotMerge?.hideBorder) ? 'border-b border-table-row-divider' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
        isPinned
@@ -221,7 +278,7 @@ function handleClick() {
             ? 'whitespace-nowrap overflow-hidden'
             : 'whitespace-nowrap overflow-hidden text-ellipsis',
       meta?.cellClass ?? '',
-      isTreeColumn ? 'relative' : '',
+      (isTreeColumn || hasCellActions) ? 'relative' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
       isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
@@ -237,6 +294,8 @@ function handleClick() {
         : {},
     ]"
     @click="handleClick"
+    @mouseenter="onCellActionsEnter"
+    @mouseleave="onCellActionsLeave"
   >
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
@@ -269,7 +328,7 @@ function handleClick() {
       </span>
       <div class="flex-1 min-w-0">
         <div v-if="$slots.default" :class="slotAlignClass">
-          <div v-if="!isAction" class="truncate min-w-0 flex-1"><slot /></div>
+          <div v-if="!isAction" :class="slotContentClass"><slot /></div>
           <slot v-else />
         </div>
         <FlexRender
@@ -288,10 +347,11 @@ function handleClick() {
       </div>
     </div>
 
-    <template v-else>
+    <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
+    <template v-else-if="!pivotMerge?.hideContent">
       <div v-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
-        <div v-if="!isAction" class="truncate min-w-0 flex-1"><slot /></div>
+        <div v-if="!isAction" :class="slotContentClass"><slot /></div>
         <slot v-else />
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
@@ -323,6 +383,26 @@ function handleClick() {
     >
       <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
     </button>
+
+    <!-- Per-cell hover-action overlay (G13). `active` is true only for the cell
+         the pointer currently hovers (debounced in OTable) so consumers mount
+         their action menu lazily. Spans the cell's right edge full-height so it
+         anchors BOTH flow content (plain buttons, flex-centered right) AND
+         self-positioned content (e.g. CellActions' own `absolute right-0` lands
+         at the cell's right edge, not on a tiny point-box). -->
+    <div
+      v-if="hasCellActions"
+      class="o2-table-cell-hover-actions absolute inset-y-0 right-0 z-2 flex items-center"
+      :data-test="`o2-table-cell-hover-actions-${cell.column.id}`"
+    >
+      <slot
+        name="cell-hover-actions"
+        :row="row.original"
+        :column="cell.column.columnDef"
+        :value="rawValue"
+        :active="isCellActionActive"
+      />
+    </div>
   </td>
 </template>
 

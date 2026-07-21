@@ -172,7 +172,7 @@ describe("ScheduledPipeline Component", () => {
               triggerAutoComplete: () => {},
             },
           },
-          'TenstackTable': true,
+          'OTable': true,
           'PreviewPromqlQuery': true,
           'O2AIChat': true,
           'FullViewContainer': true
@@ -1122,6 +1122,39 @@ describe("ScheduledPipeline Component", () => {
       expect(f.state.values.query_condition.aggregation.having.value).toBe(9);
 
       w.unmount();
+    });
+  });
+
+  // ── SQL preview table — OTable migration parity (§7.5) ──────────────────────
+  // The SQL output pane migrated from the logs TenstackTable to OTable. These
+  // assert the data contract the OTable renders (timestamp + source columns, the
+  // source-JSON the #cell-source / #expansion slots consume) and the copy /
+  // send-to-AI handlers wired to those slots. Row virtualization + the actual
+  // expand→JsonPreview rendering are covered by manual QA (§6.6).
+  describe("SQL preview table (OTable migration)", () => {
+    it("exposes a timestamp + source column contract for the OTable", () => {
+      const cols = child.getColumns;
+      expect(Array.isArray(cols)).toBe(true);
+      expect(cols.map((c) => c.id)).toEqual(["_timestamp", "source"]);
+    });
+
+    it("the source column serialises the whole row to JSON (drives #cell-source / #expansion)", () => {
+      const cols = child.getColumns;
+      const sourceCol = cols.find((c) => c.id === "source");
+      const row = { _timestamp: 1_700_000_000_000_000, message: "hello" };
+      expect(sourceCol.accessorFn(row)).toBe(JSON.stringify(row));
+    });
+
+    it("copyLogToClipboard serialises the row to JSON by default", () => {
+      // Wired to the expansion JsonPreview's @copy. Should serialise, not throw.
+      expect(typeof child.copyLogToClipboard).toBe("function");
+      expect(() => child.copyLogToClipboard({ a: 1 })).not.toThrow();
+    });
+
+    it("sendToAiChat enables the AI chat panel (wired to the timestamp AI button + JsonPreview)", async () => {
+      child.sendToAiChat(JSON.stringify({ a: 1 }), true);
+      await nextTick();
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setIsAiChatEnabled", true);
     });
   });
 });

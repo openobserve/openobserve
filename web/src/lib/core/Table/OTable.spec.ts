@@ -23,6 +23,7 @@ beforeAll(() => {
   config.global.plugins.unshift([i18n as any]);
 });
 
+import { nextTick } from "vue";
 import OTable from "./OTable.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
@@ -564,6 +565,63 @@ describe("OTable", () => {
     });
   });
 
+  // ── Cell hover-action overlay (G13) ─────────────────────────
+
+  describe("cell hover actions (G13)", () => {
+    it("renders a cell-hover-actions overlay per cell and activates only the hovered cell", async () => {
+      vi.useFakeTimers();
+      wrapper = mount(OTable, {
+        props: { data: makeRows(2), columns: makeColumns() },
+        slots: {
+          "cell-hover-actions": `<span class="hover-act" :data-active="active">A</span>`,
+        },
+      });
+
+      // Overlay rendered in cells
+      expect(
+        wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length,
+      ).toBeGreaterThan(0);
+      // Nothing active before hover
+      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
+
+      // Hovering one cell activates exactly that cell after the debounce
+      await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseenter");
+      vi.advanceTimersByTime(250);
+      await nextTick();
+      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(1);
+
+      // Leaving clears it after the leave debounce
+      await wrapper.find('[data-test="o2-table-cell-id"]').trigger("mouseleave");
+      vi.advanceTimersByTime(200);
+      await nextTick();
+      expect(wrapper.findAll('.hover-act[data-active="true"]').length).toBe(0);
+      vi.useRealTimers();
+    });
+
+    it("does not collide with a per-column '#cell-actions' slot (id: 'actions')", () => {
+      // The established convention: a column with id 'actions' renders its cell
+      // content via #cell-actions. The hover overlay must NOT hijack that name.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(1),
+          columns: [
+            ...makeColumns().slice(0, 1),
+            { id: "actions", header: "", isAction: true },
+          ],
+        },
+        slots: {
+          "cell-actions": `<span data-test="col-actions">Edit</span>`,
+        },
+      });
+      // Per-column actions slot still renders
+      expect(wrapper.find('[data-test="col-actions"]').exists()).toBe(true);
+      // No generic hover overlay was created (that slot wasn't provided)
+      expect(
+        wrapper.findAll('[data-test^="o2-table-cell-hover-actions-"]').length,
+      ).toBe(0);
+    });
+  });
+
   // ── Dense / Bordered / Striped ─────────────────────────────
 
   describe("display variants", () => {
@@ -661,6 +719,14 @@ describe("OTable", () => {
       });
       expect(wrapper.find('[data-test="o2-table-root"]').exists()).toBe(true);
     });
+
+    // NOTE (G8 variable-height virtual rows): OTable auto-enables per-row DOM
+    // measurement when `virtualScroll && wrap` (see useTableVirtualization
+    // `dynamicRowHeight` + OTableBodyRow `data-index`/measureRowElement). It
+    // cannot be asserted in jsdom — the virtualizer returns 0 virtual items with
+    // no real scroll-element size, so the virtual branch (which carries the
+    // wiring) never renders and getBoundingClientRect is 0. Validated via the
+    // logs-grid browser QA (§6.1 wrap + scroll).
   });
 
   // ── Column Management ──────────────────────────────────────
@@ -725,6 +791,39 @@ describe("OTable", () => {
         props: { data: makeRows(3), columns: makeColumns() },
       });
       expect(wrapper.find('[data-test="o2-table-th-email"]').exists()).toBe(true);
+    });
+  });
+
+  describe("column close (G4)", () => {
+    it("renders a close button only for meta.closable columns and emits close-column", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(2),
+          columns: [
+            { id: "id", header: "ID", accessorKey: "id" },
+            {
+              id: "name",
+              header: "Name",
+              accessorKey: "name",
+              meta: { closable: true },
+            },
+          ] as OTableColumnDef<TestRow>[],
+        },
+      });
+      // Only the closable column gets a remove button
+      expect(
+        wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="o2-table-th-remove-id-btn"]').exists(),
+      ).toBe(false);
+
+      await wrapper
+        .find('[data-test="o2-table-th-remove-name-btn"]')
+        .trigger("click");
+      const ev = wrapper.emitted("close-column");
+      expect(ev).toBeTruthy();
+      expect((ev![0][0] as OTableColumnDef).id).toBe("name");
     });
   });
 

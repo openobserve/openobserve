@@ -266,21 +266,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="overflow-hidden svc-panel-table"
                   data-test="service-graph-side-panel-operations-table"
                 >
-                  <TenstackTable
+                  <OTable
                     :columns="operationsTableColumns"
-                    :rows="sortedOperationsTableRows"
+                    :data="sortedOperationsTableRows"
+                    sorting="server"
                     :sort-by="sortBy"
-                    :sort-order="sortOrder"
+                    :sort-order="sortOrder || undefined"
                     :loading="loadingOperations"
                     :default-columns="false"
-                    :enable-column-reorder="false"
-                    :enable-row-expand="false"
-                    :enable-text-highlight="false"
-                    :enable-status-bar="false"
-                    :enable-ai-context-button="false"
                     :row-height="38"
-                    @sort-change="handleSortChange"
-                    @click:data-row="
+                    :show-global-filter="false"
+                    :fill-height="false"
+                    pagination="none"
+                    @sort-change="(p: any) => handleSortChange(p.column)"
+                    @row-click="
                       (row: any) =>
                         navigateToTraces({
                           operationName: row.operation,
@@ -288,50 +287,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         })
                     "
                   >
-                    <template #cell-errors="{ item }">
+                    <template #cell-errors="{ row }">
                       <span
                         :class="
-                          item.errors > 0
-                            ? 'text-[var(--color-status-negative)] font-semibold'
+                          row.errors > 0
+                            ? 'text-status-negative font-semibold'
                             : ''
                         "
-                        >{{ item.errors }}</span
+                        >{{ row.errors }}</span
                       >
                     </template>
-                    <template #cell-p99="{ item }">
+                    <template #cell-p99="{ row }">
                       <ServiceCatalogBarCell
-                        :value="item.p99"
+                        :value="row.p99"
                         :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
-                        :label="formatOperationLatency(item.p99)"
+                        :label="formatOperationLatency(row.p99)"
                         variant="warning"
                         align="right"
                         inline
                       />
                     </template>
-                    <template #cell-p95="{ item }">
+                    <template #cell-p95="{ row }">
                       <ServiceCatalogBarCell
-                        :value="item.p95"
+                        :value="row.p95"
                         :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
-                        :label="formatOperationLatency(item.p95)"
+                        :label="formatOperationLatency(row.p95)"
                         align="right"
                         inline
                       />
                     </template>
-                    <template #cell-p75="{ item }">
+                    <template #cell-p75="{ row }">
                       <ServiceCatalogBarCell
-                        :value="item.p75"
+                        :value="row.p75"
                         :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
-                        :label="formatOperationLatency(item.p75)"
+                        :label="formatOperationLatency(row.p75)"
                         align="right"
                         inline
                       />
                     </template>
-                    <template #cell-actions="{ row, column, active }">
+                    <template #cell-hover-actions="{ row, column, active }">
                       <OButton
                         v-if="active"
                         variant="ghost"
                         size="icon"
-                        class="ml-1 absolute! right-1!"
                         data-test="service-graph-side-panel-view-traces-btn"
                         @click.stop="
                           navigateToTraces({
@@ -353,7 +351,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t('traces.serviceGraphNodeSidePanel.noOperationsFound') }}
                       </div>
                     </template>
-                  </TenstackTable>
+                  </OTable>
               </div>
             </OTabPanel>
 
@@ -392,21 +390,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="overflow-hidden svc-panel-table"
                 :data-test="`service-graph-side-panel-${cfg.id}-table`"
               >
-                <TenstackTable
+                <OTable
                   :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
-                  :rows="sortResourceRows(buildResourceTableRows(cfg))"
+                  :data="sortResourceRows(buildResourceTableRows(cfg))"
+                  sorting="server"
                   :sort-by="sortBy"
-                  :sort-order="sortOrder"
+                  :sort-order="sortOrder || undefined"
                   :loading="resourceTabLoading[cfg.id]"
                   :default-columns="false"
-                  :enable-column-reorder="false"
-                  :enable-row-expand="false"
-                  :enable-text-highlight="false"
-                  :enable-status-bar="false"
-                  :enable-ai-context-button="false"
                   :row-height="38"
-                  @sort-change="handleSortChange"
-                  @click:data-row="
+                  :show-global-filter="false"
+                  :fill-height="false"
+                  pagination="none"
+                  @sort-change="(p: any) => handleSortChange(p.column)"
+                  @row-click="
                     (row: any) =>
                       navigateToTraces({
                         resourceFilter: cfg.fields
@@ -415,12 +412,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                   "
                 >
-                  <template #cell-actions="{ row, column, active }">
+                  <template #cell-hover-actions="{ row, column, active }">
                     <OButton
                       v-if="active"
                       variant="ghost"
                       size="icon"
-                      class="ml-1 absolute! right-1! bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
+                      class="bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                       :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                       @click.stop="
                         navigateToTraces({
@@ -436,40 +433,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                     </OButton>
                   </template>
-                  <template #cell-errors="{ item }">
+                  <template #cell-errors="{ row }">
                     <span
                       :class="
-                        item.errors > 0
-                          ? 'text-[var(--color-status-negative)] font-semibold'
+                        row.errors > 0
+                          ? 'text-status-negative font-semibold'
                           : ''
                       "
-                      >{{ item.errors }}</span
+                      >{{ row.errors }}</span
                     >
                   </template>
-                  <template #cell-p99="{ item }">
+                  <template #cell-p99="{ row }">
                     <ServiceCatalogBarCell
-                      :value="item.p99"
+                      :value="row.p99"
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
-                      :label="formatOperationLatency(item.p99)"
+                      :label="formatOperationLatency(row.p99)"
                       variant="warning"
                       align="right"
                       inline
                     />
                   </template>
-                  <template #cell-p95="{ item }">
+                  <template #cell-p95="{ row }">
                     <ServiceCatalogBarCell
-                      :value="item.p95"
+                      :value="row.p95"
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
-                      :label="formatOperationLatency(item.p95)"
+                      :label="formatOperationLatency(row.p95)"
                       align="right"
                       inline
                     />
                   </template>
-                  <template #cell-p75="{ item }">
+                  <template #cell-p75="{ row }">
                     <ServiceCatalogBarCell
-                      :value="item.p75"
+                      :value="row.p75"
                       :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
-                      :label="formatOperationLatency(item.p75)"
+                      :label="formatOperationLatency(row.p75)"
                       align="right"
                       inline
                     />
@@ -481,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t('traces.serviceGraphNodeSidePanel.noResourceDataFound', { resource: cfg.label.toLowerCase() }) }}
                     </div>
                   </template>
-                </TenstackTable>
+                </OTable>
               </div>
             </OTabPanel>
 
@@ -644,8 +641,8 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-const TenstackTable = defineAsyncComponent(
-  () => import("@/components/TenstackTable.vue"),
+const OTable = defineAsyncComponent(
+  () => import("@/lib/core/Table/OTable.vue"),
 );
 
 // Agent-scoped behavior signals shown on agent nodes (enterprise). Async so the
@@ -884,7 +881,7 @@ export default defineComponent({
     ODropdownItem,
     ODrawer,
     TelemetryCorrelationDashboard,
-    TenstackTable,
+    OTable,
     RenderDashboardCharts,
     OTooltip,
     OCheckbox,
@@ -2628,7 +2625,7 @@ export default defineComponent({
 /* The panel itself scrolls, so these short summary tables should render at their
    natural height without their own scrollbars. Let the inner scroll container
    grow to content and hide its scrollbars. */
-.svc-panel-table :deep(.o2-scroll-container) {
+.svc-panel-table :deep([data-test="o2-table-scroll-container"]) {
   overflow: hidden;
   height: auto;
   max-height: none;

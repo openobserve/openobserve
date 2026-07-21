@@ -50,6 +50,14 @@ const props = defineProps<{
   rowStyleFn?: (row: any) => Record<string, any>;
   /** Virtual scroll: callback for measuring row DOM element height */
   measureEl?: (el: HTMLElement | null) => void;
+  /** Variable-height mode (G8): the virtualizer's measureElement callback. When
+   *  set, the row reports its real height (and is re-measured on reflow). */
+  measureRowElement?: (el: Element | null) => void;
+  /** Variable-height mode flag (G8). */
+  dynamicRowHeight?: boolean;
+  /** Virtual index of this row — written as `data-index` so the virtualizer can
+   *  key the measurement in variable-height mode. */
+  virtualIndex?: number;
   /** Status bar color — renders a 4px left border indicator per row */
   statusBarColor?: string;
   /** Enable hover-visible copy button on cells */
@@ -60,6 +68,11 @@ const props = defineProps<{
     row: any;
     value: any;
   }) => Record<string, any>;
+  /** Pivot row-field cell merge (G17). */
+  getPivotMerge?: (
+    row: any,
+    columnId: string,
+  ) => { hideContent: boolean; hideBorder: boolean } | null;
   /** When true, renders a drag handle grip icon as the first cell. */
   enableRowReorder?: boolean;
   /** Per-row predicate: when false, the drag handle is hidden for this row. */
@@ -79,6 +92,16 @@ const emit = defineEmits<{
 const slots = useSlots();
 
 const rowRef = ref<HTMLElement | null>(null);
+
+// Function ref for the row's <tr>: keeps rowRef in sync AND, in variable-height
+// mode (G8), hands the element to the virtualizer's measureElement so its real
+// height is measured (and re-measured on reflow via the virtualizer's observer).
+function setRowRef(el: any) {
+  rowRef.value = (el as HTMLElement) ?? null;
+  if (props.dynamicRowHeight && props.measureRowElement && el) {
+    props.measureRowElement(el);
+  }
+}
 
 onMounted(() => {
   if (props.measureEl && rowRef.value) {
@@ -252,8 +275,9 @@ function onRowBlur() {
 
 <template>
   <tr
-    ref="rowRef"
+    :ref="setRowRef"
     :data-test="`o2-table-row-${row.index}`"
+    :data-index="dynamicRowHeight ? virtualIndex : undefined"
     :tabindex="clickable ? 0 : undefined"
     :class="[
       'group/row',
@@ -353,6 +377,7 @@ function onRowBlur() {
       :bordered="bordered"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
+      :pivot-merge="getPivotMerge ? getPivotMerge(row.original, cell.column.id) : null"
       @cell-click="emit('cell-click', $event)"
     >
       <template v-if="slots[`cell-${cell.column.id}`]" #default>
@@ -362,6 +387,10 @@ function onRowBlur() {
           :value="cell.getValue()"
           :column="cell.column.columnDef"
         />
+      </template>
+      <!-- Per-cell hover-action overlay (G13) — forwarded to every cell -->
+      <template v-if="slots['cell-hover-actions']" #cell-hover-actions="caProps">
+        <slot name="cell-hover-actions" v-bind="caProps" />
       </template>
     </OTableBodyCell>
   </tr>

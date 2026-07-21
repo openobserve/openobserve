@@ -42,34 +42,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="traces-search-result-list"
         class="w-full h-auto! relative"
       >
-        <TenstackTable
+        <OTable
           class="h-auto!"
           :columns="searchObj.data.resultGrid.columns"
-          :rows="hits"
+          :data="hits"
           :loading="loading"
           :row-class="traceRowClass"
+          sorting="server"
           :sort-by="props.sortBy"
           :sort-order="props.sortOrder"
           :sort-field-map="sortFieldMap"
           :row-height="28"
+          virtual-scroll
+          :fill-height="false"
           :scroll-el="scrollEl"
           :scroll-margin="0"
           :enable-column-reorder="true"
-          :enable-row-expand="false"
-          :enable-text-highlight="false"
-          :enable-status-bar="false"
           :default-columns="false"
-          @click:data-row="(row: any) => emit('row-click', row)"
-          @sort-change="(by, order) => emit('sort-change', by, order)"
-          @update:columnOrder="onColumnReorder"
-          @closeColumn="onCloseColumn"
+          :show-global-filter="false"
+          pagination="none"
+          @row-click="(row: any) => emit('row-click', row)"
+          @sort-change="onSortChange"
+          @column-order-change="onColumnReorder"
+          @close-column="onCloseColumn"
         >
-          <template #cell-actions="{ row, column, active }">
+          <!-- Per-cell hover actions (G13). `column` is the OTableColumnDef, so
+               `column.meta` (not `column.columnDef.meta`) holds disableCellAction. -->
+          <template #cell-hover-actions="{ row, column, active }">
             <CellActions
               v-if="
                 showCellActions &&
                 active &&
-                !column.columnDef.meta.disableCellAction
+                !column.meta?.disableCellAction
               "
               :column="column"
               :row="row"
@@ -88,84 +92,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template
-            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }"
+            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ value }"
           >
-            <TraceTimestampCell :value="cell.getValue()" />
+            <TraceTimestampCell :value="value" />
           </template>
 
-          <template #cell-service_name="{ item }">
-            <TraceServiceCell :item="item" />
+          <template #cell-service_name="{ row }">
+            <TraceServiceCell :item="row" />
           </template>
 
-          <template #cell-operation_name="{ item }">
+          <template #cell-operation_name="{ row }">
             <span
               class="text-xs truncate text-text-body"
               data-test="trace-row-operation-name"
             >
-              {{ item.operation_name }}
-              <OTooltip :content="item.operation_name" side="bottom" align="center" />
+              {{ row.operation_name }}
+              <OTooltip :content="row.operation_name" side="bottom" align="center" />
             </span>
           </template>
 
-          <template #cell-duration="{ item }">
+          <template #cell-duration="{ row }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-duration">
-              {{ formatTimeWithSuffix(item.duration) || "0us" }}
+              {{ formatTimeWithSuffix(row.duration) || "0us" }}
             </span>
           </template>
 
-          <template #cell-spans="{ item }">
+          <template #cell-spans="{ row }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-spans">
-              {{ item.spans }}
+              {{ row.spans }}
             </span>
           </template>
 
-          <template #cell-status_code="{ item }">
-            <SpanStatusCodeBadge :code="item.http_status_code" />
+          <template #cell-status_code="{ row }">
+            <SpanStatusCodeBadge :code="row.http_status_code" />
           </template>
 
-          <template #cell-span_status="{ item }">
-            <SpanStatusPill :status="item.span_status" />
+          <template #cell-span_status="{ row }">
+            <SpanStatusPill :status="row.span_status" />
           </template>
 
-          <template #cell-status="{ item }">
-            <TraceStatusCell :item="item" />
+          <template #cell-status="{ row }">
+            <TraceStatusCell :item="row" />
           </template>
-          <template #cell-input_tokens="{ item }">
+          <template #cell-input_tokens="{ row }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-input-tokens">
               {{
-                isLLMTrace(item)
-                  ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
+                isLLMTrace(row)
+                  ? formatTokens(extractLLMData(row)?.usage?.input ?? 0)
                   : "-"
               }}
             </span>
           </template>
 
-          <template #cell-output_tokens="{ item }">
+          <template #cell-output_tokens="{ row }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-output-tokens">
               {{
-                isLLMTrace(item)
-                  ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
+                isLLMTrace(row)
+                  ? formatTokens(extractLLMData(row)?.usage?.output ?? 0)
                   : "-"
               }}
             </span>
           </template>
 
-          <template #cell-cost="{ item }">
+          <template #cell-cost="{ row }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-cost">
               {{
-                isLLMTrace(item)
-                  ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`
+                isLLMTrace(row)
+                  ? `$${formatCost(extractLLMData(row)?.cost?.total ?? 0)}`
                   : "-"
               }}
             </span>
           </template>
 
-          <template #cell-service_latency="{ item }">
-            <TraceLatencyCell :item="item" />
+          <template #cell-service_latency="{ row }">
+            <TraceLatencyCell :item="row" />
           </template>
 
-          <template #empty />
-        </TenstackTable>
+          <template #empty><div /></template>
+        </OTable>
       </div>
     </div>
   </div>
@@ -175,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
-import TenstackTable from "@/components/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
@@ -311,6 +315,21 @@ const addSearchTerm = (
 
 const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 
+/**
+ * OTable server sort emits `{ column, order }` and cycles asc → desc → cleared
+ * (3-state). The parent consumes `(field, order)` where `field` is the backend
+ * field (already mapped via `sortFieldMap`). On the "cleared" tick (empty
+ * column) we fall back to the default trace sort so the query never receives an
+ * empty sort field.
+ */
+const onSortChange = (params: { column: string; order: "asc" | "desc" }) => {
+  if (!params.column) {
+    emit("sort-change", "start_time", "desc");
+  } else {
+    emit("sort-change", params.column, params.order);
+  }
+};
+
 const rowsPerPageOptions = [10, 25, 50, 100];
 
 const { searchObj, updatedLocalLogFilterField } = useTraces();
@@ -413,5 +432,13 @@ const totalPages = computed(() =>
 /* keep(complex-state): :deep override to square off the child table's corners */
 .traces-table-container :deep(.table-container) {
   border-radius: 0 !important;
+}
+
+/* keep(generated-content): the error-row left border. `traceRowClass` puts
+   `oz-table__row--error` on OTable-rendered <tr>s; the rule that styled it lived
+   in the now-deleted legacy table, so it is re-homed here (mirrors
+   PlayerTracesTab's `trace-row--error`). Reaches OTable's <td>, hence :deep. */
+.traces-table-container :deep(.oz-table__row--error td:first-child) {
+  box-shadow: inset 0.125rem 0 0 0 var(--color-status-error-text);
 }
 </style>

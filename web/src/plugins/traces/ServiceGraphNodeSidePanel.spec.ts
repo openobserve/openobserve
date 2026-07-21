@@ -209,7 +209,7 @@ function mountPanel(
       plugins: [store],
       stubs: {
         RenderDashboardCharts: { template: '<div data-test="stub-charts" />' },
-        TenstackTable: { template: '<div data-test="stub-table" />' },
+        OTable: { template: '<div data-test="stub-table" />' },
         TelemetryCorrelationDashboard: {
           template: '<div data-test="stub-telemetry" />',
         },

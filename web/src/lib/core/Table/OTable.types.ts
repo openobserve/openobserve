@@ -1,7 +1,25 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { Component } from "vue";
+import type { Component, ComputedRef, InjectionKey, Ref } from "vue";
 import type { ColumnDef, Row, Table } from "@tanstack/vue-table";
+
+// ─── Cell hover-actions context (G13) ────────────────────────────
+/**
+ * Single-active-cell hover model shared by OTable → OTableBodyCell via
+ * provide/inject. Hovering a cell marks it active (after a short debounce), so a
+ * consumer's `#cell-actions` overlay renders for only ONE cell at a time — this
+ * mirrors the legacy tables, which mounted a heavy actions menu lazily rather
+ * than on every cell. `enabled` is false when no `#cell-actions` slot is present
+ * so cells can skip the mouse bookkeeping entirely.
+ */
+export interface OTableCellActionsContext {
+  activeCellKey: Ref<string | null>;
+  setActiveCell: (key: string | null) => void;
+  enabled: ComputedRef<boolean>;
+}
+
+export const OTableCellActionsKey: InjectionKey<OTableCellActionsContext> =
+  Symbol("OTableCellActions");
 
 // ─── Shared column size constants ────────────────────────────────
 /**
@@ -346,9 +364,12 @@ export interface OTableProps<TData = any> {
   // ── Pivot (Dashboard) ──
   /** Pivot header levels (multi-level headers) */
   pivotHeaderLevels?: any[];
-  /** Pivot row field columns (for sticky headers) */
+  /** Pivot row field columns (for sticky headers + row-field cell merge) */
   pivotRowColumns?: any[];
-  /** Show sticky row totals */
+  /** Grand-total row data object rendered as a sticky `<tfoot>` (pivot). Keyed by
+   *  each column's `accessorKey`/`id`; values run through the column's `meta.format`. */
+  stickyTotalRow?: Record<string, any> | null;
+  /** Show sticky row totals (pins the grand-total `<tfoot>` to the bottom) */
   stickyRowTotals?: boolean;
   /** Show sticky column totals */
   stickyColTotals?: boolean;
@@ -394,6 +415,9 @@ export interface OTableEmits<TData = any> {
   // Column events
   "column-order-change": [order: string[]];
   "column-visibility-change": [visibility: Record<string, boolean>];
+  /** A column's close ("x") affordance was clicked (G4). Payload is the column
+   *  definition; the consumer decides how to remove/hide it. */
+  "close-column": [column: OTableColumnDef<TData>];
   "update:columnSizes": [
     sizes: Record<string, number>,
     idMap: Record<string, string>,
@@ -416,6 +440,25 @@ export interface OTableSlots<TData = any> {
     column: OTableColumnDef<TData>;
     value: any;
     table: Table<TData>;
+  }) => any;
+  /**
+   * Per-cell hover-action overlay (G13). Rendered as an absolutely-positioned
+   * overlay inside every data cell; `active` is true only for the single cell
+   * the pointer is currently hovering (debounced). Consumers gate their heavy
+   * action menus on `active` so they mount lazily — e.g. logs cell copy /
+   * add-search-term / add-to-table, traces "view traces". Scoped to
+   * `{ row, column, value, active }` (`row` is the original data object).
+   *
+   * NOTE: deliberately **not** named `cell-actions` — that name is already the
+   * established per-column cell slot for a column whose `id` is `"actions"`
+   * (the `#cell-{id}` convention), used across the app (WorkflowsList,
+   * SourceMaps, LogStream, …). This overlay is orthogonal to any single column.
+   */
+  "cell-hover-actions"?: (props: {
+    row: TData;
+    column: OTableColumnDef<TData>;
+    value: any;
+    active: boolean;
   }) => any;
   /** Custom header content */
   "header-actions"?: () => any;
