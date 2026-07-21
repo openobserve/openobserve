@@ -390,10 +390,10 @@ export default defineComponent({
         "data.variables",
         { name: "", value: "" },
       );
-    const removeVariableRow = (index: number) =>
+    const removeVariableRow = (index: number | string) =>
       (form.removeFieldValue as (field: string, index: number) => void)(
         "data.variables",
-        index,
+        Number(index),
       );
 
     // Reactive read of the form values (form.useStore) — drives the v-if

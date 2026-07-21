@@ -512,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
                           Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         </small>
-                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-status-error-text">
+                        <small v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''" class="text-status-error-text">
                           Retention period must be at least 1 day
                         </small>
                       </div>
@@ -1048,6 +1048,11 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 20,
     });
+    // Holds Record<field, PatternAssociation[]> after grouping, PatternAssociation[]
+    // transiently while saving — hence `any`.
+    const patternAssociations = ref<any>([]);
+    // Loading-toast dismisser created in getSchema; also used by setSchema.
+    let dismiss: () => void = () => {};
     const patternAssociationDialog = ref<{
       show: boolean;
       data: PatternAssociation[];

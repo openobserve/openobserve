@@ -102,15 +102,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span class="text-xs w-8 shrink-0">{{ p.label }}</span>
                       <span class="text-xs flex-1 text-right pr-1">
-                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                        {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
                       <div class="flex w-12">
                         <OButton
                           v-if="p.key !== 'max'"
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                          @click.stop="addSearchTerm(`duration>='${formatPercentile(durationPercentiles[p.key])}'`)"
                           class="o2-custom-button-hover ml-1! border! border-card-glass-border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
@@ -118,8 +118,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                          @click.stop="addSearchTerm(`duration<='${formatPercentile(durationPercentiles[p.key])}'`)"
                           class="o2-custom-button-hover mr-2.5! border! border-card-glass-border! ml-auto!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
@@ -385,6 +385,9 @@ export default defineComponent({
       PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
     );
 
+    const formatPercentile = (value: number | null) =>
+      value === null ? "" : formatTimeWithSuffix(value);
+
     const expandedFields = ref<Record<string, boolean>>({});
     const fieldValuesCurrentFrom = ref<Record<string, number>>({});
     const fieldValuesCurrentKeyword = ref<Record<string, string>>({});
@@ -615,6 +618,7 @@ export default defineComponent({
       hasDurationPercentiles,
       PERCENTILE_LABELS,
       formatTimeWithSuffix,
+      formatPercentile,
       getValueMapper,
     };
   },

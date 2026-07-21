@@ -529,6 +529,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -1726,8 +1727,8 @@ export default defineComponent({
         },
       });
     },
-    onRowClick(row: DashboardRow, _evt: MouseEvent) {
-      this.routeToViewD(row);
+    onRowClick(row: Record<string, any>, _evt: MouseEvent) {
+      this.routeToViewD(row as DashboardRow);
     },
     ownerInitials(name: string) {
       if (!name) return "";

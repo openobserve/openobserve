@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     :title="t('alerts.insights.title')"
-    :back="{ onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+    :back="{ label: t('menu.alerts'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
     tabs-below
     bleed
   >

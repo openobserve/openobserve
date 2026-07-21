@@ -141,7 +141,7 @@ export const usePanelDataLoader = (
     loading: false,
     errorDetail: {
       message: "",
-      code: "",
+      code: "" as string | number,
     },
     metadata: {
       queries: [] as any,

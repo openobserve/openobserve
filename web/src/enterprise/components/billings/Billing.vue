@@ -196,7 +196,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OPageLayout, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
+    OPageLayout, OTabs, ORouteTab, AppTabs, OSelect,
     OIcon, OSplitter, OButton, UsageMemberList, DateTimePickerDashboard },
   setup() {
     const { t } = useI18n();

@@ -63,7 +63,7 @@ export function useLogsHighlighter() {
   watch(
     () => isDark.value,
     (newTheme) => {
-      currentColors.value = getThemeColors(newTheme === "dark");
+      currentColors.value = getThemeColors(newTheme);
     },
   );
 

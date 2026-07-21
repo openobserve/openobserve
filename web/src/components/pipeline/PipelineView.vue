@@ -82,7 +82,7 @@ const queryImage = getImageURL("images/pipeline/input_query.png");
     props: {
       pipeline: { type: Object as PropType<Pipeline>, required: true }
     },
-    components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge, ControlButton, Controls },
+    components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge },
     setup(props) {
       const {
       pipelineObj,

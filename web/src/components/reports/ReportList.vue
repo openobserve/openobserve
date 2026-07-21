@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Table footer: pagination + bulk actions -->
-                <template #bottom="scope">
+                <template #bottom>
                   <div class="flex items-center justify-between w-full h-12">
                     <!-- Left: count + action buttons grouped together -->
                     <div class="flex items-center gap-2">

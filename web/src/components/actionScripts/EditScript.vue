@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="add-action-script-section"
     :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
     :back="{
+      label: t('actions.header'),
       onClick: () => router.back(),
       dataTest: 'add-action-script-back-btn',
     }"
@@ -252,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             name="cron"
                             class="showLabelOnTop w-full"
                             type="text"
-                            debounce="300"
+                            :debounce="300"
                             :disabled="isEditingActionScript"
                             :readonly="isEditingActionScript"
                           />

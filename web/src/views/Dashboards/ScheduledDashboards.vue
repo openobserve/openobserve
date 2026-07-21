@@ -190,7 +190,8 @@ const createScheduledReport = () => {
 };
 
 // Row shape for the list: adds the raw sort keys not on the shared interface.
-type ScheduledReportRow = ScheduledDashboardReport & {
+// "#" is provided by OTable's show-index, so rows built here omit it.
+type ScheduledReportRow = Omit<ScheduledDashboardReport, "#"> & {
   last_triggered_at_raw: number | null;
   created_at_raw: number | null;
 };

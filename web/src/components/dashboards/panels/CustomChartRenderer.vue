@@ -183,8 +183,10 @@ export default defineComponent({
       }
 
       try {
-        const convertedData = convertStringToFunction(props.data);
-        const safeChartOptions = deepSanitize(convertedData);
+        const convertedData = convertStringToFunction(
+          props.data,
+        ) as CustomChartData;
+        const safeChartOptions = deepSanitize(convertedData) as CustomChartData;
         chart.setOption(withChartFont(safeChartOptions));
 
         const o2Events = convertedData.o2_events;

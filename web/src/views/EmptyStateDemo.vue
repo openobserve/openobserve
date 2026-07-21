@@ -137,5 +137,5 @@ const presets: { preset: EmptyStatePresetName; label: string }[] = [
   { preset: "no-invitations", label: "No invitations" },
 ];
 
-const onAction = () => {};
+const onAction = (_source?: string) => {};
 </script>

@@ -285,7 +285,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -300,7 +299,6 @@ import { convertMinutesToCron } from "@/utils/zincutils";
 export default defineComponent({
   name: "Step3AlertConditions",
   components: {
-    OButton,
     OFormInput,
     OFormSwitch,
     OTooltip,

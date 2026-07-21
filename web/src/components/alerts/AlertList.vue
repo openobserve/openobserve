@@ -710,7 +710,6 @@ export default defineComponent({
   name: "AlertList",
   components: {
     OPageLayout,
-    OSeparator,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),

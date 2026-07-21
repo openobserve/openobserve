@@ -980,7 +980,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Traces Tab Content -->
         <div v-if="activeTab === 'traces'" class="flex flex-col flex-1 overflow-hidden h-full">
           <!-- Refresh Button (shown when traces data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="px-4 py-2 border-b border-solid border-card-glass-border flex items-center gap-2">
+          <div v-if="hasCorrelatedData && !correlationLoading && (correlationData?.traceStreams?.length ?? 0) > 0" class="px-4 py-2 border-b border-solid border-card-glass-border flex items-center gap-2">
             <span class="text-xs">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
             <OButton
               variant="ghost"

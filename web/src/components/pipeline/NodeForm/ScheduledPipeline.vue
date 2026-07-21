@@ -167,15 +167,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     >
                                       <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
                                       <span class="text-2xs flex-1 text-right pr-1">
-                                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                                        {{ formatPercentile(durationPercentiles[p.key]) }}
                                       </span>
                                       <div class="flex w-[2.7rem]">
                                         <OButton
                                           v-if="p.key !== 'max'"
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration>='${formatPercentile(durationPercentiles[p.key])}'`)"
                                           class="ml-0.5! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
@@ -183,8 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                         <OButton
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration<='${formatPercentile(durationPercentiles[p.key])}'`)"
                                           class="ml-auto! mr-2! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
@@ -1349,6 +1349,11 @@ const {
 const hasDurationPercentiles = computed(() =>
   PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
 );
+
+// Percentile values are `number | null`; formatTimeWithSuffix already renders
+// null as "0us", so `?? 0` preserves runtime output while satisfying its `number` param.
+const formatPercentile = (value: number | null) =>
+  formatTimeWithSuffix(value ?? 0);
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);

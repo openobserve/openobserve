@@ -291,12 +291,6 @@ const importSqlParser = async () => {
   parser = await sqlParser();
 };
 
-const streamTypes = ["logs", "enrichment_tables"];
-
-const streamRoute: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
-const originalStreamRouting: Ref<StreamRoute> = ref(getDefaultStreamRoute());
-
 // The shared ConditionBuilder owns the condition tree + its OForm/zod schema.
 // We only hold a ref to it (for submit() and the cancel dirty-check).
 const builder = ref<any>(null);
@@ -308,27 +302,6 @@ onMounted(() => {
     JSON.stringify(builder.value?.conditionGroup ?? null),
   );
 });
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
-const filterStreams = (val: string, update: any) => {
-  filteredStreams.value = filterColumns(indexOptions.value, val, update);
-};
 
 const updateStreamFields = async (streamName: any, streamType: any) => {
   let streamCols: any = [];

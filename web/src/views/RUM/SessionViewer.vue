@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="qp-2"
     :title="sessionDetails.id || t('rum.sessionReplay')"
-    :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
+    :back="{ label: t('rum.sessionReplay'), onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
     bleed
   >
       <template #subtitle>

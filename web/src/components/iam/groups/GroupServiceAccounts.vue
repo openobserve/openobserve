@@ -225,33 +225,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   const fetchOrgServiceAccounts = async () => {
     // fetch group users
     hasFetchedOrgServiceAccounts.value = true;
-    return new Promise(async (resolve) => {
-      const data: any = await serviceAccountsState.getServiceAccounts(
-        store.state.selectedOrganization.identifier
-      );
-  
-      serviceAccountsState.service_accounts_users = cloneDeep(
-        data
-          .filter((user: any) => user.is_system !== true) // Filter out system accounts
-          .map((user: any) => {
-            return {
-              email: user.email,
-              isInGroup: groupUsersMap.value.has(user.email),
-            };
-          })
-      );
-  
-      users.value = cloneDeep(serviceAccountsState.service_accounts_users).map(
-        (user: any, index: number) => {
+    const data: any = await serviceAccountsState.getServiceAccounts(
+      store.state.selectedOrganization.identifier
+    );
+
+    serviceAccountsState.service_accounts_users = cloneDeep(
+      data
+        .filter((user: any) => user.is_system !== true) // Filter out system accounts
+        .map((user: any) => {
           return {
-            "#": index + 1,
             email: user.email,
             isInGroup: groupUsersMap.value.has(user.email),
           };
-        }
-      );
-      resolve(true);
-    });
+        })
+    );
+
+    users.value = cloneDeep(serviceAccountsState.service_accounts_users).map(
+      (user: any, index: number) => {
+        return {
+          "#": index + 1,
+          email: user.email,
+          isInGroup: groupUsersMap.value.has(user.email),
+        };
+      }
+    );
+    return true;
   };
   
   const toggleUserSelection = (user: any) => {

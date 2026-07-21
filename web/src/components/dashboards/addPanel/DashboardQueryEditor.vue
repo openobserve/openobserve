@@ -696,7 +696,8 @@ export default defineComponent({
       { immediate: true },
     );
 
-    const removeTab = async (index: number) => {
+    const removeTab = async (rawIndex: string | number) => {
+      const index = Number(rawIndex);
       if (
         dashboardPanelData.layout.currentQueryIndex >=
         dashboardPanelData.data.queries.length - 1
@@ -705,7 +706,8 @@ export default defineComponent({
       removeQuery(index);
     };
 
-    const toggleQueryVisibility = (index) => {
+    const toggleQueryVisibility = (rawIndex: string | number) => {
+      const index = Number(rawIndex);
       // Lazy-init for older saved dashboard layouts that lack this array.
       if (!Array.isArray(dashboardPanelData.layout.hiddenQueries)) {
         dashboardPanelData.layout.hiddenQueries = [];
@@ -922,7 +924,8 @@ export default defineComponent({
     // underlying <input> via querySelector. Cleaner than a global DOM lookup.
     const renameInputRef = ref<any>(null);
 
-    const startEditQueryName = (index: number, tab: any) => {
+    const startEditQueryName = (rawIndex: string | number, tab: any) => {
+      const index = Number(rawIndex);
       editingQueryIndex.value = index;
       editingQueryName.value = tab.tabName || "Query " + (index + 1);
       // OInput renders on the next tick; focus + select the inner <input>

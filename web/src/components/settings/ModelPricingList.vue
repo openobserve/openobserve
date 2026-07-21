@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </template>
 
-        <template #bottom="scope">
+        <template #bottom>
           <div class="flex items-center w-full h-12 gap-x-2">
             <div
               class="text-xs font-normal flex items-center w-25"

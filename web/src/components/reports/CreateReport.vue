@@ -877,7 +877,9 @@ const frequencyType = form.useStore(
 const selectedTimeTab = form.useStore(
   (s: any) => s.values?.selectedTimeTab ?? "scheduleNow",
 );
-const dashboardRows = form.useStore((s: any) => s.values?.dashboards ?? []);
+const dashboardRows = form.useStore(
+  (s: any): any[] => s.values?.dashboards ?? [],
+);
 
 // `variables` are now form-owned (VariablesInput renders in form mode,
 // name-prefix="variables"); read from the form value at save.

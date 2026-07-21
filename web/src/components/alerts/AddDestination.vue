@@ -576,7 +576,9 @@ const form = useOForm({
 // Single submit entry-point: prebuilt types save via handlePrebuiltSave, custom/
 // pipeline via saveCustomDestination. Returned so OForm awaits the real save (the
 // footer Save spinner spans it).
-function saveDestination(value: AddDestinationForm) {
+function saveDestination(
+  value: AddDestinationForm,
+): Promise<void> | undefined {
   return isPrebuiltDestination.value
     ? handlePrebuiltSave(value)
     : saveCustomDestination(value);
@@ -819,7 +821,7 @@ const setupDestinationData = () => {
     // loop leaves every prefilled field marked dirty/touched with stale errors, and
     // this runs again on every onActivated. Start from the defaults so every key is
     // present, then overlay the record.
-    const record: Record<string, any> = {
+    const record: AddDestinationForm = {
       ...addDestinationDefaults(),
       destination_type: destType,
       name: props.destination.name,

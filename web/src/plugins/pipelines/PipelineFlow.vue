@@ -121,6 +121,7 @@ import { Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
 import { useI18n } from "vue-i18n";
@@ -130,7 +131,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
 export default {
-  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls,ControlButton,EdgeWithButton,FlowEdge
+  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls, FlowEdge
    },
   setup() {
     const { t } = useI18n();

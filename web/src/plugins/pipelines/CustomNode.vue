@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import useDragAndDrop from "./useDnD";
-import { ref, computed } from "vue";
+import { ref, computed, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -29,6 +29,48 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 
+// Shapes are derived from the pipeline runtime (`useDnD` reactive store + API
+// payload). The shared store types `nodes`/`edges` as `any` and omits
+// `last_error`, so these local interfaces narrow what this node card reads.
+interface NodeData {
+  node_type?: string;
+  name?: string;
+  after_flatten?: boolean;
+  stream_type?: string;
+  stream_name?: string | { label?: string };
+  destination_name?: string;
+  condition?: unknown;
+  conditions?: unknown;
+  [key: string]: unknown;
+}
+
+interface NodeErrorInfo {
+  errors?: string[];
+  error_count?: number;
+  [key: string]: unknown;
+}
+
+interface PipelineNode {
+  id: string;
+  io_type?: string;
+  data: NodeData;
+  [key: string]: unknown;
+}
+
+interface PipelineEdge {
+  source?: string;
+  style?: Record<string, unknown>;
+  markerEnd?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface NodeType {
+  label: string;
+  icon: string;
+  subtype?: string;
+  io_type?: string;
+  [key: string]: unknown;
+}
 
 const props = defineProps({
   id: {
@@ -122,13 +164,13 @@ const getNodeErrorInfo = computed(() => {
 // url(), which terminates it early and breaks the arrowhead. Resolving the token
 // to a literal (getComputedStyle on :root) at call time is the fix, and would
 // also give these edges the dark-mode step they currently lack.
-const getNodeColor = (ioType) => {
-  const colorMap = {
+const getNodeColor = (ioType: string | undefined) => {
+  const colorMap: Record<string, string> = {
     input: "#3b82f6", // Blue    — pairs with --color-status-info-text
     output: "#22c55e", // Green   — pairs with --color-status-positive
     default: "#f59e0b", // Amber   — pairs with --color-status-warning-text
   };
-  return colorMap[ioType] || "var(--color-grey-500)";
+  return (ioType && colorMap[ioType]) || "var(--color-grey-500)";
 };
 
 // Function to update edge colors on node hover
@@ -270,7 +312,7 @@ const deleteNode = (id: string) => {
 };
 
 // Condition preview reuses the shared util (also used by workflow nodes).
-const getTruncatedConditions = (conditionData) =>
+const getTruncatedConditions = (conditionData: unknown) =>
   getTruncatedConditionsUtil(conditionData);
 
 const confirmDialogMeta = ref({
@@ -309,6 +351,21 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.onConfirm = () => {};
 };
 
+// The union `string | { label }` cannot be narrowed by `hasOwnProperty` in the
+// template; resolve the display label in script instead.
+const streamNameLabel = computed(() => {
+  const name = props.data?.stream_name;
+  if (name && typeof name === "object") return name.label;
+  return name;
+});
+
+// Error count for this node, read from the runtime-only `last_error` payload.
+const nodeErrorCount = computed<number | undefined>(() => {
+  const lastError = getLastError();
+  if (!lastError?.node_errors || props.id === undefined) return undefined;
+  return lastError.node_errors[props.id]?.error_count;
+});
+
 function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   const searchTerm = data?.node_type;
   // nodeTypes is declared as an empty literal (never[]) in the shared store;
@@ -331,7 +388,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
       :has-output="io_type === 'input' || io_type === 'default'"
       :input-handle-test="`pipeline-node-${io_type}-input-handle`"
       :output-handle-test="`pipeline-node-${io_type}-output-handle`"
-      :data-test="`pipeline-node-${io_type}-${data.node_type.replace(/_/g, '-')}-node`"
+      :data-test="`pipeline-node-${io_type}-${(data.node_type ?? '').replace(/_/g, '-')}-node`"
       :data-node-type="data.node_type"
       class="btn-fixed-width"
       @mouseenter="handleNodeHover(id, io_type)"
@@ -354,7 +411,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
             v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
             class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
           >
-            {{ data.stream_type }} - {{ data.stream_name.label }}
+            {{ data.stream_type }} - {{ streamNameLabel }}
           </div>
           <div
             v-else
@@ -398,16 +455,10 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
-            v-if="
-              pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
-                ?.error_count
-            "
+            v-if="nodeErrorCount"
             class="absolute -top-1.5 -right-1.5 bg-status-negative text-white text-3xs font-bold min-w-3.5 h-3.5 rounded-full flex items-center justify-center px-0.75 border-[0.09375rem] border-solid border-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
           >
-            {{
-              pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
-                .error_count
-            }}
+            {{ nodeErrorCount }}
           </span>
           <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
             <template #content>

@@ -281,7 +281,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                   <span class="flex-1" />
                   <span class="font-mono text-2xs text-text-secondary">
-                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep.id, total: steps.length }) }}
+                    {{ t('synthetics.runDetail.stepOf', { selected: selectedStep?.id, total: steps.length }) }}
                   </span>
                 </OCardSection>
                 <OSeparator />

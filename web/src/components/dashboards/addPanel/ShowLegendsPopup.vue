@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="copyLegend(legend.name, Number(index))"
               >
                 <template #icon-left><OIcon
-                    :name="isLegendCopied(index) ? 'check' : 'content-copy'" size="sm"
+                    :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'" size="sm"
                 /></template>
                 <OTooltip :content="isLegendCopied(Number(index)) ? 'Copied!' : 'Copy legend'" />
               </OButton>

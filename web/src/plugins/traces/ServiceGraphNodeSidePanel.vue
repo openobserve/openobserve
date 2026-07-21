@@ -261,7 +261,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="operationsTableColumns"
                     :rows="sortedOperationsTableRows"
                     :sort-by="sortBy"
-                    :sort-order="sortOrder"
+                    :sort-order="sortOrderProp"
                     :loading="loadingOperations"
                     :default-columns="false"
                     :enable-column-reorder="false"
@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
                   :rows="sortResourceRows(buildResourceTableRows(cfg))"
                   :sort-by="sortBy"
-                  :sort-order="sortOrder"
+                  :sort-order="sortOrderProp"
                   :loading="resourceTabLoading[cfg.id]"
                   :default-columns="false"
                   :enable-column-reorder="false"
@@ -1729,6 +1729,12 @@ export default defineComponent({
     const sortBy = ref<string>("");
     const sortOrder = ref<"asc" | "desc" | "">("");
 
+    // The table's sort-order prop only accepts "asc" | "desc" | undefined; our
+    // internal "" cleared-sentinel maps to undefined for the binding.
+    const sortOrderProp = computed<"asc" | "desc" | undefined>(() =>
+      sortOrder.value === "" ? undefined : sortOrder.value,
+    );
+
     // 3-state sort cycle to match other O2 tables (OTable): asc → desc → cleared.
     // TenstackTable itself only toggles asc/desc, so we drive the cycle from our
     // own state and ignore its computed order — clearing restores the default order.
@@ -2482,6 +2488,7 @@ export default defineComponent({
       sortedOperationsTableRows,
       sortBy,
       sortOrder,
+      sortOrderProp,
       handleSortChange,
       sortResourceRows,
       formatOperationLatency,

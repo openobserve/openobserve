@@ -5,7 +5,7 @@ import type {
   ToggleGroupSlots,
 } from "./OToggleGroup.types";
 import { ToggleGroupAnimatedKey } from "./OToggleGroup.types";
-import { ToggleGroupRoot } from "reka-ui";
+import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
 import {
   computed,
   provide,

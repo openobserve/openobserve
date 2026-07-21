@@ -229,19 +229,17 @@ const updateUserTable = async (value: string) => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise(async (resolve) => {
-    const data: any = await getRoles(
-      store.state.selectedOrganization.identifier
-    );
+  const data: any = await getRoles(
+    store.state.selectedOrganization.identifier
+  );
 
-    users.value = cloneDeep(data.data).map((role: any) => {
-      return {
-        role_name: role,
-        isInGroup: groupUsersMap.value.has(role),
-      };
-    });
-    resolve(true);
+  users.value = cloneDeep(data.data).map((role: any) => {
+    return {
+      role_name: role,
+      isInGroup: groupUsersMap.value.has(role),
+    };
   });
+  return true;
 };
 
 const toggleUserSelection = (user: any) => {

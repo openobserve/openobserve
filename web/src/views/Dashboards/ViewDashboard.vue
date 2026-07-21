@@ -344,7 +344,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useLoading } from "@/composables/useLoading";
 import { isEqual } from "lodash-es";
@@ -377,7 +376,6 @@ export default defineComponent({
   emits: ["onDeletePanel"],
   components: {
     OPageLayout,
-    OSeparator,
     DateTimePickerDashboard,
     ShareButton,
     AutoRefreshInterval,

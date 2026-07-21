@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="col-auto text-center">
             <span class="text-xs text-text-secondary">
-              {{ t("search.patternXofYShort", { index: selectedPattern.index + 1, total: totalPatterns }) }}
+              {{ t("search.patternXofYShort", { index: (selectedPattern?.index ?? 0) + 1, total: totalPatterns }) }}
             </span>
           </div>
           <div class="col-auto">

@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     :title="t('logs.searchJobInspector.title')"
-    :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
+    :back="{ label: t('logs.searchJobInspector.title'), onClick: goBack, dataTest: 'inspector-close-button' }"
     bleed
   >
       <template #title>
@@ -696,6 +696,7 @@ export default defineComponent({
       copySql,
       store,
       hasNoData,
+      isDark,
       t,
     };
   },

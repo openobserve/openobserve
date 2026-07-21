@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <label
       class="relative inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-default border border-border-default p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12] bg-[conic-gradient(from_0deg,var(--color-error-500),var(--color-warning-400),var(--color-success-500),var(--color-blue-500),var(--color-purple-500),var(--color-error-500))]"
       :class="isCustomActive ? 'border-primary-600 ring-2 ring-focus-ring' : ''"
-      :style="isCustomActive ? { background: modelValue } : {}"
+      :style="customStyle"
       :title="t('dashboard.customColor')"
     >
       <OIcon
@@ -84,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, PropType } from "vue";
+import type { CSSProperties } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
@@ -116,12 +117,19 @@ export default defineComponent({
 
     const select = (c: string | null) => emit("update:modelValue", c);
 
+    const customStyle = computed<CSSProperties>(() =>
+      isCustomActive.value && props.modelValue
+        ? { background: props.modelValue }
+        : {},
+    );
+
     return {
       t,
       isActive,
       isCustomActive,
       isDark: isColorDark,
       select,
+      customStyle,
       DEFAULT_CUSTOM_COLOR,
     };
   },

@@ -320,8 +320,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     t,
     config.isEnterprise === "true" || config.isCloud === "true",
   );
-  const form = useOForm({
-    defaultValues: buildDefaultForm() as Record<string, unknown>,
+  const form = useOForm<AlertFormValues>({
+    defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
     onSubmit: async () => {
       await performSave();

@@ -93,7 +93,9 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
 import { ref, reactive, watch, computed } from "vue";
+import type { PropType } from "vue";
 
 // Period keys used to index relativeDates and label lookups.
 type PeriodKey = "s" | "m" | "h" | "d" | "w" | "M";
@@ -205,7 +207,7 @@ const setRelativeDate = (period: RelativePeriod, item: number) => {
 };
 
 // Function to update custom period when selecting from the select
-const updateCustomPeriod = (newPeriod) => {
+const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
   picker.data.selectedDate.relative.label = getPeriodLabelFromValue(newPeriod);
   emit(
     "update:modelValue",

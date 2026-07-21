@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="alert-history-page"
     :title="t('alerts.history')"
     title-data-test="alerts-history-title"
-    :back="{ onClick: goBack, dataTest: 'alert-history-back-btn' }"
+    :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-history-back-btn' }"
     bleed
   >
       <template #actions>

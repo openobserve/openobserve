@@ -335,7 +335,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'px-page-edge py-2'
       "
     >
-      <OTabPanels v-model="activeTab"
+      <OTabPanels :model-value="activeTab"
+@update:model-value="$emit('update:activeTab', $event)"
 grow
 class="h-full overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
@@ -1070,7 +1071,7 @@ export default defineComponent({
 
     // Emits class names only — the colours live in the style block below, driven
     // by the registered --color-json-* tokens, so the output themes itself.
-    const highlightedJSON = (value) => {
+    const highlightedJSON = (value: Record<string, unknown>) => {
       const attrs = value;
       const query = props.searchQuery;
 
