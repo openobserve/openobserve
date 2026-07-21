@@ -294,6 +294,33 @@ CN5lTowpVXP2OIiiNTGa75Fj
         assert!(result.is_err(), "expired token must be rejected");
     }
 
+    /// The Dex refresh flow is unaffected by always-on expiry validation.
+    ///
+    /// `refresh_token_with_dex` reads the REFRESH token from the `auth_tokens`
+    /// cookie and exchanges it at Dex; it never decodes the expired access
+    /// token. The only `verify_decode_token` call in that flow runs on the
+    /// FRESHLY MINTED access token (status/mod.rs:1265), as do the other two
+    /// non-middleware callers — `exchange_code` (status/mod.rs:1010) and
+    /// `exchange_token` (service_accounts.rs:54).
+    ///
+    /// This test pins that contract: a newly issued token validates under both
+    /// `login_flow` settings. If someone later makes a caller decode an
+    /// already-expired token to harvest claims before refreshing, that is a
+    /// design change which must be made explicit rather than relying on
+    /// expiry validation being silently disabled.
+    #[test]
+    fn freshly_minted_token_validates_for_refresh_flow() {
+        let fresh = mint_token("o2-client", 3600);
+        assert!(
+            verify_decode_token(&fresh, &test_jwks(), "o2-client", false, true).is_ok(),
+            "refresh/exchange flows decode the newly minted token, not the expired one"
+        );
+        assert!(
+            verify_decode_token(&fresh, &test_jwks(), "o2-client", false, false).is_ok(),
+            "same token must validate on the MCP path too"
+        );
+    }
+
     /// Documents the INTENDED relaxation: MCP clients register dynamically with
     /// Dex, so their tokens carry an `aud` that is not O2's static `client_id`.
     /// Skipping the audience check for them is deliberate (see commit 1593db0e22).
