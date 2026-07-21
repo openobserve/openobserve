@@ -114,24 +114,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OBadge>
               </template>
 
-              <!-- Language of the transform. Its own column (sortable + hideable)
-                   rather than a glyph on the name, so JS vs VRL reads at a glance. -->
-              <template #cell-transType="{ row }">
-                <OBadge
-                  size="xs"
-                  :variant="row?.transType === '1' ? 'amber-soft' : 'blue-soft'"
-                  :data-test="`function-list-type-badge-${
-                    row?.transType === '1' ? 'js' : 'vrl'
-                  }`"
-                >
-                  {{
-                    row?.transType === "1"
-                      ? t("function.javascript")
-                      : t("function.vrl")
-                  }}
-                </OBadge>
-              </template>
-
               <template #cell-actions="{ row }">
                 <div class="flex items-center actions-container">
                   <OButton

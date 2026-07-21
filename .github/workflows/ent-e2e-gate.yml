@@ -111,25 +111,12 @@ jobs:
           set -euo pipefail
           REPO="openobserve/o2-enterprise"; WF="oss-pr-ent-gate.yml"
 
-          # Resolve which ENT *code* to build against (distinct from --ref, which only selects the
-          # version of the engine workflow file). Cross-repo features are developed on same-named
-          # branches in both repos (the tree-merge convention), so an OSS feature branch usually
-          # NEEDS its matching ENT branch — building it against ENT main would miss enterprise code
-          # the OSS side references and fail to compile. Prefer a same-named ENT branch, else main.
-          ENT_CODE_REF=main
-          if gh api "repos/$REPO/branches/$HEAD_REF" >/dev/null 2>&1; then
-            ENT_CODE_REF="$HEAD_REF"
-            echo "::notice::Matching ENT branch '$HEAD_REF' exists — building the enterprise binary against it."
-          else
-            echo "::notice::No matching ENT branch '$HEAD_REF' — building against ENT main."
-          fi
-
-          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF) for OSS PR #$PR ($HEAD_REF)…"
+          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF) for OSS PR #$PR ($HEAD_REF)…"
           gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
             -f oss_branch="$HEAD_REF" \
             -f oss_pr="$PR" \
             -f oss_sha="$HEAD_SHA" \
-            -f enterprise_ref="$ENT_CODE_REF"
+            -f enterprise_ref="$ENT_REF"
 
           # Correlate our run by its PR-scoped run-name: "ENT e2e gate — OSS PR #<PR> (<branch>)".
           # `#<PR> (` boundary avoids #12 matching #123. gh returns newest-first, so [0] is our latest.
@@ -174,15 +161,6 @@ jobs:
 
           if [ "$CONCL" = "success" ]; then
             echo "::notice::✅ Enterprise e2e specs passed against this PR."
-            exit 0
-          fi
-
-          # A cancelled/skipped ENT run almost always means a NEWER push/label superseded it
-          # (the engine's concurrency is cancel-in-progress). That is NOT a spec failure — the
-          # newer run is authoritative and reports on its own. Don't post a scary "Needs Review"
-          # comment or fail the gate on it; defer to the newer run.
-          if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
-            echo "::notice::ENT run concluded '$CONCL' (likely superseded by a newer push) — deferring to the newer run, not failing the gate."
             exit 0
           fi
 
