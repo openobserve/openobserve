@@ -102,14 +102,6 @@ const useHttpStreaming = () => {
     }
   };
 
-  const onComplete = (traceId: string) => {
-    if (!traceMap.value[traceId]) return;
-
-    for (const handler of traceMap.value[traceId].complete) {
-      handler(traceId);
-    }
-  };
-
   const onError = async (traceId: string, error: any) => {
     if (!traceMap.value[traceId]) return;
 
@@ -122,14 +114,6 @@ const useHttpStreaming = () => {
     }
 
     cleanUpListeners(traceId);
-  };
-
-  const onReset = (data: any, traceId: string) => {
-    if (!traceMap.value[traceId]) return;
-
-    for (const handler of traceMap.value[traceId].reset) {
-      handler(data, traceId);
-    }
   };
 
   const fetchQueryDataWithHttpStream = async (
@@ -156,7 +140,7 @@ const useHttpStreaming = () => {
       reset: (data: any, response: any) => void;
     },
   ) => {
-    const { traceId, org_id } = data;
+    const { traceId } = data;
 
     if (!traceMap.value[traceId]) {
       traceMap.value[traceId] = {
@@ -186,7 +170,7 @@ const useHttpStreaming = () => {
     traceMap.value[traceId].isInitiated = true;
 
     // Initiate the HTTP/2 stream connection
-    initiateStreamConnection(data, handlers);
+    initiateStreamConnection(data);
   };
 
   const initiateStreamConnection = async (
@@ -205,12 +189,6 @@ const useHttpStreaming = () => {
       searchType?: string;
       meta?: any;
       clear_cache?: boolean;
-    },
-    handlers: {
-      data: (data: any, response: any) => void;
-      error: (data: any, response: any) => void;
-      complete: (data: any, response: any) => void;
-      reset: (data: any, response: any) => void;
     },
   ) => {
     const {
@@ -646,7 +624,6 @@ const useHttpStreaming = () => {
   const convertToWsEventProgress = (
     traceId: string,
     response: any,
-    type: StreamResponseType,
   ) => {
     return {
       content: {
@@ -656,11 +633,7 @@ const useHttpStreaming = () => {
     };
   };
 
-  const convertToWsEnd = (
-    traceId: string,
-    response: any,
-    type: StreamResponseType,
-  ) => {
+  const convertToWsEnd = () => {
     return {
       content: {
         end: true,
@@ -679,7 +652,6 @@ const useHttpStreaming = () => {
   const convertToPromQLResponse = (
     traceId: string,
     response: any,
-    type: StreamResponseType,
   ) => {
     // Backend sends: PromqlResponse { data: QueryResult { result_type, result } }
     // We need to extract the QueryResult and return it in a format compatible with the old API

@@ -20,6 +20,8 @@ export type InputType =
   | "search"
   | "url"
   | "tel"
+  | "date"
+  | "datetime-local"
   | "textarea";
 
 export interface InputProps {
@@ -111,4 +113,6 @@ export interface InputSlots {
    * Provide a tooltip element as the slot content.
    */
   tooltip?: () => unknown;
+  /** Content rendered after the field, outside the border */
+  append?: () => unknown;
 }

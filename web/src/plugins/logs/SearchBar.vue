@@ -1925,7 +1925,6 @@ import {
   onUnmounted,
   onDeactivated,
   defineAsyncComponent,
-  onBeforeMount,
   onBeforeUnmount,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -1945,7 +1944,6 @@ import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
 import jsTransformService from "@/services/jstransform";
 import searchService from "@/services/search";
-import shortURLService from "@/services/short_url";
 
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
@@ -2001,7 +1999,6 @@ import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
   encodeVisualizationConfig,
-  decodeVisualizationConfig,
 } from "@/composables/useLogs/logsVisualization";
 
 import useSearchBar from "@/composables/useLogs/useSearchBar";
@@ -2018,9 +2015,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
 import {
-  getFieldFromExpression,
   hasFieldCondition,
-  replaceExistingFieldCondition,
   removeFieldCondition,
 } from "@/plugins/logs/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -2157,10 +2152,6 @@ export default defineComponent({
         // this.searchObj.runQuery = true;
         this.$emit("searchdata");
       }
-    },
-    changeFunctionName(value) {
-      // alert(value)
-      // console.log(value);
     },
     createNewValue(inputValue, doneFn) {
       // Call the doneFn with the new value
@@ -2835,6 +2826,8 @@ export default defineComponent({
 
       if (!searchObj.data.transformType)
         return "img:" + getImageURL("images/common/transform.svg");
+
+      return undefined;
     });
 
     const getColumnNames = (parsedSQL: any) => {
@@ -2844,7 +2837,10 @@ export default defineComponent({
         if (item.expr.type === "column_ref") {
           columnNames.push(item.expr.column?.expr?.value);
         } else if (item.expr.type === "aggr_func") {
-          if (item.expr.args?.expr?.hasOwnProperty("column")) {
+          if (
+            item.expr.args?.expr &&
+            Object.prototype.hasOwnProperty.call(item.expr.args.expr, "column")
+          ) {
             columnNames.push(item.expr.args?.expr?.column?.value);
           } else if (item.expr.args?.expr?.value) {
             columnNames.push(item.expr.args?.expr?.value);
@@ -2867,7 +2863,7 @@ export default defineComponent({
       return columnNames;
     };
 
-    const updateQueryValue = (value: string, event?: any) => {
+    const updateQueryValue = (value: string) => {
       // During stream changes, the editor's debounced onDidChangeModelContent
       // callback can re-emit a stale value after onStreamChange has cleared the
       // query. Reject these stale re-emissions to prevent the old filter from
@@ -3105,10 +3101,10 @@ export default defineComponent({
         value.valueType == "absolute" &&
         searchObj.data.stream.selectedStream.length > 0 &&
         searchObj.data.datetime.queryRangeRestrictionInHour > 0 &&
-        value.hasOwnProperty("selectedDate") &&
-        value.hasOwnProperty("selectedTime") &&
-        value.selectedDate.hasOwnProperty("from") &&
-        value.selectedTime.hasOwnProperty("startTime")
+        Object.prototype.hasOwnProperty.call(value, "selectedDate") &&
+        Object.prototype.hasOwnProperty.call(value, "selectedTime") &&
+        Object.prototype.hasOwnProperty.call(value.selectedDate, "from") &&
+        Object.prototype.hasOwnProperty.call(value.selectedTime, "startTime")
       ) {
         // Convert hours to microseconds
         let newStartTime =
@@ -3430,7 +3426,7 @@ export default defineComponent({
       );
 
       callTransform
-        .then((res: { data: any }) => {
+        .then(() => {
           toast({
             variant: "success",
             message: t('logs.searchBar.functionUpdatedSuccess'),
@@ -3666,7 +3662,12 @@ export default defineComponent({
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
 
-            if (!extractedObj.data.stream.hasOwnProperty("streamType")) {
+            if (
+              !Object.prototype.hasOwnProperty.call(
+                extractedObj.data.stream,
+                "streamType",
+              )
+            ) {
               extractedObj.data.stream.streamType = "logs";
             }
 
@@ -3690,7 +3691,8 @@ export default defineComponent({
               );
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
-                  extractedObj.data.stream.selectedStream.hasOwnProperty(
+                  Object.prototype.hasOwnProperty.call(
+                    extractedObj.data.stream.selectedStream,
                     "value",
                   )
                 ) {
@@ -3714,7 +3716,6 @@ export default defineComponent({
                   streamNotExist,
                 );
                 throw new Error(errMsg);
-                return;
               }
               // extractedObj.data.stream.selectedStream = [];
               // extractedObj.data.stream.selectedStream = selectedStreams;
@@ -3722,7 +3723,12 @@ export default defineComponent({
               delete extractedObj.data.stream.selectedStream;
               delete searchObj.data.stream.selectedStream;
               delete searchObj.meta.regions;
-              if (extractedObj.meta.hasOwnProperty("regions")) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  extractedObj.meta,
+                  "regions",
+                )
+              ) {
                 searchObj.meta["regions"] = extractedObj.meta.regions;
               } else {
                 searchObj.meta["regions"] = [];
@@ -3911,7 +3917,12 @@ export default defineComponent({
                 extractedObj.data.stream.streamType;
 
               delete searchObj.meta.regions;
-              if (extractedObj.meta.hasOwnProperty("regions")) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  extractedObj.meta,
+                  "regions",
+                )
+              ) {
                 searchObj.meta["regions"] = extractedObj.meta.regions;
               } else {
                 searchObj.meta["regions"] = [];
@@ -3924,7 +3935,8 @@ export default defineComponent({
               let selectedStreams = [];
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
-                  extractedObj.data.stream.selectedStream.hasOwnProperty(
+                  Object.prototype.hasOwnProperty.call(
+                    extractedObj.data.stream.selectedStream,
                     "value",
                   )
                 ) {
@@ -3981,7 +3993,6 @@ export default defineComponent({
                   streamNotExist,
                 );
                 throw new Error(errMsg);
-                return;
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -4058,7 +4069,8 @@ export default defineComponent({
 
             if (
               extractedObj.data.resultGrid.colOrder &&
-              extractedObj.data.resultGrid.colOrder.hasOwnProperty(
+              Object.prototype.hasOwnProperty.call(
+                extractedObj.data.resultGrid.colOrder,
                 searchObj.data.stream.selectedStream,
               )
             ) {
@@ -4077,7 +4089,8 @@ export default defineComponent({
 
             if (
               extractedObj.data.resultGrid.colSizes &&
-              extractedObj.data.resultGrid.colSizes.hasOwnProperty(
+              Object.prototype.hasOwnProperty.call(
+                extractedObj.data.resultGrid.colSizes,
                 searchObj.data.stream.selectedStream,
               )
             ) {
@@ -4246,7 +4259,12 @@ export default defineComponent({
           .then((res) => {
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
-              if (searchObj.data.hasOwnProperty("savedViews") == false) {
+              if (
+                Object.prototype.hasOwnProperty.call(
+                  searchObj.data,
+                  "savedViews",
+                ) === false
+              ) {
                 searchObj.data.savedViews = [];
               }
               searchObj.data.savedViews.push({
@@ -4375,12 +4393,7 @@ export default defineComponent({
 
     const QUERY_TEMPLATE = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
 
-    function getFieldList(
-      stream,
-      streamFields,
-      interestingFields,
-      isQuickMode,
-    ) {
+    function getFieldList(stream, streamFields, interestingFields) {
       searchObj.data.streamResults.list.forEach((item) => {
         if (
           item.name == stream &&
@@ -4443,7 +4456,6 @@ export default defineComponent({
                 stream,
                 selectedStreamFields,
                 interestingFieldList,
-                quickMode,
               );
 
               // Ensure fieldList is valid before building the query
@@ -4533,7 +4545,7 @@ export default defineComponent({
         localSavedView = savedViews.value;
       }
 
-      Object.keys(localSavedView).forEach((item, key) => {
+      Object.keys(localSavedView).forEach((item) => {
         if (item == row.view_id) {
           if (flag) {
             delete localSavedView[item];
@@ -4854,7 +4866,7 @@ export default defineComponent({
       "dashboardPanelDataPageKey",
       "logs",
     );
-    const { dashboardPanelData, resetDashboardPanelData } =
+    const { dashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
 
     // [START] cancel running queries

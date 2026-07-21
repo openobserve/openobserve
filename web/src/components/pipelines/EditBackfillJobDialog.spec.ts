@@ -126,11 +126,6 @@ const setField = (w: any, name: string, val: unknown) =>
   (w.vm as any).form.setFieldValue(name, val);
 const formVals = (w: any) => (w.vm as any).form.state.values;
 const setRange = (w: any, range: unknown) => setField(w, "timerange", range);
-const validRange = () => ({
-  type: "absolute",
-  from: mockJob.start_time,
-  to: mockJob.end_time,
-});
 const submitForm = async (w: any) => {
   await (w.vm as any).form.handleSubmit();
   await flushPromises();

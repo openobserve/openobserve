@@ -44,13 +44,11 @@ import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import Group from "./Group.vue";
-import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "DashboardFiltersOption",
   components: {
     Group,
-    AddCondition,
   },
   props: ["dashboardData"],
 

@@ -618,7 +618,6 @@ describe("PanelContainer", () => {
   describe("Refresh Panel Functionality", () => {
     it("should refresh panel and generate new runId", async () => {
       wrapper = createWrapper();
-      const initialRunId = wrapper.vm.runId;
 
       // Simulate refresh which generates new runId
       await wrapper.vm.onRefreshPanel(false);
@@ -771,7 +770,7 @@ describe("PanelContainer", () => {
       wrapper = createWrapper();
       toastMock.mockClear();
 
-      const duplicatePromise = wrapper.vm.onDuplicatePanel(mockPanelData);
+      wrapper.vm.onDuplicatePanel(mockPanelData);
 
       expect(toastMock).toHaveBeenCalledWith(
         expect.objectContaining({

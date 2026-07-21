@@ -13,7 +13,14 @@ import {
   type AgentFilterSelection,
 } from "../utils/agentFilterSql";
 
-export type ConfigStatus = "healthy" | "noData";
+// "unhealthy" | "warn" | "noThreshold" are legacy — no longer produced here,
+// but QualityConfigSidebar still branches on them.
+export type ConfigStatus =
+  | "healthy"
+  | "noData"
+  | "unhealthy"
+  | "warn"
+  | "noThreshold";
 
 export interface ScoreConfigRow {
   config: ScoreConfig;
@@ -28,6 +35,9 @@ export interface ScoreConfigRow {
   status: ConfigStatus;
   statusPriority: number;
   trendSparkline: number[];
+  /** Legacy threshold fields — no longer populated; sidebar guards on their absence */
+  hasThreshold?: boolean;
+  unhealthyPct?: number | null;
 }
 
 interface AggRow {

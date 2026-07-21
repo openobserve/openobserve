@@ -155,9 +155,6 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import segment from "@/services/segment_analytics";
-import { convertToTitleCase } from "@/utils/zincutils";
-import config from "@/aws-exports";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
 import CipherKeysService from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -280,7 +277,7 @@ export default defineComponent({
       selectedKeys.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
-    const addCipherKey = (evt: any) => {
+    const addCipherKey = () => {
       router.push({
         query: {
           action: "add",

@@ -897,7 +897,7 @@ describe('FolderList.vue', () => {
     })
 
     it('should update search input value', async () => {
-      const searchInput = wrapper.find('[data-test="folder-search"]')
+      wrapper.find('[data-test="folder-search"]')
       // Since we're using v-model, we can test by setting the component value directly
       wrapper.vm.searchQuery = 'test folder'
       await nextTick()
@@ -908,8 +908,8 @@ describe('FolderList.vue', () => {
     it('should clear search input', async () => {
       wrapper.vm.searchQuery = 'test'
       await nextTick()
-      const searchInput = wrapper.find('[data-test="folder-search"]')
-      
+      wrapper.find('[data-test="folder-search"]')
+
       // Simulate clear button click
       wrapper.vm.searchQuery = ''
       await nextTick()

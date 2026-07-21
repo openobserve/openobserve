@@ -11,8 +11,8 @@ export interface NavigationAction {
   action: "load_query" | "navigate_direct";
   label: string;
   target: {
-    // For load_query action
-    query?: string;
+    // For load_query action (string) or navigate_direct action (record)
+    query?: string | Record<string, any>;
     sql_mode?: boolean;
     functionContent?: string;
     stream?: string[];
@@ -23,7 +23,6 @@ export interface NavigationAction {
 
     // For navigate_direct action
     path?: string;
-    query?: Record<string, any>;
 
     // Extensible - can add more fields
     [key: string]: any;

@@ -18,7 +18,7 @@ vi.mock("@/utils/commons", () => ({
 
 // Mock date-fns-tz to return the input date unchanged (simulate UTC timezone)
 vi.mock("date-fns-tz", () => ({
-  fromZonedTime: (date: Date, _timezone: string) => date,
+  fromZonedTime: (date: Date) => date,
 }));
 
 const mockGetDashboard = vi.mocked(getDashboard);

@@ -202,10 +202,6 @@ const setupRoles = async () => {
     });
 };
 
-const hideForm = () => {
-  showAddGroup.value = false;
-};
-
 const deleteUserRole = (role: any) => {
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {

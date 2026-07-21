@@ -55,7 +55,14 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
           filter: z.array(z.record(z.string(), z.any())).optional().default([]),
         })
         .optional()
-        .default({}),
+        // Fully-shaped default: zod v4's .default() returns the value as-is
+        // (no inner-default fill), so it must match the output shape.
+        .default({
+          stream_type: "",
+          stream: "",
+          field: "",
+          filter: [],
+        }),
       value: z.string().optional().default(""),
       // form-owned custom option rows; row rules enforced in superRefine below.
       options: z.array(z.record(z.string(), z.any())).optional().default([]),

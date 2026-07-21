@@ -1,13 +1,11 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 
 // Mock @/utils/date before importing formatters
 vi.mock("@/utils/date", () => ({
-  formatDate: vi.fn((value: any, _fmt: string) => String(value)),
+  formatDate: vi.fn((value: any) => String(value)),
 }));
-
-import { formatDate as mockFormatDate } from "@/utils/date";
 
 import {
   b64EncodeUnicode,

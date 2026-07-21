@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount } from "@vue/test-utils";
 import FieldRow from "@/components/common/FieldRow.vue";
 
 vi.mock("vue-i18n", () => ({
@@ -63,11 +63,6 @@ const defaultProps = {
   timestampColumn: "_timestamp",
   theme: "light",
   showQuickMode: false,
-};
-
-// Default slot for the expansion (when field would use expansion)
-const expansionSlot = {
-  expansion: `<template #expansion="{ field }"><div class="expansion-slot-stub" :data-field-name="field.name">expansion</div></template>`,
 };
 
 function createWrapper(props = {}, slots = {}) {

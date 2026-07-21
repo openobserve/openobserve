@@ -237,6 +237,7 @@ import {
   computed,
   inject,
   type PropType,
+  type Ref,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
@@ -341,7 +342,7 @@ export default defineComponent({
 
     // ── Reactive form reads (single source of truth for preview + help
     //    drawer). ────────────────────────────────────────────────────────────
-    const variableRows = form.useStore(
+    const variableRows: Ref<Variable[]> = form.useStore(
       (s: any) => (s.values?.context_attributes ?? []) as Variable[],
     );
     const templateValue = form.useStore(

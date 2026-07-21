@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="countChip"
           value="neutral"
           size="xs"
-          shape="rounded-default"
+          shape="rounded"
           :data-test="`metrics-explorer-${mode}-count-${facet.id}`"
           >{{ facet.count }}</OTag
         >

@@ -388,28 +388,9 @@ const head = computed<ThreadHead>(() =>
       }
     : { systemPrompt: "", userQuery: "" },
 );
-const historicalUserCount = computed(() =>
-  traceGroups.value.length ? traceGroups.value[0].historicalUserCount : 0,
-);
-
 const showSystemFull = ref(false);
 
 /* ─── visual helpers ──────────────────────────────────────────────────── */
-
-/** Model "family" glyph + accent color for the avatar. */
-function modelBadge(model: string | null | undefined): {
-  glyph: string;
-  color: string;
-} {
-  const m = String(model || "").toLowerCase();
-  if (m.includes("claude")) return { glyph: "A", color: "#cc785c" };
-  if (m.includes("gpt") || m.startsWith("o1") || m.startsWith("o3"))
-    return { glyph: "O", color: "#10a37f" };
-  if (m.includes("gemini")) return { glyph: "G", color: "#4285f4" };
-  if (m.includes("deepseek")) return { glyph: "D", color: "#5a67d8" };
-  if (m.includes("mistral")) return { glyph: "M", color: "#f97316" };
-  return { glyph: "✦", color: "#10b981" };
-}
 
 /* ─── summary aggregates ──────────────────────────────────────────────── */
 const summary = computed(() => {

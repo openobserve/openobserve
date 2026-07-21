@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 
@@ -219,7 +219,7 @@ describe("usePanelSQLExecutor", () => {
 
       // Re-import after mock override
       const { usePanelSQLExecutor: freshFn } = await import("./usePanelSQLExecutor");
-      const { ctx, fetchQueryDataWithHttpStream, state } = makeCtx();
+      const { ctx, state } = makeCtx();
 
       const { executeSQL } = freshFn(ctx);
       await executeSQL(0, 300_000_000, null);
@@ -303,7 +303,7 @@ describe("usePanelSQLExecutor", () => {
     });
 
     it("skips fetch and sets partial data flag when abort signal is aborted", async () => {
-      const { ctx, fetchQueryDataWithHttpStream, state } = makeCtx();
+      const { ctx, state } = makeCtx();
       const abortController = new AbortController();
 
       // Set up fetchQueryDataWithHttpStream to abort before call

@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { computed, h } from "vue";
+import { computed } from "vue";
 import i18n from "@/locales";
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ const OToggleGroupItemStub = {
   `,
   props: ["value", "size"],
   inheritAttrs: false,
-  setup(props: { value: string }, { attrs }: any) {
+  setup(props: { value: string }) {
     function handleClick(e: MouseEvent) {
       const el = e.currentTarget as HTMLElement;
       el.dispatchEvent(

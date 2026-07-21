@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
 import ODialog from "./ODialog.vue";
 import { DialogContent } from "reka-ui";
 

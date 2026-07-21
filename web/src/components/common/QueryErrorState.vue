@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   └─────────────────────────────────────────────────────────────────────────┘
 
   Usage examples:
-    <!-- Logs / Traces / Metrics (full page) -->
+    Logs / Traces / Metrics (full page):
     <QueryErrorState
       :error-code="searchObj.data.errorCode"
       :error-msg="searchObj.data.errorMsg"
@@ -70,14 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @widen-range="onWidenRange"
     />
 
-    <!-- Dashboard panel (compact) -->
+    Dashboard panel (compact):
     <QueryErrorState
       :error-code="state.errorDetail.code"
       :error-msg="state.errorDetail.message"
       size="block"
     />
 
-    <!-- Alert test query result -->
+    Alert test query result:
     <QueryErrorState
       :error-msg="testResult.error"
       size="block"

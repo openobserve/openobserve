@@ -801,7 +801,7 @@ describe("GeoMapRenderer", () => {
           series: [{
             type: "scatter",
             coordinateSystem: "lmap",
-            data: Array.from({ length: 1000 }, (_, i) => [
+            data: Array.from({ length: 1000 }, () => [
               116 + Math.random(),
               39 + Math.random(),
               Math.random() * 100

@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="filteredTransformOptions.length" class="max-h-72 overflow-y-auto">
             <ul class="flex flex-col m-0 p-0 list-none">
               <li
-                v-for="(item, i) in filteredTransformOptions"
+                v-for="item in filteredTransformOptions"
                 :key="'transform-' + item?.name"
                 :data-test="`logs-search-saved-transform-item-${item?.name}`"
                 class="border-b saved-view-item flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/50"
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -272,6 +272,8 @@ const transformIcon = computed(() => {
           : "images/common/transform.svg",
       )
     );
+
+  return undefined;
 });
 
 const updateTransforms = () => {

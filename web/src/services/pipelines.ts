@@ -1,4 +1,3 @@
-import { update } from "lodash-es";
 import http from "./http";
 
 const pipelines = {

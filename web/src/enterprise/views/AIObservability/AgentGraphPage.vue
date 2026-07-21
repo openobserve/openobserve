@@ -127,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { defineAsyncComponent, ref, computed, onMounted } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
@@ -223,7 +224,9 @@ const effectiveStream = computed(() =>
     : activeStream.value,
 );
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(
+  mode: boolean | AcceptableValue | AcceptableValue[],
+) {
   if (mode === "stream" || mode === "agent") filterMode.value = mode;
 }
 
@@ -238,8 +241,10 @@ function effectiveWindow() {
 
 async function loadStreams() {
   try {
-    const res = await getStreams("traces", false, false);
-    availableStreams.value = (res?.list ?? []).map((s: any) => s.name);
+    const res = (await getStreams("traces", false, false)) as {
+      list?: { name: string }[];
+    };
+    availableStreams.value = (res?.list ?? []).map((s) => s.name);
     if (
       availableStreams.value.length &&
       !availableStreams.value.includes(activeStream.value)

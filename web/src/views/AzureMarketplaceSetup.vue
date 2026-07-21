@@ -116,9 +116,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @submit="linkToExistingOrg"
                 v-slot="{ isSubmitting }"
               >
+                <!-- label-key/value-key map the fields; SelectOptionInput's required `label` doesn't apply -->
                 <OFormSelect
                   name="selectedOrg"
-                  :options="eligibleOrganizations"
+                  :options="eligibleOrganizations as any[]"
                   label-key="name"
                   value-key="identifier"
                   label="Select Organization"
@@ -182,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onUnmounted } from "vue";
+import { defineComponent, ref, onMounted } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useRouter } from "vue-router";

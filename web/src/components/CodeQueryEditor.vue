@@ -32,7 +32,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="toggleNlpMode"
       data-test="query-editor-ai-icon-btn"
     >
-      <OIcon size="md">
+      <!-- name="" satisfies the required prop; empty name renders only the slot -->
+      <OIcon name="" size="md">
         <img :src="aiIcon" alt="AI" class="w-4.5 h-4.5" />
       </OIcon>
       <OTooltip side="top" align="center">
@@ -55,6 +56,8 @@ import {
   watch,
   computed,
 } from "vue";
+
+import type * as MonacoEditor from "monaco-editor/esm/vs/editor/editor.api";
 
 // Lazy load Monaco Editor - only loaded when this component is rendered
 // This reduces initial bundle size by ~3.1MB
@@ -338,16 +341,16 @@ export default defineComponent({
           `match_all_raw_ignore_case('${_keyword}')`,
       },
       {
-        label: (_keyword: string) =>
+        label: () =>
           `re_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
-        insertText: (_keyword: string) => `re_match(fieldname, '')`,
+        insertText: () => `re_match(fieldname, '')`,
       },
       {
-        label: (_keyword: string) =>
+        label: () =>
           `re_not_match(fieldname: string, regular_expression: string)`,
         kind: "Text",
-        insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
+        insertText: () => `re_not_match(fieldname, '')`,
       },
       {
         label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
@@ -403,13 +406,13 @@ export default defineComponent({
 
       // ONLY emit events if NOT already in NLP mode (auto-detection feature)
       // If already in NLP mode (user toggled it), don't change anything
+      // Only emit when not already in NLP mode; if already set, do nothing.
       if (!props.nlpMode) {
         if (isNL) {
           emit("nlpModeDetected", true);
         } else {
           emit("nlpModeDetected", false);
         }
-      } else {
       }
     }, 500);
 
@@ -894,7 +897,7 @@ export default defineComponent({
     // update readonly when prop value changes
     watch(
       () => props.query,
-      (newQuery, oldQuery) => {
+      () => {
         if (!editorObj) return;
 
         const currentValue = editorObj?.getValue();
@@ -929,7 +932,10 @@ export default defineComponent({
       provider.value = monaco.languages.registerCompletionItemProvider(
         props.language,
         {
-          provideCompletionItems: function (model, position) {
+          provideCompletionItems: function (
+            model: MonacoEditor.editor.ITextModel,
+            position: MonacoEditor.Position,
+          ) {
             // find out if we are completing a property in the 'dependencies' object.
             var textUntilPosition = model.getValueInRange({
               startLineNumber: 1,
@@ -1047,7 +1053,7 @@ export default defineComponent({
         };
       });
 
-      const decorationIds = editorObj.deltaDecorations([], decorations);
+      editorObj.deltaDecorations([], decorations);
     };
 
     function addErrorDiagnostics(ranges: any) {

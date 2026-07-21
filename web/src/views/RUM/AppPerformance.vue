@@ -101,7 +101,7 @@ import {
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
+import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
@@ -133,7 +133,7 @@ export default defineComponent({
     const activePerformanceTab = ref("overview");
     const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
-    const { rumState } = useRum();
+    useRum();
 
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);

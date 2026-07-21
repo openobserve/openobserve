@@ -70,7 +70,7 @@ vi.mock("@/services/organizations", () => ({
 }));
 
 vi.mock("@/utils/zincutils", () => ({
-  timestampToTimezoneDate: vi.fn((timestamp, tz, format) => {
+  timestampToTimezoneDate: vi.fn((timestamp) => {
     // Always return a valid date string to prevent i18n timestamp validation errors
     if (timestamp && typeof timestamp === "number" && timestamp > 0) {
       return `2023-12-01`;

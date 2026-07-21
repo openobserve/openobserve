@@ -204,6 +204,7 @@ import {
   onMounted,
   ref,
   watch,
+  type PropType,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -217,6 +218,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
@@ -245,11 +247,11 @@ export default defineComponent({
       default: false,
     },
     streamDocTimeRange: {
-      type: Object,
+      type: Object as PropType<{ min: number; max: number }>,
       default: undefined,
     },
     queryWindowUs: {
-      type: Object,
+      type: Object as PropType<{ start: number; end: number }>,
       default: undefined,
     },
   },
@@ -418,9 +420,10 @@ export default defineComponent({
       emit("update:scroll");
     }
 
-    function changeRowsPerPage(val: number) {
+    function changeRowsPerPage(val: SelectModelValue) {
       if (searchObj.loading) return;
-      searchObj.meta.resultGrid.rowsPerPage = val;
+      // rowsPerPageOptions are all numbers, so val is always a number here
+      searchObj.meta.resultGrid.rowsPerPage = val as number;
       searchObj.data.resultGrid.currentPage = 0;
       emit("update:scroll");
     }

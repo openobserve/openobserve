@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('search.includePatternInSearch')"
         :data-test="`pattern-card-${index}-include-btn`"
       >
-        <OIcon style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 8px; width: 8px">
           <EqualIcon />
         </OIcon>
       </OButton>
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('search.excludePatternFromSearch')"
         :data-test="`pattern-card-${index}-exclude-btn`"
       >
-        <OIcon style="height: 8px; width: 8px">
+        <OIcon name="" style="height: 8px; width: 8px">
           <NotEqualIcon />
         </OIcon>
       </OButton>

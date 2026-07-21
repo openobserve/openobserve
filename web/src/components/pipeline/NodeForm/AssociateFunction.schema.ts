@@ -41,6 +41,7 @@ export const makeAssociateFunctionSchema = (
       }
     });
 
-export type AssociateFunctionForm = z.infer<
-  ReturnType<typeof makeAssociateFunctionSchema>
->;
+export type AssociateFunctionForm = {
+  selectedFunction: string;
+  afterFlattening?: boolean;
+};

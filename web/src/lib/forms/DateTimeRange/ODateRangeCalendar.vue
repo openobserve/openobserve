@@ -5,7 +5,7 @@ import type {
   DateRangeCalendarProps,
   DateRangeCalendarEmits,
 } from "./ODateRangeCalendar.types";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import {
   RangeCalendarRoot,
   RangeCalendarGrid,
@@ -47,12 +47,19 @@ function fromIso(s: string) {
 // Internal calendar state. We do NOT commit to parent until both ends are
 // picked, so the parent's startDate/endDate stay valid (avoiding "[object
 // Object]" display artifacts from formatters that assume both are non-empty).
-const internalStart = ref<DateValue | undefined>(undefined);
-const internalEnd = ref<DateValue | undefined>(undefined);
+// Casts: ref() deep-unwraps DateValue's class type structurally, breaking DateValue params
+const internalStart = ref<DateValue | undefined>(undefined) as Ref<
+  DateValue | undefined
+>;
+const internalEnd = ref<DateValue | undefined>(undefined) as Ref<
+  DateValue | undefined
+>;
 // Tracks the hovered cell while awaiting the second click — used to render
 // the dashed preview range only between start and hover (not all valid-to-pick
 // cells, which is what reka-ui's data-highlighted alone would give us).
-const hoverDate = ref<DateValue | undefined>(undefined);
+const hoverDate = ref<DateValue | undefined>(undefined) as Ref<
+  DateValue | undefined
+>;
 
 // Resync internal state when parent provides new dates (initial load, external
 // changes, or after a committed range round-trip).

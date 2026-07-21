@@ -40,7 +40,7 @@ export default defineComponent({
     // we have list of variables
     variablesList: {
       type: Array,
-      default: [],
+      default: () => [],
       required: true,
     },
   },

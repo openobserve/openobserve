@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div v-if="filesImportResults.length" class="py-2" data-test="dashboard-import-file-results">
-                      <div v-for="importResult in filesImportResults">
+                      <div v-for="(importResult, index) in filesImportResults" :key="index">
                         <span
                           v-if="importResult.status == 'rejected'"
                           class="text-status-negative"
@@ -286,7 +286,6 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -522,7 +521,8 @@ export default defineComponent({
       }
 
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
-        return new Promise(async (resolve, reject) => {
+        return new Promise((resolve, reject) => {
+          (async () => {
           const fileName =
             jsonFiles.value[fileIndex]?.name ||
             t("dashboard.importDashboardPage.fileFallback", { n: fileIndex + 1 });
@@ -582,6 +582,7 @@ export default defineComponent({
           } catch (e) {
             reject({ file: fileName, error: t("dashboard.importDashboardPage.errorProcessingFile") });
           }
+          })().catch(reject);
         });
       });
 
@@ -881,7 +882,7 @@ export default defineComponent({
   },
   components: { OSeparator, SelectFolderDropdown, AppTabs, OPageLayout, QueryEditor, OButton, OInput, OSelect,
     OForm, OFormInput, OFormFile,
-    OIcon, OSplitter,
+    OSplitter,
 },
 });
 </script>

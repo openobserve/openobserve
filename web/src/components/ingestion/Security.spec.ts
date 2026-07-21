@@ -399,7 +399,6 @@ describe("Security Component", () => {
 
   describe("Reactive Properties", () => {
     it("should have reactive tabs property", async () => {
-      const initialTabs = wrapper.vm.tabs;
       wrapper.vm.tabs = "test-value";
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.tabs).toBe("test-value");

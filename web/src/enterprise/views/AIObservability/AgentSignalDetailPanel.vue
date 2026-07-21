@@ -542,7 +542,7 @@ const fetchDetails = async () => {
 // panel's own bounds when present, else a wide fallback (last 30 days). Trace
 // Details re-derives the exact trace time from its spans, so a wide window is
 // safe — it only needs to contain the trace.
-const openTrace = (row: { trace_id: string }) => {
+const openTrace = (row: Record<string, any>) => {
   if (!row?.trace_id) return;
   const nowUs = Date.now() * 1000;
   // Guarantee a valid, containing µs window. Trace Details re-derives the exact

@@ -19,7 +19,6 @@ import Plans from "./plans.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";
-import config from "@/aws-exports";
 import * as zincutils from "@/utils/zincutils";
 import { nextTick } from "vue";
 
@@ -393,7 +392,6 @@ describe("Plans Component", () => {
   // Test 20: retrieveHostedPage method - successful
   it("should reload page when hosted page state is succeeded", async () => {
     // Test the behavior without relying on component state
-    const mockHostedResponse = { id: "hp_123" };
     const response = {
       data: { data: { hosted_page: { state: "succeeded" } } },
     };

@@ -84,13 +84,13 @@
 
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 import OForm from '@/lib/forms/Form/OForm.vue'
 import OFormInput from '@/lib/forms/Input/OFormInput.vue'
 import OFormCheckbox from '@/lib/forms/Checkbox/OFormCheckbox.vue'
-import { getStartedSchema, getStartedDefaults } from './GetStarted.schema'
+import { getStartedSchema, getStartedDefaults, type GetStartedForm } from './GetStarted.schema'
 import { useStore } from 'vuex'
   import billings from '@/services/billings'
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -98,7 +98,7 @@ const store = useStore()
 const emit = defineEmits(['removeFirstTimeLogin'])
 const formRef = ref(null);
 
-const doSubmit = async (value) => {
+const doSubmit = async (value: GetStartedForm) => {
   const res = await billings.submit_new_user_info(store.state.selectedOrganization.identifier, {
     from: value.hearAboutUs,
     company: value.whereDoYouWork,

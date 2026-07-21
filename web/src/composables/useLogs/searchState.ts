@@ -17,21 +17,74 @@ import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 // import { useI18n } from "vue-i18n";
-import type { SearchRequestPayload } from "@/ts/interfaces";
+import type {
+  SearchRequestPayload,
+  ParsedSQLResult,
+} from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
 
+
+// Cross-link definition returned by the backend cross-linking API.
+export interface CrossLinkField {
+  name: string;
+  alias?: string;
+}
+export interface CrossLink {
+  name: string;
+  url: string;
+  fields: CrossLinkField[];
+}
+
+// A transform (VRL function) entry shown in the function selector.
+export interface Transform {
+  name?: string;
+  function?: string;
+  content?: string;
+  id?: string;
+  [key: string]: unknown;
+}
+
+// The currently applied transform/action; spread from a source item at runtime.
+export interface SelectedTransform {
+  id?: string;
+  name?: string;
+  type?: string;
+  [key: string]: unknown;
+}
+
+// An action entry shown in the action selector.
+export interface ActionItem {
+  name: string;
+  id: string;
+}
+
+export interface RefreshTimeItem {
+  label: string;
+  value: number;
+}
+
+export interface SearchConfig {
+  splitterModel: number;
+  lastSplitterPosition: number;
+  splitterLimit: number[];
+  fnSplitterModel: number;
+  fnLastSplitterPosition: number;
+  fnSplitterLimit: number[];
+  refreshTimes: RefreshTimeItem[][];
+}
+
 export interface HistogramData {
-  xData: any[];
-  yData: any[];
+  xData: number[];
+  yData: number[];
   breakdownField: string | null;
   breakdownSeries: Map<string, number[]> | null;
   chartParams: {
     title: string;
-    unparsed_x_data: any[];
+    unparsed_x_data: unknown[];
     timezone: string;
   };
   errorMsg: string;
@@ -40,66 +93,129 @@ export interface HistogramData {
 }
 
 export interface StreamData {
+  loading?: boolean;
+  // A found entry is assigned directly to selectedStream (string[]) at a call
+  // site, which only type-checks if elements are any.
   streamLists: any[];
   selectedStream: string[];
   selectedStreamFields: any[];
-  selectedFields: any[];
+  selectedFields: string[];
   filterField: string;
   addToFilter: string;
   addToFilterMode: "replace" | "append";
   removeFilterField: string;
-  functions: any[];
+  functions: { name: string; args: string }[];
   streamType: string;
+  interestingFieldList: string[];
+  userDefinedSchema: unknown[];
+  expandGroupRows: { [key: string]: boolean };
+  expandGroupRowsFieldCount: { [key: string]: number };
+  filteredField: { expr: { value: string } }[];
+  missingStreamMultiStreamFilter: string[];
+  pipelineQueryStream: string[];
+  // Holds grouped field-row objects at runtime; left as any[] for the same
+  // conflicting-StreamField-shape reason as selectedStreamFields above.
+  selectedInterestingStreamFields: any[];
+  interestingExpandedGroupRows: { [key: string]: boolean };
+  interestingExpandedGroupRowsFieldCount: { [key: string]: number };
 }
 
 export interface ResultGrid {
+  currentDateTime?: Date;
   currentPage: number;
+  // Column definitions vary between logs and traces grids; treated opaquely here.
+  columns: unknown[];
+  colOrder: { [key: string]: string[] };
+  colSizes: { [key: string]: unknown };
 }
 
 export interface SearchAroundData {
   indexTimestamp: number;
   size: number;
+  histogramHide: boolean;
 }
 
 export interface SearchObjectData {
+  // Backend stream-list response; also reset to {} at times, so kept as any.
   streamResults: any;
   errorMsg: string;
   errorDetail: string;
   errorCode: number;
   countErrorMsg: string;
+  filterErrMsg: string;
+  missingStreamMessage: string;
+  additionalErrorMsg?: string;
+  savedViewFilterFields?: string;
   stream: StreamData;
+  // Search response: hits are arbitrary log records and consumers write
+  // computed props onto it, so this stays any.
   queryResults: any;
-  sortedQueryResults: any[];
+  sortedQueryResults: unknown[];
   histogram: HistogramData;
+  histogramQuery: any;
+  histogramInterval: number | null;
+  parsedQuery?: ParsedSQLResult;
+  hasSearchDataTimestampField: boolean;
+  originalDataCache: { [key: string]: unknown };
+  tempFunctionName: string;
   tempFunctionContent: string;
+  tempFunctionLoading: boolean;
   query: string;
   editorValue: string;
+  // Saved-view records are indexed by a string|number key at a call site, which
+  // a typed array cannot express, so this stays any.
   savedViews: any[];
-  transforms: any[];
+  transforms: Transform[];
+  transformType: string;
+  selectedTransform: SelectedTransform | null;
+  selectedFunction?: { name?: string; function?: string } | null;
+  actions: ActionItem[];
+  actionId: string | null;
+  // Polymorphic: used both flat (startTime/endTime) and nested
+  // (relative.period.label) with unguarded deep access, so kept as any.
+  datetime: any;
   resultGrid: ResultGrid;
   searchAround: SearchAroundData;
+  customDownloadQueryObj: SearchRequestPayload;
+  functionError: string;
+  searchRequestTraceIds: string[];
+  searchWebSocketTraceIds?: string[];
+  lastSearchTraceId: string;
+  lastHistogramTraceId: string;
+  isOperationCancelled: boolean;
+  searchRetriesCount?: { [key: string]: number };
+  patterns?: unknown;
   highlightQuery: string;
-  crossLinks: { stream_links: any[]; org_links: any[] };
+  crossLinks: { stream_links: CrossLink[]; org_links: CrossLink[] };
   crossLinkQuery: string;
   sqlSyntaxErrorRanges: Array<{ startLine: number; endLine: number; column?: number; error: string }>;
 }
 
 export interface SearchObject {
   organizationIdentifier: string;
-  config: any;
+  config: SearchConfig;
   communicationMethod: string;
+  // Large, dynamically-keyed UI/feature-flag bag with no stable schema.
   meta: any;
   data: SearchObjectData;
   runQuery: boolean;
+  loading: boolean;
+  loadingHistogram: boolean;
+  loadingCounter: boolean;
+  loadingStream: boolean;
+  loadingSavedView: boolean;
+  shouldIgnoreWatcher: boolean;
   // Streaming progress (0-100) for the results table and histogram bars
   loadingProgressPercentage: number;
   loadingHistogramProgressPercentage: number;
 }
 
-// Main search object containing all search state
+// Main search object containing all search state.
+// DEFAULT_LOGS_CONFIG is declared `as const`, so its readonly literal type does
+// not overlap with the mutable SearchObject interface; bridge via unknown.
 const searchObj = reactive(
   Object.assign({}, DEFAULT_LOGS_CONFIG),
-) as SearchObject;
+) as unknown as SearchObject;
 
 // Debug data for search operations
 const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
@@ -114,9 +230,11 @@ type SearchPartition = {
 
 const searchPartitionMap = reactive<Record<string, SearchPartition>>({});
 
+// Reassigned to a Map<string, {zo_sql_num,...}> by consumers and accessed via
+// unguarded Map ops, so kept as any to avoid possibly-undefined cascades.
 const histogramMappedData: any = [];
 
-const histogramResults: any = ref([]);
+const histogramResults = ref<unknown[]>([]);
 
 const initialQueryPayload: Ref<SearchRequestPayload | null> = ref(null);
 
@@ -142,7 +260,7 @@ export const searchState = () => {
   const notificationMsg = ref("");
 
   // FTS (Full Text Search) fields
-  const ftsFields: any = ref([]);
+  const ftsFields = ref<string[]>([]);
 
   /**
    * Initializes the logs state from cached store data.

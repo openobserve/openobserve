@@ -212,17 +212,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </template>
   <script lang="ts">
-  import { defineComponent, ref, onMounted, defineAsyncComponent, watch, computed, onUnmounted, onActivated   , onBeforeMount, nextTick, inject } from "vue";
+  import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
   import { useStore } from "vuex";
   import useTheme from "@/composables/useTheme";
   import { useI18n } from "vue-i18n";
   import BillingService from "@/services/billings";
   import organizations from "@/services/organizations";
-  import { convertBillingData } from "@/utils/billing/convertBillingData";
-import router from "@/router";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
-import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -237,10 +234,6 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
   export default defineComponent({
     name: "Usage",
     components: {
-      ChartRenderer: defineAsyncComponent(
-        () => import("@/components/dashboards/panels/ChartRenderer.vue")
-      ),
-      CustomChartRenderer,
       PanelSchemaRenderer,
       OSpinner,
       OEmptyState,
@@ -411,7 +404,7 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
       watch(effectiveUsageDate, () => {
         getUsage();
       })
-      watch(usageDataType, (val) => {
+      watch(usageDataType, () => {
         getUsage();
       })
       watch(selectedMember, () => {

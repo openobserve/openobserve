@@ -167,15 +167,17 @@ export const fillMissingValues = (
   const searchDataMap = new Map();
   let actualMinTime: string | null = null;
   let actualMaxTime: string | null = null;
-  processedData?.forEach((d: any) => {
+  // for-of (not forEach) so the compiler tracks actualMin/MaxTime assignments
+  // in this scope and keeps their declared string|null type at reads below.
+  for (const d of processedData ?? []) {
     const timeVal = `${getDataValue(d, timeKey)}`;
     const key = hasBreakdown
       ? `${timeVal}-${getDataValue(d, uniqueKey)}`
       : timeVal;
     searchDataMap.set(key, d);
-    if (!actualMinTime || timeVal < actualMinTime) actualMinTime = timeVal;
-    if (!actualMaxTime || timeVal > actualMaxTime) actualMaxTime = timeVal;
-  });
+    if (actualMinTime === null || timeVal < actualMinTime) actualMinTime = timeVal;
+    if (actualMaxTime === null || timeVal > actualMaxTime) actualMaxTime = timeVal;
+  }
 
   if (loading) {
     // LTR streaming: clamp both edges to actual data bounds. Timestamps
