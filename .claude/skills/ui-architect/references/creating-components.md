@@ -264,4 +264,13 @@ describe("OButton", () => {
 ## 11. After building
 
 1. **Add the component to this skill's catalog** — the sibling reference files in this folder are grouped by domain: `core-controls-table.md`, `core-display.md`, `forms-inputs.md`, `forms-specialized.md`, `forms-validation.md`, `feedback-data.md`, `overlay-navigation.md`, `keyboard-shortcuts.md`. Document the new component (props, variants, usage) in the matching file so consumers can find it.
-2. **Lint + type-check** (from `web/`): `npm run lint` then `npm run type-check`. Fix everything before declaring done. Do **not** run `npm run build`.
+2. **Add / update the component's story** in the in-app component gallery
+   (`/component-gallery`, dev-only). Every `O*` component ships a co-located
+   `O<Name>.story.vue` next to its source; the gallery auto-discovers it via
+   `import.meta.glob`. This is not only for new components — **any change to a
+   component's public surface (new prop, new variant/size, new slot, new emit)
+   must land in its story's `controls`/sections in the same PR**, so the
+   gallery never drifts from the code (`npm run lint:stories` enforces both,
+   once the gallery exists — if it doesn't yet, flag the gap instead of
+   skipping silently).
+3. **Lint + type-check** (from `web/`): `npm run lint` then `npm run type-check`. Fix everything before declaring done. Do **not** run `npm run build`.

@@ -166,6 +166,7 @@ and each domain has its own reference below.
 | **Keyboard shortcuts** | registry-driven — declare in `shortcutRegistry.ts`, bind with `useShortcuts([{ id, handler }])`; never an ad-hoc `keydown` listener or a hardcoded `⌘N` in a template | [keyboard-shortcuts](references/keyboard-shortcuts.md) |
 | **Cancel / Save row** | cancel = `variant="outline"`, save = `variant="primary"`, both `size="sm-action"`, spaced with `gap-2` on the parent | [conventions](references/conventions.md) |
 | **Nothing fits** | build a reusable component — generic primitive → a new `O*` in `web/src/lib`; app-specific composition → a named component in `web/src/components`. Never hand-assemble `<div>` + utility classes to fake a component | [creating-components](references/creating-components.md) |
+| **Component stories** | every `O*` component has a co-located `O<Name>.story.vue` rendered in the in-app gallery (`/component-gallery`, dev-only, auto-discovered). Adding or changing a **prop, variant, slot, or emit** updates the story in the same PR — the gallery mirrors the component's real API, always (`npm run lint:stories`) | [creating-components](references/creating-components.md) |
 
 **Dark mode is automatic** — every O2 component and token resolves correctly in
 both themes. Never branch on `store.state.appTheme` around an O2 component; if
@@ -252,6 +253,11 @@ considering the UI done:
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
+- [ ] **Story is in sync** — a new `O*` component ships its co-located
+      `O<Name>.story.vue`, and any change to an existing component's public
+      surface (prop, variant, slot, emit) updates that story's controls/
+      sections in the same PR (`npm run lint:stories`; if the gallery doesn't
+      exist yet, flag the gap rather than skipping silently).
 - [ ] `cd web && npm run lint && npm run type-check` pass.
 
 ## When a rule can't be satisfied
