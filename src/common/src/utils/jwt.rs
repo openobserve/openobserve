@@ -93,13 +93,16 @@ pub fn verify_decode_token(
         .and_then(key_algorithm_to_algorithm)
         .map(Validation::new)
         .ok_or(JwtError::ValidationFailed())?;
+    // Expiry is ALWAYS enforced. There is no secondary `exp` check anywhere in
+    // the auth path, so relaxing it here would make session expiry and token
+    // revocation unenforceable for every route that reaches this function.
+    validation.validate_exp = true;
     if login_flow {
-        validation.validate_exp = true;
         validation.set_audience(&[aud]);
     } else {
-        // we are decoding the token for the service account, which is issued by the dex
-        // hence we don't need to validate the exp and aud
-        validation.validate_exp = false;
+        // MCP clients register dynamically with Dex, so their `aud` is not our
+        // static `client_id` and cannot be matched against it. Only the audience
+        // check is relaxed for them — never expiry.
         validation.validate_aud = false;
     };
 
@@ -171,6 +174,156 @@ pub async fn get_user_name_from_token(auth_str: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Fixed 2048-bit RSA test keypair. Hard-coded (not generated per-run) so the
+    /// JWKS modulus below stays in sync and the tests remain hermetic and fast.
+    /// Test-only material — never used outside this module.
+    const TEST_PRIV_KEY_PEM: &str = "-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDGTBNl8SrAdlAU
+fsXuDA7mAVAOd9et3zx5zxaPCxGbHCUyMfBxPTUiBgJVfZw82PEGZW/nIBg0Jh9y
+oVxfPZI8IjBTWyhv+pjewe2a8sIquEeeK1ke6INUhTP98P2xeabw+LeTtuBOVVxy
+84+wIrSOMpytyiW+PPRpfUZ6odTBnV1lPVesI/z3eodmVBrGApEK1mRo+zCRboh7
+N6ZgWJLNcp94ChHN0EkKktyBLaFQFd/6n3ZZGO9BrlaUNTIMa2cw4W6TZgQ44Pg2
+XEudkr9nIPIQSkiW1BapnB2bWufFO7Qa5XQv1i1jA7FjOMiFLM04hJtVNKsEqdTD
+zNTAvgIVAgMBAAECggEAevmE8iyM6cy1vvAbyZP6zVM1FbPmsrKFq7js8YrYwUvE
+GYv05BUkVVRKsD/025tiZigULM6vk++sgwdk5L+nZ9mABMG8oy1TDppPw08XcSzV
+ZVbWrx9dCtaMtsh0XFLoX/quxlGca5fufG9lxcLQHHtwxSpfG8prfNwvEDA6ZFMe
+Rsovk/4UCLWDSA6TDzjl/rgMiiqHPUe2bZn4Dmz6dB75JGqDUlRrHzYf0EpbirXN
+sHqVmCTN5coQ9YEbVxO5YvvCA2VIzaOV/vtjsxVo6AW0Su6Q1zG95e6B+dHT8gq3
+23zdDDyhvuLZZDuJxMjTzYrdKa6Cbj5cxRMARY1HhQKBgQDugLVcmrmD+a+CyROb
+QLJkFpLks6u9mIR88i1GofCdswcic77DFm9dJ08Qf38+liWL8hCr1WJdJgPLXxNp
+h3gseKn6RL1p2dwFAkSRMO88vxVc4PYMFds7PfJC/tuN2Sc1/03o05mwBkeEX9On
+dhhFqJWcCRmPI9nf4L5OL98LfwKBgQDU2EVZqvTTDvqXr7oh7DJ7YD/GUNuEop2K
+1L4fnrq+HVCKZ8wzTh8yjKfO6fpZf4wWZGETBWbg87nexpap8BDzQxwBIJzmEE7H
+qbgoyb1kWbXN7r4Zz9KMK/lrmaH9Uzr/W1ZJNdDhyuJBna7s3Y5BZFEdXTPoB0ez
+tgdHqCXMawKBgQCF9n9oC3RGX9moYV8E5jsNIuzRTuYZMXDBaZnqwY0QVv2b6V1t
+4M0eirTLNIH5Woaua4HXspx0a6TX94hEzxW+DOyUqUWnDfqaSaLP1qeZ/E54g9dQ
+BHrGdM39uX8C1sVCfCt7qlb52x0Simys9BVAEygto6Lalq2LJYZfDl5+6wKBgFao
+k1vVwgZos9isgHEtVMRsxKp+41GWT+Rlh98h5lBfaRpg9n/xD7yqDeyt0PM9fhDj
+36455dAzC3tLia45Av24Vh+TYq4894ZNcKCSutyvtdjZmmax+bx+bvfDPnQAviWX
+z4LROXGlBAfJJp5j+nZfXLNC7k5LIINn2oDvUixvAoGBAMhtnO1d8ufI9swV2i3T
+f65K5EUUYygLm1AXgFCenb6L9golR0XCtibdEI8lCBK7mGjrLAbV0z9gNVoc7uZ7
+plzPFc/u57aR2ej7TOIVdtH4o5dfd55UJFwocNvfSBAAoGHaUlQ19/JZpu1g+LVk
+CN5lTowpVXP2OIiiNTGa75Fj
+-----END PRIVATE KEY-----";
+
+    /// JWKS containing the public half of `TEST_PRIV_KEY_PEM`.
+    fn test_jwks() -> String {
+        r#"{"keys":[{"kty":"RSA","kid":"test-key","alg":"RS256","use":"sig","n":"xkwTZfEqwHZQFH7F7gwO5gFQDnfXrd88ec8WjwsRmxwlMjHwcT01IgYCVX2cPNjxBmVv5yAYNCYfcqFcXz2SPCIwU1sob_qY3sHtmvLCKrhHnitZHuiDVIUz_fD9sXmm8Pi3k7bgTlVccvOPsCK0jjKcrcolvjz0aX1GeqHUwZ1dZT1XrCP893qHZlQaxgKRCtZkaPswkW6IezemYFiSzXKfeAoRzdBJCpLcgS2hUBXf-p92WRjvQa5WlDUyDGtnMOFuk2YEOOD4NlxLnZK_ZyDyEEpIltQWqZwdm1rnxTu0GuV0L9YtYwOxYzjIhSzNOISbVTSrBKnUw8zUwL4CFQ","e":"AQAB"}]}"#.to_string()
+    }
+
+    /// Mint a real RS256 token signed by the test key.
+    /// `exp_offset_secs` is relative to now, so negative values yield an EXPIRED token.
+    fn mint_token(aud: &str, exp_offset_secs: i64) -> String {
+        use jsonwebtoken::{EncodingKey, Header, encode};
+
+        let now = chrono::Utc::now().timestamp();
+        let mut header = Header::new(jsonwebtoken::Algorithm::RS256);
+        header.kid = Some("test-key".to_string());
+
+        let claims = serde_json::json!({
+            "sub": "CgVhZG1pbhIFbG9jYWw",
+            "aud": aud,
+            "iss": "http://localhost:5556/dex",
+            "email": "victim@example.com",
+            "name": "Victim User",
+            "iat": now - 3600,
+            "exp": now + exp_offset_secs,
+        });
+
+        encode(
+            &header,
+            &claims,
+            &EncodingKey::from_rsa_pem(TEST_PRIV_KEY_PEM.as_bytes()).expect("valid test RSA key"),
+        )
+        .expect("token encodes")
+    }
+
+    /// Sanity check: a correctly-audienced, unexpired token must validate in the
+    /// normal login flow. Anchors the tests below — if this fails, the harness is
+    /// broken rather than the security property.
+    #[test]
+    fn valid_token_is_accepted_in_login_flow() {
+        let token = mint_token("o2-client", 3600);
+        let result = verify_decode_token(&token, &test_jwks(), "o2-client", false, true);
+        assert!(
+            result.is_ok(),
+            "well-formed token must validate: {:?}",
+            result.err()
+        );
+    }
+
+    /// SECURITY: an EXPIRED token must never be accepted.
+    ///
+    /// `login_flow = false` (set for any MCP-flagged request) disables
+    /// `validate_exp`, so a token that expired long ago still authenticates.
+    /// There is no secondary expiry check anywhere in the auth path, so this
+    /// makes session expiry and revocation unenforceable.
+    ///
+    /// Expected once fixed: expiry is validated unconditionally.
+    #[test]
+    fn expired_token_is_rejected_even_when_audience_check_is_skipped() {
+        // Expired an hour ago.
+        let token = mint_token("o2-client", -3600);
+
+        let result = verify_decode_token(&token, &test_jwks(), "o2-client", false, false);
+
+        assert!(
+            result.is_err(),
+            "SECURITY: expired token was accepted because login_flow=false disables \
+             validate_exp. Skipping the `aud` check for dynamically-registered MCP \
+             clients must not also disable expiry validation."
+        );
+    }
+
+    /// No upper bound on token age under the same bypass.
+    #[test]
+    fn ancient_token_is_rejected_when_audience_check_is_skipped() {
+        let token = mint_token("o2-client", -315_360_000); // expired 10 years ago
+        assert!(
+            verify_decode_token(&token, &test_jwks(), "o2-client", false, false).is_err(),
+            "SECURITY: token expired 10 years ago must not authenticate"
+        );
+    }
+
+    /// Expiry must also be enforced on the ordinary login path (regression guard).
+    #[test]
+    fn expired_token_is_rejected_in_login_flow() {
+        let token = mint_token("o2-client", -3600);
+        let result = verify_decode_token(&token, &test_jwks(), "o2-client", false, true);
+        assert!(result.is_err(), "expired token must be rejected");
+    }
+
+    /// Documents the INTENDED relaxation: MCP clients register dynamically with
+    /// Dex, so their tokens carry an `aud` that is not O2's static `client_id`.
+    /// Skipping the audience check for them is deliberate (see commit 1593db0e22).
+    ///
+    /// This test pins that behaviour so a fix for the expiry bug above does not
+    /// silently re-enable `aud` validation and break real MCP clients.
+    #[test]
+    fn foreign_audience_is_tolerated_for_mcp_clients_when_unexpired() {
+        let token = mint_token("some-dynamically-registered-mcp-client", 3600);
+
+        let result = verify_decode_token(&token, &test_jwks(), "o2-client", false, false);
+
+        assert!(
+            result.is_ok(),
+            "MCP tokens from dynamically-registered clients must still be accepted \
+             while unexpired: {:?}",
+            result.err()
+        );
+    }
+
+    /// A foreign audience must still be rejected on the normal login path.
+    #[test]
+    fn foreign_audience_is_rejected_in_login_flow() {
+        let token = mint_token("attacker-registered-client", 3600);
+        let result = verify_decode_token(&token, &test_jwks(), "o2-client", false, true);
+        assert!(
+            result.is_err(),
+            "login flow must enforce audience binding (RFC 8707)"
+        );
+    }
 
     #[test]
     fn test_verify_decode_token_missing_kid_header() {
