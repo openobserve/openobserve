@@ -22,8 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (`dest:<name>` / `wf:<id>`) and split back apart on change — the payload wiring,
   validation, and backend contract are unchanged.
 
-  In OSS `isEnterprise` is false: no Workflows group is built, no group headers
-  are shown, and the control behaves exactly like the old Destinations dropdown.
+  When `workflowsEnabled` is false — OSS, or an enterprise/cloud deployment with
+  the backend `/config` flag `workflows_enabled` off — no Workflows group is
+  built, no group headers are shown, and the control behaves exactly like the old
+  Destinations dropdown.
   Only the control row lives here; the field label + inline required-error stay
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
@@ -34,13 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="options"
       multiple
       :error="error"
-      :collapsible-groups="isEnterprise"
+      :collapsible-groups="workflowsEnabled"
       class="min-w-[11.25rem] max-w-[18.75rem]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
       <template #empty>{{
-        isEnterprise
+        workflowsEnabled
           ? t("alerts.alertSettings.noTargetsAvailable")
           : t("alerts.alertSettings.noDestinationsAvailable")
       }}</template>
@@ -66,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("alerts.alertSettings.addNewDestination") }}
     </OButton>
     <OButton
-      v-if="isEnterprise"
+      v-if="workflowsEnabled"
       data-test="create-workflow-btn"
       variant="outline"
       size="sm"
@@ -97,7 +99,7 @@ const props = defineProps<{
   workflows: string[];
   destinationOptions: RawOption[];
   workflowOptions: RawOption[];
-  isEnterprise: boolean;
+  workflowsEnabled: boolean;
   error?: boolean;
 }>();
 
@@ -167,7 +169,7 @@ const toTagged = (list: RawOption[] | undefined, tag: string) =>
 
 const options = computed(() => {
   const dests = toTagged(props.destinationOptions, DEST);
-  if (!props.isEnterprise) return dests;
+  if (!props.workflowsEnabled) return dests;
   const wfs = toTagged(props.workflowOptions, WF);
   return [
     { header: true, label: t("alerts.alertSettings.targetsDestinationsGroup") },
