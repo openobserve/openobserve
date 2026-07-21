@@ -2158,14 +2158,89 @@ class APICleanup {
         }
     }
 
+    // ============================================================
+    // WORKFLOWS (v1) cleanup — Enterprise "Workflows" feature.
+    // A workflow linked to an alert is delete-protected, so callers must delete
+    // the linked test alerts FIRST (completeCascadeCleanup does this in STEP 1),
+    // then call cleanupWorkflows() to remove the now-unlinked workflows.
+    // ============================================================
+
+    /** Fetch all workflows in the current org. Returns an array (list endpoint returns a bare array). */
+    async fetchWorkflows() {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/workflows`, {
+                method: 'GET',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) {
+                testLogger.error('Failed to fetch workflows', { status: response.status });
+                return [];
+            }
+            const data = await response.json();
+            return Array.isArray(data) ? data : (data.list || data.data || []);
+        } catch (error) {
+            testLogger.error('Failed to fetch workflows', { error: error.message });
+            return [];
+        }
+    }
+
+    /** Delete a single workflow by id. */
+    async deleteWorkflow(workflowId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/workflows/${workflowId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            const result = await response.json().catch(() => ({}));
+            return { code: response.status, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete workflow', { workflowId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete all workflows whose name matches any of the given prefixes/regexes.
+     * Safe to call as a standalone sweep; linked workflows will report an error
+     * (delete the referencing alerts first — see completeCascadeCleanup STEP 1).
+     * @param {Array<string|RegExp>} patterns
+     */
+    async cleanupWorkflows(patterns = []) {
+        if (!patterns.length) return;
+        testLogger.info('Starting workflows cleanup', { patterns: patterns.map(p => p.source || p) });
+        try {
+            const workflows = await this.fetchWorkflows();
+            const matching = workflows.filter(w =>
+                patterns.some(p => (p instanceof RegExp) ? p.test(w.name) : String(w.name).startsWith(p))
+            );
+            testLogger.info('Workflows matching cleanup patterns', { total: workflows.length, matching: matching.length });
+
+            let deleted = 0, failed = 0;
+            for (const w of matching) {
+                const res = await this.deleteWorkflow(w.id);
+                if (res.code === 200) {
+                    deleted++;
+                    testLogger.debug('Deleted workflow', { id: w.id, name: w.name });
+                } else {
+                    failed++;
+                    testLogger.warn('Failed to delete workflow (still linked to an alert?)', { id: w.id, name: w.name, res });
+                }
+            }
+            testLogger.info('Workflows cleanup completed', { deleted, failed });
+        } catch (error) {
+            testLogger.error('Failed to cleanup workflows', { error: error.message });
+        }
+    }
+
     /**
      * Complete cascade cleanup: Alerts -> Folders -> Destinations -> Templates
      * Deletes resources in correct dependency order to avoid conflicts
      * @param {Array<string|RegExp>} destinationPrefixes - Array of destination name prefixes or regex patterns to match (e.g., ['auto_', /^destination\d{1,3}$/])
      * @param {Array<string>} templatePrefixes - Array of template name prefixes to match (e.g., ['auto_email_template_', 'auto_webhook_template_'])
      * @param {Array<string>} folderPrefixes - Array of folder name prefixes to match (e.g., ['auto_'])
+     * @param {Array<string|RegExp>} workflowPrefixes - Array of workflow name prefixes/regexes to match (deleted AFTER alerts are unlinked)
      */
-    async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = []) {
+    async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = [], workflowPrefixes = ['wf_auto_']) {
         testLogger.info('Starting complete cascade cleanup (Alerts -> Folders -> Destinations -> Templates)', {
             destinationPrefixes,
             templatePrefixes,
@@ -2179,6 +2254,7 @@ class APICleanup {
             'Automation_',
             'sanity',
             'rbac_',
+            'wf_auto_',                // Workflows v1 test alerts (unlink workflows before deleting them)
             'user_delete_test_',      // RBAC user delete test alerts (orphaned)
             'user_update_test_',      // RBAC user update test alerts (orphaned)
             'viewer_delete_test_',    // RBAC viewer delete test alerts (orphaned)
@@ -2382,6 +2458,14 @@ class APICleanup {
             }
 
             testLogger.info('Step 4 complete: Templates deleted', { deletedTemplates });
+
+            // STEP 5: Delete WORKFLOWS (alerts were unlinked in STEP 1, so these are now deletable)
+            if (workflowPrefixes && workflowPrefixes.length) {
+                testLogger.info('Step 5: Deleting workflows matching prefixes', {
+                    workflowPrefixes: workflowPrefixes.map(p => p.source || p)
+                });
+                await this.cleanupWorkflows(workflowPrefixes);
+            }
 
             testLogger.info('Complete cascade cleanup finished', {
                 deletedAlerts,
