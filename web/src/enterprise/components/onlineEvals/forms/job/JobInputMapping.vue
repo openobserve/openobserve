@@ -38,7 +38,7 @@
           >
             <code class="overflow-hidden py-1.25 px-2 rounded-default bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-label font-semibold text-2xs font-mono truncate">{{ formatTemplateVariable(variable) }}</code>
             <input
-              class="w-full h-7 py-0 px-2.5 border border-input-border rounded-default bg-input-bg text-input-text font-normal text-xs font-mono outline-none transition-colors duration-120 focus:border-primary-600"
+              class="w-full h-7 py-0 px-2.5 border border-input-border rounded-default bg-input-bg text-input-text font-normal text-xs font-mono outline-none transition-colors duration-120 focus:border-accent"
               :value="inputMappings[entityId(scorer)]?.[variable] || ''"
               :placeholder="defaultJobMappingValue(variable)"
               @input="updateMapping(entityId(scorer), variable, ($event.target as HTMLInputElement).value)"

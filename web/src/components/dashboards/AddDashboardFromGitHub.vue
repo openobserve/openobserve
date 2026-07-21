@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 px-3 py-1 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
                 isSelected(dashboard)
-                  ? 'bg-theme-tab-bg! border-primary-600'
+                  ? 'bg-theme-tab-bg! border-accent'
                   : 'border-transparent hover:bg-hover-gray',
               ]"
               data-test="add-dashboard-github-item"

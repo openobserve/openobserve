@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 80,
+    "rawProjectRamp": 60,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -100,24 +100,6 @@
       "rawProjectRamp": 2,
       "arbZ": 1
     },
-    "components/common/SectionHub.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/common/empty-states/QuickStartCard.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/dashboards/AddDashboardFromGitHub.vue": {
-      "rawProjectRamp": 1
-    },
-    "components/dashboards/ColorSwatchPicker.vue": {
-      "rawProjectRamp": 3
-    },
-    "components/dashboards/ColumnFormatControls.vue": {
-      "rawProjectRamp": 2
-    },
-    "components/dashboards/OverrideConfigPopup.vue": {
-      "rawProjectRamp": 1
-    },
     "components/dashboards/QueryInspector.vue": {
       "rawVarInComponent": 4
     },
@@ -184,7 +166,6 @@
       "rawVarInComponent": 4
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue": {
-      "rawProjectRamp": 5,
       "rawVarInComponent": 6
     },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
@@ -195,12 +176,6 @@
     },
     "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
       "rawVarInComponent": 2
-    },
-    "enterprise/components/onlineEvals/forms/job/JobInputMapping.vue": {
-      "rawProjectRamp": 1
-    },
-    "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {
-      "rawProjectRamp": 1
     },
     "lib/core/Button/OButton.vue": {
       "rawProjectRamp": 4
@@ -358,9 +333,6 @@
     "plugins/logs/patterns/PatternList.vue": {
       "rawVarInComponent": 6
     },
-    "plugins/metrics/explorer/FunctionConfigDialog.vue": {
-      "rawProjectRamp": 1
-    },
     "plugins/pipelines/CustomNode.vue": {
       "arbZ": 2,
       "rawVarInComponent": 10
@@ -477,7 +449,6 @@
       "rawVarInComponent": 18
     },
     "views/OverviewTab.vue": {
-      "rawProjectRamp": 3,
       "arbZ": 1
     },
     "views/synthetics/CreateBrowserTest.vue": {
