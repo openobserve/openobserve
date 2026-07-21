@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 36,
+    "rawProjectRamp": 25,
     "rawVarInComponent": 584,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -23,9 +23,6 @@
     },
     "components/Header.vue": {
       "rawVarInComponent": 2
-    },
-    "components/MenuLink.vue": {
-      "rawProjectRamp": 7
     },
     "components/O2AIChat.vue": {
       "rawVarInComponent": 50
@@ -428,12 +425,6 @@
     },
     "views/synthetics/CreateBrowserTest.vue": {
       "rawProjectRamp": 3
-    },
-    "views/synthetics/MonitorRuns.vue": {
-      "rawProjectRamp": 3
-    },
-    "views/synthetics/RunDetail.vue": {
-      "rawProjectRamp": 1
     }
   }
 }

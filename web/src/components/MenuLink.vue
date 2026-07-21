@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="asTrigger || submenu"
       class="absolute right-1 top-3 transition-opacity duration-150"
       :class="isActive || expanded
-        ? 'opacity-100 text-primary-600'
+        ? 'opacity-100 text-accent'
         : 'opacity-70 group-hover:opacity-100 text-tabs-inactive-text'"
       aria-hidden="true"
     >
@@ -196,19 +196,19 @@ export default defineComponent({
       if (slideActive.value) {
         return isDark.value
           ? "text-tabs-active-text border-l-2 border-transparent"
-          : "text-primary-700 border-l-2 border-transparent";
+          : "text-accent border-l-2 border-transparent";
       }
       return isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-primary-400"
-        : "text-primary-700 bg-surface-base border-l-2 border-primary-600";
+        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-accent"
+        : "text-accent bg-surface-base border-l-2 border-accent";
     });
     const activeIconClass = computed(() =>
-      isDark.value ? "text-tabs-active-text!" : "text-primary-700!",
+      isDark.value ? "text-tabs-active-text!" : "text-accent!",
     );
     const activeLabelClass = computed(() =>
       isDark.value
         ? "font-semibold text-tabs-active-text!"
-        : "font-semibold text-primary-600!",
+        : "font-semibold text-accent!",
     );
 
     // Compute ARIA label with fallback
