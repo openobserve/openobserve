@@ -28,7 +28,16 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
 const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-v4-pro";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
-const API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
+// REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
+// never the key itself — the value is read only via apiKey() below and is never logged or
+// posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs and
+// into a public PR comment on misconfiguration, so a malformed value must not become the
+// vehicle for leaking anything. This also keeps CodeQL's js/clear-text-logging taint analysis
+// from treating the *name* as the secret (it flags any `...API_KEY...` env read reaching a log).
+const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
+const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
+  ? RAW_API_KEY_VAR_NAME
+  : "DEEPSEEK_API_KEY";
 const MODEL_LABEL = process.env.REVIEW_LABEL || "DeepSeek-V4-Pro";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
