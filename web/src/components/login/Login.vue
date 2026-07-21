@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="name"
               data-cy="login-user-id"
               data-test="login-user-id"
-              :label="`${t('login.userEmail')} *`"
+              :label="t('login.userEmail')"
               :placeholder="t('login.email')"
               type="email"
               required
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="password"
               data-cy="login-password"
               data-test="login-password"
-              :label="`${t('login.password')} *`"
+              :label="t('login.password')"
               :placeholder="t('login.password')"
               type="password"
               required
