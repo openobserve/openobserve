@@ -71,7 +71,26 @@ impl Searcher {
 
     // get all task status that is leader
     pub async fn get_task_status(&self) -> Vec<proto::cluster_rpc::QueryStatus> {
-        self.query_manager.get_task_status().await
+        let mut status = self.query_manager.get_task_status().await;
+
+        // Enrich dashboard searches submitted without names so query management can display the
+        // dashboard and folder instead of only their IDs.
+        for query_status in &mut status {
+            if let Some(ref mut ctx) = query_status.search_event_context
+                && matches!(query_status.search_type.as_deref(), Some("dashboards"))
+                && let Some(dashboard_id) = &ctx.dashboard_id
+                && ctx.dashboard_name.is_none()
+                && let Some(org_id) = &query_status.org_id
+                && let Ok(Some((folder, dashboard))) =
+                    infra::table::dashboards::get_by_id(org_id, dashboard_id).await
+            {
+                ctx.dashboard_name = Some(dashboard.title().unwrap_or("").to_string());
+                ctx.dashboard_folder_name = Some(folder.name);
+                ctx.dashboard_folder_id = Some(folder.folder_id);
+            }
+        }
+
+        status
     }
 
     // add file stats
