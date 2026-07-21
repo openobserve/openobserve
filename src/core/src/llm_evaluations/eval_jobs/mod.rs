@@ -110,6 +110,17 @@ fn ensure_source_stream_exists(stream: &str, exists: bool) -> Result<(), EvalJob
     }
 }
 
+fn normalize_manual_target_id(target_id: &str) -> Result<String, EvalJobError> {
+    let target_id = target_id.trim();
+    if target_id.is_empty() {
+        return Err(EvalJobError::InvalidJob(
+            "targetId must not be empty".to_string(),
+        ));
+    }
+
+    Ok(target_id.to_string())
+}
+
 async fn validate_source_stream(
     org_id: &str,
     job: &table::online_eval_jobs::OnlineEvalJob,
@@ -309,7 +320,7 @@ pub async fn manual_evaluate(
         .map_err(|e| EvalJobError::InvalidJob(e.to_string()))?;
     validate_source_stream(org_id, &job).await?;
 
-    let target_id = body.target_id.trim().to_string();
+    let target_id = normalize_manual_target_id(&body.target_id)?;
     let target =
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::manual::ManualEvaluationTarget {
             target_id: target_id.clone(),
@@ -464,5 +475,19 @@ mod tests {
             "Invalid eval job: Trace stream 'missing-traces' not found"
         );
         assert!(ensure_source_stream_exists("traces", true).is_ok());
+    }
+
+    #[test]
+    fn manual_target_id_is_trimmed_and_must_not_be_empty() {
+        assert_eq!(
+            normalize_manual_target_id("  trace-1  ").unwrap(),
+            "trace-1"
+        );
+
+        let error = normalize_manual_target_id(" \n\t ").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Invalid eval job: targetId must not be empty"
+        );
     }
 }
