@@ -41,9 +41,9 @@ test.describe(
 
     // =====================================================================
     // CT-18 — Negative & validation sweep (UI)
-    // Covers NEG-01 (empty name), NEG-02 (no-sink), NEG-04 (long/unicode/emoji names).
-    // NEG-05 (invalid function code) + NEG-06 (dead destination URL) need node-config
-    // selectors not yet mapped -> test.fixme below.
+    // Covers NEG-01 (empty name), NEG-02 (no-sink), NEG-04 (long/unicode/emoji names),
+    // NEG-05 (invalid function code -> graceful compile error) and NEG-06 (dead destination
+    // URL -> per-node send error, via a Test-run).
     // =====================================================================
 
     // NEG-02 — CONFIRMED (F-05): a trigger-only workflow cannot be saved; the app requires
@@ -103,33 +103,50 @@ test.describe(
       );
     }
 
-    // NEG-05 — invalid function code (node throws) surfaces a graceful error.
-    // TODO(Healer): needs the Function node-config editor selectors (FunctionPicker create/edit)
-    // which are NOT yet in the confirmed selector map (04-execution-log.md). Also editing a
-    // function from inside the workflow is a known UX gap (K7). Map selectors, then implement.
-    test.fixme(
-      'CT-18 NEG-05: invalid function code surfaces a graceful runtime error',
+    // NEG-05 — invalid function code is rejected gracefully. Workflow functions run on QuickJS
+    // (JavaScript); feeding the inline function editor code that fails to compile must surface a
+    // graceful "JS compilation failed" message and keep the editor rendered — never an uncaught
+    // app crash. (This is the deterministic guard; runtime-abort surfacing is covered separately.)
+    test(
+      'CT-18 NEG-05: invalid function code surfaces a graceful error',
       { tag: ['@workflowsNegative'] },
       async () => {
-        // await pm.workflowsPage.goToAdd();
-        // await pm.workflowsPage.addStepFromTrigger('function');
-        // TODO: enter throwing JS/VRL in the function editor, add a destination, Save+Test,
-        //       assert per-node runtime error is shown (not an uncaught app crash).
+        const id = uniq();
+        await pm.workflowsPage.goToAdd();
+        await pm.workflowsPage.setName(`wf_auto_neg_${id}`);
+        await pm.workflowsPage.addNodeFromPalette('function');
+        const msg = await pm.workflowsPage.attemptCreateFunction({
+          name: `wf_auto_fn_${id}`,
+          code: 'function ((( this is not valid javascript', // fails QuickJS compilation
+        });
+        testLogger.info('invalid function save result', { msg });
+        // A graceful compilation-error message is surfaced (no uncaught crash).
+        expect(msg.toLowerCase()).toMatch(/compil|exception|fail|error/);
+        // The editor is still rendered — the app degraded gracefully.
+        await pm.workflowsPage.expectEditorVisible();
       }
     );
 
-    // NEG-06 — dead / invalid destination URL surfaces a per-node "Error sending request…".
-    // TODO(Healer): needs the DestinationPicker create-wizard Connection-step selectors
-    // (Choose Type -> Connection, F-07) which are only partially mapped. Requires the Test
-    // dialog too. Map selectors, then implement.
-    test.fixme(
+    // NEG-06 — dead / invalid destination URL surfaces a per-node send error. Build
+    // Trigger -> Destination pointed at an unreachable URL, save, then Test-run the graph and
+    // assert the destination node paints an error badge while the trigger paints ✓.
+    test(
       'CT-18 NEG-06: dead destination URL surfaces a per-node send error',
       { tag: ['@workflowsNegative'] },
       async () => {
-        // await pm.workflowsPage.goToAdd();
-        // await pm.workflowsPage.addStepFromTrigger('destination');
-        // TODO: create a destination pointing at an unreachable URL, Save+Test,
-        //       assert the node shows "Error sending request…" and input is shown.
+        const id = uniq();
+        const name = `wf_auto_neg_${id}`;
+        await pm.workflowsPage.buildTriggerToDestinationAndSave({
+          name,
+          destName: `wf_auto_dest_${id}`,
+          url: 'http://10.255.255.1:9/dead', // non-routable -> send fails
+        });
+        await pm.workflowsPage.goToList();
+        await pm.workflowsPage.openEdit(name);
+        await pm.workflowsPage.testRunFromEditor();
+        // The destination step fails to send; the trigger step still succeeds.
+        await pm.workflowsPage.expectNodeTestError('destination');
+        await pm.workflowsPage.expectNodeTestOk('workflow_trigger');
       }
     );
 
@@ -174,20 +191,21 @@ test.describe(
       }
     );
 
-    // K9 — documents that a NORMAL Playwright .click() on Save is intercepted by the tooltip
-    // overlay (observed live: click timeout, o-tooltip-content on top). This is inherently
-    // timing/hover-dependent to reproduce deterministically in CI, so it is parked as fixme.
-    // TODO(Healer): reproduce the interception reliably (e.g. hover to force the tooltip, then
-    //   assert page.click(saveBtn,{timeout:...}) rejects / an overlay owns the point), or drop
-    //   once K9 is fixed and the JS-click workaround can be removed from the page object.
-    test.fixme(
+    // K9 — a NORMAL Playwright .click() on Save is intercepted (Save is covered by the tooltip
+    // overlay), which is why the page object saves via a JS .click(). This asserts the bug still
+    // reproduces AND that the JS-click workaround reaches the app. If K9 is ever fixed, the first
+    // assertion flips and this fails — the signal to drop the workaround from the page object.
+    test(
       'CT-19 K9: a normal .click() on Save is intercepted by the tooltip overlay',
       { tag: ['@workflowsNegative'] },
       async () => {
-        // await pm.workflowsPage.goToAdd();
-        // await pm.workflowsPage.setName(`wf_auto_neg_${uniq()}`);
-        // TODO: hover the save button to raise o-tooltip-content, then expect a plain
-        //   page.locator(saveBtn).click({ timeout: 3000 }) to reject with interception.
+        await pm.workflowsPage.goToAdd();
+        await pm.workflowsPage.setName(`wf_auto_neg_${uniq()}`);
+        // A plain click cannot land on Save (overlay owns the point).
+        expect(await pm.workflowsPage.normalSaveClickIsIntercepted(4000)).toBe(true);
+        // The JS-click workaround still reaches the app (validation toast comes back).
+        const msg = await pm.workflowsPage.saveAndCaptureResult();
+        expect(msg.length).toBeGreaterThan(0);
       }
     );
 

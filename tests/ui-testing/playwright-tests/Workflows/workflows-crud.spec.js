@@ -63,17 +63,17 @@ test.describe('Workflows CRUD & builder', { tag: ['@workflows', '@enterprise', '
     expect(count).toBe(0);
   });
 
-  // CT-01 (happy build+save) — needs a bound Destination node. The inline "Create New Destination"
-  // wizard (Choose Type -> Connection) selectors are pending Healer-phase discovery; scaffolded here.
-  test.fixme('builds Trigger->Destination workflow and saves', { tag: ['@workflowsCrud'] }, async () => {
-    const name = `wf_auto_${uniq()}`;
-    await pm.workflowsPage.goToAdd();
-    await pm.workflowsPage.setName(name);
-    await pm.workflowsPage.addStepFromTrigger('destination');
-    // TODO(Healer): create/select a wf_auto_dest_* destination targeting a wf_auto_sink_* stream (in-cluster)
-    // await pm.workflowsPage.selectExistingDestination(`wf_auto_dest_${...}`);
-    await pm.workflowsPage.clickSave();
-    // TODO(Healer): handle the link-alerts dialog -> Skip for now
+  // CT-01 (happy build+save) — full path: Trigger -> Destination (created inline via the
+  // Choose Type -> Connection wizard), save, skip the link-alerts prompt, verify it lands in
+  // the list. A destination node is a valid leaf (F-09), so this is the minimal saveable graph.
+  test('builds Trigger->Destination workflow and saves', { tag: ['@workflowsCrud'] }, async () => {
+    const id = uniq();
+    const name = `wf_auto_${id}`;
+    await pm.workflowsPage.buildTriggerToDestinationAndSave({
+      name,
+      destName: `wf_auto_dest_${id}`,
+      url: `http://localhost:5080/api/${process.env.ORGNAME || 'default'}/wf_auto_sink/_json`,
+    });
     await pm.workflowsPage.goToList();
     expect(await pm.workflowsPage.isPresent(name)).toBeTruthy();
   });
