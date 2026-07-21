@@ -502,6 +502,20 @@ pub fn basic_routes() -> Router {
         get(mcp::oauth_authorization_server_metadata),
     );
 
+    // OAuth 2.0 Protected Resource Metadata (RFC 9728) — public, points MCP
+    // clients at the auth server. Path-suffixed form per RFC 9728 §3.1, plus a
+    // bare root probe. Registered here (before auth_middleware nesting) so both
+    // stay unauthenticated.
+    router = router
+        .route(
+            "/.well-known/oauth-protected-resource/{*resource_path}",
+            get(mcp::oauth_protected_resource_metadata),
+        )
+        .route(
+            "/.well-known/oauth-protected-resource",
+            get(mcp::oauth_protected_resource_metadata_root),
+        );
+
     // Auth routes (no authentication required)
     let auth_routes = Router::new()
         .route("/login", post(users::authentication).get(users::get_auth))
