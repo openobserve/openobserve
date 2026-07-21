@@ -252,8 +252,8 @@ describe("OverrideConfig", () => {
     });
 
     it("should forward open state to OverrideConfigPopup via :open prop", async () => {
-      // After the q-dialog -> ODialog migration the component no longer wraps
-      // the popup in a <q-dialog v-model>. The popup itself receives the open
+      // After the dialog -> ODialog migration the component no longer wraps
+      // the popup in a modal v-model. The popup itself receives the open
       // state via the `:open` prop instead.
       wrapper = createWrapper();
 
@@ -268,7 +268,7 @@ describe("OverrideConfig", () => {
     });
 
     it("should close popup when OverrideConfigPopup emits close", async () => {
-      // Replaces the previous q-dialog v-model close behaviour: dismissal is
+      // Replaces the previous dialog v-model close behaviour: dismissal is
       // now driven by the popup emitting `close`.
       wrapper = createWrapper();
 
@@ -356,7 +356,7 @@ describe("OverrideConfig", () => {
     });
 
     it("should not pass theme-specific class to popup after migration", async () => {
-      // Migration: q-dialog wrapper + dark-mode/bg-white class binding removed.
+      // Migration: dialog wrapper + dark-mode/bg-white class binding removed.
       // OverrideConfigPopup is rendered directly with no theme class.
       store.state.theme = "dark";
       wrapper = createWrapper();

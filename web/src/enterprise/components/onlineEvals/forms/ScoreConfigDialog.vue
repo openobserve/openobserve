@@ -1,9 +1,8 @@
 <template>
-  <!-- Standard shared drawer (main's ux-revamp): the drawer owns the header
-       (title + ×), the scrim, and the footer buttons. The body is an <OForm>
-       tied to the footer's primary button via `form-id`, so Save (and Enter)
-       route through the schema-validated submit; the Save spinner is auto-driven
-       by the nested OForm's isSubmitting (no manual `isSaving`). -->
+  <!-- The drawer owns the header (title + ×), the scrim, and the footer buttons.
+       The body is an <OForm> tied to the footer's primary button via `form-id`,
+       so Save (and Enter) route through the schema-validated submit; the Save
+       spinner is auto-driven by the nested OForm's isSubmitting. -->
   <ODrawer
     :open="open"
     side="right"
@@ -21,25 +20,28 @@
     @update:open="handleOpenChange"
     @click:secondary="$emit('cancel')"
   >
-    <OForm id="score-config-form" class="sc-form" :form="form">
-      <div v-if="mode === 'edit'" class="sc-callout">
-        <OIcon name="info" size="xs" />
-        <div class="sc-callout__text flex flex-col gap-0.5 min-w-0">
+    <OForm id="score-config-form" :form="form">
+      <div
+        v-if="mode === 'edit'"
+        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-status-info-text)_14%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_20%,transparent)] rounded-default text-xs leading-normal text-text-body mb-4"
+      >
+        <OIcon name="info" size="xs" class="shrink-0 mt-px text-status-info-text" />
+        <div class="flex flex-col gap-0.5 min-w-0">
           <i18n-t
             :keypath="`onlineEvals.scoreConfig.editInfoBannerEmphasis.${formValues.dataType}`"
             tag="span"
-            class="sc-callout__lead font-normal"
+            class="font-normal"
           >
             <template #nextVersion>
-              <strong>{{ nextVersionLabel }}</strong>
+              <strong class="font-bold">{{ nextVersionLabel }}</strong>
             </template>
           </i18n-t>
-          <em class="sc-callout__detail italic font-normal text-(--color-text-secondary)">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
+          <em class="italic font-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
         </div>
       </div>
 
       <!-- Name -->
-      <div class="sc-field">
+      <div class="mb-2.5">
         <OFormInput
           name="name"
           :label="t('onlineEvals.scoreConfig.nameLabel')"
@@ -52,7 +54,7 @@
       </div>
 
       <!-- Description -->
-      <div class="sc-field">
+      <div class="mb-2.5">
         <OFormTextarea
           name="description"
           :label="t('onlineEvals.scoreConfig.descriptionLabel')"
@@ -61,14 +63,14 @@
           :rows="3"
           data-test="score-config-description-input"
         />
-        <div v-if="mode === 'edit'" class="sc-field__help text-[11px] text-(--color-text-secondary) mt-1">
+        <div v-if="mode === 'edit'" class="text-2xs text-text-secondary mt-1">
           {{ t("onlineEvals.scoreConfig.descriptionHelp") }}
         </div>
       </div>
 
       <!-- Data type -->
-      <div class="sc-field">
-        <label class="sc-field__label o-input-label">
+      <div class="mb-2.5">
+        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
           {{ t("onlineEvals.scoreConfig.dataTypeLabel")
           }}<span v-if="mode === 'create'" class="select-none" aria-hidden="true">&nbsp;*</span>
         </label>
@@ -79,18 +81,26 @@
           :model-value="formValues.dataType"
           :disabled="mode === 'edit'"
           orientation="horizontal"
-          class="sc-dtype-radios"
+          class="mt-0.5"
           data-test="score-config-datatype-radios"
           @update:model-value="form.setFieldValue('dataType', $event)"
         >
+          <!-- `sc-dtype-radio` is kept purely as the hook for the ORadio
+               :deep() keeper below; all of its own chrome is utilities. In edit
+               mode the cards are locked, so the hover utility is simply not
+               applied (rather than being re-neutralised by a second rule). -->
           <div
             v-for="type in DATA_TYPES"
             :key="type"
-            class="sc-dtype-radio"
-            :class="{
-              'sc-dtype-radio--selected': formValues.dataType === type,
-              'sc-dtype-radio--locked': mode === 'edit',
-            }"
+            class="sc-dtype-radio flex-1 min-w-0 border rounded-default transition-[border-color,background] duration-120"
+            :class="[
+              formValues.dataType === type
+                ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
+                : 'border-dialog-header-border bg-card-bg',
+              mode === 'edit'
+                ? ''
+                : 'hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]',
+            ]"
           >
             <ORadio
               :value="type"
@@ -99,8 +109,8 @@
               :data-test="`score-config-datatype-${type}`"
             >
               <template #label>
-                <span class="sc-dtype-radio__hd">{{ t(`onlineEvals.scoreConfig.dataTypes.${type}`) }}</span>
-                <span class="sc-dtype-radio__sub">{{ t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`) }}</span>
+                <span class="text-compact font-bold text-text-heading">{{ t(`onlineEvals.scoreConfig.dataTypes.${type}`) }}</span>
+                <span class="text-2xs font-normal text-text-secondary mt-0.75 leading-[1.4]">{{ t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`) }}</span>
               </template>
             </ORadio>
           </div>
@@ -108,12 +118,12 @@
       </div>
 
       <!-- Numeric range -->
-      <div v-if="formValues.dataType === 'numeric'" class="sc-field">
-        <label class="sc-field__label o-input-label">
+      <div v-if="formValues.dataType === 'numeric'" class="mb-2.5">
+        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
           {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
         </label>
-        <div class="sc-range-row flex items-center gap-[10px]">
-          <span class="sc-range-row__label text-(--color-text-secondary) text-[11px]">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
+        <div class="flex items-center gap-2.5">
+          <span class="text-text-secondary text-2xs">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
           <OFormInput
             name="min"
             type="number"
@@ -121,7 +131,7 @@
             field-width="xs"
             data-test="score-config-min-input"
           />
-          <span class="sc-range-row__label text-(--color-text-secondary) text-[11px]">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
+          <span class="text-text-secondary text-2xs">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
           <OFormInput
             name="max"
             type="number"
@@ -133,37 +143,38 @@
       </div>
 
       <!-- Categories -->
-      <div v-if="formValues.dataType === 'categorical'" class="sc-field">
-        <label class="sc-field__label o-input-label">
+      <div v-if="formValues.dataType === 'categorical'" class="mb-2.5">
+        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
           {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
         </label>
-        <!-- Shared TagInput (a genuine non-OForm* widget) bridged into the one
-             form via setFieldValue; read back through formValues. -->
-        <TagInput
-          :model-value="formValues.categories"
+        <!-- Categories are a `string[]` OForm field — OFormTagInput binds it by
+             name (read/write through the form; no manual setFieldValue bridge). -->
+        <OFormTagInput
+          name="categories"
           :placeholder="t('onlineEvals.scoreConfig.addCategoryPlaceholder')"
           data-test="score-config-categories-input"
-          @update:model-value="form.setFieldValue('categories', $event)"
         />
       </div>
 
       <!-- Boolean info banner -->
       <div
         v-if="formValues.dataType === 'boolean'"
-        class="sc-callout sc-callout--neutral flex gap-[10px] items-start px-3 py-[10px] bg-[color-mix(in_srgb,var(--color-text-secondary,var(--o2-text-secondary))_12%,transparent)] border border-(--color-dialog-header-border) rounded-md text-xs leading-normal text-(--color-text-primary) mb-4"
+        class="flex gap-2.5 items-start px-3 py-2.5 bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] border border-dialog-header-border rounded-default text-xs leading-normal text-text-body mb-4"
       >
-        <OIcon name="info" size="xs" />
+        <OIcon name="info" size="xs" class="shrink-0 mt-px text-text-secondary" />
         <span>
           {{ t("onlineEvals.scoreConfig.booleanInfo", { trueLabel: "true", falseLabel: "false" }) }}
         </span>
       </div>
 
       <!-- Healthy threshold -->
-      <div class="sc-ht-section">
-        <div class="sc-ht-section__head">
-          <span class="sc-ht-section__title-group">
-            <span class="o-input-label">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
-            <OIcon name="info-outline" size="sm" class="sc-ht-section__info">
+      <div
+        class="mt-1 pt-3 px-3.5 pb-2.5 border border-dialog-header-border rounded-default bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))]"
+      >
+        <div class="flex items-center gap-2.5 mb-3">
+          <span class="inline-flex items-center gap-1">
+            <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
+            <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
                 max-width="300px"
@@ -175,11 +186,16 @@
 
         <!-- Numeric threshold -->
         <template v-if="formValues.dataType === 'numeric'">
-          <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
-          <div class="sc-ht-radio-row flex flex-col gap-1.5">
+          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
+          <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
+          <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
-              :class="{ 'sc-ht-num-radio--selected': formValues.healthyDirection === 'gte' }"
+              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              :class="
+                formValues.healthyDirection === 'gte'
+                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  : 'border-dialog-header-border bg-card-bg'
+              "
             >
               <input
                 type="radio"
@@ -188,8 +204,8 @@
                 :checked="formValues.healthyDirection === 'gte'"
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
-              <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≥</span>
-              <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+              <span class="font-mono text-lg font-bold text-text-body text-center">≥</span>
+              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
               <OFormInput
                 name="healthyGteValue"
                 type="number"
@@ -201,8 +217,12 @@
               />
             </label>
             <label
-              class="sc-ht-num-radio grid grid-cols-[18px_22px_1fr_110px] items-center gap-[10px] px-3 py-1.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
-              :class="{ 'sc-ht-num-radio--selected': formValues.healthyDirection === 'lte' }"
+              class="flex-1 min-w-0 grid grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 px-3 py-1.5 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              :class="
+                formValues.healthyDirection === 'lte'
+                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  : 'border-dialog-header-border bg-card-bg'
+              "
             >
               <input
                 type="radio"
@@ -211,8 +231,8 @@
                 :checked="formValues.healthyDirection === 'lte'"
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
-              <span class="sc-ht-sym sc-mono text-[17px] font-bold text-(--color-text-primary) text-center">≤</span>
-              <span class="sc-ht-op text-[12.5px] text-(--color-text-primary)">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+              <span class="font-mono text-lg font-bold text-text-body text-center">≤</span>
+              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
               <OFormInput
                 name="healthyLteValue"
                 type="number"
@@ -228,16 +248,20 @@
 
         <!-- Categorical threshold -->
         <template v-else-if="formValues.dataType === 'categorical'">
-          <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
-          <div v-if="formValues.categories.length === 0" class="sc-ht-empty text-[11.5px] italic text-(--color-text-secondary) px-3 py-[10px] border border-dashed border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg)">
+          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
+          <div v-if="formValues.categories.length === 0" class="text-2xs italic text-text-secondary px-3 py-2.5 border border-dashed border-dialog-header-border rounded-default bg-card-bg">
             {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
           </div>
-          <div v-else class="sc-ht-checks flex flex-col gap-0.5 border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) p-1">
+          <div v-else class="flex flex-col gap-0.5 border border-dialog-header-border rounded-default bg-card-bg p-1">
             <label
               v-for="cat in formValues.categories"
               :key="cat"
-              class="sc-ht-check flex items-center gap-[10px] px-[10px] py-[7px] rounded cursor-pointer transition-[background] duration-[120ms]"
-              :class="{ 'sc-ht-check--on': formValues.healthyCategories.includes(cat) }"
+              class="flex items-center gap-2.5 px-2.5 py-1.75 rounded-default cursor-pointer transition-[background] duration-120 hover:bg-[color-mix(in_srgb,var(--color-text-heading)_6%,transparent)]"
+              :class="
+                formValues.healthyCategories.includes(cat)
+                  ? 'bg-[color-mix(in_srgb,color-mix(in_srgb,var(--color-status-success-text)_14%,transparent)_35%,transparent)]'
+                  : ''
+              "
             >
               <input
                 type="checkbox"
@@ -245,22 +269,27 @@
                 :checked="formValues.healthyCategories.includes(cat)"
                 @change="toggleHealthyCategory(cat)"
               />
-              <span class="sc-mono font-[var(--o2-font-mono)]">{{ cat }}</span>
+              <span class="font-mono">{{ cat }}</span>
             </label>
           </div>
-          <div class="sc-ht-example flex items-center gap-1.5 mt-2 text-[11px] text-(--color-text-secondary)">
-            <OIcon name="info" size="xs" />
+          <div class="flex items-center gap-1.5 mt-2 text-2xs text-text-secondary">
+            <OIcon name="info" size="xs" class="shrink-0 text-status-info-text" />
             <span>{{ t("onlineEvals.scoreConfig.healthyCategoriesHint") }}</span>
           </div>
         </template>
 
         <!-- Boolean threshold -->
         <template v-else>
-          <div class="sc-ht-field-label text-[11.5px] font-semibold text-(--color-text-primary) mb-1.5">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
-          <div class="sc-ht-bool-radios flex flex-col gap-1.5">
+          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
+          <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
+          <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
-              class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
-              :class="{ 'sc-ht-bool-radio--selected': formValues.healthyBool === true }"
+              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              :class="
+                formValues.healthyBool === true
+                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  : 'border-dialog-header-border bg-card-bg'
+              "
             >
               <input
                 type="radio"
@@ -270,13 +299,17 @@
                 @change="form.setFieldValue('healthyBool', true)"
               />
               <div>
-                <div class="sc-ht-bool-radio__hd text-(--color-text-primary) font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
-                <div class="sc-ht-bool-radio__sub text-[11px] text-(--color-text-secondary) mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
+                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
+                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
               </div>
             </label>
             <label
-              class="sc-ht-bool-radio grid grid-cols-[16px_1fr] items-start gap-[10px] px-3 py-[7px] border border-(--color-dialog-header-border) rounded-[5px] bg-(--color-card-bg) cursor-pointer transition-[border-color,background] duration-[120ms]"
-              :class="{ 'sc-ht-bool-radio--selected': formValues.healthyBool === false }"
+              class="flex-1 min-w-0 grid grid-cols-[1rem_1fr] items-start gap-2.5 px-3 py-1.75 border rounded-default cursor-pointer transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
+              :class="
+                formValues.healthyBool === false
+                  ? 'border-primary-600 bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
+                  : 'border-dialog-header-border bg-card-bg'
+              "
             >
               <input
                 type="radio"
@@ -286,15 +319,15 @@
                 @change="form.setFieldValue('healthyBool', false)"
               />
               <div>
-                <div class="sc-ht-bool-radio__hd text-(--color-text-primary) font-[var(--o2-font-mono)]">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
-                <div class="sc-ht-bool-radio__sub text-[11px] text-(--color-text-secondary) mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
+                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
+                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
               </div>
             </label>
           </div>
         </template>
 
-        <div class="sc-ht-section__foot flex items-start gap-1.5 mt-[10px] pt-2 border-t border-dashed border-(--color-dialog-header-border) text-[11px] text-(--color-text-secondary) leading-normal">
-          <OIcon name="info" size="xs" />
+        <div class="flex items-start gap-1.5 mt-2.5 pt-2 border-t border-dashed border-dialog-header-border text-2xs text-text-secondary leading-normal">
+          <OIcon name="info" size="xs" class="shrink-0 mt-0.5 text-text-secondary" />
           <span>{{ t("onlineEvals.scoreConfig.thresholdEmptyHint") }}</span>
         </div>
       </div>
@@ -305,7 +338,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import TagInput from "@/components/alerts/TagInput.vue";
+import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -361,19 +394,19 @@ const drawerTitle = computed(() =>
 const DATA_TYPES = ["numeric", "categorical", "boolean"] as const;
 
 // Co-located Zod schema (factory keeps messages i18n-driven and branches the
-// create-only name-slug rule on `mode`, matching main's validateName).
+// create-only name-slug rule on `mode`).
 const scoreConfigSchema = makeScoreConfigSchema(t, props.mode);
 
 // OWNER pattern (Rule ③): this component owns <OForm>, so it creates the form
 // with useOForm and reads it reactively via form.useStore — a SINGLE source of
 // truth, NO mirror ref. `formValues` drives the parent-side reads: the
 // `dataType`/`categories` `v-if` branches and the `defaultGte/LteValue`
-// computeds. The bespoke choice controls (the dataType ORadioGroup, the
-// healthy-threshold radios/checkboxes) and the categories TagInput are genuine
-// non-`OForm*` widgets, so they bridge into the one form via `form.setFieldValue`
-// and read back through `formValues` (the sanctioned non-input bridge); the
-// scalar inputs are plain `name=` fields. The @submit handler reads the
-// validated `value`.
+// computeds. The bespoke choice controls (the dataType ORadioGroup and the
+// healthy-threshold radios/checkboxes) are genuine non-`OForm*` widgets, so they
+// bridge into the one form via `form.setFieldValue` and read back through
+// `formValues` (the sanctioned non-input bridge); the scalar inputs and the
+// categories OFormTagInput are plain `name=` fields. The @submit handler reads
+// the validated `value`.
 const form = useOForm<ScoreConfigForm>({
   defaultValues: initForm(props.row),
   schema: scoreConfigSchema,
@@ -386,9 +419,9 @@ const nextVersionLabel = computed(() => {
   return `v${v + 1}`;
 });
 
-// Dirty affordance (a save-affordance, NOT a validation gate — R3). TanStack
-// tracks per-field dirtiness against the seeded defaults, so editing any field
-// (incl. the bridged choice controls) flips this true.
+// Dirty affordance (a save-affordance, not a validation gate). TanStack tracks
+// per-field dirtiness against the seeded defaults, so editing any field (incl.
+// the bridged choice controls) flips this true.
 const isDirty = form.useStore((s: any) => s.isDirty);
 
 const defaultGteValue = computed(() => {
@@ -448,7 +481,7 @@ function initForm(row: ScoreConfig | null): ScoreConfigForm {
   };
 }
 
-// TagInput owns add/remove of categories. Keep the healthy-category selection in
+// The categories OFormTagInput owns add/remove of categories. Keep the healthy-category selection in
 // sync: whenever a category disappears, drop it from the healthy set too. Reads
 // the form reactively and writes back via setFieldValue (no mirror).
 watch(
@@ -478,7 +511,7 @@ function buildNumericRange(v: ScoreConfigForm) {
   if (v.dataType !== "numeric") return null;
   // A number <input> emits a STRING and the @submit value is TanStack's RAW store
   // value (the schema's z.coerce.number coerces for validation only, not the
-  // stored value) — so coerce here, exactly as the old `v-model.number` did.
+  // stored value) — so coerce to a number here.
   const min = Number(v.min);
   const max = Number(v.max);
   if (Number.isNaN(min) || Number.isNaN(max)) return null;
@@ -509,11 +542,10 @@ function buildHealthyThreshold(v: ScoreConfigForm) {
 }
 
 // @submit handler — OForm only calls this once the schema passes (name required
-// + the create-only slug pattern; matching main, there is NO min<max ordering
-// rule). A categorical config with zero categories is also allowed (pre-migration
-// behavior: buildCategories() just sends `categories: null`). The handler builds
-// the payload from the validated `value` ONLY. OForm awaits this → the ODrawer
-// Save spinner spans the save (no manual `isSaving`).
+// + the create-only slug pattern; there is no min<max ordering rule). A
+// categorical config with zero categories is allowed (buildCategories() just
+// sends `categories: null`). The handler builds the payload from the validated
+// `value` only. OForm awaits this, so the ODrawer Save spinner spans the save.
 async function save(value: ScoreConfigForm) {
   if (!props.orgId) return;
   try {
@@ -544,356 +576,54 @@ async function save(value: ScoreConfigForm) {
 }
 </script>
 
-<style lang="scss">
-/* Body form inside the shared ODrawer — the drawer owns the scroll/chrome, the
-   form just carries the field padding the old .sc-drawer__body had. */
-.sc-form {
-  padding: 14px 22px;
-}
-
-.sc-mono { font-family: var(--o2-font-mono); }
-
-.sc-callout {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  padding: 10px 12px;
-  background: color-mix(in srgb, var(--color-status-info-text) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-status-info-text) 20%, transparent);
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--color-text-primary, currentColor);
-  margin-bottom: 16px;
-}
-
-.sc-callout > :first-child {
-  flex-shrink: 0;
-  margin-top: 1px;
-  color: var(--color-status-info-text);
-}
-
-/* descendant selector: cannot be inlined */
-.sc-callout__lead strong { font-weight: 700; }
-
-/* child selector for neutral callout icon: cannot be inlined */
-.sc-callout--neutral > :first-child { color: var(--color-text-secondary, var(--o2-text-secondary)); }
-
-.sc-field {
-  margin-bottom: 10px;
-}
-
-/* Layout only — typography comes from the shared .o-input-label class (added on
-   these group labels) so they match OInput's rendered labels exactly. */
-.sc-field__label {
-  display: flex;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-/* Info icon sitting after a field label (e.g. Data type's "can't change"). */
-.sc-field__info {
-  margin-left: 4px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-/* ── Data-type radio cards (reuse ORadio inside ORadioGroup) ────────────────
-   ORadioGroup(orientation=horizontal) lays the three wrappers in one row; each
-   wrapper carries the card chrome while ORadio renders the circle + label. */
-.sc-dtype-radios {
-  margin-top: 2px;
-}
-
-.sc-dtype-radio {
-  flex: 1;
-  min-width: 0;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  background: var(--color-card-bg);
-  transition: border-color 0.12s, background 0.12s;
-}
-
-/* ORadio renders its own <label>; make it fill the card and top-align so the
-   circle lines up with the title above the inline description. */
-.sc-dtype-radio > label {
+<style scoped>
+/* keep(lib-override:o-radio): the data-type cards wrap <ORadio>, whose root
+   <label> and label-content <span> are rendered INSIDE the ORadio component —
+   this file cannot put utilities on them. The card needs that label to fill its
+   full width and top-align (ORadio ships `inline-flex items-center`), and the
+   label span to stack the title above the help text. Everything else on the
+   card (border/radius/background/hover/selected) is utilities in the template;
+   `.sc-dtype-radio` survives only as the hook for these two rules. */
+.sc-dtype-radio :deep(label) {
   display: flex;
   width: 100%;
   align-items: flex-start;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
 }
 
-/* ORadio's label-content <span> → stack the title + help vertically. */
-.sc-dtype-radio > label > span {
+.sc-dtype-radio :deep(label > span) {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.sc-dtype-radio:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
+/* keep(generated-content): the healthy-threshold choice controls are native
+   <input type="radio"|"checkbox">; their checked affordance is drawn with
+   ::after on the input itself, which no utility can express. */
+.sc-radio:checked {
+  border-color: var(--color-primary-600);
 }
-
-/* dynamic selected state: cannot be inlined */
-.sc-dtype-radio--selected {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, var(--color-card-bg));
-}
-
-/* Edit mode: cards are locked — no hover affordance, but the selected card keeps
-   its highlight so the current type stays obvious. */
-.sc-dtype-radio--locked:hover {
-  border-color: var(--color-dialog-header-border, var(--o2-border));
-  background: var(--color-card-bg);
-}
-.sc-dtype-radio--locked.sc-dtype-radio--selected,
-.sc-dtype-radio--locked.sc-dtype-radio--selected:hover {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 5%, var(--color-card-bg));
-}
-
-.sc-dtype-radio__hd {
-  font: 700 12.5px var(--o2-font);
-  color: var(--color-text-primary, currentColor);
-}
-
-.sc-dtype-radio__sub {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-top: 3px;
-  line-height: 1.4;
-}
-
-.sc-range-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sc-range-row__label {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  font-size: 11px;
-}
-
-.sc-ht-section {
-  margin-top: 4px;
-  padding: 12px 14px 10px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 2.5%, var(--color-card-bg));
-}
-
-.sc-ht-section__head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-/* Title + info icon hug together; the 10px head gap separates them from the
-   "optional" badge. */
-.sc-ht-section__title-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.sc-ht-section__info {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sc-ht-section__foot {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  line-height: 1.5;
-}
-
-/* child selector: cannot be inlined */
-.sc-ht-section__foot > :first-child {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.sc-ht-field-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  margin-bottom: 8px;
-}
-
-.sc-ht-radio-row {
-  display: flex;
-  gap: 10px;
-}
-
-/* Narrow drawers: fall back to stacked so the label + input don't crush. */
-@media (max-width: 820px) {
-  .sc-ht-radio-row {
-    flex-direction: column;
-  }
-}
-
-.sc-ht-num-radio {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 18px 20px minmax(0, 1fr) 80px;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.sc-ht-num-radio:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
-}
-
-.sc-ht-num-radio--selected {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
-}
-
-.sc-ht-sym {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--color-text-primary, currentColor);
-  text-align: center;
-}
-
-.sc-ht-op { font-size: 12.5px; color: var(--color-text-primary, currentColor); }
-
-.sc-ht-num-input { width: 100%; }
-
-.sc-ht-example {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  font-size: 11px;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-/* child selector: cannot be inlined */
-.sc-ht-example > :first-child {
-  flex-shrink: 0;
-  color: var(--color-status-info-text);
-}
-
-/* descendant selector: cannot be inlined */
-.sc-ht-example code {
-  font-family: var(--o2-font-mono);
-  font-weight: 700;
-  color: var(--color-text-primary, var(--o2-text));
-}
-
-.sc-ht-checks {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-  padding: 4px;
-}
-
-.sc-ht-check {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background 0.12s;
-}
-
-.sc-ht-check:hover { background: color-mix(in srgb, var(--color-text-primary) 6%, transparent); }
-
-.sc-ht-check--on {
-  background: color-mix(in srgb, color-mix(in srgb, var(--color-status-success-text) 14%, transparent) 35%, transparent);
-}
-
-.sc-ht-empty {
-  font-size: 11.5px;
-  font-style: italic;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  padding: 10px 12px;
-  border: 1px dashed var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-}
-
-.sc-ht-bool-radios {
-  display: flex;
-  gap: 10px;
-}
-
-/* Narrow drawers: stack so the label + hint don't crush. */
-@media (max-width: 820px) {
-  .sc-ht-bool-radios {
-    flex-direction: column;
-  }
-}
-
-.sc-ht-bool-radio {
-  flex: 1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 16px 1fr;
-  align-items: start;
-  gap: 10px;
-  padding: 7px 12px;
-  border: 1px solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 5px;
-  background: var(--color-card-bg);
-  cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
-}
-
-.sc-ht-bool-radio:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600, #3F7994) 40%, var(--color-dialog-header-border, var(--o2-border)));
-}
-
-/* dynamic selected state: cannot be inlined */
-.sc-ht-bool-radio--selected {
-  border-color: var(--color-primary-600, #3F7994);
-  background: color-mix(in srgb, var(--color-primary-600, #3F7994) 4%, var(--color-card-bg));
-}
-
-/* pseudo-class + pseudo-element: cannot be inlined */
-.sc-radio:checked { border-color: var(--color-primary-600, #3F7994); }
 
 .sc-radio:checked::after {
   content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--color-primary-600, #3F7994);
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-600);
 }
 
-/* pseudo-class + pseudo-element: cannot be inlined */
 .sc-checkbox:checked {
-  background: var(--color-primary-600, #3F7994);
-  border-color: var(--color-primary-600, #3F7994);
+  background: var(--color-primary-600);
+  border-color: var(--color-primary-600);
 }
 
 .sc-checkbox:checked::after {
   content: "";
-  width: 7px;
-  height: 4px;
-  border-left: 1.5px solid white;
-  border-bottom: 1.5px solid white;
-  transform: rotate(-45deg) translate(0, -1px);
+  width: 0.4375rem;
+  height: 0.25rem;
+  border-left: 0.09375rem solid var(--color-white);
+  border-bottom: 0.09375rem solid var(--color-white);
+  transform: rotate(-45deg) translate(0, -0.0625rem);
 }
 </style>

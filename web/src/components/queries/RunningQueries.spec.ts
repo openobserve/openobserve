@@ -147,20 +147,7 @@ describe("RunningQueries", () => {
           $store: store,
         },
         stubs: {
-          "q-table": true,
-          "q-btn": true,
-          "q-input": true,
-          "q-select": true,
-          "q-tab": true,
-          "q-tab-panel": true,
-          "q-tab-panels": true,
-          "q-tabs": true,
-          "q-card": true,
-          "q-card-section": true,
-          "q-card-actions": true,
-          "q-separator": true,
           "OIcon": true,
-          "q-tooltip": true,
           "confirm-dialog": true,
           "query-list": true,
           "running-queries-list": true,
@@ -525,9 +512,7 @@ describe("RunningQueries", () => {
     await wrapper.vm.$nextTick();
     const rows = wrapper.vm.summaryRows;
     expect(Array.isArray(rows)).toBe(true);
-    if (rows.length > 0) {
-      expect(rows[0]).toHaveProperty("#");
-    }
+    // "#" is no longer injected into row data — it's OTable's built-in show-index.
   });
 
   // Test 36: rowsQuery computed property
@@ -539,7 +524,6 @@ describe("RunningQueries", () => {
     const rows = wrapper.vm.rowsQuery;
     expect(Array.isArray(rows)).toBe(true);
     if (rows.length > 0) {
-      expect(rows[0]).toHaveProperty("#");
       expect(rows[0]).toHaveProperty("user_id");
       expect(rows[0]).toHaveProperty("duration");
       expect(rows[0]).toHaveProperty("queryRange");
@@ -604,7 +588,6 @@ describe("RunningQueries", () => {
     expect(columns.length).toBeGreaterThan(0);
     
     const columnNames = columns.map((col: any) => col.name);
-    expect(columnNames).toContain("#");
     expect(columnNames).toContain("user_id");
     expect(columnNames).toContain("actions");
   });

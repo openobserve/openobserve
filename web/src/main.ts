@@ -19,6 +19,10 @@ import App from "./App.vue";
 import createRouter from "./router";
 import i18n, { getLocale, loadLocaleMessages } from "./locales";
 import "./styles/tailwind.css";
+// Global generated-content stylesheet: syntax classes (.log-key, .log-string, …)
+// applied to v-html-highlighted log output across logs/traces/RUM. Loaded once
+// here instead of re-@imported inside each consumer's <style> block.
+import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
 import configService from "./services/config";
 

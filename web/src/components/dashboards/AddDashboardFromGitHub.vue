@@ -41,8 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="error-outline"
-            class="mb-2" style="width: 3em; height: 3em;" />
-          <div class="text-red-500">{{ error }}</div>
+            class="mb-2 w-[3em] h-[3em]" />
+          <div class="text-status-error-text">{{ error }}</div>
           <OButton
             variant="primary"
             size="sm"
@@ -62,13 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="add-dashboard-github-search"
           />
 
-          <div class="text-xs text-gray-500 mb-2 px-1">
+          <div class="text-xs text-text-secondary mb-2 px-1">
             {{ t('dashboard.addDashboardFromGitHub.dashboardsAvailable', { count: filteredDashboards.length }) }}
           </div>
 
           <ul
-            class="dashboard-list flex flex-col rounded list-none p-0 m-0 max-h-[calc(100dvh-200px)] overflow-y-auto"
-            :class="filteredDashboards.length > 0 ? 'border border-border' : ''"
+            class="flex flex-col rounded-default list-none p-0 m-0 max-h-[calc(100dvh-12.5rem)] overflow-y-auto"
+            :class="filteredDashboards.length > 0 ? 'border border-border-default' : ''"
           >
             <li
               v-for="dashboard in filteredDashboards"
@@ -77,8 +77,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 px-3 py-1 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
                 isSelected(dashboard)
-                  ? 'selected-item bg-(--o2-tab-bg)! border-primary'
-                  : 'border-transparent hover:bg-gray-50',
+                  ? 'bg-theme-tab-bg! border-primary-600'
+                  : 'border-transparent hover:bg-hover-gray',
               ]"
               data-test="add-dashboard-github-item"
             >
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <span
                   v-if="dashboard.description"
-                  class="block text-xs text-muted-foreground"
+                  class="block text-xs text-text-muted"
                 >
                   {{ dashboard.description }}
                 </span>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="grow"
           data-test="add-dashboard-github-folder-select"
         />
-        <div style="width: 40px; margin-bottom: 2px">
+        <div class="w-10 mb-0.5">
           <OButton
             variant="outline"
             size="icon-xs"
@@ -600,9 +600,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.dashboard-list li:hover:not(.selected-item) {
-  background-color: var(--o2-hover-gray);
-}
-</style>

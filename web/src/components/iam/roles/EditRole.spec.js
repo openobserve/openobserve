@@ -193,7 +193,7 @@ describe('EditRole - basic rendering', () => {
   it('renders page and title with role name', async () => {
     const wrapper = await mountEditRole();
     expect(wrapper.find('[data-test="edit-role-page"]').exists()).toBe(true);
-    // Role name now renders as the AppPageHeader title (row 1).
+    // Role name now renders as the OPageHeader title (row 1).
     expect(wrapper.find('.app-page-header h1').text()).toContain('Admin');
   });
 

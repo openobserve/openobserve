@@ -211,12 +211,12 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
   },
   provide: { _q_: { notify: vi.fn(() => vi.fn()), dialog: vi.fn() } },
   stubs: {
-    PageLayout: {
-      name: "PageLayout",
+    OPageLayout: {
+      name: "OPageLayout",
       template: '<div data-test-stub="page-layout"><slot name="header" /><slot /><slot name="footer" /></div>',
     },
-    AppPageHeader: {
-      name: "AppPageHeader",
+    OPageHeader: {
+      name: "OPageHeader",
       template: '<div data-test-stub="app-page-header"><slot /><slot name="actions" /></div>',
     },
     FolderList: true,
@@ -229,27 +229,7 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
     ODropdown: true,
     ODropdownItem: true,
     AddDashboardFromGitHub: true,
-    "q-page": true,
-    "q-input": true,
-    "q-btn": true,
-    "q-toggle": true,
-    "q-tooltip": true,
-    // q-splitter must render both named slots so the drawers nested in
-    // <template v-slot:after> are present for assertions.
-    "q-splitter": {
-      name: "QSplitter",
-      template: '<div data-test-stub="q-splitter"><slot name="before" /><slot name="after" /></div>',
-    },
-    "q-tabs": true,
-    "q-tab": true,
-    "q-separator": true,
-    "q-menu": true,
-    "q-list": true,
-    "q-item": true,
-    "q-item-section": true,
-    "q-item-label": true,
     "OIcon": true,
-    "q-table": true,
     // Migrated overlay primitives — preserve props/emits for assertion
     ODrawer: {
       name: "ODrawer",
@@ -420,9 +400,10 @@ describe("Dashboards.vue", () => {
       expect(Array.isArray(columns)).toBe(true);
       expect(columns.length).toBeGreaterThan(0);
 
-      // Check specific required columns (columns use id/header, not name)
+      // Check specific required columns (columns use id/header, not name).
+      // "#" is no longer a member column — it's OTable's built-in show-index.
       const columnIds = columns.map((col: any) => col.id);
-      expect(columnIds).toContain("#");
+      expect(columnIds).not.toContain("#");
       expect(columnIds).toContain("name");
       expect(columnIds).toContain("actions");
     });
@@ -510,7 +491,6 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showFavoritesOnly).toBe(true);
       expect(wrapper.vm.dashboards).toHaveLength(1);
       expect(wrapper.vm.dashboards[0].id).toBe("dash2");
-      expect(wrapper.vm.dashboards[0]["#"]).toBe("01");
       expect(wrapper.vm.resultTotal).toBe(1);
 
       wrapper.vm.updateActiveFolderId("default");

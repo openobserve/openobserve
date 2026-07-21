@@ -15,11 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-(--o2-border-color) bg-(--o2-card-bg) rounded-lg w-full h-full dark:bg-[var(--o2-card-background)] dark:border-[var(--o2-border)]">
+  <OCard class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-default w-full h-full dark:bg-surface-base dark:border-border-default">
     <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="pt-2 text-base font-semibold leading-6 text-(--o2-text-heading) m-0">{{ t("billing.proPlanLabel") }}</h3>
-        <p class="mt-2 text-sm font-normal leading-4.5 text-(--o2-text-secondary) m-0">
+        <h3 class="pt-2 text-base font-semibold leading-6 text-text-heading m-0">{{ t("billing.proPlanLabel") }}</h3>
+        <p class="mt-2 text-sm font-normal leading-4.5 text-text-secondary m-0">
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
@@ -34,17 +34,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator class="my-2" />
 
     <div class="px-3 py-2">
-      <h4 class="text-[0.8125rem] font-semibold leading-[0.983rem] text-(--o2-text-heading) m-0">{{ t("billing.features") }}</h4>
-      <p class="mb-3 mt-1 text-[0.8125rem] font-normal leading-4.5 text-(--o2-text-secondary) m-0">
+      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">{{ t("billing.features") }}</h4>
+      <p class="mb-3 mt-1 text-compact font-normal leading-4.5 text-text-secondary m-0">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="flex items-center mb-2 text-red-500"
+        class="flex items-center mb-2 text-status-error-text"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-[0.938rem] leading-5.5 text-(--o2-text-body)"
+        <span class="text-base leading-5.5 text-text-body"
           >Failed to load pricing details. Please refresh the page.</span
         >
       </div>
@@ -58,27 +58,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="mr-2 text-green-500 check-icon"
+            class="mr-2 text-status-positive check-icon"
           />
-          <div class="text-[0.938rem] leading-5.5 text-(--o2-text-body)" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-base leading-5.5 text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
         </div>
         <div
           v-if="feature.price !== ''"
-          class="mx-2"
-          style="
-            flex: 1;
-            border-top: 1px dotted #454f5b;
-            height: 0;
-            opacity: 0.4;
-          "
+          class="mx-2 flex-1 h-0 opacity-40 border-t border-dotted border-border-default"
         ></div>
-        <div class="text-[0.938rem] leading-5.5 text-(--o2-text-body) font-bold">{{ feature.price }}</div>
+        <div class="text-base leading-5.5 text-text-body font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="px-3 pt-2 text-[0.8125rem] font-normal leading-4.5 text-(--o2-text-secondary) m-0">
+    <p class="px-3 pt-2 text-compact font-normal leading-4.5 text-text-secondary m-0">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </p>
@@ -95,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-gray-400 mt-2">
+        <div class="text-xs text-text-secondary mt-2">
           Billing is handled through your AWS account
         </div>
       </div>
@@ -112,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-gray-400 mt-2">
+        <div class="text-xs text-text-secondary mt-2">
           Billing is handled through your Azure account
         </div>
       </div>
@@ -130,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon name="description" size="xs" />
           </template>
         </OTag>
-        <div class="text-xs text-gray-400 mt-2">
+        <div class="text-xs text-text-secondary mt-2">
           Billing is handled through your contract — contact your account
           manager for changes
         </div>

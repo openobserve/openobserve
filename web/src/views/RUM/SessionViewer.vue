@@ -15,12 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex flex-col qp-2 h-full">
-    <AppPageHeader
-      :title="sessionDetails.id || t('rum.sessionReplay')"
-      :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
-      class="shrink-0 border-b border-border-default"
-    >
+  <OPageLayout
+    class="qp-2"
+    :title="sessionDetails.id || t('rum.sessionReplay')"
+    :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
+    bleed
+  >
       <template #subtitle>
         <div class="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
           <div class="text-xs truncate flex items-center gap-1.5">
@@ -52,13 +52,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="sentiment-very-dissatisfied"
               size="sm"
-              class="pr-1"
-              style="color: #fb923c"
+              class="pr-1 text-severity-warning-color"
               data-test="frustration-summary-icon"
             />
             <span
-              class="font-semibold"
-              style="color: #fb923c"
+              class="font-semibold text-severity-warning-color"
               data-test="frustration-summary-text"
               >{{ frustrationCount }} Frustration{{
                 frustrationCount > 1 ? "s" : ""
@@ -67,16 +65,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </AppPageHeader>
     <div
-      class="w-full flex card-container overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
+      class="w-full flex bg-card-glass-bg overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
     >
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
         unit="px"
         class="w-full h-full"
-        separatorClass="bg-[var(--o2-border-color)] w-[1px]! hover:bg-[var(--o2-theme-color)]"
+        separatorClass="bg-card-glass-border w-px! hover:bg-theme-accent"
       >
         <template #before>
           <VideoPlayer
@@ -110,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :session-id="sessionId"
       :session-details="sessionDetails"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts" setup>
@@ -128,7 +125,7 @@ import useSessionsReplay from "@/composables/useSessionReplay";
 import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";

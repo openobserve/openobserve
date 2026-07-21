@@ -65,7 +65,7 @@ function makeSegment(
   return {
     runId: "run-001",
     status: "all-pass",
-    color: "bg-[var(--o2-status-success)]",
+    color: "bg-[var(--color-badge-success-solid-bg)]",
     title: "Passed",
     timestampMs: 1_700_000_000_000,
     executions: [makePassExec()],
@@ -125,9 +125,9 @@ describe("MonitorStatusTimeline", () => {
 
     it("should render timeline bars for each segment", () => {
       const segments = [
-        makeSegment({ runId: "run-001", color: "bg-[var(--o2-status-success)]" }),
-        makeSegment({ runId: "run-002", color: "bg-[var(--o2-status-danger)]" }),
-        makeSegment({ runId: "run-003", color: "bg-[var(--o2-status-warning)]" }),
+        makeSegment({ runId: "run-001", color: "bg-[var(--color-badge-success-solid-bg)]" }),
+        makeSegment({ runId: "run-002", color: "bg-[var(--color-badge-error-solid-bg)]" }),
+        makeSegment({ runId: "run-003", color: "bg-[var(--color-badge-orange-solid-bg)]" }),
       ];
       wrapper = makeWrapper({ segments });
 

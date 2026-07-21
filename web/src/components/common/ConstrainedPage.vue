@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   Use it either:
     • directly  — wrap a section's content: <ConstrainedPage><MyForm/></ConstrainedPage>
-    • via PageLayout's `constrained` prop — PageLayout wraps its main slot in this.
+    • via OPageLayout's `constrained` prop — OPageLayout wraps its main slot in this.
 
   `size` maps to a fixed max-width (literal classes so Tailwind's scanner keeps
   them). `padded` toggles the default page gutter (px-6 py-6); turn it off when

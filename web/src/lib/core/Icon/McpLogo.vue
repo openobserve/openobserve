@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Official Model Context Protocol brand mark — three interlocking rounded
+  Official Model Context Protocol brand mark — three interlocking curved
   strokes. Registered in OIcon.icons.ts as the "mcp" icon because brand logos
   are not part of Material Symbols. Strokes use currentColor so it inherits the
   theme text color exactly like every other OIcon (adapts to light/dark). Inline

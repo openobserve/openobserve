@@ -22,7 +22,7 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 // Forward the consumer's `data-test` from <ODialog data-test="…"> onto the
 // rendered panel so e2e selectors can scope to the specific dialog instance
-// using the audit pattern: [data-test="<parent>"] [data-test="o-dialog-*-btn"].
+// using the pattern: [data-test="<parent>"] [data-test="o-dialog-*-btn"].
 // (DialogRoot is renderless, so default attribute inheritance would lose it.)
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
@@ -84,7 +84,6 @@ function handleEscapeKeyDown(e: KeyboardEvent) {
     e.preventDefault();
     return;
   }
-  clearBodyValidation();
   handleOpenChange(false);
 }
 
@@ -125,7 +124,6 @@ function handleInteractOutside(e: Event) {
     e.preventDefault();
     return;
   }
-  clearBodyValidation();
 }
 
 // Header renders when there is a header slot, a title, any sub-slot, OR a visible close button.
@@ -207,43 +205,12 @@ const contentStyle = computed(() => {
   return Object.keys(style).length ? style : undefined;
 });
 
-// ── Validation reset on cancel-path close ───────────────────────────────────
-/** Reset q-field validation for every field in the body slot so that
- *  cancel-path closes (Cancel button, ×, Escape, overlay click) never surface
- *  lazy-rules validation errors to the user. */
-function clearBodyValidation() {
-  const body = bodyRef.value;
-  if (!body) return;
-  body.querySelectorAll<HTMLElement>('.q-field').forEach((el) => {
-    const vm = (el as any).__vueParentComponent;
-    if (vm?.ctx?.resetValidation) {
-      vm.ctx.resetValidation();
-    } else if (typeof vm?.exposed?.resetValidation === 'function') {
-      vm.exposed.resetValidation();
-    }
-  });
-}
-
-/** When focus moves to a non-form element inside the body (e.g. an action
- *  button), reset all field validation so sibling fields never show
- *  premature errors before the user clicks Save. */
-function handleBodyFocusIn(e: FocusEvent) {
-  const target = e.target as HTMLElement | null;
-  if (!target) return;
-  const isFormField =
-    target.matches('input, textarea, select') ||
-    !!target.closest('.q-field, .q-input, .q-select');
-  if (!isFormField) {
-    clearBodyValidation();
-  }
-}
-
 // ── Auto-focus logic ─────────────────────────────────────────────────────────
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
 // Text fields take priority; a select/combobox trigger (OSelect listbox
-// trigger, reka SelectTrigger, q-select) is the second tier so a dialog whose
+// trigger, reka SelectTrigger) is the second tier so a dialog whose
 // only field is a select still keeps keyboard focus on a field — otherwise
 // keystrokes land on a plain button and leak to page-level single-letter
 // shortcuts (e.g. "s" on logs opening Save View over an open dialog).
@@ -263,7 +230,7 @@ function findAutoFocusTarget(root: Element): HTMLElement | null {
   const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
     (el) =>
       !el.closest(
-        '.q-select, .o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]',
+        '.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]',
       ),
   );
   if (textField) return textField;
@@ -429,7 +396,7 @@ watch(internalOpen, (open) => {
           !isFullSize && 'max-h-[90vh]',
           // Surface
           'bg-dialog-bg border border-dialog-border',
-          !isFullSize && 'rounded-xl',
+          !isFullSize && 'rounded-surface',
           'shadow-dialog',
           // Typography
           'text-dialog-content-text',
@@ -467,10 +434,10 @@ watch(internalOpen, (open) => {
           v-if="hasHeader"
           :class="[
             'flex items-center gap-2 shrink-0',
-            'px-(--spacing-dialog-header-px) py-(--spacing-dialog-header-py)',
+            'px-dialog-header-px py-dialog-header-py',
             'bg-dialog-header-bg text-dialog-header-text',
             'border-b border-dialog-header-border',
-            !isFullSize && 'rounded-t-xl',
+            !isFullSize && 'rounded-t-surface',
           ]"
         >
           <!-- CASE 1: Full override — backward compat, sub-slots are ignored -->
@@ -519,7 +486,7 @@ watch(internalOpen, (open) => {
               @mousedown.prevent
               :class="[
                 'shrink-0 flex items-center justify-center',
-                'h-7 w-7 rounded-md',
+                'h-7 w-7 rounded-default',
                 'text-dialog-close-text',
                 'hover:bg-dialog-close-hover-bg',
                 'active:bg-dialog-close-active-bg',
@@ -557,13 +524,12 @@ watch(internalOpen, (open) => {
           :class="[
             'min-h-0 overflow-x-hidden',
             isFullSize ? 'flex-1 overflow-hidden p-0' : 'overflow-y-auto',
-            !isFullSize && 'px-(--spacing-dialog-content-px) py-(--spacing-dialog-content-py)',
+            !isFullSize && 'px-dialog-content-px py-dialog-content-py',
             'text-dialog-content-text',
             !isFullSize && canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             !isFullSize && canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
             !isFullSize && canScrollUp && canScrollDown && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
-          @focusin="handleBodyFocusIn"
         >
           <slot />
         </div>
@@ -573,10 +539,10 @@ watch(internalOpen, (open) => {
           v-if="hasFooter"
           :class="[
             'shrink-0',
-            'px-(--spacing-dialog-footer-px) py-(--spacing-dialog-footer-py)',
+            'px-dialog-footer-px py-dialog-footer-py',
             'bg-dialog-footer-bg',
             'border-t border-dialog-footer-border',
-            !isFullSize && 'rounded-b-xl',
+            !isFullSize && 'rounded-b-surface',
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->

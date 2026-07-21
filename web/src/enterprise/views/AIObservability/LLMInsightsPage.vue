@@ -15,16 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OPageLayout
     data-test="ai-llm-insights-page"
-    class="flex flex-col h-full min-h-0 overflow-hidden"
+    :title="t('aiObservability.nav.llmInsights')"
+    :subtitle="t('aiObservability.subtitle.llmInsights')"
+    icon="dashboard"
+    bleed
+    :scroll="false"
   >
-    <AppPageHeader
-      :title="t('aiObservability.nav.llmInsights')"
-      :subtitle="t('aiObservability.subtitle.llmInsights')"
-      icon="dashboard"
-      class="px-4 border-b border-border-default"
-    >
       <template #actions>
         <date-time
           ref="dateTimeRef"
@@ -37,13 +35,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
           :default-relative-time="dateState.relativeTimePeriod ?? ''"
           data-test="ai-llm-insights-date-time"
-          class="h-[2rem]"
+          class="h-8"
           @on:date-change="onDateChange"
         />
         <!-- Whole-page last-refresh + refresh control (logs-style): relative
              time + freshness dot, ticking on its own. -->
         <div
-          class="inline-flex items-center border border-border-default rounded-md px-1 h-[2rem] overflow-hidden"
+          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
         >
           <ORefreshButton
             :last-run-at="dashboardLastRunAt"
@@ -54,18 +52,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </template>
-    </AppPageHeader>
 
-    <div class="flex-1 min-h-0 overflow-hidden">
-      <LLMInsightsDashboard
-        ref="dashboardRef"
-        :stream-name="streamName"
-        :start-time="timeRange.startTime"
-        :end-time="timeRange.endTime"
-        class="h-full"
-      />
-    </div>
-  </div>
+    <LLMInsightsDashboard
+      ref="dashboardRef"
+      :stream-name="streamName"
+      :start-time="timeRange.startTime"
+      :end-time="timeRange.endTime"
+      class="flex-1 min-h-0"
+    />
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -74,7 +69,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import DateTime from "@/components/DateTime.vue";
 import LLMInsightsDashboard from "@/plugins/traces/LLMInsightsDashboard.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import {

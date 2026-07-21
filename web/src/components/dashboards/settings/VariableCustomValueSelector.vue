@@ -17,14 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <OSelect
-      style="min-width: 150px; max-width: 40rem"
       v-model="selectedValue"
       :label="variableItem?.label || variableItem?.name"
       label-position="inside"
       :options="variableItem?.options || []"
       labelKey="label"
       valueKey="value"
-      class="textbox flex flex-col no-case o2-custom-select-dashboard"
+      class="textbox flex flex-col no-case o2-custom-select-dashboard min-w-37.5 max-w-160"
       :loading="variableItem.isLoading"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"

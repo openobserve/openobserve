@@ -145,7 +145,6 @@ const globalOptions = {
     store: mockStore,
   },
   stubs: {
-    "q-resize-observer": true,
     TracesSearchResultList: {
       name: "TracesSearchResultList",
       template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',

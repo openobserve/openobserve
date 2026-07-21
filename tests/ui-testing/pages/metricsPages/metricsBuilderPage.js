@@ -452,7 +452,7 @@ export class MetricsBuilderPage {
      * Read the selected metric/stream value from the OSelect trigger's data-test
      * attributes. OSelect exposes `data-test-selected-value` /
      * `data-test-selected-label` on the inner PopoverTrigger (data-test
-     * `${parent}-trigger`). Falls back to inputValue() for legacy q-select.
+     * `${parent}-trigger`). Falls back to inputValue() for the legacy select.
      */
     async getStreamSelectedValue() {
         const wrapper = this.streamSelectorInput;
@@ -634,7 +634,7 @@ export class MetricsBuilderPage {
     async clickAddOperation() {
         await this.addOperationBtn.click();
         // Operation selector is now an ODialog (see OperationsList.vue) — wait on the
-        // parent slug rather than the legacy `.q-dialog` wrapper.
+        // parent slug rather than the legacy dialog wrapper.
         await this.operationDialog.waitFor({ state: 'visible', timeout: 5000 });
     }
 
@@ -647,7 +647,7 @@ export class MetricsBuilderPage {
         await this.operationDialog.waitFor({ state: 'visible', timeout: 5000 });
 
         // Do NOT fill the search input: typing triggers a Vue re-render that temporarily
-        // collapses q-expansion-item sections, making items transiently invisible.
+        // collapses expansion-item sections, making items transiently invisible.
         // The full un-filtered list is already rendered with all sections expanded.
 
         // Find an operation option by data-test-value (preferred)
@@ -1206,11 +1206,11 @@ export class MetricsBuilderPage {
             // OSelect post-migration: the PopoverTrigger button (`-trigger`) is
             // the element that carries the disabled state when `:disabled` is
             // set on the OSelect. We also check ancestor data-disabled, native
-            // disabled attr, and the legacy q-field--disabled class for safety.
+            // disabled attr, and the legacy disabled class for safety.
             const hasDisabledClass = (node) => {
                 if (!node) return false;
                 const cls = node.className || '';
-                return cls.includes('q-field--disabled') || cls.includes('disabled');
+                return cls.includes('disabled');
             };
             // Find the OSelect trigger inside the wrapper (post-migration) — the
             // disabled flag binds to the PopoverTrigger button.

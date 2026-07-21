@@ -57,10 +57,12 @@ test.describe("Theme Management Tests", () => {
       await page.reload();
       await page.waitForLoadState('domcontentloaded');
 
-      // Wait for theme to be restored from storage (Vue needs time to apply it)
+      // Wait for theme to be restored from storage (Vue needs time to apply it).
+      // The dark-mode signal is the `.dark` class on <html> (set by
+      // utils/theme.ts); the legacy `body--dark` on <body> was retired.
       await page.waitForFunction(
-        (darkClass) => document.body.classList.contains(darkClass),
-        'body--dark',
+        (darkClass) => document.documentElement.classList.contains(darkClass),
+        'dark',
         { timeout: 10000 }
       );
 

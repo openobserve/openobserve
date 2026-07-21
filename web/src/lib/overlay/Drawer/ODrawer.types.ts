@@ -48,6 +48,18 @@ export interface DrawerProps {
   width?: number;
 
   /**
+   * Full-bleed body (SPACING_AUDIT.md §7/§8). By default the drawer body owns a
+   * single, fixed inset — the same `--spacing-dialog-content-*` token ODialog
+   * uses — so every drawer's content lines up identically and consumers never
+   * hand-roll their own body padding. Set `bleed` for the exceptions that must
+   * reach the edges: code/JSON editors, embedded dashboards, and full-width
+   * tables/detail views that supply their own inset. This is the only body-
+   * spacing knob, on purpose — a fixed default with one escape hatch, not a
+   * size scale.
+   */
+  bleed?: boolean;
+
+  /**
    * Convenience prop: plain-text title rendered in the header.
    * Ignored when the `header` slot is provided.
    */

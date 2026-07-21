@@ -1290,8 +1290,8 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
     if (await dropdownBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
       await dropdownBtn.click();
     }
-    // PanelContainer uses ODropdown (Reka UI), not the q-menu — wait for
-    // the edit menu item directly instead of waiting for a .q-menu element.
+    // PanelContainer uses ODropdown (Reka UI) — wait for the edit menu item
+    // directly instead of waiting for the dropdown menu container.
 
     // Click Edit Panel menu item
     const editMenuItem = builder.getEditPanelMenuItem();

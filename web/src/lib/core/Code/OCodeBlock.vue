@@ -24,7 +24,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useStore } from "vuex";
 import hljs from "highlight.js";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -46,9 +45,6 @@ const props = withDefaults(defineProps<CodeBlockProps>(), {
 
 const emit = defineEmits<CodeBlockEmits>();
 defineSlots<CodeBlockSlots>();
-
-const store = useStore();
-const isDark = computed(() => store.state?.theme === "dark");
 
 // Secret reveal state — only relevant when `codeMasked` is provided.
 const revealed = ref(false);
@@ -94,20 +90,38 @@ const onCopy = () => {
 
 <template>
   <div
-    class="o2-code-block"
-    :class="[isDark ? 'o2-dark' : 'o2-light', chrome ? `o2-chrome-${chrome}` : '']"
+    class="o2-code-block my-3 overflow-hidden rounded-default border border-border-default"
+    :class="chrome ? `o2-chrome-${chrome}` : ''"
     :data-test="dataTest"
   >
-    <div class="o2-code-toolbar">
-      <span v-if="chrome === 'terminal'" class="o2-code-head">
-        <span class="o2-win-dots" aria-hidden="true"><i /><i /><i /></span>
-        <span class="o2-code-lang">Terminal</span>
+    <div
+      class="o2-code-toolbar flex items-center justify-between border-b border-border-default py-1 pl-3 pr-1.5"
+    >
+      <span
+        v-if="chrome === 'terminal'"
+        class="o2-code-head inline-flex min-w-0 items-center gap-2"
+      >
+        <span class="inline-flex gap-1.5" aria-hidden="true">
+          <i class="block size-2.5 rounded-full bg-status-negative" />
+          <i class="block size-2.5 rounded-full bg-warning" />
+          <i class="block size-2.5 rounded-full bg-status-positive" />
+        </span>
+        <span class="o2-code-lang font-mono text-2xs uppercase tracking-wider opacity-55"
+          >Terminal</span
+        >
       </span>
-      <span v-else-if="chrome === 'editor'" class="o2-code-head">
-        <OIcon name="code" size="xs" class="o2-code-file-ico" />
-        <span class="o2-code-file">{{ filename || lang || "text" }}</span>
+      <span
+        v-else-if="chrome === 'editor'"
+        class="o2-code-head inline-flex min-w-0 items-center gap-2"
+      >
+        <OIcon name="code" size="xs" class="opacity-60" />
+        <span class="font-mono text-xs font-semibold tracking-[0.01em] opacity-75">{{
+          filename || lang || "text"
+        }}</span>
       </span>
-      <span v-else class="o2-code-lang">{{ lang || "text" }}</span>
+      <span v-else class="o2-code-lang font-mono text-2xs uppercase tracking-wider opacity-55">{{
+        lang || "text"
+      }}</span>
       <div class="flex items-center gap-1">
         <OButton
           v-if="codeMasked"
@@ -138,74 +152,34 @@ const onCopy = () => {
 </template>
 
 <style scoped lang="scss">
+/* keep(generated-content): the `:deep(.hljs-*)` rules below colour highlight.js
+   markup injected via v-html — those class names never appear in this template,
+   so Tailwind cannot see them and no utility can reach them. The few non-:deep
+   rules here are the ones whose values are unregistered tokens
+   (--color-syntax-bg / --color-syntax-text have no @theme entry, so `bg-syntax-bg`
+   would compile to nothing) or need color-mix over one. */
 .o2-code-block {
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 0.75rem 0;
-  border: 1px solid;
+  /* --color-syntax-* are :root-only (no @theme registration) → no utility exists.
+     They flip light→dark in dark.css, so one rule set covers both themes. */
+  background: var(--color-syntax-bg);
 }
 
 .o2-code-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.25rem 0.4rem 0.25rem 0.75rem;
-  border-bottom: 1px solid;
+  background: color-mix(in srgb, var(--color-syntax-text) 4%, transparent);
 }
 
-.o2-code-lang {
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  opacity: 0.55;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-/* window chrome (terminal / editor) */
-.o2-code-head {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 0;
-}
-.o2-win-dots {
-  display: inline-flex;
-  gap: 5px;
-}
-.o2-win-dots i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: block;
-}
-.o2-win-dots i:nth-child(1) {
-  background: #ec6a5e;
-}
-.o2-win-dots i:nth-child(2) {
-  background: #f4bf4f;
-}
-.o2-win-dots i:nth-child(3) {
-  background: #61c454;
-}
-.o2-code-file {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  opacity: 0.75;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-.o2-code-file-ico {
-  opacity: 0.6;
-}
 /* editor tab: a subtle raised tab on the toolbar's left */
 .o2-chrome-editor .o2-code-head {
   padding: 0.18rem 0.6rem;
   margin: -0.05rem 0;
-  border-radius: 6px;
-  background: var(--o2-tab-bg, rgba(0, 0, 0, 0.05));
+  border-radius: 0.375rem;
+  background: var(--color-theme-tab-bg);
 }
-.o2-dark.o2-chrome-editor .o2-code-head {
-  --o2-tab-bg: rgba(255, 255, 255, 0.06);
+/* Dark keeps a neutral white wash rather than the accent-tinted token, so the
+   tab reads as a highlight on the near-black syntax surface. `.dark` is set on
+   the root by utils/theme.ts (see dark.css). */
+.dark .o2-chrome-editor .o2-code-head {
+  background: color-mix(in srgb, var(--color-white) 6%, transparent);
 }
 
 .o2-code-pre {
@@ -217,24 +191,15 @@ const onCopy = () => {
 .o2-code-pre code {
   background: transparent;
   white-space: pre;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
   line-height: 1.55;
   padding: 0;
+  color: var(--color-syntax-text);
 }
 
-/* ===================== LIGHT THEME ===================== */
-.o2-light {
-  background: #f6f8fa;
-  border-color: rgba(0, 0, 0, 0.1);
-
-  .o2-code-toolbar {
-    background: rgba(0, 0, 0, 0.03);
-    border-bottom-color: rgba(0, 0, 0, 0.08);
-  }
-  .o2-code-pre code {
-    color: #24292e;
-  }
-  // github (light) token palette
+/* ============ CODE THEME (token-driven; tokens flip via dark.css,
+   so one rule set covers both themes) ============ */
+.o2-code-block {
   :deep(.hljs-doctag),
   :deep(.hljs-keyword),
   :deep(.hljs-meta .hljs-keyword),
@@ -242,12 +207,12 @@ const onCopy = () => {
   :deep(.hljs-template-variable),
   :deep(.hljs-type),
   :deep(.hljs-variable.language_) {
-    color: #d73a49;
+    color: var(--color-syntax-keyword);
   }
   :deep(.hljs-title),
   :deep(.hljs-title.class_),
   :deep(.hljs-title.function_) {
-    color: #6f42c1;
+    color: var(--color-syntax-function);
   }
   :deep(.hljs-attr),
   :deep(.hljs-attribute),
@@ -259,95 +224,30 @@ const onCopy = () => {
   :deep(.hljs-selector-attr),
   :deep(.hljs-selector-class),
   :deep(.hljs-selector-id) {
-    color: #005cc5;
+    color: var(--color-syntax-number);
   }
   :deep(.hljs-regexp),
   :deep(.hljs-string),
   :deep(.hljs-meta .hljs-string) {
-    color: #032f62;
+    color: var(--color-syntax-string);
   }
   :deep(.hljs-built_in),
   :deep(.hljs-symbol) {
-    color: #e36209;
+    color: var(--color-syntax-builtin);
   }
   :deep(.hljs-comment),
   :deep(.hljs-code),
   :deep(.hljs-formula) {
-    color: #6a737d;
+    color: var(--color-syntax-comment);
   }
   :deep(.hljs-name),
   :deep(.hljs-quote),
   :deep(.hljs-selector-tag),
   :deep(.hljs-selector-pseudo) {
-    color: #22863a;
+    color: var(--color-syntax-tag);
   }
   :deep(.hljs-section) {
-    color: #005cc5;
-    font-weight: 600;
-  }
-}
-
-/* ===================== DARK THEME ===================== */
-.o2-dark {
-  background: #0d1117;
-  border-color: rgba(255, 255, 255, 0.08);
-
-  .o2-code-toolbar {
-    background: rgba(255, 255, 255, 0.04);
-    border-bottom-color: rgba(255, 255, 255, 0.08);
-  }
-  .o2-code-pre code {
-    color: #c9d1d9;
-  }
-  // github-dark token palette
-  :deep(.hljs-doctag),
-  :deep(.hljs-keyword),
-  :deep(.hljs-meta .hljs-keyword),
-  :deep(.hljs-template-tag),
-  :deep(.hljs-template-variable),
-  :deep(.hljs-type),
-  :deep(.hljs-variable.language_) {
-    color: #ff7b72;
-  }
-  :deep(.hljs-title),
-  :deep(.hljs-title.class_),
-  :deep(.hljs-title.function_) {
-    color: #d2a8ff;
-  }
-  :deep(.hljs-attr),
-  :deep(.hljs-attribute),
-  :deep(.hljs-literal),
-  :deep(.hljs-meta),
-  :deep(.hljs-number),
-  :deep(.hljs-operator),
-  :deep(.hljs-variable),
-  :deep(.hljs-selector-attr),
-  :deep(.hljs-selector-class),
-  :deep(.hljs-selector-id) {
-    color: #79c0ff;
-  }
-  :deep(.hljs-regexp),
-  :deep(.hljs-string),
-  :deep(.hljs-meta .hljs-string) {
-    color: #a5d6ff;
-  }
-  :deep(.hljs-built_in),
-  :deep(.hljs-symbol) {
-    color: #ffa657;
-  }
-  :deep(.hljs-comment),
-  :deep(.hljs-code),
-  :deep(.hljs-formula) {
-    color: #8b949e;
-  }
-  :deep(.hljs-name),
-  :deep(.hljs-quote),
-  :deep(.hljs-selector-tag),
-  :deep(.hljs-selector-pseudo) {
-    color: #7ee787;
-  }
-  :deep(.hljs-section) {
-    color: #1f6feb;
+    color: var(--color-syntax-number);
     font-weight: 600;
   }
 }

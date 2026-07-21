@@ -39,9 +39,9 @@ vi.mock("vue-i18n", () => ({
 }));
 
 // ── Stubs for O2 and layout components ──────────────────────────────────────
-vi.mock("@/components/common/AppPageHeader.vue", () => ({
+vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
-    name: "AppPageHeader",
+    name: "OPageHeader",
     props: ["subtitle", "back", "drawerMode"],
     template: '<div data-test="app-page-header"><slot name="title"></slot><slot name="title-trail"></slot></div>',
   },

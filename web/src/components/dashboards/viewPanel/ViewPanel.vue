@@ -15,27 +15,26 @@
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
-  <div style="height: 100%; display: flex; flex-direction: column; overflow: hidden" data-test="view-panel-screen">
+  <div class="h-full flex flex-col overflow-hidden" data-test="view-panel-screen">
     <div class="flex justify-between items-center p-3">
       <div class="flex items-center text-xl tracking-[0.005em] mr-3">
         <span data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex items-center" style="gap: 0.5rem">
+      <div class="flex items-center gap-2">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
           v-model="histogramInterval"
-          class="h-8 transition-all duration-200 hover:bg-[var(--color-interactive-hover-bg)]"
-          style="width: 150px"
+          class="h-8 transition-all duration-200 hover:bg-interactive-hover-bg w-37.5"
           data-test="dashboard-viewpanel-histogram-interval-dropdown"
         />
 
         <DateTimePickerDashboard
           v-model="selectedDate"
           ref="dateTimePickerRef"
-          class="h-8 min-h-8 transition-all duration-200 hover:bg-[var(--color-interactive-hover-bg)]"
+          class="h-8 min-h-8 transition-all duration-200 hover:bg-interactive-hover-bg"
           data-test="dashboard-viewpanel-date-time-picker"
           :disable="disable"
           @hide="setTimeForVariables()"
@@ -47,7 +46,7 @@
             store.state?.zoConfig?.min_auto_refresh_interval || 5
           "
           @trigger="refreshData"
-          class="h-8 transition-all duration-200 hover:bg-[var(--color-interactive-hover-bg)]"
+          class="h-8 transition-all duration-200 hover:bg-interactive-hover-bg"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButton
@@ -86,11 +85,11 @@
       </div>
     </div>
     <OSeparator />
-    <div class="flex" style="flex: 1; overflow: hidden">
-      <div class="flex flex-col" style="width: 100%; height: 100%">
-        <div class="flex" style="height: 100%; width: 100%">
-          <div class="flex flex-col" style="height: 100%; width: 100%">
-            <div class="flex flex-col" style="height: 100%">
+    <div class="flex flex-1 overflow-hidden">
+      <div class="flex flex-col w-full h-full">
+        <div class="flex h-full w-full">
+          <div class="flex flex-col h-full w-full">
+            <div class="flex flex-col h-full">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
                 :showDynamicFilters="
@@ -106,7 +105,7 @@
                 :tabId="currentTabId"
                 :panelId="currentPanelId"
               />
-              <div style="flex: 1; overflow: hidden">
+              <div class="flex-1 overflow-hidden">
                 <div
                   class="flex justify-end mr-2 items-center"
                   data-test="view-panel-last-refreshed-at"
@@ -127,7 +126,7 @@
                     :viewOnly="false"
                   />
                 </div>
-                <PanelSchemaRenderer
+                <PanelSchemaRenderer class="h-[calc(100%_-_1.3125rem)]"
                   v-if="chartData"
                   :key="dashboardPanelData.data.type"
                   :panelSchema="chartData"
@@ -156,7 +155,6 @@
                   "
                   @show-legends="showLegendsDialog = true"
                   data-test="dashboard-viewpanel-panel-schema-renderer"
-                  style="height: calc(100% - 21px)"
                   ref="panelSchemaRendererRef"
                 />
               </div>
@@ -642,7 +640,7 @@ export default defineComponent({
               globalVar.value = passedVar.value;
               globalVar.isVariablePartialLoaded = true;
               globalVar.isLoading = false;
-              // KEY FIX: Set pending to false to prevent API call
+              // Set pending to false to prevent API call
               globalVar.isVariableLoadingPending = false;
             }
           });
@@ -679,7 +677,7 @@ export default defineComponent({
     watch(selectedDate, () => {
       updateDateTime(selectedDate.value);
 
-      // CRITICAL FIX: When date time changes (user clicked Apply), also commit any pending variable changes
+      // CRITICAL: When date time changes (user clicked Apply), also commit any pending variable changes
       // This ensures that if user changed both variables and date time,
       // both changes are applied to the chart when Apply is clicked
       Object.assign(

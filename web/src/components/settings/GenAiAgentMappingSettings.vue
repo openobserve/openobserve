@@ -1,14 +1,10 @@
 <template>
-  <div
+  <OPageLayout
     data-test="gen-ai-agent-mapping-settings"
-    class="flex flex-col h-full min-h-0"
+    :subtitle="t('settings.genAiAgentMapping.description')"
+    icon="smart-toy"
+    bleed
   >
-    <AppPageHeader
-      :subtitle="t('settings.genAiAgentMapping.description')"
-      icon="smart-toy"
-      class="shrink-0 px-4 border-b border-border-default"
-      data-test="gen-ai-agent-mapping-header"
-    >
       <template #title>
         <span data-test="gen-ai-agent-mapping-page-title">{{
           t("settings.genAiAgentMapping.title")
@@ -45,7 +41,6 @@
           {{ t("settings.genAiAgentMapping.clearRegistry") }}
         </OButton>
       </template>
-    </AppPageHeader>
 
     <div
       v-if="loading"
@@ -122,11 +117,11 @@
       @click:secondary="clearRegistryDialogOpen = false"
       @click:primary="clearAgentRegistry"
     >
-      <p class="text-sm text-text-primary">
+      <p class="text-sm text-text-body">
         {{ t("settings.genAiAgentMapping.clearRegistryDescription") }}
       </p>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -138,7 +133,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import genAiAgentMappingService, {
   fetchDefaultGenAiAgentMapping,

@@ -636,7 +636,7 @@ export const applyRightLegendPositioning = (
     // Reserve minimum space for scroll legends to prevent chart overlap
     const chartWidth = chartPanelRef.value?.offsetWidth || 800;
 
-    // Calculate legend width similar to old code approach - ensuring proper space reservation
+    // Calculate legend width - ensuring proper space reservation
     let legendWidth;
 
     // Get the longest series name to calculate appropriate width
@@ -655,7 +655,7 @@ export const applyRightLegendPositioning = (
     }
 
     // Calculate legend width based on content, with constraints for different container sizes
-    // Use the same logic as the old code - ensure legends and chart both get reasonable space
+    // Ensure legends and chart both get reasonable space
     legendWidth = Math.min(
       chartWidth / 3, // Never take more than 1/3 of the chart width
       calculateWidthText(maxValue) + 60, // Calculate based on text width + padding for icons and scroll
@@ -673,7 +673,7 @@ export const applyRightLegendPositioning = (
     options.legend.left = legendLeftPx;
     options.legend.right = 0;
 
-    // Set text width for truncation similar to old code
+    // Set text width for truncation
     options.legend.textStyle = options.legend.textStyle || {};
     options.legend.textStyle.width = legendWidth - 55; // Account for padding and scroll indicators
   }

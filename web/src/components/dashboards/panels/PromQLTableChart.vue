@@ -15,17 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <div class="h-full w-full flex flex-col relative"
     data-test="promql-table-chart"
-    style="
-      height: 100%;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    "
   >
-    <div style="height: 100%; position: relative">
+    <div class="h-full relative">
       <TableRenderer
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
@@ -41,10 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #bottom="scope" v-if="showLegendFooter">
           <div class="flex items-center w-full" data-test="dashboard-table-pagination">
             <div class="flex items-center gap-1">
-              <OSelect
+              <OSelect class="min-w-50 max-w-100"
                 v-model="selectedLegend"
                 :options="legendOptions"
-                style="min-width: 200px; max-width: 400px"
                 :placeholder="t('dashboard.promQLTableChart.selectSeriesToFilter')"
               >
                 <template #icon-left>
@@ -123,7 +115,7 @@ export default defineComponent({
         console.warn("No rows found in table data");
         return [];
       }
-      // Add unique ID to each row for q-table
+      // Add unique ID to each row for the table
       const rows = props.data.rows.map((row: any, index: number) => ({
         id: `row_${index}`,
         ...row,

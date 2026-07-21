@@ -534,7 +534,7 @@ export class AlertsPage {
      * Returns 'table' if history table is visible, 'empty' if empty state is shown
      */
     async expectAlertDetailsHistorySectionVisible() {
-        // The history section shows either a q-table (when history exists) or an empty state
+        // The history section shows either a history table (when history exists) or an empty state
         const table = this.page.locator(this.locators.alertDetailsHistoryTable);
         const emptyState = this.page.locator('text=No history available').or(this.page.locator('.OIcon:has-text("history")'));
 
@@ -658,7 +658,7 @@ export class AlertsPage {
     async expectNoChartError() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
         // Assert no error-class banner is visible within the chart container
-        const errorBanner = chartArea.locator('[class*="error"], .q-banner--negative').first();
+        const errorBanner = chartArea.locator('[class*="error"]').first();
         await expect(errorBanner).not.toBeVisible({ timeout: 5000 });
         // Assert no error text pattern is visible anywhere in the chart area.
         // Do NOT swallow — a "Schema error" / "No field named" banner must fail the test.
@@ -666,7 +666,7 @@ export class AlertsPage {
         await expect(errorText).not.toBeAttached({ timeout: 3000 });
 
         // Also check page-level error toasts/banners rendered outside the chart container
-        const pageError = this.page.locator('[role="alert"][class*="bg-negative"], .q-banner--negative').first();
+        const pageError = this.page.locator('[role="alert"][class*="bg-negative"]').first();
         await expect(pageError).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('No chart error detected');
@@ -678,7 +678,7 @@ export class AlertsPage {
      */
     async getChartErrorMessage() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
-        const errorEl = chartArea.locator('[class*="error"], .q-banner--negative, [role="alert"][class*="bg-negative"]').first();
+        const errorEl = chartArea.locator('[class*="error"], [role="alert"][class*="bg-negative"]').first();
         if (await errorEl.isVisible({ timeout: 2000 }).catch(() => false)) {
             return await errorEl.textContent();
         }
@@ -877,10 +877,6 @@ export class AlertsPage {
         await this.commonActions.navigateToAlerts();
         await this.page.waitForTimeout(1000);
 
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         await this.page.locator(this.locators.newFolderButton).click();
@@ -1146,12 +1142,12 @@ export class AlertsPage {
         await this.page.waitForTimeout(500);
 
         // v3 wizard may handle validation differently:
-        //   A) Show inline q-field--error on missing fields
+        //   A) Show inline field error on missing fields
         //   B) Show a toast/notification at the top of the form
         //   C) Submit successfully (if optional fields have defaults)
         // Wait for any of these outcomes within the timeout window.
-        const errorFields = this.page.locator('.q-field--error');
-        const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
+        const errorFields = this.page.locator('[aria-invalid="true"]');
+        const anyToast = this.page.locator('[role="alert"], .notifications');
         const successMsg = this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertSuccessMessage });
 
         const outcomes = await Promise.race([
@@ -1990,7 +1986,7 @@ export class AlertsPage {
      * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
      */
     async getSeverityBadgeText() {
-        // Match the q-badge that contains P1, P2, P3, or P4 text
+        // Match the badge that contains P1, P2, P3, or P4 text
         const badge = this.page.locator(this.locators.severityBadge).filter({ hasText: /^.*P[1-4].*$/ });
         await badge.first().waitFor({ state: 'visible', timeout: 10000 });
         // Get just the span with the severity value (first span inside the inner div)
@@ -2053,7 +2049,7 @@ export class AlertsPage {
 
     /**
      * Verify the service graph tab content rendered.
-     * Tabs are v-if gated (no q-tab-panel wrapper). The serviceGraph tab
+     * Tabs are v-if gated (no tab-panel wrapper). The serviceGraph tab
      * renders IncidentServiceGraph inside an absolute-positioned div.
      * Checks for the .incident-service-graph container OR the detail page
      * still being visible (confirming no crash).
@@ -2871,12 +2867,12 @@ export class AlertsPage {
     }
 
     /**
-     * Force-remove residual q-portal elements that occasionally intercept clicks
+     * Force-remove residual portal overlays that occasionally intercept clicks
      * after closing the SQL editor dialog. Used in scheduled feature tests.
      */
     async removeResidualPortals() {
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[data-reka-dialog-overlay], div[data-reka-portalled]').forEach(el => el.remove());
         }).catch(() => {});
     }
 
@@ -2894,7 +2890,7 @@ export class AlertsPage {
      * @param {number} stepIndex - 0-based step index
      */
     async clickStepIndicator(stepIndex) {
-        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"] .q-stepper__nav-item, .alert-v3-steps > div > div');
+        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"], .alert-v3-steps > div > div');
         const target = indicators.nth(stepIndex);
         await target.waitFor({ state: 'visible', timeout: 10000 });
         await target.click({ force: true });
@@ -3145,11 +3141,6 @@ export class AlertsPage {
      * Click the update button for a specific alert
      */
     async clickAlertUpdateButton(alertName) {
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         // Search for the alert first
         await this.searchAlert(alertName);
         await this.page.waitForTimeout(1000);
@@ -3584,7 +3575,7 @@ export class AlertsPage {
 
     /**
      * Get autocomplete suggestions dropdown items
-     * Scoped to menu context to avoid matching all q-items on page
+     * Scoped to menu context to avoid matching all option items on page
      * @returns {Locator}
      */
     getAutocompleteSuggestions() {
@@ -3607,8 +3598,8 @@ export class AlertsPage {
      * In v3, aggregation is controlled by selecting a measure function from a dropdown:
      * - "total events" (default) = no aggregation, no group-by
      * - "count", "avg", "sum", etc. = aggregation enabled, group-by appears
-     * This replaces the v2 q-toggle for aggregation.
-     * @returns {Locator} The function dropdown q-select element
+     * This replaces the v2 toggle for aggregation.
+     * @returns {Locator} The function dropdown select element
      */
     getAggregationToggle() {
         // The aggregation function OSelect has no data-test. Its trigger is the first
@@ -3639,7 +3630,7 @@ export class AlertsPage {
 
     /**
      * Enable aggregation by selecting 'count' from the function dropdown (v3 UI).
-     * This replaces the v2 behavior of clicking a q-toggle.
+     * This replaces the v2 behavior of clicking a toggle.
      */
     async enableAggregation() {
         const toggle = this.getAggregationToggle();
@@ -3651,7 +3642,7 @@ export class AlertsPage {
 
     /**
      * Disable aggregation by selecting 'total events' from the function dropdown (v3 UI).
-     * This replaces the v2 behavior of clicking a q-toggle off.
+     * This replaces the v2 behavior of clicking a toggle off.
      */
     async disableAggregation() {
         const toggle = this.getAggregationToggle();
@@ -3865,6 +3856,6 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getErrorMessageBanner() {
-        return this.page.locator('[class*="error"], .q-banner--negative, [data-test*="error"]');
+        return this.page.locator('[class*="error"], [data-test*="error"]');
     }
 }

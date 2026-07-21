@@ -53,7 +53,7 @@ function createWrapper(props: Record<string, any> = {}) {
     global: {
       plugins: [store, i18n],
       stubs: {
-        AppPageHeader: true,
+        OPageHeader: true,
         JobScorerPicker: true,
         JobFilterBuilder: true,
         JobInputMapping: true,

@@ -19,7 +19,7 @@
       data-test="panel-error-data"
     >
       <OTooltip side="bottom" align="end" max-width="420px" hoverable>
-        <template #content><div style="white-space: pre-wrap">{{ error }}</div></template>
+        <template #content><div class="whitespace-pre-wrap">{{ error }}</div></template>
       </OTooltip>
     </OButton>
     <OButton
@@ -30,7 +30,7 @@
       data-test="panel-max-duration-warning"
     >
       <OTooltip side="bottom" align="end" max-width="420px" hoverable>
-        <template #content><div data-test="panel-max-duration-warning-content" style="white-space: pre-wrap">{{ maxQueryRangeWarning }}</div></template>
+        <template #content><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">{{ maxQueryRangeWarning }}</div></template>
       </OTooltip>
     </OButton>
     <OButton
@@ -39,11 +39,10 @@
       size="icon"
       data-test="panel-limit-number-of-series-warning"
     >
-      <template #icon-left
-        ><OIcon name="data-info-alert" size="sm"
+      <template #icon-left><OIcon name="data-info-alert" size="sm"
       /></template>
       <OTooltip side="bottom" align="end" hoverable>
-        <template #content><div style="white-space: pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
+        <template #content><div class="whitespace-pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template>
       </OTooltip>
     </OButton>
     <OButton
@@ -55,7 +54,7 @@
     >
       <OTooltip side="bottom" align="end" max-width="420px" hoverable>
         <template #content>
-          <div style="white-space: pre-wrap">{{ t('dashboard.xAliasInconsistencyWarning') }}</div>
+          <div class="whitespace-pre-wrap">{{ t('dashboard.xAliasInconsistencyWarning') }}</div>
         </template>
       </OTooltip>
     </OButton>
@@ -65,8 +64,7 @@
       size="icon"
       data-test="panel-is-cached-data-differ-with-current-time-range-warning"
     >
-      <template #icon-left
-        ><OIcon name="running-with-errors" size="sm"
+      <template #icon-left><OIcon name="running-with-errors" size="sm"
       /></template>
       <OTooltip side="bottom" align="end" hoverable :content="t('dashboard.panelErrorButtons.cachedDataDiffers')" />
     </OButton>
@@ -76,8 +74,7 @@
       size="icon"
       data-test="panel-partial-data-warning"
     >
-      <template #icon-left
-        ><OIcon name="clock-loader-20" size="sm"
+      <template #icon-left><OIcon name="clock-loader-20" size="sm"
       /></template>
       <OTooltip side="bottom" align="end" hoverable :content="t('dashboard.panelErrorButtons.partialData')" />
     </OButton>
@@ -163,12 +160,3 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.lastRefreshedAt::after {
-  content: "";
-}
-
-.lastRefreshedAt::before {
-  content: "";
-}
-</style>

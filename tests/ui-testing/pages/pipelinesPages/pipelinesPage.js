@@ -250,7 +250,7 @@ export class PipelinesPage {
         this.pipelineSavedMessage = page.locator('[data-test-message="Pipeline saved successfully"]');
         this.addEnrichmentTableText = page.locator('[data-test="enrichment-tables-add-btn"]');
         this.deletedSuccessfullyText = page.locator('[data-test-message*="deleted successfully"]');
-        this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) > .q-field > .q-field__inner > .q-field__control > .q-field__control-container > .q-field__native");
+        this.conditionDropdown = page.locator("div:nth-child(2) > div:nth-child(2) input");
         this.deleteButtonNth1 = page.locator("button").filter({ hasText: "delete" }).nth(1);
 
         // Condition-specific locators for comprehensive testing
@@ -501,15 +501,15 @@ export class PipelinesPage {
         await this.page.waitForLoadState('networkidle').catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // The data-test attribute is on a wrapper div, the q-select is inside
-        // Target the q-select input inside the wrapper
+        // The data-test attribute is on a wrapper div, the select trigger is inside
+        // Target the select trigger inside the wrapper
         const streamTypeWrapper = this.page.locator('[data-test="add-pipeline-stream-type-select"]');
         await streamTypeWrapper.waitFor({ state: 'visible', timeout: 15000 });
 
-        // Click on the q-select component inside the wrapper
-        const qSelect = streamTypeWrapper.locator('.q-select');
-        await qSelect.waitFor({ state: 'visible', timeout: 10000 });
-        await qSelect.click();
+        // Click on the select trigger inside the wrapper
+        const streamTypeSelect = streamTypeWrapper.locator('[role="combobox"]');
+        await streamTypeSelect.waitFor({ state: 'visible', timeout: 10000 });
+        await streamTypeSelect.click();
         await this.page.waitForTimeout(500);
     }
 
@@ -963,7 +963,7 @@ export class PipelinesPage {
         await this.dragStreamToTarget(this.conditionButton, { x: 250, y: 250 });
     }
     async fillColumnAndSelectOption(columnName) {
-        // Click the column select (q-select in FilterCondition)
+        // Click the column select in FilterCondition
         await this.columnSelect.locator('input').click();
         await this.columnSelect.locator('input').fill(columnName);
         await this.columnOption.click();
@@ -3045,7 +3045,7 @@ export class PipelinesPage {
     async testPauseToggle(rowIndex) {
         const pipelineRows = this.page.locator('[data-test*="pipeline-row"], tr:has([data-test*="pipeline"])');
         const row = pipelineRows.nth(rowIndex);
-        const pauseToggle = row.locator('[data-test*="pause"], [data-test*="toggle"], .q-toggle').first();
+        const pauseToggle = row.locator('[data-test*="pause"], [data-test*="toggle"]').first();
 
         if (await pauseToggle.isVisible().catch(() => false)) {
             const initialState = await pauseToggle.getAttribute('aria-pressed').catch(() => 'unknown');
@@ -3270,7 +3270,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isBackfillTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="backfill-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3429,7 +3429,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isHistoryTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="history-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="history-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3538,7 +3538,7 @@ export class PipelinesPage {
      * @returns {Promise<boolean>} True if table is visible
      */
     async isBackfillJobsTableVisible() {
-        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], table, .q-table').first();
+        const tableLocator = this.page.locator('[data-test*="backfill-table"], [data-test*="jobs-table"], table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3548,9 +3548,9 @@ export class PipelinesPage {
      */
     async isGenericTableVisible() {
         // TODO(data-test): backfill/jobs/generic tables don't yet expose a data-test
-        // root in their source components — keeping native <table>/.q-table fallback
+        // root in their source components — keeping native <table> fallback
         // until added in web/src/components/pipeline/ and shared table components.
-        const tableLocator = this.page.locator('table, .q-table').first();
+        const tableLocator = this.page.locator('table').first();
         return await tableLocator.isVisible({ timeout: 5000 }).catch(() => false);
     }
 
@@ -3573,12 +3573,12 @@ export class PipelinesPage {
      * Filter by pipeline name
      */
     async filterByPipeline() {
-        const pipelineFilter = this.page.locator('[data-test*="pipeline-filter"], [data-test*="pipeline-select"], .q-select').first();
+        const pipelineFilter = this.page.locator('[data-test*="pipeline-filter"], [data-test*="pipeline-select"]').first();
         if (await pipelineFilter.isVisible().catch(() => false)) {
             await pipelineFilter.click();
             await this.page.waitForTimeout(500);
             // Select first available option
-            const option = this.page.locator('.q-item').first();
+            const option = this.page.locator('[role="option"]').first();
             if (await option.isVisible().catch(() => false)) {
                 await option.click();
             }
@@ -3618,7 +3618,7 @@ export class PipelinesPage {
      * @returns {Promise<number>} Count of buttons
      */
     async getTableButtonCount() {
-        const buttons = await this.page.locator('table button, .q-table button').all();
+        const buttons = await this.page.locator('table button').all();
         return buttons.length;
     }
 
@@ -3903,7 +3903,7 @@ export class PipelinesPage {
 
     /**
      * Dismiss any open dialogs or menus.
-     * Use in afterEach cleanup instead of raw page.locator('.q-dialog').
+     * Use in afterEach cleanup instead of a raw dialog locator.
      */
     async dismissOpenDialogs() {
         try {

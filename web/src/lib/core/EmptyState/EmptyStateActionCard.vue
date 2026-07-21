@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 ps-3 pe-3.5 py-2.5 rounded-xl border border-border-default bg-surface-base shadow-sm text-left cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-[0.125rem] focus-visible:ring-primary-500/40"
+    class="group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 ps-3 pe-3.5 py-2.5 rounded-default border border-border-default bg-surface-base text-left cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-[0.125rem] focus-visible:ring-primary-500/40"
   >
     <span
-      class="relative inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-lg bg-tabs-active-bg text-tabs-active-text transition-colors group-hover:bg-primary-600 group-hover:text-white"
+      class="relative inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-tabs-active-bg text-tabs-active-text transition-colors group-hover:bg-primary-600 group-hover:text-white"
     >
       <OIcon :name="icon" size="md" />
     </span>
@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="relative flex-1 min-w-0">
       <span
         :title="label"
-        class="block text-sm font-medium text-text-primary wrap-break-word"
+        class="block text-sm font-medium text-text-heading wrap-break-word"
         >{{ label }}</span
       >
       <span
@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <OIcon
+      v-if="!hideChevron"
       name="chevron-right"
       size="sm"
       class="relative shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-primary-600"
@@ -60,5 +61,6 @@ defineProps<{
   icon: IconName;
   label: string;
   sublabel?: string;
+  hideChevron?: boolean;
 }>();
 </script>

@@ -48,8 +48,10 @@ export class ThemePage {
         // Theme Switcher
         this.themeToggleBtn = page.locator('[data-test="navbar-theme-toggle-btn"]');
 
-        // Body class for theme detection (the dark plugin adds 'body--dark')
-        this.bodyDarkClass = 'body--dark';
+        // Dark-mode detection. The dark-mode signal is the `.dark` class on
+        // <html> (document.documentElement) — set by utils/theme.ts. The legacy
+        // `body--dark` class on <body> was retired in the token migration.
+        this.bodyDarkClass = 'dark';
 
         // Notification — OToast surfaces success/error toasts under stable data-test slugs
         this.successToast = page.locator('[data-test-variant="success"]');
@@ -133,7 +135,7 @@ export class ThemePage {
         const bodyDarkClass = this.bodyDarkClass;
         await this.page.waitForFunction(
             ([darkClass, expectedDark]) => {
-                const isDark = document.body.classList.contains(darkClass);
+                const isDark = document.documentElement.classList.contains(darkClass);
                 return isDark !== expectedDark;
             },
             [bodyDarkClass, wasDark],
@@ -143,7 +145,7 @@ export class ThemePage {
 
     async isDarkMode() {
         const bodyDarkClass = this.bodyDarkClass;
-        return await this.page.evaluate((darkClass) => document.body.classList.contains(darkClass), bodyDarkClass);
+        return await this.page.evaluate((darkClass) => document.documentElement.classList.contains(darkClass), bodyDarkClass);
     }
 
     async isLightMode() {
@@ -334,7 +336,7 @@ export class ThemePage {
 
     async getThemeColor() {
         return await this.page.evaluate(() => {
-            return getComputedStyle(document.documentElement).getPropertyValue('--q-primary').trim();
+            return getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim();
         });
     }
 

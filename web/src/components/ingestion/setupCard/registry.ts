@@ -35,6 +35,11 @@ import snowflake from "./content/snowflake";
 import cassandra from "./content/cassandra";
 import databricks from "./content/databricks";
 import dynamodb from "./content/dynamodb";
+import kubernetes from "./content/kubernetes";
+import linux from "./content/linux";
+import windows from "./content/windows";
+import gcp from "./content/gcp";
+import otlpTraces from "./content/otlpTraces";
 
 /** Given per-org substitutions, returns a data source's setup-card content. */
 export type DataSourceCardBuilder = (
@@ -54,6 +59,11 @@ const registry: Record<string, DataSourceCardBuilder> = {
   cassandra,
   databricks,
   dynamoDB: dynamodb,
+  kubernetes,
+  linux,
+  windows,
+  gcp,
+  otlpTraces,
 };
 
 /** Whether a data source slug has an in-repo rich setup card. */
