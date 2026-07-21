@@ -17,7 +17,6 @@ import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
 import store from "@/stores";
-import { isWorkflowsDisabled } from "@/utils/featureGates";
 
 // Synthetics routes are gated on the backend /config flag `synthetics_enabled`
 // (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
@@ -29,13 +28,18 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
-// Workflows are gated on BOTH the enterprise/cloud build and the backend
-// /config flag `workflows_enabled`. Redirect home on direct URL access when the
-// flag is explicitly off. Uses isWorkflowsDisabled (not !isWorkflowsEnabled) so a
-// deep link is not bounced during the startup window where /config has not landed
-// yet — see the note in featureGate.ts.
+// Workflows routes are gated on the backend /config flag `workflows_enabled`
+// (enterprise O2_WORKFLOWS_ENABLED). The enterprise/cloud build check is already
+// implicit — this whole block only runs for those builds.
+//
+// Checks `=== false`, NOT `!== true`, and that is deliberate: /config is fetched
+// without await, so the flag is briefly undefined at startup. Redirecting on
+// "not yet known" would bounce a bookmarked /workflows to home on a cold load.
+// The sidebar entry takes the opposite stance (it requires `=== true`, so it
+// never flashes in) — the two are not meant to match. Same split as
+// syntheticsRouteGuard above.
 const workflowsRouteGuard = (to: any, from: any, next: any) => {
-  if (isWorkflowsDisabled()) {
+  if (store.state.zoConfig?.workflows_enabled === false) {
     next("/");
     return;
   }

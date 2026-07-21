@@ -98,7 +98,6 @@ import {
 } from "@/utils/alerts/anomalyFilterOperators";
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import config from "@/aws-exports";
-import { isWorkflowsEnabled } from "@/utils/featureGates";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import {
   makeAddAlertSchema,
@@ -312,7 +311,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // cannot make. Falls back to the strict "destination required" rule, which is
   // the same rule OSS gets. (Built once in setup — if /config has not landed
   // yet this is the stricter of the two, which is the safe direction.)
-  const addAlertSchema = makeAddAlertSchema(t, isWorkflowsEnabled());
+  const addAlertSchema = makeAddAlertSchema(
+    t,
+    (config.isEnterprise === "true" || config.isCloud === "true") &&
+      store.state.zoConfig?.workflows_enabled === true,
+  );
   const form = useOForm({
     defaultValues: buildDefaultForm() as Record<string, unknown>,
     schema: addAlertSchema,

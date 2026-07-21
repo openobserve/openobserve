@@ -292,7 +292,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import workflowService from "@/services/workflows";
-import { isWorkflowsEnabled } from "@/utils/featureGates";
 import config from "@/aws-exports";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
@@ -396,7 +395,11 @@ export default defineComponent({
     // `workflows_enabled`, via the same shared gate the sidebar and routes use.
     // Renamed from `workflowsEnabled` because it no longer means "enterprise build":
     // on an enterprise deployment with workflows switched off this is false.
-    const workflowsEnabled = computed(() => isWorkflowsEnabled());
+    const workflowsEnabled = computed(
+      () =>
+        (config.isEnterprise === "true" || config.isCloud === "true") &&
+        store.state.zoConfig?.workflows_enabled === true,
+    );
     const workflowOptions = ref<{ label: string; value: string }[]>([]);
     const fetchWorkflows = async () => {
       if (!workflowsEnabled.value) return;

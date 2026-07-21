@@ -180,7 +180,6 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
-import { isWorkflowsEnabled as workflowsEnabled } from "@/utils/featureGates";
 
 import { setLanguage } from "../utils/cookies";
 import { getLocale } from "../locales";
@@ -344,11 +343,16 @@ export default defineComponent({
     });
 
     // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
-    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`.
-    // Reactive so the menu picks it up regardless of whether the config response
-    // arrived before or after mount — the shared gate is the same one the routes
-    // and the alert workflow picker use.
-    const isWorkflowsEnabled = computed(() => workflowsEnabled());
+    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`
+    // (enterprise `O2_WORKFLOWS_ENABLED`). Reactive so the menu picks it up
+    // regardless of whether the config response arrived before or after mount.
+    // `=== true`, not truthy: /config is fetched without await, so the flag is
+    // briefly undefined and the entry must stay hidden rather than flash in.
+    const isWorkflowsEnabled = computed(
+      () =>
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig?.workflows_enabled === true,
+    );
 
     // Backend `/config` flag `online_evals_enabled` — controlled by
     // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
