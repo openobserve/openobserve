@@ -80,6 +80,34 @@ impl OAuthServerMetadata {
     }
 }
 
+/// OAuth 2.0 Protected Resource Metadata
+/// RFC 9728: https://datatracker.ietf.org/doc/html/rfc9728
+#[derive(Debug, Serialize)]
+pub struct OAuthProtectedResourceMetadata {
+    pub resource: String,
+    pub authorization_servers: Vec<String>,
+    pub scopes_supported: Vec<String>,
+    pub bearer_methods_supported: Vec<String>,
+}
+
+impl OAuthProtectedResourceMetadata {
+    /// Build RFC 9728 metadata: this MCP resource + the Dex auth server that guards it.
+    pub fn build(resource: &str, authorization_server: &str) -> Self {
+        Self {
+            resource: resource.to_string(),
+            authorization_servers: vec![authorization_server.to_string()],
+            scopes_supported: vec![
+                "openid".to_string(),
+                "email".to_string(),
+                "groups".to_string(),
+                "profile".to_string(),
+                "offline_access".to_string(),
+            ],
+            bearer_methods_supported: vec!["header".to_string()],
+        }
+    }
+}
+
 /// Handle a single MCP request (non-streaming)
 pub async fn handle_mcp_request(
     request: MCPRequest,
@@ -332,5 +360,18 @@ mod tests {
 
         // Should contain error in response
         assert!(data_str.contains("error"));
+    }
+
+    #[test]
+    fn protected_resource_metadata_build_shape() {
+        let m = OAuthProtectedResourceMetadata::build(
+            "http://localhost:5080/api/default/mcp",
+            "http://localhost:5556/dex",
+        );
+        let v = serde_json::to_value(&m).unwrap();
+        assert_eq!(v["resource"], "http://localhost:5080/api/default/mcp");
+        assert_eq!(v["authorization_servers"][0], "http://localhost:5556/dex");
+        assert_eq!(v["bearer_methods_supported"][0], "header");
+        assert!(v["scopes_supported"].as_array().unwrap().contains(&serde_json::json!("openid")));
     }
 }
