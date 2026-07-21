@@ -149,6 +149,29 @@ describe("FunctionsToolbar", () => {
     expect(wrapper.find('[data-test="function-transform-type-js-radio"]').exists()).toBe(false);
   });
 
+  it("hides the language toggle entirely when hideTransType is set", () => {
+    const wrapper = mount(FunctionsToolbar, {
+      props: {
+        name: "testFunction",
+        hideTransType: true,
+        transformTypeOptions: [
+          { label: "VRL", value: "0" },
+          { label: "JavaScript", value: "1" },
+        ],
+      },
+      global: {
+        plugins: [i18n, store, router],
+      },
+    });
+
+    expect(
+      wrapper.find('[data-test="function-transform-type-vrl-radio"]').exists(),
+    ).toBe(false);
+    expect(
+      wrapper.find('[data-test="function-transform-type-js-radio"]').exists(),
+    ).toBe(false);
+  });
+
   it("should emit test event when test button is clicked", async () => {
     const wrapper = mountToolbar({
       transformTypeOptions: [{ label: "VRL", value: "0" }],

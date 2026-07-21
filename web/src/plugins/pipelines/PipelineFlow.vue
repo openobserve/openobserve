@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template> -->
     <template #edge-custom="customEdgeProps">
-      <CustomEdge
+      <FlowEdge
         :id="customEdgeProps.id"
         :source-x="customEdgeProps.sourceX"
         :source-y="customEdgeProps.sourceY"
@@ -118,7 +118,7 @@ import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { ControlButton, Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
-import CustomEdge from "./CustomEdge.vue";
+import FlowEdge from "@/components/flow/FlowEdge.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
 import EdgeWithButton from "./EdgeWithButton.vue";
@@ -131,11 +131,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const { onInit } = useVueFlow();
 
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton,CustomEdge
+  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls,ControlButton,EdgeWithButton,FlowEdge
    },
   setup() {
     const { t } = useI18n();
     const {
+      onDragStart,
       onDragOver,
       onDrop,
       onDragLeave,
@@ -208,6 +209,7 @@ function resetTransform() {
 
     return {
       pipelineObj,
+      onDragStart,
       onDragOver,
       onDrop,
       onDragLeave,

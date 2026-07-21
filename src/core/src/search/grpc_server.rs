@@ -21,8 +21,9 @@ use proto::cluster_rpc::{
     CancelQueryRequest, CancelQueryResponse, DeleteResultRequest, DeleteResultResponse,
     GetLicenseUsageRequest, GetLicenseUsageResponse, GetResultRequest, GetResultResponse,
     GetSourcemapFileRequest, GetSourcemapFileResponse, GetTableRequest, GetTableResponse,
-    QueryStatusRequest, QueryStatusResponse, SearchPartitionRequest, SearchPartitionResponse,
-    SearchRequest, SearchResponse, search_server::Search,
+    GetWorkflowInputsRequest, GetWorkflowInputsResponse, QueryStatusRequest, QueryStatusResponse,
+    SearchPartitionRequest, SearchPartitionResponse, SearchRequest, SearchResponse,
+    search_server::Search,
 };
 use tonic::{Request, Response, Status};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -418,6 +419,74 @@ impl Search for Searcher {
         &self,
         _req: Request<proto::cluster_rpc::ReleaseQueryRequest>,
     ) -> Result<Response<proto::cluster_rpc::ReleaseQueryResponse>, Status> {
+        Err(Status::unimplemented("Not Supported"))
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn get_workflow_inputs(
+        &self,
+        req: Request<GetWorkflowInputsRequest>,
+    ) -> Result<Response<GetWorkflowInputsResponse>, Status> {
+        let req = req.into_inner();
+
+        let org_id = req.org_id;
+        let w_id = req.workflow_id;
+        let r_id = req.run_id;
+        let is_errors = req.is_error_data;
+
+        log::info!(
+            "got get request for inputs data for {org_id}/{w_id}/{r_id} error data {is_errors}"
+        );
+
+        let data = if is_errors {
+            let err = crate::service::workflows::get_workflow_errors(&org_id, &w_id, &r_id)
+                .await
+                .map_err(|e| {
+                    log::error!("error getting workflow errors for {org_id}/{w_id}/{r_id} : {e}");
+                    Status::internal(format!("error getting workflow error : {e}"))
+                })?;
+            match err {
+                Some(v) => {
+                    if let Some(v) = v.input_data {
+                        v
+                    } else {
+                        log::error!(
+                            "workflow errors input data for {org_id}/{w_id}/{r_id} not present in the cluster"
+                        );
+                        return Err(Status::internal(
+                            "workflow error data not stored".to_string(),
+                        ));
+                    }
+                }
+                None => {
+                    log::error!("workflow errors for {org_id}/{w_id}/{r_id} not found");
+                    return Err(Status::internal("workflow error not found".to_string()));
+                }
+            }
+        } else {
+            let err = crate::service::workflows::get_data_for_run(&org_id, &w_id, &r_id)
+                .await
+                .map_err(|e| {
+                    log::error!("error getting workflow rn data for {org_id}/{w_id}/{r_id} : {e}");
+                    Status::internal(format!("error getting workflow run data : {e}"))
+                })?;
+            match err {
+                Some(v) => v,
+                None => {
+                    log::error!("workflow run data for {org_id}/{w_id}/{r_id} not found");
+                    return Err(Status::internal("workflow run data not found".to_string()));
+                }
+            }
+        };
+
+        Ok(Response::new(GetWorkflowInputsResponse { data }))
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    async fn get_workflow_inputs(
+        &self,
+        _req: Request<GetWorkflowInputsRequest>,
+    ) -> Result<Response<GetWorkflowInputsResponse>, Status> {
         Err(Status::unimplemented("Not Supported"))
     }
 }

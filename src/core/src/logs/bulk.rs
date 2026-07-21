@@ -31,6 +31,7 @@ use config::{
     },
 };
 use infra::errors::Result;
+pub use transform::TRANSFORM_FAILED;
 
 use crate::{
     common::meta::ingestion::{
@@ -43,8 +44,6 @@ use crate::{
         schema::{get_future_discard_error, get_upto_discard_error},
     },
 };
-
-pub const TRANSFORM_FAILED: &str = "document_failed_transform";
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 pub const PIPELINE_EXEC_FAILED: &str = "pipeline_execution_failed";
