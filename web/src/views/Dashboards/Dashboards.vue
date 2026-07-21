@@ -84,11 +84,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`dashboard-migrate-${migration.key}`"
             @select="openMigration(migration.url)"
           >
-            <div class="flex flex-col">
-              <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60"
-                >{{ t(`dashboard.${migration.descKey}`) }}</span
-              >
+            <div class="flex items-center gap-2 w-full">
+              <div class="flex flex-col flex-1 min-w-0">
+                <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
+                <span class="text-xs text-dropdown-item-text opacity-60"
+                  >{{ t(`dashboard.${migration.descKey}`) }}</span
+                >
+              </div>
+              <OIcon
+                name="open-in-new"
+                size="xs"
+                class="shrink-0 text-dropdown-item-text opacity-60"
+              />
             </div>
           </ODropdownItem>
         </ODropdown>
