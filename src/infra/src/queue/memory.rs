@@ -281,12 +281,6 @@ impl super::Queue for MemoryQueue {
         if !inner.topics.contains_key(&topic_key) {
             return Err(QueueError::TopicNotFound(topic_key).into());
         }
-        // sweep expired entries first so their budget can be reused
-        let released = {
-            let topic_state = inner.topics.get_mut(&topic_key).unwrap();
-            sweep_expired(topic_state, &topic_key, now)
-        };
-        inner.used_bytes = inner.used_bytes.saturating_sub(released);
 
         let Some(accounted) = (value.len() as u64).checked_add(ENTRY_ACCOUNTING_OVERHEAD_BYTES)
         else {
@@ -308,6 +302,20 @@ impl super::Queue for MemoryQueue {
                 limit_bytes: limit,
             }
             .into());
+        }
+        if inner.used_bytes.saturating_add(accounted) > limit {
+            // lazy sweep: only when capacity is short, reclaim expired
+            // entries (from every topic, the budget is global) so a queue
+            // full of expired garbage cannot reject a valid publication; the
+            // happy path stays O(1) and routine expiration is handled by the
+            // maintenance loop
+            let mut released = 0u64;
+            let keys: Vec<String> = inner.topics.keys().cloned().collect();
+            for key in keys {
+                let topic_state = inner.topics.get_mut(&key).unwrap();
+                released += sweep_expired(topic_state, &key, now);
+            }
+            inner.used_bytes = inner.used_bytes.saturating_sub(released);
         }
         if inner.used_bytes.saturating_add(accounted) > limit {
             metrics::QUEUE_PUBLISH_TOTAL
@@ -914,6 +922,29 @@ mod tests {
         q.create("t1").await.unwrap();
         let err = q.create("t2").await.unwrap_err();
         assert_queue_error(err, |e| matches!(e, QueueError::QueueFull { .. }));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_publish_reclaims_expired_budget_when_full() {
+        // room for the topic plus exactly two 10-byte messages
+        let limit = topic_overhead(TOPIC) + 2 * entry_bytes(10);
+        let q = MemoryQueue::new(limit);
+        let config = super::super::QueueConfigBuilder::new()
+            .max_age(Duration::from_secs(5))
+            .build();
+        q.create_with_config(TOPIC, config).await.unwrap();
+        q.publish(TOPIC, Bytes::from(vec![0u8; 10])).await.unwrap();
+        q.publish(TOPIC, Bytes::from(vec![1u8; 10])).await.unwrap();
+        let err = q
+            .publish(TOPIC, Bytes::from(vec![2u8; 10]))
+            .await
+            .unwrap_err();
+        assert_queue_error(err, |e| matches!(e, QueueError::QueueFull { .. }));
+        // once the backlog expires, its budget is reclaimed and the same
+        // publication succeeds
+        tokio::time::sleep(Duration::from_secs(6)).await;
+        q.publish(TOPIC, Bytes::from(vec![2u8; 10])).await.unwrap();
+        assert_eq!(q.used_bytes(), topic_overhead(TOPIC) + entry_bytes(10));
     }
 
     #[tokio::test(start_paused = true)]
