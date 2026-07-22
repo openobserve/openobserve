@@ -34,11 +34,11 @@
           align="left"
           @change="activeSection = ($event as 'checks' | 'private')"
         >
-          <OTab value="checks">
+          <OTab name="checks">
             <OIcon name="radar" size="sm" />
             <span>{{ t('synthetics.tabs.checks') }}</span>
           </OTab>
-          <OTab value="private">
+          <OTab name="private">
             <OIcon name="location-on" size="sm" />
             <span>{{ t('synthetics.tabs.private') }}</span>
           </OTab>
