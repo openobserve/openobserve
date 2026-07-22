@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="composite-term-card card-container border border-border-default rounded-md"
+    class="composite-term-card card-container border border-border-default rounded-surface"
     :data-test="`composite-term-card-${term.name}`"
   >
     <!-- Header: collapse + alias + mode toggle + remove -->
@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <button
         type="button"
-        class="shrink-0 cursor-pointer text-text-secondary hover:text-text-primary flex items-center"
+        class="shrink-0 cursor-pointer text-text-secondary hover:text-text-body flex items-center"
         :data-test="`composite-term-${term.name}-collapse`"
         @click="collapsed = !collapsed"
       >
@@ -34,11 +34,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
 
       <div class="flex items-center gap-1.5">
-        <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.alias") }} <span class="text-text-primary">*</span></span>
+        <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.alias") }} <span class="text-text-body">*</span></span>
         <OInput
           :model-value="term.name"
           placeholder="A"
-          class="w-[90px] h-[28px]! min-h-[28px]!"
+          class="w-22.5 h-7! min-h-7!"
           :data-test="`composite-term-${term.name}-alias`"
           @update:model-value="onAliasInput"
         />
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Compact summary when collapsed -->
       <span
         v-if="collapsed"
-        class="text-xs text-text-secondary truncate max-w-[280px]"
+        class="text-xs text-text-secondary truncate max-w-70"
         :title="collapsedSummary"
       >
         {{ collapsedSummary }}
@@ -84,14 +84,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Existing: pick an alert from this folder -->
     <div v-if="term.mode === 'existing'" class="px-3 py-2.5 flex flex-col gap-2">
       <div class="flex items-center gap-1.5">
-        <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.memberAlert") }} <span class="text-text-primary">*</span></span>
+        <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.memberAlert") }} <span class="text-text-body">*</span></span>
         <OSelect
           :model-value="term.alert_id"
           :options="memberOptions"
           :loading="loadingMembers"
           searchable
           :placeholder="t('alerts.composite.selectMember')"
-          class="flex-1 min-w-[220px] h-[28px]! min-h-[28px]!"
+          class="flex-1 min-w-55 h-7! min-h-7!"
           :data-test="`composite-term-${term.name}-member`"
           @update:model-value="onMemberSelect"
         />
@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="info" size="xs" class="shrink-0" />
         <span class="min-w-0">
           {{ t("alerts.composite.memberTriggersWhen") }}
-          <span class="text-text-primary font-medium">{{ operatorText }} {{ selectedMember.threshold }}</span>
+          <span class="text-text-body font-medium">{{ operatorText }} {{ selectedMember.threshold }}</span>
         </span>
         <div class="flex-1" />
         <button
@@ -125,24 +125,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-else>
       <div class="flex items-center gap-4 px-3 py-2 flex-wrap">
         <div class="flex items-center gap-1.5">
-          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.streamType") }} <span class="text-text-primary">*</span></span>
+          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.streamType") }} <span class="text-text-body">*</span></span>
           <OSelect
             :model-value="term.draft.stream_type"
             :options="streamTypes"
             :searchable="false"
             :disabled="locked"
-            class="h-[28px]! min-h-[28px]!"
+            class="h-7! min-h-7!"
             @update:model-value="onStreamTypeChange"
           />
         </div>
         <div class="flex items-center gap-1.5">
-          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.stream_name") }} <span class="text-text-primary">*</span></span>
+          <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.stream_name") }} <span class="text-text-body">*</span></span>
           <OSelect
             :model-value="term.draft.stream_name"
             :options="streamNameOptions"
             :loading="isFetchingStreams"
             :disabled="locked || !term.draft.stream_type"
-            class="h-[28px]! min-h-[28px]! min-w-[160px]"
+            class="h-7! min-h-7! min-w-40"
             @update:model-value="onStreamNameChange"
           />
         </div>

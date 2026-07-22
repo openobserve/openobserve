@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="info"
               size="sm"
-              class="cursor-pointer text-gray-400 hover:text-text-primary"
+              class="cursor-pointer text-text-secondary hover:text-text-heading"
               data-test="add-alert-mode-info"
               @click="setCompositeInfoDismissed(!compositeInfoDismissed)"
             />
