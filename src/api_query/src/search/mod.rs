@@ -74,6 +74,7 @@ use crate::{
     },
 };
 
+pub mod agent_format;
 pub(crate) mod around;
 pub mod error_utils;
 pub mod multi_streams;
@@ -226,7 +227,7 @@ async fn can_use_distinct_stream(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more.",
+            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets.",
             "category": "search",
             "pinned": true
         }))
@@ -513,6 +514,10 @@ pub async fn search(
             {
                 res.function_error.clear();
                 res.is_partial = false;
+            }
+
+            if let Some(opts) = req.agent_options.as_ref() {
+                agent_format::apply_output_format(&mut res, opts.output_format);
             }
 
             Json(res).into_response()
@@ -1047,6 +1052,7 @@ pub async fn build_search_request_per_field(
         use_cache: req.use_cache,
         clear_cache: req.clear_cache,
         local_mode: None,
+        agent_options: None,
     };
 
     let distinct_prefix = if can_use_distinct_stream {
@@ -1284,6 +1290,7 @@ async fn values_v1(
         use_cache: default_use_cache(),
         clear_cache: get_clear_cache_from_request(query),
         local_mode: None,
+        agent_options: None,
     };
 
     req.use_cache = get_use_cache_from_request(query);

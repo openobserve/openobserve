@@ -490,6 +490,7 @@ pub async fn get_latest_traces(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     req.use_cache = get_use_cache_from_request(&query);
@@ -1310,6 +1311,7 @@ async fn process_latest_traces_stream(
         use_cache,
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     // Get time partitions

@@ -1085,6 +1085,9 @@ mod tests {
                 query_index: None,
                 peak_memory_usage: Some(1024000.0),
                 histogram_breakdown_field: None,
+                format: None,
+                data: None,
+                advisory: None,
             },
             deltas: vec![],
             has_cached_data: true,
@@ -1204,6 +1207,9 @@ mod tests {
                     query_index: None,
                     peak_memory_usage: Some(1024000.0),
                     histogram_breakdown_field: None,
+                    format: None,
+                    data: None,
+                    advisory: None,
                 },
                 deltas: vec![],
                 has_cached_data: true,
@@ -1244,6 +1250,9 @@ mod tests {
                     query_index: None,
                     peak_memory_usage: Some(1024000.0),
                     histogram_breakdown_field: None,
+                    format: None,
+                    data: None,
+                    advisory: None,
                 },
                 deltas: vec![],
                 has_cached_data: true,
@@ -1313,6 +1322,7 @@ mod tests {
             use_cache: true,
             clear_cache: false,
             local_mode: None,
+            agent_options: None,
         };
         let mut origin_sql = req.query.sql.clone();
         let file_path = "test_org/logs/test_stream".to_string();
