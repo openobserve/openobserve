@@ -1100,6 +1100,10 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
             .route(
+                "/{org_id}/ai/usage_limit",
+                put(organization::org::set_ai_usage_limit),
+            )
+            .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
                 get(cloud::org_usage::get_org_usage),
             )

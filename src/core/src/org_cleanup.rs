@@ -380,12 +380,14 @@ async fn delete_org_cipher_keys(org_id: &str) -> Result<(), anyhow::Error> {
 }
 
 async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
+    #[cfg(feature = "cloud")]
+    use infra::table::trial_quota_usage;
     use infra::table::{
         action_scripts, alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards,
         destinations, distinct_values, enrichment_table_urls, enrichment_tables, folders,
         incident_events, kv_store, org_ingestion_tokens, org_storage_providers, re_pattern,
         re_pattern_stream_map, reports, search_queue, service_streams, short_urls, system_settings,
-        templates, timed_annotations, trial_quota_usage,
+        templates, timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -465,6 +467,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     org_storage_providers::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_storage_providers: {e}"))?;
+    #[cfg(feature = "cloud")]
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
