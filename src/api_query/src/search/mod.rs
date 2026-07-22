@@ -498,7 +498,7 @@ pub async fn search(
             user_id,
             &mut req,
             stream_type,
-            stream_names,
+            stream_names.clone(),
             get_fallback_order_by_col_from_request(&url_query),
             range_error,
             http_span,
@@ -541,6 +541,9 @@ pub async fn search(
             Json(res).into_response()
         }
         Err(err) => {
+            // swap the engine's pruned valid-fields list for the real schema
+            // so the error response can carry useful suggestions
+            let err = utils::enrich_field_error(err, &org_id, stream_type, &stream_names).await;
             let search_type = req
                 .search_type
                 .map(|t| t.to_string())

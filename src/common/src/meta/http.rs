@@ -46,6 +46,12 @@ pub struct HttpResponse {
     pub error_detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trace_id: Option<String>,
+    /// One-line guidance on how to fix the error (agent self-correction, D4).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
+    /// Closest valid alternatives for a mistyped field/function name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestions: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -64,6 +70,8 @@ impl HttpResponse {
             name: None,
             error_detail: None,
             trace_id: None,
+            hint: None,
+            suggestions: None,
         }
     }
 
@@ -75,6 +83,8 @@ impl HttpResponse {
             name: None,
             error_detail: None,
             trace_id: None,
+            hint: None,
+            suggestions: None,
         }
     }
 
@@ -86,6 +96,8 @@ impl HttpResponse {
             name: None,
             error_detail: Some(err.get_error_detail()),
             trace_id: None,
+            hint: None,
+            suggestions: None,
         }
     }
 
@@ -97,6 +109,8 @@ impl HttpResponse {
             name: None,
             error_detail: Some(err.get_error_detail()),
             trace_id,
+            hint: None,
+            suggestions: None,
         }
     }
 
@@ -319,6 +333,8 @@ mod tests {
             name: Some("test".to_string()),
             error_detail: None,
             trace_id: Some("trace-123".to_string()),
+            hint: None,
+            suggestions: None,
         };
 
         let serialized = serde_json::to_string(&response).unwrap();
@@ -415,6 +431,8 @@ mod tests {
             name: None,
             error_detail: None,
             trace_id: None,
+            hint: None,
+            suggestions: None,
         };
         let serialized = serde_json::to_string(&response).unwrap();
         assert!(!serialized.contains("id"));
@@ -445,6 +463,8 @@ mod tests {
             name: Some("my-name".to_string()),
             error_detail: Some("detail".to_string()),
             trace_id: Some("trace-abc".to_string()),
+            hint: None,
+            suggestions: None,
         };
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("\"id\""));
@@ -462,6 +482,8 @@ mod tests {
             name: None,
             error_detail: None,
             trace_id: None,
+            hint: None,
+            suggestions: None,
         };
         let response = http_response.into_response();
         assert_eq!(response.status(), http::StatusCode::OK);
@@ -488,6 +510,8 @@ mod tests {
             name: None,
             error_detail: None,
             trace_id: None,
+            hint: None,
+            suggestions: None,
         };
         let response = http_response.into_response();
         assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
