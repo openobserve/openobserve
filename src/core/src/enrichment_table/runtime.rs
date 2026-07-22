@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-pub use ::db::enrichment_table::*;
 use config::{QUERY_WITH_NO_LIMIT, ider, meta::stream::StreamType};
 use infra::db as infra_db;
 #[cfg(feature = "enterprise")]
@@ -44,24 +43,16 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 let org_id = keys[0];
                 let stream_name = keys[2];
 
-                let data = match super::super::enrichment::get_enrichment_table(
-                    org_id,
-                    stream_name,
-                    false,
-                )
-                .await
+                let data = match crate::enrichment::get_enrichment_table(org_id, stream_name, false)
+                    .await
                 {
                     Ok(data) => data,
                     Err(e) => {
                         log::error!(
                             "[ENRICHMENT::TABLE watch] get enrichment table {org_id}/{stream_name} error, trying again: {e}"
                         );
-                        match super::super::enrichment::get_enrichment_table(
-                            org_id,
-                            stream_name,
-                            false,
-                        )
-                        .await
+                        match crate::enrichment::get_enrichment_table(org_id, stream_name, false)
+                            .await
                         {
                             Ok(data) => data,
                             Err(e) => {

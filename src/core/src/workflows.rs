@@ -26,13 +26,26 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    common::{infra::config::ALERTS, utils::get_nats_lock},
+    common::{
+        infra::config::ALERTS,
+        meta::authz::Authz,
+        utils::{
+            auth::{remove_ownership, set_ownership},
+            get_nats_lock,
+        },
+    },
     service::{
         db,
         pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
         self_reporting::publish_triggers_usage,
     },
 };
+
+pub mod runtime {
+    pub use crate::workflows_runtime::{
+        WORKFLOW_TRIGGER_PREFIX, clean, send_workflow_trigger, watch_workflow_triggers,
+    };
+}
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub enum WorkflowTriggerType {
@@ -303,13 +316,16 @@ async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
 
 pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow).await?;
-    db::workflows::save_workflow(workflow).await?;
+    db::workflows::save_workflow_record(workflow.clone()).await?;
+    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
 
 pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow).await?;
-    db::workflows::update_workflow(workflow).await?;
+    db::workflows::update_workflow_record(workflow.clone()).await?;
+    db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
 
@@ -323,7 +339,8 @@ pub async fn enable_disable_workflow(
         return Err(anyhow::anyhow!("workflow with id {id} not found"));
     };
     workflow.enabled = enabled;
-    db::workflows::update_workflow(workflow).await?;
+    db::workflows::update_workflow_record(workflow.clone()).await?;
+    db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
 
@@ -367,7 +384,9 @@ pub async fn delete_workflow(org_id: &str, id: &str) -> Result<(), anyhow::Error
         }
     }
 
-    db::workflows::delete_workflow(org_id, id).await?;
+    db::workflows::delete_workflow_record(id).await?;
+    remove_ownership(org_id, "workflows", Authz::new(id)).await;
+    db::workflows::notify_workflow_delete(id).await?;
     Ok(())
 }
 
@@ -583,7 +602,7 @@ pub async fn send_workflow_trigger(
         run_id: run_id.clone(),
         origin_cluster: config::get_cluster_name(),
     };
-    db::workflows::send_workflow_trigger(trigger).await?;
+    runtime::send_workflow_trigger(trigger).await?;
     log::info!("successfully sent workflow trigger for trace id {trace_id} run id {run_id}");
 
     Ok(())

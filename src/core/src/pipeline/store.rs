@@ -15,6 +15,7 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
+use ::db::pipeline as db_pipeline;
 use config::{
     cluster::LOCAL_NODE,
     meta::{
@@ -22,11 +23,7 @@ use config::{
         stream::StreamParams,
     },
 };
-use infra::{
-    coordinator::pipelines::PIPELINES_WATCH_PREFIX,
-    db,
-    pipeline::{self as infra_pipeline},
-};
+use infra::{coordinator::pipelines::PIPELINES_WATCH_PREFIX, db};
 
 use crate::{
     common::infra::config::{
@@ -75,7 +72,7 @@ impl From<infra::errors::Error> for PipelineError {
 ///
 /// Pipeline validation should be handled by the caller.
 pub async fn set(pipeline: &Pipeline) -> Result<(), PipelineError> {
-    infra_pipeline::put(pipeline).await?;
+    db_pipeline::put(pipeline).await?;
     update_cache(PipelineTableEvent::Add(pipeline)).await;
 
     Ok(())
@@ -93,7 +90,7 @@ pub async fn update(
         update_cache(PipelineTableEvent::Remove(&pipeline.id)).await;
     }
 
-    infra_pipeline::put(pipeline).await?;
+    db_pipeline::put(pipeline).await?;
     update_cache(PipelineTableEvent::Add(pipeline)).await;
 
     Ok(())
@@ -101,7 +98,7 @@ pub async fn update(
 
 /// Returns all streams with existing pipelines.
 pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>, PipelineError> {
-    Ok(infra_pipeline::list_streams_with_pipeline(org).await?)
+    Ok(db_pipeline::list_streams_with_pipeline(org).await?)
 }
 
 /// Retrieve cached ExecutablePipelines for a stream. User pipelines come first,
@@ -121,7 +118,7 @@ pub async fn get_executable_pipelines(stream_params: &StreamParams) -> Vec<Execu
 
 /// Returns all realtime pipelines for the given stream. User pipelines first.
 pub async fn get_by_stream(stream_params: &StreamParams) -> Vec<Pipeline> {
-    infra_pipeline::get_by_stream(stream_params)
+    db_pipeline::get_by_stream(stream_params)
         .await
         .unwrap_or_default()
 }
@@ -130,7 +127,7 @@ pub async fn get_by_stream(stream_params: &StreamParams) -> Vec<Pipeline> {
 ///
 /// Used to get the pipeline associated with the ID when scheduled job is ran.
 pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline, PipelineError> {
-    Ok(infra_pipeline::get_by_id(pipeline_id).await?)
+    Ok(db_pipeline::get_by_id(pipeline_id).await?)
 }
 
 /// Returns the owning org for a pipeline id from the in-memory `PIPELINE_ID_TO_ORG` cache.
@@ -143,7 +140,7 @@ pub async fn get_org_by_id(pipeline_id: &str) -> Option<String> {
     if let Some(org) = PIPELINE_ID_TO_ORG.read().await.get(pipeline_id).cloned() {
         return Some(org);
     }
-    match infra_pipeline::get_by_id(pipeline_id).await {
+    match db_pipeline::get_by_id(pipeline_id).await {
         Ok(p) => {
             PIPELINE_ID_TO_ORG
                 .write()
@@ -218,17 +215,17 @@ pub async fn clear_scheduled_pipelines_cache() {
 pub async fn get_with_same_source_stream(
     pipeline: &Pipeline,
 ) -> Result<Vec<Pipeline>, PipelineError> {
-    Ok(infra_pipeline::get_with_same_source_stream(pipeline).await?)
+    Ok(db_pipeline::get_with_same_source_stream(pipeline).await?)
 }
 
 /// Lists all pipelines across all orgs.
 pub async fn list() -> Result<Vec<Pipeline>, PipelineError> {
-    Ok(infra_pipeline::list().await?)
+    Ok(db_pipeline::list().await?)
 }
 
 /// Lists all pipelines for a given organization.
 pub async fn list_by_org(org: &str) -> Result<Vec<Pipeline>, PipelineError> {
-    Ok(infra_pipeline::list_by_org(org).await?)
+    Ok(db_pipeline::list_by_org(org).await?)
 }
 
 /// Deletes a pipeline by ID.
@@ -236,7 +233,7 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
     // remove from cache first
     update_cache(PipelineTableEvent::Remove(pipeline_id)).await;
 
-    infra_pipeline::delete(pipeline_id).await?;
+    db_pipeline::delete(pipeline_id).await?;
 
     Ok(())
 }

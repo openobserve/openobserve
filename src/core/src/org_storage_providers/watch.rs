@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-pub use ::db::org_storage_providers::*;
+use db::org_storage_providers::OSP_PREFIX;
 use infra::{db::Event, table::org_storage_providers::OrgStorageProvider};
 use parquet::data_type::AsBytes;
 
@@ -46,12 +46,8 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     continue;
                 };
                 let org_id = entry.org_id.clone();
-                let provider = match super::super::org_storage_providers::get_provider(
-                    &org_id,
-                    entry.provider_type,
-                    &entry.data,
-                )
-                .await
+                let provider = match super::get_provider(&org_id, entry.provider_type, &entry.data)
+                    .await
                 {
                     Ok(provider) => provider,
                     Err(err) => {

@@ -29,6 +29,8 @@ pub mod distinct_values;
 pub mod enrichment_table;
 pub mod file_list;
 pub mod functions;
+#[cfg(feature = "enterprise")]
+pub mod keys;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod license;
@@ -43,6 +45,7 @@ pub mod org_status;
 pub mod org_storage_providers;
 pub mod org_users;
 pub mod organization;
+pub mod pipeline;
 pub mod pipeline_errors;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
@@ -57,6 +60,8 @@ pub mod short_url;
 pub mod sourcemaps;
 pub mod system_settings;
 pub mod user;
+#[cfg(feature = "enterprise")]
+pub mod workflows;
 
 pub use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 

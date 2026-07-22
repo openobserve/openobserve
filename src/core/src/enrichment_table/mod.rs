@@ -50,9 +50,11 @@ use crate::{
 };
 
 pub mod geoip;
+mod runtime;
 pub mod url_processor;
 
 // Re-export the initialization function for easy access
+pub use runtime::{get_enrichment_table_data, watch};
 pub use url_processor::init_url_processor;
 
 pub async fn save_enrichment_data(

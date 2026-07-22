@@ -30,7 +30,8 @@ pub mod cache;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
-pub mod db;
+// Compatibility re-export only. Database implementations live in the `db` crate.
+pub use ::db;
 pub mod enrichment;
 pub mod enrichment_table;
 pub mod file_downloader;
@@ -38,18 +39,22 @@ pub mod file_list;
 pub mod file_list_dump;
 pub mod folders;
 pub mod functions;
+mod functions_cache;
 pub mod github;
 pub mod grpc;
 pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
 pub mod ingestion_types;
+#[cfg(feature = "enterprise")]
+pub mod keys;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
+pub mod model_pricing;
 pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
@@ -67,6 +72,7 @@ pub mod providers;
 pub mod ratelimit;
 pub mod runtime_metrics;
 pub mod schema;
+mod schema_watcher;
 pub mod search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
@@ -86,6 +92,8 @@ pub mod trial_quota;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
+#[cfg(feature = "enterprise")]
+mod workflows_runtime;
 
 /// Compatibility namespace for the common crate. Authentication and stream-query helpers remain
 /// available at their historical paths while their service-backed implementations live in the

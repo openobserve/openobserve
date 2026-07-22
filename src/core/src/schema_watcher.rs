@@ -13,12 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Runtime watchers for schema and enrichment-table cache updates.
+
 use std::{
     sync::{Arc, atomic::Ordering},
     time::Duration,
 };
 
-pub use ::db::schema::*;
 use arrow_schema::Schema;
 use config::{
     cluster::LOCAL_NODE_ID,
@@ -228,7 +229,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 drop(w);
                 cache::stats::remove_stream_stats(org_id, stream_name, stream_type);
                 if let Err(e) =
-                    super::compact::files::del_offset(org_id, stream_type, stream_name).await
+                    ::db::compact::files::del_offset(org_id, stream_type, stream_name).await
                 {
                     log::error!("[Schema:watch] del_offset: {e}");
                 }
@@ -493,8 +494,7 @@ pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
         // Only use the primary region if specified to fetch enrichment table data assuming only the
         // primary region contains the data.
         let data =
-            super::super::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true)
-                .await?;
+            crate::enrichment::get_enrichment_table(&tbl.org_id, &tbl.stream_name, true).await?;
         let len = data.len();
         ENRICHMENT_TABLES.insert(
             key,

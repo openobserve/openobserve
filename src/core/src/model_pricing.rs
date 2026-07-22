@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Built-in Model Pricing Sync
+//! Built-in model-pricing synchronization.
 //!
 //! Syncs model pricing definitions from the configured GitHub source into the database
 //! under the `_openobserve` org. Runs on startup and periodically (every 6h by default).
@@ -29,7 +29,7 @@ use config::meta::model_pricing::{
 use infra::table;
 use serde::{Deserialize, Serialize};
 
-use crate::service::github::GitHubDataService;
+use crate::github::GitHubDataService;
 
 /// Shared GitHub data service instance (reused by the cron and the built-in endpoint).
 pub static GITHUB_SERVICE: LazyLock<GitHubDataService> = LazyLock::new(GitHubDataService::new);

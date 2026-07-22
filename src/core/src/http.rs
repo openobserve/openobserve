@@ -30,11 +30,9 @@ use crate::{
     service::{
         alerts::alert::AlertError,
         dashboards::{DashboardError, reports::ReportError},
-        db::{
-            alerts::{destinations::DestinationError, templates::TemplateError},
-            pipeline::PipelineError,
-        },
+        db::alerts::{destinations::DestinationError, templates::TemplateError},
         folders::FolderError,
+        pipeline::PipelineError,
     },
 };
 

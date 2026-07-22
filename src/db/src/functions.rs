@@ -20,6 +20,44 @@ use config::{meta::function::Transform, utils::json};
 
 use crate as db;
 
+#[derive(Debug)]
+pub struct FunctionCacheError {
+    pub org_id: String,
+    pub function_name: String,
+    pub message: String,
+}
+
+/// Load function definitions into the shared function cache.
+///
+/// Invalid entries are returned to the application service so it can publish
+/// self-reporting events without introducing a dependency from `db` to Core.
+pub async fn load_cache() -> Result<Vec<FunctionCacheError>, anyhow::Error> {
+    let key = "/function/";
+    let functions = db::list(key).await?;
+    let mut errors = Vec::new();
+
+    for (item_key, item_value) in functions {
+        let item_key = item_key.strip_prefix(key).unwrap();
+        let function: Transform = match json::from_slice(&item_value) {
+            Ok(function) => function,
+            Err(err) => {
+                log::error!("Error deserializing function {item_key}: {err}");
+                let mut parts = item_key.splitn(2, '/');
+                errors.push(FunctionCacheError {
+                    org_id: parts.next().unwrap_or_default().to_string(),
+                    function_name: parts.next().unwrap_or(item_key).to_string(),
+                    message: format!("Error deserializing function: {err}"),
+                });
+                continue;
+            }
+        };
+        QUERY_FUNCTIONS.insert(item_key.to_string(), function);
+    }
+
+    log::info!("Functions Cached");
+    Ok(errors)
+}
+
 pub async fn set(org_id: &str, name: &str, func_val: &Transform) -> Result<(), anyhow::Error> {
     let key = format!("/function/{org_id}/{name}");
     let val = json::to_vec(func_val)?;
