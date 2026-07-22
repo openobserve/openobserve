@@ -11,6 +11,8 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "dep:openobserve-cipher",
+    "openobserve-cipher/enterprise",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
@@ -65,6 +67,7 @@ anyhow.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
+openobserve-cipher = { workspace = true, optional = true }
 datafusion.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true

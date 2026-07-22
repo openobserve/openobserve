@@ -3598,6 +3598,43 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46c4cf71a36b46dcfc00e5014c0c20ccad2b1b6a008304d7d57d2749b2d41b3d"
 
 [[package]]
+name = "db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "cron",
+ "dashmap",
+ "hashbrown 0.16.1",
+ "hashlink 0.11.0",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-cipher",
+ "parquet",
+ "proto",
+ "rayon",
+ "regex",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "svix-ksuid",
+ "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tracing",
+ "transform",
+]
+
+[[package]]
 name = "dbl"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6827,6 +6864,7 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-api-management",
  "openobserve-api-query",
+ "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
  "opentelemetry",
@@ -6940,6 +6978,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-cipher"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.16.1",
+ "o2_enterprise",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
 name = "openobserve-core"
 version = "0.1.0"
 dependencies = [
@@ -6965,6 +7015,7 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
+ "db",
  "expect-test",
  "flate2",
  "flight",
@@ -9651,6 +9702,7 @@ dependencies = [
  "memchr",
  "o2_enterprise",
  "object_store",
+ "openobserve-cipher",
  "opentelemetry",
  "parking_lot 0.12.5",
  "parquet",

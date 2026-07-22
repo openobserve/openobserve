@@ -32,11 +32,8 @@ use infra::{
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 use openobserve_core::service::{
-    db::{
-        sourcemaps::SOURCEMAP_PREFIX,
-        workflows::{WORKFLOW_TRIGGER_PREFIX, WORKFLOWS_PREFIX},
-    },
-    workflows::WorkflowTrigger,
+    db::{sourcemaps::SOURCEMAP_PREFIX, workflows::WORKFLOWS_PREFIX},
+    workflows::{WorkflowTrigger, runtime::WORKFLOW_TRIGGER_PREFIX},
 };
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
