@@ -106,7 +106,7 @@ limitations under the License.
         <!-- Email Preview -->
         <div v-if="type === 'email'" data-test="email-preview" class="email-client max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="email-header bg-[var(--color-brand-msg-bg)] p-4 border-b border-[var(--color-brand-msg-border)]">
-            <div data-test="email-subject" class="email-subject font-bold text-base mb-2">
+            <div data-test="email-subject" class="email-subject font-bold text-base mb-2 text-[var(--color-brand-msg-text-strong)]">
               Subject: 🚨 OpenObserve Alert Notification
             </div>
             <div data-test="email-from" class="email-from text-[var(--color-brand-msg-meta)] text-sm mb-1">

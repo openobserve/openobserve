@@ -71,7 +71,7 @@
           </div>
 
           <div class="job-field job-field--desc">
-            <label class="job-field__label">{{ t("onlineEvals.job.descriptionLabel") }}</label>
+            <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">{{ t("onlineEvals.job.descriptionLabel") }}</label>
             <OFormTextarea
               name="description"
               :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
@@ -115,7 +115,7 @@
           <div class="flex flex-col gap-3 py-3.5 px-4">
           <div class="job-field-row grid grid-cols-2 max-[68.75rem]:grid-cols-1 gap-3.5">
             <div class="job-field">
-              <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
+              <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
               <OFormSelect
                 name="samplingMode"
                 :options="samplingModeOptions"
