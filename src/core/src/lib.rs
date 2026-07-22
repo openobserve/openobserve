@@ -17,9 +17,6 @@
 
 #![recursion_limit = "256"]
 
-#[cfg(feature = "enterprise")]
-pub use ::search::cipher;
-
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
@@ -30,14 +27,16 @@ pub mod cache;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
-pub mod db;
+// Compatibility re-export only. Database implementations live in the `db` crate.
+pub use ::db;
 pub mod enrichment;
 pub mod enrichment_table;
 pub mod file_downloader;
 pub mod file_list;
-pub mod file_list_dump;
-pub mod folders;
+pub use ::db::folders;
+pub use search_service::file_list_dump;
 pub mod functions;
+mod functions_cache;
 pub mod github;
 pub mod grpc;
 pub mod http;
@@ -50,6 +49,7 @@ pub mod llm_evaluations;
 pub mod logs;
 pub mod metadata;
 pub mod metrics;
+pub mod model_pricing;
 pub mod node;
 #[cfg(feature = "enterprise")]
 pub mod ofga;
@@ -67,7 +67,8 @@ pub mod providers;
 pub mod ratelimit;
 pub mod runtime_metrics;
 pub mod schema;
-pub mod search;
+mod schema_watcher;
+pub use search_service as search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
@@ -78,6 +79,7 @@ pub mod sourcemaps;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
+pub mod system_settings;
 pub mod tantivy;
 pub mod tls;
 pub mod traces;

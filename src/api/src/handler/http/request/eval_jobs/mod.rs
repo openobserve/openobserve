@@ -28,7 +28,8 @@ use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::models::eval_jobs::{
         EvalJobRequestBody, EvalJobResponseBody, EvalJobStatusActionResponseBody,
-        ListEvalJobsQuery, ListEvalJobsResponseBody,
+        ListEvalJobsQuery, ListEvalJobsResponseBody, ManualEvalJobRequestBody,
+        ManualEvalJobResponseBody,
     },
     service::llm_evaluations::eval_jobs,
 };
@@ -355,6 +356,46 @@ pub async fn archive_eval_job(Path((org_id, job_id)): Path<(String, String)>) ->
     }
 }
 
+/// ManualEvalJob
+#[utoipa::path(
+    post,
+    path = "/{org_id}/eval_jobs/{job_id}/manual_eval",
+    context_path = "/api",
+    tag = "EvalJobs",
+    operation_id = "ManualEvalJob",
+    summary = "Manually evaluate a target",
+    description = "Creates durable evaluation tasks for an explicit target, bypassing automatic target sampling.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("job_id" = String, Path, description = "Eval job id"),
+    ),
+    request_body(content = inline(ManualEvalJobRequestBody), description = "Manual evaluation target payload"),
+    responses(
+        (status = 200, body = inline(ManualEvalJobResponseBody)),
+        (status = 400, description = "Bad Request", body = ()),
+        (status = 404, description = "Not Found", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "EvalJobs", "operation": "manual_eval"})),
+    ),
+)]
+pub async fn manual_eval_job(
+    Path((org_id, job_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    axum::Json(body): axum::Json<ManualEvalJobRequestBody>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let author = Some(user_email.user_id);
+    #[cfg(not(feature = "enterprise"))]
+    let author = None;
+
+    match eval_jobs::manual_evaluate(&org_id, &job_id, body, author).await {
+        Ok(resp) => MetaHttpResponse::json(resp),
+        Err(err) => err.into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -367,6 +408,7 @@ mod tests {
                 from: "archived".to_string(),
                 to: "active".to_string(),
             },
+            EvalJobError::InvalidJob("bad scope".to_string()),
         ];
         for err in cases {
             let resp: Response = err.into();

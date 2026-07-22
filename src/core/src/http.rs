@@ -30,76 +30,27 @@ use crate::{
     service::{
         alerts::alert::AlertError,
         dashboards::{DashboardError, reports::ReportError},
-        db::{
-            alerts::{destinations::DestinationError, templates::TemplateError},
-            pipeline::PipelineError,
-        },
-        folders::FolderError,
+        db::alerts::{destinations::DestinationError, templates::TemplateError},
+        pipeline::PipelineError,
     },
 };
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
+    // the status code mapping lives on `infra::errors::Error` so that other
+    // consumers (e.g. audit logging) stay consistent with the HTTP responses
+    let status =
+        StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     match err {
-        errors::Error::ErrorCode(code) => match code {
-            errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
-                (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                    Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-                )
-                    .into_response()
-            }
-            errors::ErrorCodes::SearchTimeout(_) => (
-                StatusCode::REQUEST_TIMEOUT,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-            errors::ErrorCodes::InvalidParams(_)
-            | errors::ErrorCodes::SearchSQLExecuteError(_)
-            | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
-            | errors::ErrorCodes::SearchFunctionNotDefined(_)
-            | errors::ErrorCodes::FullTextSearchFieldNotFound
-            | errors::ErrorCodes::SearchFieldNotFound(_)
-            | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_)
-            | errors::ErrorCodes::SearchHistogramNotAvailable(_) => (
-                StatusCode::BAD_REQUEST,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-            errors::ErrorCodes::ServerInternalError(_)
-            | errors::ErrorCodes::SearchParquetFileNotFound => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-        },
+        errors::Error::ErrorCode(code) => (
+            status,
+            [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
+            Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+        )
+            .into_response(),
         // These errors don't carry a structured error code, so we don't set the
         // `X-Error-Message` header (it should only carry error codes). The full
         // message is still returned in the JSON response body.
-        errors::Error::ResourceError(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(MetaHttpResponse::error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                err,
-            )),
-        )
-            .into_response(),
-        // A JSON deserialization failure means the client sent a malformed
-        // request body, so surface it as 400 rather than a 500 server error.
-        errors::Error::SerdeJsonError(_) => (
-            StatusCode::BAD_REQUEST,
-            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
-        )
-            .into_response(),
-        _ => (
-            StatusCode::BAD_REQUEST,
-            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
-        )
-            .into_response(),
+        _ => (status, Json(MetaHttpResponse::error(status, err))).into_response(),
     }
 }
 
@@ -145,34 +96,30 @@ impl From<AlertError> for Response {
     }
 }
 
-impl From<DestinationError> for Response {
-    fn from(value: DestinationError) -> Self {
-        match &value {
-            DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
-                MetaHttpResponse::conflict(value)
-            }
-            DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            DestinationError::NotFound => MetaHttpResponse::not_found(value),
-            other_err => MetaHttpResponse::bad_request(other_err),
+pub fn destination_error_response(value: DestinationError) -> Response {
+    match &value {
+        DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
+            MetaHttpResponse::conflict(value)
         }
+        DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        DestinationError::NotFound => MetaHttpResponse::not_found(value),
+        other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
 
-impl From<TemplateError> for Response {
-    fn from(value: TemplateError) -> Self {
-        match value {
-            TemplateError::InfraError(e) => {
-                MetaHttpResponse::internal_error(TemplateError::InfraError(e))
-            }
-            TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
-            TemplateError::DeleteWithDestination(e) => {
-                MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
-            }
-            TemplateError::PrebuiltReadOnly(name) => {
-                MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
-            }
-            other_err => MetaHttpResponse::bad_request(other_err),
+pub fn template_error_response(value: TemplateError) -> Response {
+    match value {
+        TemplateError::InfraError(err) => {
+            MetaHttpResponse::internal_error(TemplateError::InfraError(err))
         }
+        TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
+        TemplateError::DeleteWithDestination(destination) => {
+            MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
+        }
+        TemplateError::PrebuiltReadOnly(name) => {
+            MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
+        }
+        other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
 
@@ -253,36 +200,6 @@ impl From<ReportError> for Response {
     }
 }
 
-impl From<FolderError> for Response {
-    fn from(value: FolderError) -> Self {
-        match value {
-            FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::MissingName => {
-                MetaHttpResponse::bad_request("Folder name cannot be empty")
-            }
-            FolderError::UpdateDefaultFolder => {
-                MetaHttpResponse::bad_request("Can't update default folder")
-            }
-            FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
-                "Folder contains dashboards, please move/delete dashboards from folder",
-            ),
-            FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
-                "Folder contains alerts, please move/delete alerts from folder",
-            ),
-            FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
-                "Folder contains reports, please move/delete reports from folder",
-            ),
-            FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
-            FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
-            FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
-            FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
-                "Folder with this name already exists in this organization",
-            ),
-        }
-    }
-}
-
 impl From<PipelineError> for Response {
     fn from(value: PipelineError) -> Self {
         match value {
@@ -307,9 +224,9 @@ impl From<EvalJobError> for Response {
                 log::error!("[EvalJob] reconciler error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")
             }
-            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
-                MetaHttpResponse::bad_request(value)
-            }
+            EvalJobError::InvalidStatus(_)
+            | EvalJobError::InvalidStatusTransition { .. }
+            | EvalJobError::InvalidJob(_) => MetaHttpResponse::bad_request(value),
         }
     }
 }

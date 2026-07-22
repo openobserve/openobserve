@@ -603,7 +603,7 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     #[cfg(feature = "enterprise")]
-    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    let (total_count, expired_count) = search_service::cardinality::get_cache_stats().await;
     #[cfg(not(feature = "enterprise"))]
     let (total_count, expired_count) = (0, 0);
     stats.insert(
@@ -1611,8 +1611,8 @@ async fn reload_module_cache(module: &str) -> Result<(), anyhow::Error> {
         "organization" => db::organization::cache().await,
         "user" => db::user::cache().await,
         "session" => db::session::cache().await,
-        "functions" => db::functions::cache().await,
-        "pipeline" => db::pipeline::cache().await,
+        "functions" => crate::service::functions::cache().await,
+        "pipeline" => crate::service::pipeline::store::cache().await,
         "alerts" => db::alerts::alert::cache().await,
         "destinations" => db::alerts::destinations::cache().await,
         "templates" => db::alerts::templates::cache().await,

@@ -1,7 +1,7 @@
 {
   "totals": {
     "rawProjectRamp": 8,
-    "rawVarInComponent": 566,
+    "rawVarInComponent": 564,
     "arbZ": 0,
     "darkMechanism": 8,
     "unscopedStyle": 2,
@@ -116,9 +116,6 @@
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
       "rawVarInComponent": 1
-    },
-    "enterprise/components/onlineEvals/forms/job/JobFilterBuilder.vue": {
-      "rawVarInComponent": 2
     },
     "lib/core/Button/OButton.vue": {
       "rawProjectRamp": 1

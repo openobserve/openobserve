@@ -1,10 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 //
 // Validation schema for JobFormPage.vue (online-evals eval-job create/edit page).
-// This native-`<form>` page shipped with `*` markers on name/stream but only a
-// manual `scorerIds.length` guard — the migration to OForm + Zod ADDS the
-// missing name/stream validation and folds the scorer guard into the schema
-// (online-evals-migration.md row 66).
+// The OForm migration adds schema validation for the required target fields and
+// completion-window controls while retaining the scorer toast guard used by the
+// composite picker (online-evals-migration.md row 66).
 //
 // The component OWNS <OForm> via the Rule-③ owner pattern: it creates the form
 // with `useOForm` and reads it reactively through `form.useStore` — a SINGLE
@@ -20,6 +19,10 @@
 // built into the payload at submit). Validation TIMING is owned by OForm.
 
 import { z } from "zod";
+import {
+  MIN_COMPLETION_IDLE_WINDOW_SECS,
+  TRACE_COMPLETION_WINDOW_DEFAULTS,
+} from "../utils/completionWindow";
 
 const requiredText = (message: string) =>
   z.string().refine((val) => val.trim().length > 0, { message });
@@ -32,8 +35,24 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       description: z.string().optional().default(""),
       // Internal metadata (not a rendered control), non-validated.
       streamType: z.string().optional().default("traces"),
-      // Not validated here: JobScorerPicker has no inline error slot, so the
-      // "≥1 scorer" rule is enforced as a toast guard in the component's onSubmit.
+      targetScope: z.enum(["span", "trace", "session"]).default("span"),
+      idleWindowSecs: z.coerce
+        .number()
+        .int()
+        .min(
+          MIN_COMPLETION_IDLE_WINDOW_SECS,
+          t("onlineEvals.job.validation.idleWindowMinimum"),
+        )
+        .default(TRACE_COMPLETION_WINDOW_DEFAULTS.idleWindowSecs),
+      maxAgeSecs: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(30 * 60),
+      // Scorer selection is NOT validated here: the composite JobScorerPicker
+      // has no inline error slot, so the "≥1 scorer" rule is enforced as a toast
+      // guard in the component's onSubmit (see JobFormPage.vue). Bridged from the
+      // picker via setFieldValue.
       scorerIds: z.array(z.string()),
       samplingMode: z.string().default("rate"),
       samplingValue: z.string().optional().default(""),

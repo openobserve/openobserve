@@ -47,7 +47,8 @@ export function normalizeJobFilterCondition(value: any): V2Group {
 
   const version = detectConditionsVersion(conditionValue);
   if (version === 2) return ensureIds(cloneJson(conditionValue)) as V2Group;
-  if (Array.isArray(conditionValue)) return ensureIds(convertV0ToV2(conditionValue)) as V2Group;
+  if (Array.isArray(conditionValue))
+    return ensureIds(convertV0ToV2(conditionValue)) as V2Group;
   if (conditionValue?.label && conditionValue?.items) {
     return ensureIds(convertV1ToV2(conditionValue)) as V2Group;
   }
@@ -71,7 +72,12 @@ export function cleanFilterGroup(group: any): V2Group {
 
       const hasValue =
         item?.value !== undefined && item?.value !== null && item?.value !== "";
-      if (item?.filterType !== "condition" || !item.column || !item.operator || !hasValue)
+      if (
+        item?.filterType !== "condition" ||
+        !item.column ||
+        !item.operator ||
+        !hasValue
+      )
         return null;
 
       return {
@@ -115,8 +121,13 @@ export function isJobFilterComplete(group: any): boolean {
 }
 
 export function buildJobFilterConditionPayload(group: V2Group) {
+  return buildOptionalJobConditionPayload(group) ?? { type: "all" };
+}
+
+/** Build a condition payload for optional criteria such as an End Signal. */
+export function buildOptionalJobConditionPayload(group: V2Group) {
   const conditions = cleanFilterGroup(group);
-  if (!conditions.conditions.length) return { type: "all" };
+  if (!conditions.conditions.length) return null;
 
   return {
     version: 2,
