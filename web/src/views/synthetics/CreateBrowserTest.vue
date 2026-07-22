@@ -183,7 +183,12 @@ function onLoadRetry(actionId?: string) {
 onMounted(() => {
   // Warm detection so an already-installed extension lets Record skip setup.
   probeExtension()
-    .then((installed) => { extensionReady.value = installed })
+    .then((installed) => {
+      if (installed) {
+        extensionInstalled.value = true
+        extensionReady.value = true
+      }
+    })
     .catch(() => { /* extension messaging unavailable — handled in setup screen */ })
 
   fetchFolders()
@@ -247,7 +252,7 @@ const isGateUrlValid = computed(() => {
 async function onRecordClick() {
   if (!validateGateUrl()) return
   commitGate()
-  const installed = await probeExtension({ reloadIfFailed: false })
+  const installed = await probeExtension()
   extensionReady.value = installed
   if (installed) {
     autoRecord.value = true
@@ -590,24 +595,11 @@ function onClearResults() {
                 <h4 class="text-sm font-semibold text-text-heading m-0 pb-1">{{ t('synthetics.createBrowserTest.setupStep1Title') }}</h4>
                 <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupStep1Description') }}</p>
               </div>
-              <div class="flex items-center gap-3 px-3">
-                <OButton
-                  v-if="!extensionInstalled"
-                  variant="outline"
-                  size="sm"
-                  :loading="checkingExtension"
-                  iconLeft="refresh"
-                  data-test="synthetics-setup-recheck-btn"
-                  @click="probeExtension"
-                >
-                  {{ t('synthetics.createBrowserTest.setupCheckAgain') }}
-                </OButton>
-                <span
-                  v-else
-                  class="text-sm font-medium text-status-success-text!"
-                  data-test="synthetics-setup-installed-label"
-                >{{ t('synthetics.createBrowserTest.setupInstalled') }}</span>
-              </div>
+              <OSwitch
+                v-model="extensionInstalled"
+                :label="t('synthetics.createBrowserTest.setupStep1Done')"
+                data-test="synthetics-setup-installed-switch"
+              />
             </div>
           </div>
 
@@ -615,11 +607,32 @@ function onClearResults() {
           <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-              :class="extensionInstalled ? 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
+              :class="extensionReady ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : extensionInstalled ? 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
             >2</span>
-            <div class="flex-1 min-w-0">
-              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
-              <p class="text-xs text-text-secondary m-0">{{ t('synthetics.createBrowserTest.setupStep2Description') }}</p>
+            <div class="flex-1 min-w-0 flex justify-between">
+              <div class="flex flex-col items-start">
+                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
+                <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupStep2Description') }}</p>
+              </div>
+              <div class="flex items-center gap-3 px-3">
+                <OButton
+                  v-if="!extensionReady"
+                  variant="outline"
+                  size="sm"
+                  :loading="checkingExtension"
+                  iconLeft="refresh"
+                  :disabled="!extensionInstalled"
+                  data-test="synthetics-setup-icon-check-btn"
+                  @click="probeExtension"
+                >
+                  {{ t('synthetics.createBrowserTest.setupCheckAgain') }}
+                </OButton>
+                <span
+                  v-else
+                  class="text-sm font-medium text-status-success-text!"
+                  data-test="synthetics-setup-ready-label"
+                >{{ t('synthetics.createBrowserTest.setupReady') }}</span>
+              </div>
             </div>
           </div>
 
@@ -648,7 +661,7 @@ function onClearResults() {
           variant="primary"
           size="lg"
           class="w-full mb-4"
-          :disabled="!extensionInstalled || !incognitoAllowed"
+          :disabled="!extensionInstalled || !extensionReady || !incognitoAllowed"
           data-test="synthetics-setup-open-record-btn"
           icon-left="smart-display"
           @click="onExtensionSetupRecord"
