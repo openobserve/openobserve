@@ -197,6 +197,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="selectedTime.startTime"
                         with-seconds
                         data-test="datetime-start-time"
+                        @complete="endTimeRef?.openHourPicker()"
                         @blur="
                           resetTime(
                             selectedTime.startTime,
@@ -207,6 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </td>
                     <td class="pl-1.5 w-1/2">
                       <OTime
+                        ref="endTimeRef"
                         class="w-full"
                         v-model="selectedTime.endTime"
                         :with-seconds="true"
@@ -239,8 +241,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="my-2 mx-[0.4rem]"
           />
         </div>
-        <div v-if="!autoApply" class="flex justify-end py-2 px-3">
+        <div class="flex items-center gap-1 py-2 px-3 border-t border-border-default">
+          <OTooltip :content="t('common.copyRange')">
+            <OButton
+              data-test="date-time-copy-btn"
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="content-copy"
+              :aria-label="t('common.copyRange')"
+              @click="copyRange"
+            />
+          </OTooltip>
+          <OTooltip :content="t('common.pasteRange')">
+            <OButton
+              data-test="date-time-paste-btn"
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="content-paste"
+              :aria-label="t('common.pasteRange')"
+              @click="pasteRange"
+            />
+          </OTooltip>
+          <div class="flex-1" />
           <OButton
+            v-if="!autoApply"
             data-test="date-time-apply-btn"
             variant="primary"
             size="xs"
@@ -287,9 +311,16 @@ import {
   timestampToTimezoneDate,
 } from "../utils/zincutils";
 import { subtractRelativeTime } from "@/utils/date";
+import {
+  parseDateRangeString,
+  parseSingleDateTime,
+  type ParsedSingleDateTime,
+} from "@/utils/dateTimeRangeParse";
+import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { toZonedTime } from "date-fns-tz";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 interface ConsumableDateTime {
   startTime: number;
@@ -979,6 +1010,94 @@ export default defineComponent({
       }
     });
 
+    // ----- Copy / paste of the selected range ---------------------------------
+    // Copy always resolves the selection (relative OR absolute) to a concrete
+    // absolute window, so the copied value is unambiguous. Paste accepts that
+    // format plus `Past N <Period>` and raw epoch timestamp pairs.
+    const copyRange = () => {
+      // Epoch microseconds side-step timezone ambiguity: pasting this into a
+      // tab with a different selected timezone still lands on the same
+      // instant, unlike a "yyyy/MM/dd HH:mm:ss" string (which paste would
+      // reinterpret using the pasting tab's own timezone).
+      const { startTime, endTime } = getConsumableDateTime();
+      const payload = JSON.stringify({ start_date: startTime, end_date: endTime });
+      copyToClipboard(payload, { successMessage: t("common.dateRangeCopied") });
+    };
+
+    // Converts a parsed absolute date[+time] string, interpreted as wall-clock
+    // time in the currently selected timezone, to epoch microseconds — the
+    // inverse of convertUnixTime.
+    const absoluteToMicros = (date: string, time: string): number => {
+      const iso = `${date.replace(/\//g, "-")}T${time}`;
+      return fromZonedTime(iso, store.state.timezone).getTime() * 1000;
+    };
+
+    const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
+      selectedType.value = "absolute";
+      setAbsoluteTime(startMicros, endMicros);
+      if (props.autoApply) saveDate(null);
+    };
+
+    const applyParsedRange = (text: string): boolean => {
+      const parsed = parseDateRangeString(text);
+      if (!parsed) return false;
+      if (parsed.type === "timestamp") {
+        finalizeAbsoluteRange(parsed.startMicros, parsed.endMicros);
+      } else {
+        finalizeAbsoluteRange(
+          absoluteToMicros(parsed.startDate, parsed.startTime),
+          absoluteToMicros(parsed.endDate, parsed.endTime),
+        );
+      }
+      return true;
+    };
+
+    // Applies a single pasted date-time value to whichever side of the current
+    // range it sits closer to — e.g. a range of 5:00-10:00 pasted with 7:00
+    // becomes 7:00-10:00 (closer to start), while 13:00 becomes 5:00-13:00
+    // (closer to end). There's no cursor/selection to anchor a side to
+    // without a text field, so proximity is the next best signal of intent.
+    const applySingleDateTime = (parsed: ParsedSingleDateTime) => {
+      const micros =
+        parsed.type === "timestamp"
+          ? parsed.micros
+          : absoluteToMicros(parsed.date, parsed.time ?? "00:00:00");
+
+      const { startTime: baseStart, endTime: baseEnd } = getConsumableDateTime();
+      const isCloserToStart =
+        Math.abs(micros - baseStart) <= Math.abs(micros - baseEnd);
+      finalizeAbsoluteRange(
+        isCloserToStart ? micros : baseStart,
+        isCloserToStart ? baseEnd : micros,
+      );
+    };
+
+    // Tries a full range first, then a single value applied to both sides.
+    const applyPastedText = (text: string): boolean => {
+      if (applyParsedRange(text)) return true;
+
+      const single = parseSingleDateTime(text);
+      if (!single) return false;
+
+      applySingleDateTime(single);
+      return true;
+    };
+
+    const pasteRange = async () => {
+      let text = "";
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        toast({ variant: "error", message: t("common.dateRangePasteError") });
+        return;
+      }
+      if (applyPastedText(text)) {
+        toast({ variant: "success", message: t("common.dateRangePasted") });
+      } else {
+        toast({ variant: "error", message: t("common.dateRangePasteError") });
+      }
+    };
+
     const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
       filteredTimezone.value = filterColumns(timezoneOptions, val, update);
     };
@@ -1216,6 +1335,11 @@ export default defineComponent({
       emit("show");
     };
 
+    // Lets the "Start time" field's am/pm selection advance focus into
+    // "End time"'s hour dropdown, so the whole start→end flow is one
+    // continuous guided sequence.
+    const endTimeRef = ref<InstanceType<typeof OTime> | null>(null);
+
     const menuOpen = ref(false);
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
@@ -1230,6 +1354,7 @@ export default defineComponent({
     return {
       t,
       menuOpen,
+      endTimeRef,
       onMenuOpenChange,
       datetimeBtn,
       getImageURL,
@@ -1247,6 +1372,8 @@ export default defineComponent({
       getPeriodLabel,
       displayValue,
       triggerLabel,
+      copyRange,
+      pasteRange,
       refresh,
       dateLocale,
       resetTime,

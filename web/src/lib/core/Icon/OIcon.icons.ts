@@ -48,6 +48,7 @@ import Cloud from "~icons/material-symbols/cloud-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
+import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
@@ -373,6 +374,7 @@ export const iconRegistry = {
   "code": Code,
   "compare-arrows": CompareArrows,
   "content-copy": ContentCopy,
+  "content-paste": ContentPaste,
   "delete": Delete,
   "download": Download,
   "edit": Edit,
