@@ -1265,7 +1265,7 @@ const fieldWidthClass = computed(() => {
               parentDataTest ? `${parentDataTest}-popover` : undefined
             "
             :class="[
-              'z-[10001] min-w-(--reka-popover-trigger-width)',
+              'z-10001 min-w-(--reka-popover-trigger-width)',
               'overflow-hidden flex flex-col',
               'rounded-default shadow-lg',
               'bg-select-content-bg',
@@ -1777,7 +1777,7 @@ const fieldWidthClass = computed(() => {
           :hide-when-detached="true"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'z-[10001] min-w-(--reka-select-trigger-width)',
+            'z-10001 min-w-(--reka-select-trigger-width)',
             'overflow-hidden',
             'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',

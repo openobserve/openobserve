@@ -1,6 +1,6 @@
 <template>
   <div
-    class="absolute top-0 left-0 w-full z-[999] transition-opacity duration-500 ease-out"
+    class="absolute top-0 left-0 w-full z-999 transition-opacity duration-500 ease-out"
     :class="{
       'opacity-0': !loading && !isFadingOut,
       'opacity-100': loading || isFadingOut,

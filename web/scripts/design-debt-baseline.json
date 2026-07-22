@@ -2,7 +2,7 @@
   "totals": {
     "rawProjectRamp": 8,
     "rawVarInComponent": 584,
-    "arbZ": 35,
+    "arbZ": 0,
     "darkMechanism": 20,
     "unscopedStyle": 7,
     "stylePxUnit": 84
@@ -14,12 +14,6 @@
     "components/CommunitySlackInvite.vue": {
       "rawProjectRamp": 4
     },
-    "components/CustomDateTimePicker.vue": {
-      "arbZ": 1
-    },
-    "components/EnterpriseUpgradeDialog.vue": {
-      "arbZ": 1
-    },
     "components/Header.vue": {
       "rawVarInComponent": 2
     },
@@ -30,7 +24,6 @@
       "rawVarInComponent": 2
     },
     "components/RichTextInput.vue": {
-      "arbZ": 1,
       "rawVarInComponent": 18
     },
     "components/TenstackTable.vue": {
@@ -38,12 +31,6 @@
     },
     "components/ThemeSwitcher.vue": {
       "darkMechanism": 1
-    },
-    "components/WebinarBanner.vue": {
-      "arbZ": 1
-    },
-    "components/ai-assistant/welcome/CapabilityCards.vue": {
-      "arbZ": 4
     },
     "components/alerts/AddAlert.vue": {
       "rawVarInComponent": 1
@@ -58,7 +45,6 @@
       "rawVarInComponent": 49
     },
     "components/alerts/AlertSummary.vue": {
-      "arbZ": 1,
       "rawVarInComponent": 14
     },
     "components/alerts/DestinationPreview.vue": {
@@ -73,12 +59,6 @@
     "components/alerts/IncidentRCAAnalysis.vue": {
       "rawVarInComponent": 36
     },
-    "components/alerts/PrebuiltDestinationSelector.vue": {
-      "arbZ": 2
-    },
-    "components/alerts/QueryEditorDialog.vue": {
-      "arbZ": 2
-    },
     "components/alerts/SemanticFieldGroupsConfig.vue": {
       "rawVarInComponent": 1
     },
@@ -87,9 +67,6 @@
     },
     "components/common/BaseImport.vue": {
       "unscopedStyle": 1
-    },
-    "components/common/LoadingProgress.vue": {
-      "arbZ": 1
     },
     "components/dashboards/QueryInspector.vue": {
       "rawVarInComponent": 4
@@ -115,9 +92,6 @@
     "components/logstream/schema.vue": {
       "rawVarInComponent": 2
     },
-    "components/pipeline/NodeForm/CreateDestinationForm.vue": {
-      "arbZ": 1
-    },
     "components/pipeline/PipelineEditor.vue": {
       "unscopedStyle": 1,
       "rawVarInComponent": 20
@@ -134,14 +108,8 @@
     "components/settings/License.vue": {
       "rawVarInComponent": 4
     },
-    "components/settings/ModelPricingList.vue": {
-      "arbZ": 1
-    },
     "components/settings/Nodes.vue": {
       "rawVarInComponent": 6
-    },
-    "components/settings/OrgStorageEditor.vue": {
-      "arbZ": 1
     },
     "enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue": {
       "rawVarInComponent": 4
@@ -245,30 +213,17 @@
     "lib/feedback/Skeleton/OSkeleton.vue": {
       "rawVarInComponent": 1
     },
-    "lib/forms/Color/OColor.vue": {
-      "arbZ": 1
-    },
     "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
       "rawVarInComponent": 2
-    },
-    "lib/forms/Select/OSelect.vue": {
-      "arbZ": 2
     },
     "lib/forms/Switch/OSwitch.vue": {
       "rawProjectRamp": 1
     },
     "lib/lists/FieldList/OFieldList.vue": {
-      "arbZ": 2,
       "rawVarInComponent": 1
     },
     "lib/navigation/Tabs/OTab.vue": {
       "rawProjectRamp": 1
-    },
-    "lib/overlay/Dropdown/ODropdown.vue": {
-      "arbZ": 1
-    },
-    "lib/overlay/Tooltip/OTooltip.vue": {
-      "arbZ": 1
     },
     "plugins/logs/DetailTable.vue": {
       "rawVarInComponent": 2
@@ -277,7 +232,6 @@
       "rawVarInComponent": 1
     },
     "plugins/logs/SearchBar.vue": {
-      "arbZ": 4,
       "rawVarInComponent": 1
     },
     "plugins/logs/SearchResult.vue": {
@@ -290,11 +244,7 @@
       "rawVarInComponent": 6
     },
     "plugins/pipelines/CustomNode.vue": {
-      "arbZ": 2,
       "rawVarInComponent": 10
-    },
-    "plugins/pipelines/PipelineFlow.vue": {
-      "arbZ": 1
     },
     "plugins/traces/Index.vue": {
       "rawVarInComponent": 2
@@ -308,9 +258,6 @@
     "plugins/traces/LLMInsightsSkeleton.vue": {
       "rawVarInComponent": 3
     },
-    "plugins/traces/SearchBar.vue": {
-      "arbZ": 1
-    },
     "plugins/traces/SearchResult.vue": {
       "rawVarInComponent": 1
     },
@@ -318,7 +265,6 @@
       "rawVarInComponent": 9
     },
     "plugins/traces/SessionDetails.vue": {
-      "arbZ": 1,
       "rawVarInComponent": 9
     },
     "plugins/traces/ThreadToolCalls.vue": {
@@ -344,9 +290,6 @@
     },
     "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
       "rawVarInComponent": 1
-    },
-    "plugins/traces/metrics/TracesMetricsContextMenu.vue": {
-      "arbZ": 1
     },
     "utils/dashboard/colorPalette.ts": {
       "darkMechanism": 5
@@ -400,9 +343,6 @@
     },
     "views/HomeView.vue": {
       "rawVarInComponent": 18
-    },
-    "views/OverviewTab.vue": {
-      "arbZ": 1
     }
   }
 }

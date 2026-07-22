@@ -23,7 +23,7 @@
     <!-- Detail Card -->
     <div
       v-if="showDetailCard"
-      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-default shadow-lg z-[100000] flex flex-col overflow-hidden bg-surface-base border-border-default"
+      class="chip-detail-card fixed max-w-75 max-h-75 border rounded-default shadow-lg z-100000 flex flex-col overflow-hidden bg-surface-base border-border-default"
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',

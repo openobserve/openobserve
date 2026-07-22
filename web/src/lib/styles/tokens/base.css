@@ -550,3 +550,56 @@
   --color-illustration-cocoa:    #4a3b2d;
   --color-illustration-espresso: #3a2f25;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Z-index scale — the single source for every z-index in the app, in Tailwind's
+   `--z-index-*` theme namespace (same pattern as the color/radius/shadow tokens).
+   The numeric `z-<n>` utilities (z-10, z-1000, z-9999, …) are generated from
+   these and compile to `z-index: var(--z-index-<n>)`, backed by the :root custom
+   property emitted here — components only ever write the class (`z-9999`), never
+   var(). Change a value here and every matching class follows (verified:
+   --z-index-10 = 777 makes `.z-10` resolve to 777). Grouped by tier; values
+   preserve today's usage exactly (no stacking change). NOTE: Tailwind still
+   generates an *undefined* z-<n> on demand — this block is the sanctioned set by
+   convention, the source, not a hard gate. ── */
+@theme {
+  /* Local / intra-component — relative layering inside one stacking context */
+  --z-index-0: 0;
+  --z-index-1: 1;
+  --z-index-2: 2;
+  --z-index-3: 3;
+  --z-index-5: 5;
+  --z-index-8: 8;
+  --z-index-10: 10;
+  --z-index-11: 11;
+  --z-index-12: 12;
+  --z-index-15: 15;
+  --z-index-16: 16;
+  --z-index-20: 20;
+  --z-index-30: 30;
+  --z-index-50: 50;
+  --z-index-51: 51;
+  --z-index-60: 60;
+  /* Sticky / raised */
+  --z-index-99: 99;
+  --z-index-100: 100;
+  --z-index-200: 200;
+  /* Dropdowns, menus, popovers */
+  --z-index-999: 999;
+  --z-index-1000: 1000;
+  --z-index-1001: 1001;
+  --z-index-1999: 1999;
+  /* Drawers, side panels */
+  --z-index-5000: 5000;
+  --z-index-5100: 5100;
+  --z-index-6000: 6000;
+  /* Modal / dialog overlays */
+  --z-index-9998: 9998;
+  --z-index-9999: 9999;
+  /* Tooltips / toasts above modals */
+  --z-index-10001: 10001;
+  --z-index-10100: 10100;
+  /* Absolute top */
+  --z-index-100000: 100000;
+  --z-index-9999999: 9999999;
+}

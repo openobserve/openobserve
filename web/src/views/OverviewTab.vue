@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="isEnterpriseOrCloud && selectedService">
       <div
         v-if="servicePanelVisible"
-        class="fixed inset-0 z-[99] bg-transparent"
+        class="fixed inset-0 z-99 bg-transparent"
         @click="closeServicePanel"
       />
       <ServiceGraphNodeSidePanel

@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="absolute rounded-full pointer-events-none opacity-[0.18] bg-promo-webinar-accent blur-[2.5rem] w-32 h-32 bottom-[-2.5rem] right-24" aria-hidden="true" />
 
     <!-- Content row -->
-    <div class="webinar-home-content relative z-[1] flex items-center justify-between flex-wrap gap-3 p-4 pr-[1.375rem]">
+    <div class="webinar-home-content relative z-1 flex items-center justify-between flex-wrap gap-3 p-4 pr-[1.375rem]">
       <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
         <div class="webinar-home-badge inline-flex items-center gap-1.5 text-2xs font-bold uppercase tracking-[0.06em] text-promo-webinar-accent-text">
