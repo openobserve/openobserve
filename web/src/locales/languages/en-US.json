@@ -2670,7 +2670,7 @@
     "aiLabel": "AI Integrations",
     "azureSetup": {
       "activityLogsTitle": "Azure Activity Logs",
-      "activityLogsDescription": "Stream Azure subscription activity logs to OpenObserve via Event Hub. The ARM template sets up the Event Hub infrastructure \u2014 you then configure Azure to export logs to it.",
+      "activityLogsDescription": "Stream Azure subscription activity logs to OpenObserve via Event Hub. The ARM template sets up the Event Hub infrastructure — you then configure Azure to export logs to it.",
       "manualTitle": "Manual Configuration (for reference)",
       "searchPlaceholder": "Search Azure services...",
       "categoryAll": "All Services",
@@ -9474,7 +9474,17 @@
       "empty": "No locations available",
       "locationAwsEast": "AWS · us-east-1",
       "subtitle": "Select the locations the journey runs from",
-      "title": "Locations"
+      "title": "Locations",
+      "privateBadge": "Private",
+      "publicTitle": "Public",
+      "privateTitle": "Private locations",
+      "setupAgent": "Set up private agent",
+      "privateEmptyBody": "Run this check from your own VPC or on-premise network.",
+      "offlineWarning": "No live agent — the check won't run from here until an agent is back.",
+      "liveAgents": "{count} live agents",
+      "liveAgentsNamed": "{count} live agents ({names})",
+      "offlineSince": "Offline · last seen {ago}",
+      "pendingAgent": "Waiting for the first agent to register"
     },
     "newCheck": {
       "back": "Checks",
@@ -9891,7 +9901,8 @@
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",
-      "tls": "TLS"
+      "tls": "TLS",
+      "private": "Private Locations"
     },
     "timeline": {
       "failed": "Failed",
@@ -9931,6 +9942,76 @@
       "selectorRequired": "Selector is required for \"{step}\"",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
       "urlRequired": "Starting URL is required"
+    },
+    "privateLocations": {
+      "searchPlaceholder": "Search locations...",
+      "setupAgent": "Set up an agent",
+      "copySetupCmd": "Setup command",
+      "deleteTitle": "Delete location",
+      "deleteBody": "Delete private location \"{name}\"? Its agents will stop receiving jobs.",
+      "deleteBlocked": "In use by {count} checks — unassign them first",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "pending": "Pending"
+      },
+      "table": {
+        "name": "Name",
+        "region": "Region",
+        "agents": "Agents",
+        "types": "Types",
+        "checks": "Checks",
+        "checksPerMin": "C/min",
+        "lastSeen": "Last seen"
+      },
+      "empty": {
+        "title": "No private locations yet",
+        "description": "Deploy the agent in your network with AGENT_LOCATION set — the location registers itself and appears here automatically. No manual setup in the UI.",
+        "action": "Set up an agent"
+      },
+      "toast": {
+        "deleted": "Location deleted",
+        "deleteFailed": "Failed to delete location",
+        "copied": "Setup command copied",
+        "copyFailed": "Failed to copy to clipboard",
+        "locationRequired": "Enter a location name before copying the install command."
+      },
+      "setup": {
+        "title": "Set up a private agent",
+        "step1Title": "Deploy the agent",
+        "step1Body": "Run the container on any machine in your network — Docker, Kubernetes, or native binary. AGENT_LOCATION names the location; use the same name on every agent that should serve it.",
+        "step2Title": "Watch the location appear",
+        "step2Body": "On first register the location row is created automatically and turns Online — nothing to add in the UI. More agents with the same AGENT_LOCATION join the same location.",
+        "step3Title": "Assign to checks",
+        "step3Body": "Select this location when creating or editing any check. Checks will run from your own infrastructure.",
+        "noToken": "Could not load the setup command — check your permissions and retry.",
+        "imagePlaceholderNote": "The agent image name is a placeholder until the published image is available.",
+        "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH).",
+        "locationNameLabel": "Location name",
+        "locationNamePlaceholder": "Corp HQ",
+        "tabDocker": "Docker",
+        "tabK8s": "Kubernetes",
+        "tabLinux": "Linux",
+        "tabWindows": "Windows",
+        "windowsSoon": "Coming soon",
+        "agentNameLabel": "Agent name (optional)",
+        "agentNamePlaceholder": "auto-generated from hostname",
+        "agentNameHint": "Leave blank to let the agent name itself from its hostname — useful when running multiple agents at one location."
+      },
+      "detail": {
+        "title": "Private location",
+        "back": "Private Locations",
+        "version": "Version",
+        "pool": "Pool",
+        "agentsTitle": "Agents",
+        "agentsSubtitle": "Agents self-register from your infrastructure and are read-only here.",
+        "agentName": "Agent",
+        "noAgents": "No agents have registered for this location yet.",
+        "checksTitle": "Checks running from this location",
+        "checkName": "Name",
+        "noChecks": "No checks are assigned to this location yet.",
+        "notFound": "Location not found"
+      }
     }
   },
   "shortcuts": {

@@ -124,6 +124,8 @@
   --color-toggle-item-disabled: var(--color-text-disabled);
   --color-toggle-border: var(--color-border-default);
   --color-toggle-focus-ring: var(--color-primary-400);
+  /* Insertion line shown while dragging to reorder (reorderable groups) */
+  --color-toggle-drop-indicator: var(--color-primary-600);
 
   /* Dropdown */
   --color-dropdown-bg: var(--color-surface-overlay);
@@ -890,6 +892,7 @@
   --color-toggle-item-disabled: var(--color-toggle-item-disabled);
   --color-toggle-border: var(--color-toggle-border);
   --color-toggle-focus-ring: var(--color-toggle-focus-ring);
+  --color-toggle-drop-indicator: var(--color-toggle-drop-indicator);
 
   /* Dropdown */
   --color-dropdown-bg: var(--color-dropdown-bg);

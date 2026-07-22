@@ -84,6 +84,22 @@ const syntheticsService = {
   getLocations: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations`),
 
+  // ── Private locations ──────────────────────────────────────────────────
+  getAgentSetup: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/agent-setup`),
+
+  getLocation: (orgIdentifier: string, id: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/locations/${id}`),
+
+  createLocation: (orgIdentifier: string, payload: unknown) =>
+    http().post(`/api/${orgIdentifier}/synthetics/locations`, payload),
+
+  updateLocation: (orgIdentifier: string, id: string, payload: unknown) =>
+    http().put(`/api/${orgIdentifier}/synthetics/locations/${id}`, payload),
+
+  deleteLocation: (orgIdentifier: string, id: string) =>
+    http().delete(`/api/${orgIdentifier}/synthetics/locations/${id}`),
+
   listRunsPayload(
     monitorId: string,
     startTime: number,

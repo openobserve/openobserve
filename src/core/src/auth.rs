@@ -318,11 +318,12 @@ where
             path_columns[0].to_string()
         };
 
-        // Synthetics probe job + agent APIs — no org_id in path, authenticated
-        // via the o2syn_ probe token.
+        // Synthetics probe job + agent APIs — `/{org_id}/synthetics/{jobs,agent}/*`.
+        // Authenticated via the o2syn_ probe token (not a user), so OpenFGA is
+        // bypassed; the handler asserts the token's org == the path org.
         if method.eq("POST")
-            && path_columns.first() == Some(&"synthetics")
-            && matches!(path_columns.get(1), Some(&"jobs") | Some(&"agent"))
+            && path_columns.get(1) == Some(&"synthetics")
+            && matches!(path_columns.get(2), Some(&"jobs") | Some(&"agent"))
         {
             if let Some(auth_header) = parts.headers.get("Authorization")
                 && let Ok(auth_str) = auth_header.to_str()
@@ -331,7 +332,7 @@ where
                     auth: auth_str.to_owned(),
                     method,
                     o2_type: String::new(),
-                    org_id: String::new(),
+                    org_id: org_id.clone(),
                     bypass_check: true,
                     parent_id: folder,
                     use_all_org: false,

@@ -19,6 +19,7 @@ use async_trait::async_trait;
 use axum::extract::Query;
 use config::{TIMESTAMP_COL_NAME, get_config, meta::search};
 use hashbrown::HashMap;
+use search_service as SearchService;
 
 use crate::{
     cli::data::{Context, cli::Cli},
@@ -26,7 +27,6 @@ use crate::{
         get_search_event_context_from_request, get_search_type_from_request,
         get_stream_type_from_request,
     },
-    service::search as SearchService,
 };
 
 pub struct Export {}

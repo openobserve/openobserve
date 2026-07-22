@@ -116,7 +116,11 @@ async function fetchLocations() {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.getLocations(org)
     const data = res.data ?? {}
-    locations.value = (data.locations ?? []) as SyntheticsLocation[]
+    // Browser tests are Lambda-only today — private (agent-served) locations
+    // cannot run them, so they are excluded from this picker.
+    locations.value = ((data.locations ?? []) as SyntheticsLocation[]).filter(
+      (l) => l.kind !== 'private' && l.enabled !== false,
+    )
     browsers.value = (data.browsers ?? []) as string[]
     devices.value = (data.devices ?? []) as SyntheticsDevice[]
   } catch {

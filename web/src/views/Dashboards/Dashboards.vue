@@ -416,6 +416,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm-action"
                     icon-left="delete"
                     data-test="dashboard-list-delete-dashboards-btn"
+                    :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
                   >
                     {{ t('common.delete') }}
@@ -1573,12 +1574,14 @@ export default defineComponent({
     };
 
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteDashboards = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.deletingDashboards"),
@@ -1726,6 +1729,8 @@ export default defineComponent({
             message: errorMessage,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
@@ -1816,6 +1821,7 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteDashboards,
       confirmBulkDelete,
+      bulkDeleteLoading,
       isHome,
       toggleHome,
       homeDashboard,

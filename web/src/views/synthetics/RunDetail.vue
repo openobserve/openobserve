@@ -561,6 +561,7 @@ import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import syntheticsService from "@/services/synthetics";
 import { timestampToTimezoneDate } from "@/utils/timezone";
+import { locationDisplayLabel } from "@/utils/synthetics/format";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
@@ -626,6 +627,22 @@ const props = withDefaults(defineProps<Props>(), {
 const { t } = useI18n();
 const route = useRoute();
 const store = useStore();
+
+// id -> "Name (region)" — the run's location field is the raw id (KSUID for
+// private, "aws-us-east-1" for public); resolve it for display.
+const locationNames = ref<Record<string, string>>({});
+function locationLabel(id: string): string {
+  return locationNames.value[id] ?? id;
+}
+syntheticsService
+  .getLocations(store.state.selectedOrganization.identifier)
+  .then((res) => {
+    const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
+    locationNames.value = Object.fromEntries(
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+    );
+  })
+  .catch((err) => console.error("[synthetics] failed to load locations", err));
 
 // ── Source IDs — props in drawer mode, route params otherwise ────────────────
 const monitorId = computed(() =>
@@ -1096,7 +1113,7 @@ const infoChips = computed<InfoChip[]>(() => [
   },
   {
     label: t('synthetics.results.location'),
-    value: currentRun.value.location,
+    value: locationLabel(currentRun.value.location),
     icon: locationIcon(currentRun.value.location),
   },
 ]);

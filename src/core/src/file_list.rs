@@ -14,23 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    cluster::LOCAL_NODE,
-    get_config,
-    meta::{
-        search::ScanStats,
-        stream::{FileKey, PartitionTimeLevel, StreamType},
-    },
-    metrics::{FILE_LIST_CACHE_HIT_COUNT, FILE_LIST_ID_SELECT_COUNT},
+    meta::stream::{FileKey, PartitionTimeLevel, StreamType},
     utils::file::get_file_meta as util_get_file_meta,
 };
-use hashbrown::HashSet;
 use infra::{errors::Result, file_list as infra_file_list, storage};
+pub use infra_file_list::calculate_files_size;
 use rayon::slice::ParallelSliceMut;
+pub use search_service::file_list::{query_by_ids, query_ids};
 
-use crate::service::{
-    file_list_dump,
-    search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-};
+use crate::service::file_list_dump;
 
 #[tracing::instrument(
     name = "service::file_list::query",
@@ -98,190 +90,6 @@ pub async fn query_for_merge(
     // we expected all dumped files to be already compacted,
     // and the compaction marks old files as deleted, which is not possible with dump
     Ok(files)
-}
-
-#[tracing::instrument(name = "service::file_list::query_by_ids", skip_all)]
-pub async fn query_by_ids(
-    trace_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_range: Option<(i64, i64)>,
-    ids: &[i64],
-) -> Result<Vec<FileKey>> {
-    let cfg = get_config();
-    FILE_LIST_ID_SELECT_COUNT
-        .with_label_values::<&str>(&[])
-        .set(ids.len() as i64);
-    // 1. first query from local cache
-    let ids_set: HashSet<_> = ids.iter().cloned().collect();
-    let (mut files, ids_set) = if cfg.common.local_mode {
-        (Vec::with_capacity(ids.len()), ids_set)
-    } else {
-        let start = std::time::Instant::now();
-        let cached_files = match infra_file_list::LOCAL_CACHE
-            .query_by_ids(ids, time_range)
-            .await
-        {
-            Ok(files) => files,
-            Err(e) => {
-                log::error!("[trace_id {trace_id}] file_list query cache failed: {e:?}");
-                Vec::new()
-            }
-        };
-        let cached_ids: HashSet<_> = cached_files.iter().map(|f| f.id).collect();
-        log::info!(
-            "{}",
-            search_inspector_fields(
-                format!(
-                    "[trace_id {trace_id}] file_list get cached_ids: {}, took: {} ms",
-                    cached_ids.len(),
-                    start.elapsed().as_millis()
-                ),
-                SearchInspectorFieldsBuilder::new()
-                    .trace_id(trace_id.to_string())
-                    .node_name(LOCAL_NODE.name.clone())
-                    .component("file_list get cached_ids".to_string())
-                    .search_role("follower".to_string())
-                    .duration(start.elapsed().as_millis() as usize)
-                    .desc(format!(
-                        "get cached_ids: {}, left ids: {}",
-                        cached_ids.len(),
-                        ids.len() - cached_ids.len(),
-                    ))
-                    .build()
-            )
-        );
-
-        FILE_LIST_CACHE_HIT_COUNT
-            .with_label_values::<&str>(&[])
-            .set(cached_ids.len() as i64);
-
-        (
-            cached_files,
-            ids_set.difference(&cached_ids).cloned().collect(),
-        )
-    };
-
-    // 2. query from remote db
-    let start = std::time::Instant::now();
-    let ids: Vec<_> = ids_set.iter().cloned().collect();
-    let mut db_files = infra_file_list::query_by_ids(&ids, time_range).await?;
-    log::info!(
-        "{}",
-        search_inspector_fields(
-            format!(
-                "[trace_id {trace_id}] file_list query from db: {}, took: {} ms",
-                db_files.len(),
-                start.elapsed().as_millis()
-            ),
-            SearchInspectorFieldsBuilder::new()
-                .trace_id(trace_id.to_string())
-                .node_name(LOCAL_NODE.name.clone())
-                .component("file_list query from db".to_string())
-                .search_role("follower".to_string())
-                .duration(start.elapsed().as_millis() as usize)
-                .desc(format!("query from db: {}", db_files.len()))
-                .build()
-        )
-    );
-
-    // 3. query from file_list_dump
-    let db_ids = db_files.iter().map(|f| f.id).collect();
-    let ids_set = ids_set.difference(&db_ids).cloned().collect::<HashSet<_>>();
-    if !ids_set.is_empty() {
-        let ids: Vec<_> = ids_set.iter().cloned().collect();
-        let dumped_files = file_list_dump::query(
-            trace_id,
-            org_id,
-            stream_type,
-            stream_name,
-            time_range.unwrap_or_default(),
-            &ids,
-        )
-        .await?;
-        db_files.extend(
-            dumped_files
-                .iter()
-                .filter_map(|f| ids_set.contains(&f.id).then_some(f.into())),
-        );
-    }
-
-    // 4. set the local cache
-    if !cfg.common.local_mode {
-        let db_files = db_files.clone();
-        let trace_id = trace_id.to_string();
-        tokio::task::spawn(async move {
-            let start = std::time::Instant::now();
-            if let Err(e) = infra_file_list::LOCAL_CACHE
-                .batch_add_with_id(&db_files)
-                .await
-            {
-                log::error!("[trace_id {trace_id}] file_list set cache failed for db files: {e}");
-            }
-
-            log::info!(
-                "{}",
-                search_inspector_fields(
-                    format!(
-                        "[trace_id {trace_id}] file_list set cached_ids: {}, took: {} ms",
-                        db_files.len(),
-                        start.elapsed().as_millis()
-                    ),
-                    SearchInspectorFieldsBuilder::new()
-                        .trace_id(trace_id.to_string())
-                        .node_name(LOCAL_NODE.name.clone())
-                        .component("file_list set cached_ids".to_string())
-                        .search_role("follower".to_string())
-                        .duration(start.elapsed().as_millis() as usize)
-                        .desc(format!("set cached_ids: {}", db_files.len()))
-                        .build()
-                )
-            );
-        });
-    }
-
-    // 5. merge the results
-    files.extend(db_files);
-    files.par_sort_unstable_by(|a, b| a.key.cmp(&b.key));
-    files.dedup_by(|a, b| a.key == b.key);
-    Ok(files)
-}
-
-#[tracing::instrument(
-    name = "service::file_list::query_ids",
-    skip_all,
-    fields(org_id = org_id, stream_name = stream_name)
-)]
-pub async fn query_ids(
-    trace_id: &str,
-    org_id: &str,
-    stream_type: StreamType,
-    stream_name: &str,
-    time_range: (i64, i64),
-) -> Result<Vec<infra_file_list::FileId>> {
-    let mut files =
-        infra_file_list::query_ids(org_id, stream_type, stream_name, time_range).await?;
-    let dumped_files =
-        super::file_list_dump::query_ids(trace_id, org_id, stream_type, stream_name, time_range)
-            .await?;
-    files.extend(dumped_files);
-    files.par_sort_unstable_by(|a, b| a.id.cmp(&b.id));
-    files.dedup_by(|a, b| a.id == b.id);
-    Ok(files)
-}
-
-#[inline]
-pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats> {
-    let mut stats = ScanStats::new();
-    stats.files = files.len() as i64;
-    for file in files {
-        stats.records += file.meta.records;
-        stats.original_size += file.meta.original_size;
-        stats.compressed_size += file.meta.compressed_size;
-        stats.idx_scan_size += file.meta.index_size;
-    }
-    Ok(stats)
 }
 
 #[inline]

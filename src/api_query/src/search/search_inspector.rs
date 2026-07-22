@@ -272,7 +272,7 @@ pub async fn get_search_profile(
     }
 
     // run search with cache
-    let res = crate::service::search::cache::search(
+    let res = search_service::cache::search(
         &trace_id,
         org_id,
         stream_type,
@@ -559,8 +559,9 @@ fn format_trace_id(trace_id: Option<String>) -> String {
 
 #[cfg(test)]
 mod tests {
+    use search_service::inspector::SearchInspectorFields;
+
     use super::*;
-    use crate::service::search::inspector::SearchInspectorFields;
 
     #[test]
     fn test_format_trace_id_none_returns_empty() {

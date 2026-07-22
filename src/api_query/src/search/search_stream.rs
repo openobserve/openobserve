@@ -247,7 +247,7 @@ pub async fn search_http2_stream(
     };
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 axum::Json(MetaHttpResponse::error(
@@ -308,7 +308,7 @@ pub async fn search_http2_stream(
     if is_ui_histogram {
         histogram_breakdown_field = if !is_multi_stream_search {
             if let Some(stream_name) = stream_names.first() {
-                crate::service::search::sql::histogram::resolve_histogram_breakdown_field(
+                search_service::sql::histogram::resolve_histogram_breakdown_field(
                     &org_id,
                     stream_name,
                     stream_type,
@@ -322,7 +322,7 @@ pub async fn search_http2_stream(
         };
 
         // Convert the original query to a histogram query
-        match crate::service::search::sql::histogram::convert_to_histogram_query(
+        match search_service::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
@@ -553,7 +553,6 @@ pub async fn search_http2_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
     let search_type = req.search_type;
-
     // Spawn the search task in a separate task
     tokio::spawn(process_search_stream_request(
         trace_id.clone(),
@@ -787,8 +786,7 @@ pub async fn values_http2_stream(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) =
-            crate::service::search::check_search_allowed(&org_id, Some(&values_req.stream_name))
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&values_req.stream_name))
         {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
@@ -945,7 +943,6 @@ pub async fn values_http2_stream(
 
     // Pattern extraction is not supported for values endpoint
     let extract_patterns = false;
-
     // Spawn the search task to process the request
     tokio::spawn(process_search_stream_request(
         trace_id.clone(),
@@ -1018,7 +1015,6 @@ async fn get_sql(
     org_id: &str,
     stream_type: StreamType,
     search_type: Option<SearchEventType>,
-) -> Result<crate::service::search::sql::Sql, infra::errors::Error> {
-    crate::service::search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type)
-        .await
+) -> Result<search_service::sql::Sql, infra::errors::Error> {
+    search_service::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type).await
 }

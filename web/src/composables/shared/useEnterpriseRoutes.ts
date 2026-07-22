@@ -191,6 +191,15 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
+        path: "synthetic/private-locations/:id",
+        name: "synthetic-private-location",
+        component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
+        meta: { title: "Private Location" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
         path: "synthetic/:id/results",
         name: "synthetic-monitor-results",
         component: () => import("@/views/synthetics/MonitorResults.vue"),
