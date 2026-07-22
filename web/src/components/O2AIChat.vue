@@ -2449,13 +2449,6 @@ export default defineComponent({
                 try {
                   const data = JSON.parse(jsonStr);
 
-                  // Dev-only: surface the raw SSE event shape so a schema change
-                  // on the agent side (field renames, new event types) is
-                  // immediately visible instead of silently dropping text.
-                  if (import.meta.env.DEV) {
-                    console.debug("[o2ai chat_stream event]", data);
-                  }
-
                   // Handle title events - AI-generated chat title from first message
                   if (data && data.type === "title") {
                     ctxTitle = data.title;
