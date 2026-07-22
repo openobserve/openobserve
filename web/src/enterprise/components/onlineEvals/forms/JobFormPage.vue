@@ -44,7 +44,7 @@
              so each heading actually describes its fields: naming the job and
              choosing what it reads are different decisions. -->
         <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="job-form-details-section"
         >
           <div
@@ -90,7 +90,7 @@
 
         <!-- Evaluation Target -->
         <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="job-form-target-section"
         >
           <div
@@ -142,7 +142,7 @@
              samples the matching subset (§OnlineEval-D15), so the form reads
              in the same order the job actually executes. -->
         <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="job-form-filtering-section"
         >
           <div
@@ -168,7 +168,7 @@
 
         <!-- Sampling -->
         <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="job-form-sampling-section"
         >
           <div
@@ -218,7 +218,7 @@
 
         <!-- Scorers + Mapping -->
         <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="job-form-scorers-section"
         >
           <div
@@ -257,7 +257,7 @@
         <!-- Trace/session completion -->
         <section
           v-if="formValues.targetScope !== 'span'"
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="job-form-completion-section"
         >
           <div

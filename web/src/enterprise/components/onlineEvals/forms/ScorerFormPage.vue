@@ -42,7 +42,7 @@
       >
         <!-- Identity -->
         <section
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="scorer-form-identity-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
@@ -124,7 +124,7 @@
         <!-- LLM Judge configuration -->
         <section
           v-if="formValues.scorerType === 'llm_judge'"
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="scorer-form-judge-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
@@ -313,7 +313,7 @@
         <!-- Endpoint -->
         <section
           v-else
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="scorer-form-endpoint-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
@@ -381,7 +381,7 @@
         <!-- Authentication -->
         <section
           v-if="formValues.scorerType === 'remote'"
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="scorer-form-auth-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
@@ -476,7 +476,7 @@
         <!-- Custom headers -->
         <section
           v-if="formValues.scorerType === 'remote'"
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="scorer-form-headers-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">
@@ -543,7 +543,7 @@
         <!-- Request body template -->
         <section
           v-if="formValues.scorerType === 'remote'"
-          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default"
+          class="card-container shrink-0 overflow-hidden rounded-default border border-border-default bg-surface-base"
           data-test="scorer-form-body-section"
         >
           <div class="flex items-center border-b border-border-default px-3 py-2.5">

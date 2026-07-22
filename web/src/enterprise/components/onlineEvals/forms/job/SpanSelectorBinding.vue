@@ -28,6 +28,7 @@
       type="button"
       size="xs"
       variant="ghost-primary"
+      :data-test="`span-selector-edit-${scorerId}`"
       @click="editSelector(boundSelector)"
     >
       {{ t("common.edit") }}
