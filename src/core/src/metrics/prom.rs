@@ -922,6 +922,7 @@ pub async fn get_series(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
     let series = match search_service::search("", org_id, StreamType::Metrics, None, &req).await {
         Err(err) => {
@@ -1132,6 +1133,7 @@ pub async fn get_label_values(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
     let mut label_values = match search_service::search("", org_id, stream_type, None, &req).await {
         Ok(resp) => resp

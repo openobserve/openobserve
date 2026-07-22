@@ -237,6 +237,7 @@ pub async fn get_trace_dag(
         use_cache: get_use_cache_from_request(&query),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     let stream_type = StreamType::Traces;
