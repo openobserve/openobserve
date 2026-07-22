@@ -160,7 +160,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   ].join(" "),
   // On-dark primary — white background with primary color text, for use on dark gradient panels
   "on-dark-primary": [
-    "bg-white text-primary-600 font-bold border-0 shadow-md",
+    "bg-white text-button-on-dark-primary-text font-bold border-0 shadow-md",
     "enabled:hover:shadow-lg",
     "enabled:active:opacity-90",
     "focus-visible:ring-[3px] focus-visible:ring-white/50",

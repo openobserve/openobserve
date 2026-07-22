@@ -117,10 +117,10 @@ const benefits = computed(() => [
 // dark enough for a white person glyph). Full literal classes so Tailwind emits
 // them. These are placeholders — not real members.
 const avatarBgClasses = [
-  "bg-primary-700",
-  "bg-primary-600",
-  "bg-primary-500",
-  "bg-primary-400",
+  "bg-avatar-tint-1",
+  "bg-avatar-tint-2",
+  "bg-avatar-tint-3",
+  "bg-avatar-tint-4",
 ];
 
 // Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)

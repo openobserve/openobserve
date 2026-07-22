@@ -1,6 +1,5 @@
 {
   "totals": {
-    "rawProjectRamp": 8,
     "rawVarInComponent": 559,
     "arbZ": 0,
     "darkMechanism": 8,
@@ -10,9 +9,6 @@
   "files": {
     "components/CodeQueryEditor.vue": {
       "rawVarInComponent": 2
-    },
-    "components/CommunitySlackInvite.vue": {
-      "rawProjectRamp": 4
     },
     "components/Header.vue": {
       "rawVarInComponent": 2
@@ -117,9 +113,6 @@
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
       "rawVarInComponent": 1
     },
-    "lib/core/Button/OButton.vue": {
-      "rawProjectRamp": 1
-    },
     "lib/core/Code/OCodeBlock.vue": {
       "rawVarInComponent": 13
     },
@@ -198,23 +191,14 @@
     "lib/core/Table/sub-components/OTableBodyRow.vue": {
       "rawVarInComponent": 1
     },
-    "lib/core/Table/sub-components/OTableColumnToggle.vue": {
-      "rawProjectRamp": 1
-    },
     "lib/feedback/Skeleton/OSkeleton.vue": {
       "rawVarInComponent": 1
     },
     "lib/forms/DateTimeRange/ODateRangeCalendar.vue": {
       "rawVarInComponent": 2
     },
-    "lib/forms/Switch/OSwitch.vue": {
-      "rawProjectRamp": 1
-    },
     "lib/lists/FieldList/OFieldList.vue": {
       "rawVarInComponent": 1
-    },
-    "lib/navigation/Tabs/OTab.vue": {
-      "rawProjectRamp": 1
     },
     "plugins/logs/DetailTable.vue": {
       "rawVarInComponent": 2
