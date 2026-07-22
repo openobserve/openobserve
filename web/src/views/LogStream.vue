@@ -636,6 +636,7 @@ export default defineComponent({
     };
 
     const deleteStream = () => {
+      isDeleting.value = true;
       streamService
         .delete(
           store.state.selectedOrganization.identifier,
@@ -664,6 +665,7 @@ export default defineComponent({
         })
         .finally(() => {
           deleteAssociatedAlertsPipelines.value = true;
+          isDeleting.value = false;
         });
     };
     const deleteBatchStream = () => {

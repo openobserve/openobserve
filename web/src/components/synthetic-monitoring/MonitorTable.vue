@@ -301,6 +301,7 @@
             size="sm"
             icon-left="delete"
             :data-test="`${dataTest}-delete-selected-btn`"
+            :loading="!!props.bulkActionLoading"
             @click="emit('delete-selected')"
           >{{ t('synthetics.table.delete') }}</OButton>
         </template>
