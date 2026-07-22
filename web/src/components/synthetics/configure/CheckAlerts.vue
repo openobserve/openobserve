@@ -14,6 +14,7 @@ import OButton from '@/lib/core/Button/OButton.vue'
 const props = defineProps<{
   check: BrowserCheck
   destinations: string[]
+  validationErrors?: Record<string, string>
 }>()
 
 const emit = defineEmits<{
@@ -193,6 +194,15 @@ const silenceMinutes = computed({
           </div>
         </div>
       </div>
+
+      <!-- Validation error -->
+      <p
+        v-if="props.validationErrors?.alerts"
+        class="text-xs text-status-error-text"
+        data-test="synthetics-check-alerts-error"
+      >
+        {{ props.validationErrors.alerts }}
+      </p>
 
     </div>
   </div>
