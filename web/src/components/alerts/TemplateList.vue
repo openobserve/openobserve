@@ -189,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline-destructive"
             size="sm"
             icon-left="delete"
+            :loading="bulkDeleteLoading"
             @click="openBulkDeleteDialog"
           >
             Delete
@@ -299,6 +300,7 @@ const confirmDelete: Ref<{
 }> = ref({ visible: false, data: null });
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
+const bulkDeleteLoading = ref(false);
 const filterQuery = ref("");
 // Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
 // system templates (name starts with `prebuilt_`), "custom" shows the rest.
@@ -557,6 +559,7 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeleteTemplates = () => {
+  bulkDeleteLoading.value = true;
   const templateNames = selectedTemplates.value.map(
     (template: any) => template.name,
   );
@@ -600,6 +603,9 @@ const bulkDeleteTemplates = () => {
           message: errorMessage,
         });
       }
+    })
+    .finally(() => {
+      bulkDeleteLoading.value = false;
     });
 };
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
