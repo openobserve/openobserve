@@ -105,3 +105,39 @@ describe("MetricCardChart re-renders when anything it DRAWS WITH changes", () =>
     expect(schema.queries[0].query).toBe("sum(rate(up[5m]))");
   });
 });
+
+describe("the y-axis labels get breathing room from the card's left edge", () => {
+  beforeEach(() => convertPromQLData.mockReset());
+
+  // The ChartRenderer stub records the options the card actually hands off.
+  const optionsHandedToRenderer = (wrapper: any) =>
+    wrapper.findComponent({ name: "ChartRenderer" }).props("data")?.options;
+
+  it("adds a left inset for line cards so the widest label is not clipped", async () => {
+    // containLabel under-reserves by a few px; the card widens grid.left to
+    // absorb it. The converter's default left (5) must be overridden to 8.
+    convertPromQLData.mockResolvedValue({
+      options: { series: [{ type: "line" }], grid: { left: 5, containLabel: true } },
+    });
+
+    const wrapper = mountChart({ chartType: "line" });
+    await nextTick();
+    await nextTick();
+
+    expect(optionsHandedToRenderer(wrapper).grid.left).toBe(8);
+  });
+
+  it("leaves the heatmap grid alone (it manages its own axis layout)", async () => {
+    // A heatmap sets its own axisLabel width/truncation; the line-card inset must
+    // not touch its grid.left.
+    convertPromQLData.mockResolvedValue({
+      options: { series: [{ type: "heatmap" }], grid: { left: 5 } },
+    });
+
+    const wrapper = mountChart({ chartType: "heatmap" });
+    await nextTick();
+    await nextTick();
+
+    expect(optionsHandedToRenderer(wrapper).grid.left).toBe(5);
+  });
+});

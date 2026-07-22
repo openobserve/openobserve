@@ -207,6 +207,29 @@ describe("Dashboard Data Conversion Utils", () => {
       });
     });
 
+    it("compacts large custom-unit values with an SI suffix so axis labels fit", () => {
+      // A counter card uses unit "custom" with "c/s". Without SI scaling the raw
+      // "160000.00c/s" is too wide and clips on small metric panels. The numeric
+      // part carries the SI letter; the custom unit is preserved after it.
+      expect(getUnitValue(160000, "custom", "c/s")).toEqual({
+        value: "160.00K",
+        unit: "c/s",
+      });
+      expect(getUnitValue(2_500_000, "custom", "c/s")).toEqual({
+        value: "2.50M",
+        unit: "c/s",
+      });
+    });
+
+    it("leaves small custom-unit values unscaled (no SI suffix below 1000)", () => {
+      // Below 1000 the SI suffix is empty, so the existing "100.00"/"items"
+      // contract is unchanged.
+      expect(getUnitValue(100, "custom", "items")).toEqual({
+        value: "100.00",
+        unit: "items",
+      });
+    });
+
     it("should handle zero values", () => {
       expect(getUnitValue(0, "bytes")).toEqual({
         value: "0.00",

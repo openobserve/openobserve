@@ -1770,11 +1770,64 @@ export function useMetricsExplorerGrid() {
    */
   let labelNamesGeneration = 0;
 
+  const isLabelField = (l: string) =>
+    !!l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l);
+
+  /**
+   * True when the user has narrowed the grid with a facet (prefix/suffix/type) or
+   * a metric-name search. In that case the picker offers only the labels of the
+   * metrics that survive the narrowing — NOT every label in the window. With
+   * nothing selected it stays `false` and the picker shows all labels (the
+   * global `metricsService.labels()` path).
+   */
+  const isLabelPickerNarrowed = () =>
+    selectedPrefixes.value.size +
+      selectedSuffixes.value.size +
+      selectedTypes.value.size >
+      0 || searchTerm.value.trim().length > 0;
+
+  /**
+   * The labels of the metrics the user has narrowed to, unioned from the schema
+   * map. Scoped to `sortedCandidates` (facets + search + favourites) — the
+   * no-data hiding filter is deliberately excluded, so a label from a metric
+   * that is merely empty in the current window is still offered.
+   *
+   * Returns null (not an empty list) to mean "cannot scope — fall back to the
+   * global list": the schema map failed to load, or genuinely produced no
+   * labels. An empty picker would be worse than a broad one.
+   */
+  const scopedLabelNames = (): string[] | null => {
+    const byStream = labelsByStream.value;
+    if (!Object.keys(byStream).length) return null;
+    const names = new Set<string>();
+    for (const card of sortedCandidates.value) {
+      for (const label of byStream[card.name] ?? []) {
+        if (isLabelField(label)) names.add(label);
+      }
+    }
+    if (!names.size) return null;
+    return [...names].sort();
+  };
+
   const loadLabelNames = async () => {
     if (labelNames.value.length || labelNamesLoading.value) return;
     const generation = labelNamesGeneration;
     labelNamesLoading.value = true;
     try {
+      // Narrowed picker: derive from the already-loaded schema map instead of
+      // asking the backend for every label in the window. No new network call —
+      // `ensureSchemas` populates `labelsByStream`, the same map value
+      // suggestions use. Falls through to the global path if scoping is not
+      // possible (schema load failed, or no labels on the narrowed set).
+      if (isLabelPickerNarrowed()) {
+        await ensureSchemas();
+        if (generation !== labelNamesGeneration) return;
+        const scoped = scopedLabelNames();
+        if (scoped) {
+          labelNames.value = scoped;
+          return;
+        }
+      }
       const { start_time, end_time } = timeRange.value;
       const DAY_US = 24 * 3600 * 1_000_000;
       // Walked only while the answer is empty; a rung that ERRORS is walked
@@ -1800,10 +1853,7 @@ export function useMetricsExplorerGrid() {
           // internal columns (`aggregation_temporality`, `_timestamp`, `value`, …).
           // Those are not labels and filtering on them is meaningless, so they are
           // kept out of the picker.
-          names = (response?.data?.data ?? []).filter(
-            (l: string) =>
-              l && !l.startsWith("__") && !INTERNAL_LABEL_FIELDS.has(l),
-          );
+          names = (response?.data?.data ?? []).filter(isLabelField);
         } catch {
           if (generation !== labelNamesGeneration) return;
         }
@@ -1816,6 +1866,23 @@ export function useMetricsExplorerGrid() {
       if (generation === labelNamesGeneration) labelNamesLoading.value = false;
     }
   };
+
+  /**
+   * The narrowed picker's list is a function of the facet selection and the
+   * search term, so it goes stale the moment either changes. Drop the cached
+   * list (and cancel any in-flight load) so the next `@focus-picker` recomputes
+   * against the current narrowing — reverting to the global list once nothing is
+   * selected. Mirrors the window/org invalidation above.
+   */
+  watch(
+    [selectedPrefixes, selectedSuffixes, selectedTypes, searchTerm],
+    () => {
+      labelNamesGeneration++;
+      labelNames.value = [];
+      labelNamesLoading.value = false;
+    },
+    { deep: true },
+  );
 
   /**
    * Suggested values per label, for the CURRENT org and window.

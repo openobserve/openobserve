@@ -52,6 +52,14 @@ import { toZonedTime } from "date-fns-tz";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
 
+/**
+ * Extra left inset (px) for the y-axis label strip on a metric card, added
+ * OUTSIDE ECharts' `containLabel` reservation. containLabel sizes the strip from
+ * a text-width estimate that under-measures the rendered width by a few pixels,
+ * pushing the widest labels past the card's left edge; this inset absorbs that.
+ */
+const Y_AXIS_LABEL_LEFT_INSET = 8;
+
 export default defineComponent({
   name: "MetricCardChart",
   components: { ChartRenderer },
@@ -234,6 +242,26 @@ export default defineComponent({
           };
 
           pinTimeAxis(options);
+
+          if (props.chartType !== "heatmap") {
+            // ECharts `containLabel` reserves the y-axis label strip from its own
+            // text-width ESTIMATE, which under-measures the actually-rendered
+            // width by a few pixels. On these small cards that shortfall pushes
+            // the widest labels ~3px past the left edge, clipping their first
+            // character (measured: "700.00c/s" rendered at x=-2). A small extra
+            // left inset absorbs the estimate error so labels never touch the
+            // edge. Applied only to the metric cards, not the shared converter,
+            // so dashboards keep their existing layout.
+            const grid = Array.isArray(options.grid)
+              ? options.grid[0]
+              : options.grid;
+            if (grid) {
+              // `left` is added OUTSIDE the containLabel reservation, so this is
+              // pure breathing room. 8 clears the measured ~3px overhang with
+              // margin to spare, without visibly shrinking the plot.
+              grid.left = Y_AXIS_LABEL_LEFT_INSET;
+            }
+          }
 
           if (props.chartType === "heatmap") {
             // Keep the colour bar — without it the cells are just colours with

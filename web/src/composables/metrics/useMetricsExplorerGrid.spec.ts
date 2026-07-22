@@ -1474,4 +1474,109 @@ describe("useMetricsExplorerGrid", () => {
       expect(resolved.unit).toBe("celsius"); // ...and so does what the chart uses
     });
   });
+
+  describe("the label picker follows the narrowed grid", () => {
+    // Distinct label sets per metric so a scoped list is DISTINGUISHABLE from the
+    // global one: if scoping worked, only the narrowed metrics' labels appear.
+    const withLabelSchemas = () =>
+      (StreamService.nameList as any).mockResolvedValue({
+        data: {
+          list: STREAMS.map((stream) => {
+            const labels =
+              stream.name === "http_requests_total"
+                ? ["pod", "code", "__name__", "_timestamp"]
+                : stream.name === "idle_metric_total"
+                  ? ["region"]
+                  : stream.name === "cpu_temperature"
+                    ? ["sensor"]
+                    : ["shared"];
+            return { ...stream, schema: labels.map((name) => ({ name, type: "Utf8" })) };
+          }),
+        },
+      });
+
+    it("shows all window labels when nothing is narrowed (global path)", async () => {
+      const grid = await setup();
+      (metricsService.labels as any).mockResolvedValue({
+        data: { data: ["job", "instance", "__name__"] },
+      });
+      (metricsService.labels as any).mockClear();
+
+      await grid.loadLabelNames();
+
+      // The global endpoint was asked, and its internal fields were dropped.
+      expect(metricsService.labels).toHaveBeenCalled();
+      expect(grid.labelNames.value).toEqual(["job", "instance"]);
+    });
+
+    it("scopes labels to the search-matched metrics, from the schema map", async () => {
+      const grid = await setup();
+      withLabelSchemas();
+      (metricsService.labels as any).mockResolvedValue({
+        data: { data: ["should_not_be_used"] },
+      });
+      (metricsService.labels as any).mockClear();
+
+      grid.searchTerm.value = "http_requests_total";
+      await flush();
+      await grid.loadLabelNames();
+
+      // Only http_requests_total's real labels — internal fields excluded, and
+      // the global endpoint was NOT consulted for the narrowed list.
+      expect(grid.labelNames.value).toEqual(["code", "pod"]);
+      expect(metricsService.labels).not.toHaveBeenCalled();
+    });
+
+    it("scopes labels to the selected type facet", async () => {
+      const grid = await setup();
+      withLabelSchemas();
+
+      // Counter bucket = http_requests_total + idle_metric_total (+ the histogram
+      // count/bucket siblings, which carry "shared").
+      grid.selectedTypes.value = new Set(["counter"]);
+      await flush();
+      await grid.loadLabelNames();
+
+      expect(grid.labelNames.value).toContain("pod");
+      expect(grid.labelNames.value).toContain("code");
+      expect(grid.labelNames.value).toContain("region");
+      // A gauge-only label must not leak into the counter-scoped list.
+      expect(grid.labelNames.value).not.toContain("sensor");
+    });
+
+    it("re-derives when the narrowing changes after the first load", async () => {
+      const grid = await setup();
+      withLabelSchemas();
+
+      grid.searchTerm.value = "http_requests_total";
+      await flush();
+      await grid.loadLabelNames();
+      expect(grid.labelNames.value).toEqual(["code", "pod"]);
+
+      // Change the search — the cached list must be invalidated so the next focus
+      // recomputes against the new narrowing.
+      grid.searchTerm.value = "idle_metric_total";
+      await flush();
+      await grid.loadLabelNames();
+      expect(grid.labelNames.value).toEqual(["region"]);
+    });
+
+    it("falls back to the global list when the schema map is empty", async () => {
+      const grid = await setup();
+      // Schema load yields no membership, so scoping is impossible.
+      (StreamService.nameList as any).mockResolvedValue({ data: { list: [] } });
+      (metricsService.labels as any).mockResolvedValue({
+        data: { data: ["job"] },
+      });
+      (metricsService.labels as any).mockClear();
+
+      grid.searchTerm.value = "http_requests_total";
+      await flush();
+      await grid.loadLabelNames();
+
+      // Never leaves the picker empty — the global endpoint answered instead.
+      expect(metricsService.labels).toHaveBeenCalled();
+      expect(grid.labelNames.value).toEqual(["job"]);
+    });
+  });
 });

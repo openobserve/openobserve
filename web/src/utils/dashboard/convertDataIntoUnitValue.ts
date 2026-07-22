@@ -171,9 +171,24 @@ export const getUnitValue = (
       return { value: finalValue, unit: finalUnit };
     }
     case "custom": {
+      // Compact large magnitudes with an SI suffix (K/M/B/T/Q) the same way the
+      // "numbers" unit does. Without it a value like 160000 renders as the full
+      // "160000.00", which — with a custom suffix like "c/s" — is too wide for a
+      // small panel's y-axis label and clips on the left edge. The SI letter
+      // rides on the value; the custom unit stays after it ("160.00K" + "c/s").
+      const numeric = parseFloat(value);
+      if (!Number.isFinite(numeric)) {
+        return { value: `${value}`, unit: `${customUnit ?? ""}` };
+      }
+      const table = units.numbers;
+      let unitIndex = table.length - 1;
+      while (unitIndex > 0 && Math.abs(numeric) < table[unitIndex].divisor) {
+        unitIndex--;
+      }
+      const scaled = (numeric / table[unitIndex].divisor).toFixed(decimals);
       // console.timeEnd("getUnitValue:");
       return {
-        value: `${parseFloat(value)?.toFixed(decimals) ?? 0}`,
+        value: `${scaled}${table[unitIndex].unit}`,
         unit: `${customUnit ?? ""}`,
       };
     }
