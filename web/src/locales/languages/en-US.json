@@ -9897,6 +9897,7 @@
     "tabs": {
       "all": "All",
       "browser": "Browser",
+      "checks": "Checks",
       "http": "HTTP",
       "ssh": "SSH",
       "tcp": "TCP",

@@ -172,7 +172,7 @@ const showAssertions = computed(
       :subtitle="run ? fmtTs(run.timestamp) : ''"
       :back="{
         label: t('synthetics.results.monitors'),
-        to: { name: 'synthetics-monitor-results', params: { id: monitorId } },
+        to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
         dataTest: 'synthetics-protocol-run-back-btn',
       }"
     >
