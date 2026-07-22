@@ -348,7 +348,12 @@ const props = defineProps<{
   runsError: string | null;
 }>();
 
-defineEmits<{
+// NOTE: the binding is required — the template calls emit() directly for
+// update:scope, open-run, runs-filter-change and runs-pagination-change.
+// main's lint pass (#13174) dropped `const emit =` here; on this branch the
+// OToggleGroup scope filter uses it, so removing it silently stops the panel
+// emitting.
+const emit = defineEmits<{
   (e: "back"): void;
   (e: "update:scope", value: QualityScope): void;
   (e: "open-run", value: QualityRunRow): void;
