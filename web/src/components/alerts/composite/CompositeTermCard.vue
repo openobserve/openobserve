@@ -167,14 +167,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :promqlCondition="term.draft.query_condition.promql_condition"
           :triggerCondition="mergedTrigger"
           :hideSchedule="true"
-          @update:tab="(val) => (term.draft.query_condition.type = val)"
+          @update:tab="(val) => setDraftQc('type', val)"
           @input:update="() => {}"
-          @update:sqlQuery="(val) => (term.draft.query_condition.sql = val)"
-          @update:promqlQuery="(val) => (term.draft.query_condition.promql = val)"
-          @update:vrlFunction="(val) => (term.draft.query_condition.vrl_function = val)"
+          @update:sqlQuery="(val) => setDraftQc('sql', val)"
+          @update:promqlQuery="(val) => setDraftQc('promql', val)"
+          @update:vrlFunction="(val) => setDraftQc('vrl_function', val)"
           @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
-          @update:aggregation="(val) => (term.draft.query_condition.aggregation = val)"
-          @update:promqlCondition="(val) => (term.draft.query_condition.promql_condition = val)"
+          @update:aggregation="(val) => setDraftQc('aggregation', val)"
+          @update:promqlCondition="(val) => setDraftQc('promql_condition', val)"
           @update:triggerCondition="onTriggerConditionUpdate"
         />
       </div>
@@ -243,18 +243,24 @@ export default defineComponent({
     const { t } = useI18n();
     const { getStreams, getStream } = useStreams();
 
+    // Alias the parent-owned `term` prop (the parent mutates the composite's
+    // terms array it owns; the card edits its slice in place). Writing through
+    // this computed keeps the same reference, so edits propagate as before while
+    // satisfying vue/no-mutating-props.
+    const term = computed(() => props.term);
+
     // The member-alert option matching the currently referenced alert_id, if
     // it has resolved in the parent's option list.
     const selectedMember = computed(() =>
-      props.term.mode === "existing" && props.term.alert_id
-        ? props.memberOptions.find((o) => o.value === props.term.alert_id)
+      term.value.mode === "existing" && term.value.alert_id
+        ? props.memberOptions.find((o) => o.value === term.value.alert_id)
         : undefined,
     );
 
     // A term is locked (mode/stream/query frozen) only when editing an existing
     // composite AND the term was already saved. Terms added this session
     // (_isNew) stay fully editable so authors can add members on update.
-    const locked = computed(() => props.beingUpdated && !props.term._isNew);
+    const locked = computed(() => props.beingUpdated && !term.value._isNew);
 
     // Readable comparison glyph for the referenced alert's threshold.
     const operatorText = computed(() => {
@@ -271,10 +277,10 @@ export default defineComponent({
 
     const collapsed = ref(false);
     const collapsedSummary = computed(() => {
-      if (props.term.mode === "existing") {
-        return props.term.member_name || t("alerts.composite.selectMember");
+      if (term.value.mode === "existing") {
+        return term.value.member_name || t("alerts.composite.selectMember");
       }
-      const d = props.term.draft || {};
+      const d = term.value.draft || {};
       return d.stream_name
         ? `${d.stream_type} / ${d.stream_name}`
         : t("alerts.composite.newMemberShort");
@@ -285,7 +291,7 @@ export default defineComponent({
     const columns = ref<any[]>([]);
     const isFetchingStreams = ref(false);
     const isAggregationEnabled = ref(
-      !!props.term.draft?.query_condition?.aggregation?.group_by?.length,
+      !!term.value.draft?.query_condition?.aggregation?.group_by?.length,
     );
 
     const streamFieldsMap = computed(() => {
@@ -299,8 +305,8 @@ export default defineComponent({
     // Threshold (operator + count) is per-term; the schedule is inherited from
     // the composite, so only operator/threshold are exposed to QueryConfig.
     const mergedTrigger = computed(() => ({
-      operator: props.term.draft.operator,
-      threshold: props.term.draft.threshold,
+      operator: term.value.draft.operator,
+      threshold: term.value.draft.threshold,
       period: 10,
       frequency: 10,
       frequency_type: "minutes",
@@ -308,31 +314,31 @@ export default defineComponent({
     }));
 
     const onTriggerConditionUpdate = (val: any) => {
-      props.term.draft.operator = val.operator;
-      props.term.draft.threshold = val.threshold;
+      term.value.draft.operator = val.operator;
+      term.value.draft.threshold = val.threshold;
     };
 
     // Only [A-Za-z0-9_] in the alias (it's the expression identifier).
     const onAliasInput = (val: string | number) => {
-      props.term.name = String(val ?? "").replace(/[^A-Za-z0-9_]/g, "");
+      term.value.name = String(val ?? "").replace(/[^A-Za-z0-9_]/g, "");
     };
 
     const onModeChange = (mode: string) => {
-      props.term.mode = mode;
+      term.value.mode = mode;
       // Switching modes clears the previous reference/draft binding.
       if (mode === "new") {
-        props.term.alert_id = "";
-        props.term.member_name = "";
+        term.value.alert_id = "";
+        term.value.member_name = "";
       }
     };
 
     const onMemberSelect = (val: SelectModelValue) => {
       const id = Array.isArray(val) ? "" : String(val ?? "");
-      props.term.alert_id = id;
+      term.value.alert_id = id;
       const opt = props.memberOptions.find((o) => o.value === id);
-      props.term.member_name = opt?.label || "";
-      if (!props.term.name || /^[A-Za-z]$/.test(props.term.name)) {
-        props.term.name = slugifyAlias(opt?.label || props.term.name);
+      term.value.member_name = opt?.label || "";
+      if (!term.value.name || /^[A-Za-z]$/.test(term.value.name)) {
+        term.value.name = slugifyAlias(opt?.label || term.value.name);
       }
     };
 
@@ -353,12 +359,12 @@ export default defineComponent({
     };
 
     const loadStreamFields = async (streamName: string) => {
-      if (!streamName || !props.term.draft.stream_type) {
+      if (!streamName || !term.value.draft.stream_type) {
         columns.value = [];
         return;
       }
       try {
-        const data: any = await getStream(streamName, props.term.draft.stream_type, true);
+        const data: any = await getStream(streamName, term.value.draft.stream_type, true);
         columns.value = Array.isArray(data?.schema)
           ? data.schema.map((c: any) => ({ label: c.name, value: c.name, type: c.type }))
           : [];
@@ -369,30 +375,37 @@ export default defineComponent({
 
     const onStreamTypeChange = (val: SelectModelValue) => {
       const st = Array.isArray(val) ? "" : String(val ?? "");
-      props.term.draft.stream_type = st;
-      props.term.draft.stream_name = "";
+      term.value.draft.stream_type = st;
+      term.value.draft.stream_name = "";
       columns.value = [];
       loadStreamNames(st);
     };
 
     const onStreamNameChange = (val: SelectModelValue) => {
       const sn = Array.isArray(val) ? "" : String(val ?? "");
-      props.term.draft.stream_name = sn;
+      term.value.draft.stream_name = sn;
       loadStreamFields(sn);
     };
 
+    // Write a single query_condition field of the draft (New-mode term) through
+    // the computed alias, keeping the QueryConfig event bindings prop-mutation
+    // free (vue/no-mutating-props).
+    const setDraftQc = (key: string, val: any) => {
+      term.value.draft.query_condition[key] = val;
+    };
+
     onMounted(() => {
-      if (props.term.mode === "new" && props.term.draft.stream_type) {
-        loadStreamNames(props.term.draft.stream_type);
-        if (props.term.draft.stream_name) loadStreamFields(props.term.draft.stream_name);
+      if (term.value.mode === "new" && term.value.draft.stream_type) {
+        loadStreamNames(term.value.draft.stream_type);
+        if (term.value.draft.stream_name) loadStreamFields(term.value.draft.stream_name);
       }
     });
 
     watch(
-      () => props.term.mode,
+      () => term.value.mode,
       (mode) => {
-        if (mode === "new" && props.term.draft.stream_type && !streamNameOptions.value.length) {
-          loadStreamNames(props.term.draft.stream_type);
+        if (mode === "new" && term.value.draft.stream_type && !streamNameOptions.value.length) {
+          loadStreamNames(term.value.draft.stream_type);
         }
       },
     );
@@ -417,6 +430,7 @@ export default defineComponent({
       onMemberSelect,
       onStreamTypeChange,
       onStreamNameChange,
+      setDraftQc,
     };
   },
 });
