@@ -465,7 +465,8 @@ export default defineComponent({
     // tiles popping in and shifting the layout.
     const menuReady = ref(
       !!(
-        store.state.zoConfig?.hasOwnProperty?.("version") &&
+        store.state.zoConfig &&
+        Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") &&
         store.state.zoConfig.version != ""
       ),
     );
