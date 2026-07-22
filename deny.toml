@@ -13,6 +13,15 @@ ignore = [
   "RUSTSEC-2024-0421", # from idna, transitive dep of vrl
   "RUSTSEC-2024-0436", # from paste, transitive dep of datafusion
   "RUSTSEC-2024-0437", # from protobuf, transitive dep of prometheus
+  "RUSTSEC-2023-0052", # webpki 0.21, transitive dep of sentinel-core -> etcd-rs
+  "RUSTSEC-2024-0320", # yaml-rust, transitive dep of sentinel-core
+  "RUSTSEC-2024-0336", # rustls 0.19, transitive dep of sentinel-core -> etcd-rs
+  "RUSTSEC-2025-0009", # ring 0.16, transitive dep of sentinel-core -> etcd-rs
+  "RUSTSEC-2025-0010", # ring 0.16, transitive dep of sentinel-core -> etcd-rs
+  "RUSTSEC-2025-0141", # bincode 1.x is unmaintained; transitive dep of promql-parser/lrpar
+  "RUSTSEC-2026-0189", # rmcp <1.4; rmcp-openapi and rmcp-actix-web do not support 1.x yet
+  "RUSTSEC-2026-0194", # quick-xml <0.41; pinned by plist and the object_store fork
+  "RUSTSEC-2026-0195", # quick-xml <0.41; pinned by plist and the object_store fork
 ]
 
 [licenses]
@@ -36,11 +45,15 @@ exceptions = [
     { name = "openobserve-cipher", allow = ["AGPL-3.0"] },
     { name = "db", allow = ["AGPL-3.0"] },
     { name = "promql", allow = ["AGPL-3.0"] },
+    { name = "audit", allow = ["AGPL-3.0"] },
+    { name = "search_service", allow = ["AGPL-3.0"] },
+    { name = "usage_reporting", allow = ["AGPL-3.0"] },
     # Empty dependency-resolution stubs for the private enterprise crates.
-    { name = "o2_dex", allow = ["AGPL-3.0"] },
-    { name = "o2_enterprise", allow = ["AGPL-3.0"] },
-    { name = "o2_openfga", allow = ["AGPL-3.0"] },
-    { name = "o2_ratelimit", allow = ["AGPL-3.0"] },
+    { name = "o2_dex", allow = ["AGPL-3.0", "AGPL-3.0-only"] },
+    { name = "o2_enterprise", allow = ["AGPL-3.0", "AGPL-3.0-only"] },
+    { name = "o2_openfga", allow = ["AGPL-3.0", "AGPL-3.0-only"] },
+    { name = "o2_ratelimit", allow = ["AGPL-3.0", "AGPL-3.0-only"] },
+    { name = "xdrain-rs", allow = ["AGPL-3.0-only"] },
     { name = "vortex", allow = ["AGPL-3.0"] },
     { name = "vortex-datafusion", allow = ["AGPL-3.0"] },
     { name = "config", allow = ["AGPL-3.0"] },
