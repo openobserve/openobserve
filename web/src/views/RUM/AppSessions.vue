@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Controls on the right -->
             <div class="flex items-start gap-1 shrink-0">
               <syntax-guide />
-              <date-time
+              <DateTime
                 auto-apply
                 menu-align="end"
                 :default-type="sessionState.data.datetime.valueType"
