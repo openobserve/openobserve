@@ -2680,7 +2680,7 @@ mod tests {
         // Save pipeline directly to DB (bypassing API validation) to simulate a pipeline
         // with an invalid query that was saved before validation was added, or to test
         // what happens at evaluation time when the stream does not exist.
-        openobserve::service::db::pipeline::set(&pipeline_data)
+        openobserve::service::pipeline::store::set(&pipeline_data)
             .await
             .expect("Failed to set pipeline in DB");
         // Create the scheduler trigger directly with needs_validated=false so the
