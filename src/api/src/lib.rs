@@ -18,7 +18,7 @@
 #![recursion_limit = "256"]
 
 #[cfg(feature = "enterprise")]
-pub use openobserve_core::cipher;
+pub use ::openobserve_cipher as cipher;
 pub use openobserve_core::{common, service};
 
 pub mod handler;

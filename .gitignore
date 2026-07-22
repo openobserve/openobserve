@@ -19,6 +19,7 @@ flamegraph.html
 /data*/
 /src/infra/data/
 /src/core/data/
+/src/db/data/
 /src/search/data/
 /.idea/
 /.vscode

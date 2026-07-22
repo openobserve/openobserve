@@ -11,6 +11,7 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "db/enterprise",
     "dep:aws-config",
     "dep:aws-credential-types",
     "dep:o2_dex",
@@ -22,12 +23,13 @@ enterprise = [
     "search/enterprise",
 ]
 cloud = [
+    "db/cloud",
     "infra/cloud",
     "enterprise",
     "o2_enterprise/cloud",
     "common/cloud",
 ]
-vectorscan = ["o2_enterprise/vectorscan", "search/vectorscan"]
+vectorscan = ["db/vectorscan", "o2_enterprise/vectorscan", "search/vectorscan"]
 vortex = [
     "dep:vortex",
     "config/vortex",
@@ -36,6 +38,7 @@ vortex = [
 ]
 
 [dependencies]
+db.workspace = true
 common.workspace = true
 transform.workspace = true
 promql.workspace = true

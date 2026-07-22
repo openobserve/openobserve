@@ -513,7 +513,7 @@ pub async fn get_built_in(
         })
         .collect();
 
-    let last_updated = crate::service::db::model_pricing_sync::last_sync_timestamp();
+    let last_updated = crate::service::model_pricing::last_sync_timestamp();
     MetaHttpResponse::json(BuiltInModelPricingResponse {
         models,
         source_url,
@@ -573,12 +573,12 @@ pub async fn refresh_built_in(
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
 
-    let last_sync = crate::service::db::model_pricing_sync::last_sync_timestamp();
+    let last_sync = crate::service::model_pricing::last_sync_timestamp();
     if last_sync > 0 && chrono::Utc::now().timestamp() - last_sync < 60 {
         return MetaHttpResponse::too_many_requests("Rate limit: wait 60s between refreshes");
     }
 
-    match crate::service::db::model_pricing_sync::sync_built_in_from_github(true).await {
+    match crate::service::model_pricing::sync_built_in_from_github(true).await {
         Ok(result) => MetaHttpResponse::json(result),
         Err(e) => MetaHttpResponse::internal_error(e),
     }
