@@ -336,6 +336,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                     </div>
                   </template>
+                  <template #cell-platform="{ row }">
+                    <OBadge
+                      :variant="isMobilePlatform(row.source) ? 'primary' : 'default'"
+                      size="sm"
+                      data-test="rum-app-sessions-platform-text"
+                    >{{ row.platform }}</OBadge>
+                  </template>
                   <template #cell-activity="{ row }">
                     <SessionActivitySparkline
                       :session-id="row.session_id"
@@ -430,6 +437,7 @@ import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   durationFormatter,
@@ -442,6 +450,7 @@ import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useSession from "@/composables/useSessionReplay";
+import { isMobileReplaySource } from "@/composables/rum/useMobileSessionReplay";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
@@ -670,6 +679,15 @@ const tableColumns = [
     meta: { align: "left", autoWidth: true },
   },
   {
+    id: "platform",
+    header: t("rum.platform"),
+    accessorFn: (row: any) => row["platform"] || "Browser",
+    sortable: true,
+    hideable: true,
+    size: 140,
+    meta: { align: "left" },
+  },
+  {
     id: "activity",
     header: t("rum.activity"),
     accessorFn: (row: any) => row["events"] || 0,
@@ -863,6 +881,7 @@ const getSessions = () => {
     SELECT
       min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp,
       min(type) as type,
+      min(source) as source,
       SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS error_count,
       ${frustrationCountField},
       SUM(CASE WHEN type!='null' THEN 1 ELSE 0 END) AS events,
@@ -902,6 +921,7 @@ const getSessions = () => {
           zo_sql_timestamp: hit.zo_sql_timestamp,
           timestamp: hit.zo_sql_timestamp,
           type: hit.type,
+          source: hit.source,
           error_count: hit.error_count,
           frustration_count: hit.frustration_count || 0,
           events: hit.events || 0,
@@ -1229,12 +1249,33 @@ const classifyDevice = (family?: string, os?: string): DeviceSegment => {
   return "desktop";
 };
 
+// The SDK `source` field identifies the platform that produced the session.
+// Browser RUM omits it (or sends "browser"); mobile RUM sends the platform slug.
+const PLATFORM_LABELS: Record<string, string> = {
+  browser: "Browser",
+  "react-native": "React Native",
+  ios: "iOS",
+  android: "Android",
+  flutter: "Flutter",
+};
+const classifySource = (source?: string): string => {
+  const s = (source || "").toLowerCase();
+  if (!s) return PLATFORM_LABELS.browser;
+  return PLATFORM_LABELS[s] || source || PLATFORM_LABELS.browser;
+};
+
+// A session is "mobile" when its SDK source is a mobile platform (react-native/
+// ios/android/flutter) — reuses the same predicate the replay player uses.
+const isMobilePlatform = (source?: string): boolean =>
+  isMobileReplaySource(source);
+
 const enrichedRows = computed(() =>
   rows.value.map((row: any) => ({
     ...row,
     is_bounce: (row.events ?? 0) <= 1 || (row.time_spent ?? 0) < BOUNCE_MAX_MS,
     is_active: !!row.end_time && Date.now() - row.end_time <= ACTIVE_WINDOW_MS,
     device_type: classifyDevice(row.device_family, row.os),
+    platform: classifySource(row.source),
   })),
 );
 
