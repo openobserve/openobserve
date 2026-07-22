@@ -57,31 +57,16 @@ describe("OFormSelect", () => {
     expect(wrapper.findComponent(OSelect).props("searchable")).toBe(true);
   });
 
-  it('honors an explicit :searchable="false"', () => {
+  it("honors an explicit :searchable=\"false\"", () => {
     wrapper = mount(OForm, {
       props: { defaultValues: { kind: "" } },
       slots: {
         default:
-          '<OFormSelect name="kind" :searchable="false" :options="[{label:\'A\',value:\'a\'}]" />',
+          "<OFormSelect name=\"kind\" :searchable=\"false\" :options=\"[{label:'A',value:'a'}]\" />",
       },
       global: { components: { OFormSelect } },
     });
     expect(wrapper.findComponent(OSelect).props("searchable")).toBe(false);
-  });
-
-  it("forwards help text and label position to OSelect", () => {
-    wrapper = mount(OForm, {
-      props: { defaultValues: { kind: "" } },
-      slots: {
-        default:
-          '<OFormSelect name="kind" label="Kind" help-text="Choose one" label-position="inside" :options="[]" />',
-      },
-      global: { components: { OFormSelect } },
-    });
-
-    const select = wrapper.findComponent(OSelect);
-    expect(select.props("helpText")).toBe("Choose one");
-    expect(select.props("labelPosition")).toBe("inside");
   });
 
   // Regression: OFormSelect must forward every OSelect prop it re-declares.
