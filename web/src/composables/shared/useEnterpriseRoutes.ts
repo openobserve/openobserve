@@ -171,10 +171,10 @@ const useEnterpriseRoutes = () => {
     });
 
     routes.push({
-      path: "synthetic",
-      name: "synthetic",
+      path: "synthetics",
+      name: "synthetics",
       component: () => import("@/views/SyntheticMonitoring.vue"),
-      meta: { title: "Synthetic Monitoring" },
+      meta: { title: "Synthetics" },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
@@ -182,10 +182,19 @@ const useEnterpriseRoutes = () => {
 
     routes.push(
       {
-        path: "synthetic/new",
-        name: "synthetic-new",
+        path: "synthetics/add",
+        name: "synthetics-add",
         component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { title: "New Check" },
+        meta: { title: "Add Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetics/edit/:id",
+        name: "synthetics-edit",
+        component: () => import("@/views/synthetics/CreateCheck.vue"),
+        meta: { title: "Edit Check" },
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },
@@ -209,8 +218,8 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
-        path: "synthetic/:id/results/run/:runId/:executionId",
-        name: "synthetic-run-detail",
+        path: "synthetics/:id/results/run/:runId/:executionId",
+        name: "synthetics-run-detail",
         component: () => import("@/views/synthetics/RunDetail.vue"),
         meta: { title: "Run Detail" },
         beforeEnter(to: any, from: any, next: any) {

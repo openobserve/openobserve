@@ -15,6 +15,7 @@ const OIconStub = { template: '<i />' }
 const OBadgeStub = { template: '<span><slot /></span>' }
 const OInputStub = {
   props: ['modelValue'],
+  emits: ['update:modelValue'],
   template: '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 }
 const JourneyStepsStub = {
@@ -22,8 +23,37 @@ const JourneyStepsStub = {
   template: '<div class="journey-steps-stub" :data-test-multi="$attrs[\'data-test\']"><div v-for="item in data" :key="item.id" class="step-row">{{ item.name }}</div></div>',
 }
 
+// Stub that renders the expansion slot so inline-editor interactions (selector,
+// value, timeout inputs) can be tested through the DOM.
+const JourneyStepsStubWithExpansion = {
+  props: ['data', 'mode', 'selectedIds', 'expandedIds', 'selectionEnabled', 'locked', 'readonly'],
+  template: `
+    <div class="journey-steps-stub" :data-test-multi="$attrs['data-test']">
+      <div v-for="item in data" :key="item.id" class="step-row">
+        {{ item.name }}
+        <slot name="expansion" :row="item" />
+      </div>
+    </div>`,
+}
+
 const ConfirmDialogStub = {
   template: '<div class="confirm-dialog-stub" />',
+}
+
+// Minimal stubs for components used in the expansion slot and toolbar.
+const OSelectStub = {
+  props: ['modelValue', 'options', 'label', 'error', 'errorMessage'],
+  emits: ['update:modelValue'],
+  template: '<select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option></select>',
+}
+const OTooltipStub = {
+  props: ['content'],
+  template: '<span class="tooltip-stub" />',
+}
+const OCheckboxStub = {
+  props: ['modelValue', 'size', 'class'],
+  emits: ['update:modelValue'],
+  template: '<input type="checkbox" v-bind="$attrs" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
 }
 
 const STUBS = {
@@ -33,6 +63,9 @@ const STUBS = {
   OInput: OInputStub,
   JourneySteps: JourneyStepsStub,
   ConfirmDialog: ConfirmDialogStub,
+  OSelect: OSelectStub,
+  OTooltip: OTooltipStub,
+  OCheckbox: OCheckboxStub,
 }
 
 interface FakePort {
@@ -150,5 +183,40 @@ describe('BrowserJourney recording', () => {
 
     expect((globalThis as any).chrome.runtime.connect).toHaveBeenCalled()
     expect(wrapper.find('[data-test="synthetics-journey-stop-btn"]').exists()).toBe(true)
+  })
+
+  it('should sync selector edit into step.wire when handleStepUpdate fires', async () => {
+    const wire = { id: 'w1', action: 'click', selector: '#old', name: 'Old Click', selector_type: 'css' }
+    const step = { id: 's1', action: 'click', name: 'Old Click', selector: '#old', timeout: 30000, code: '', wire }
+
+    wrapper = mount(BrowserJourney, {
+      props: { modelValue: [step] },
+      global: {
+        stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion },
+      },
+    })
+
+    // The expansion slot renders an OInput for the selector with
+    // data-test="synthetics-journey-step-selector-input". Update its value.
+    const selectorInput = wrapper.find('[data-test="synthetics-journey-step-selector-input"]')
+    await selectorInput.setValue('#new')
+
+    const emitted = wrapper.emitted('update:modelValue')
+    expect(emitted).toBeTruthy()
+    const updatedSteps = emitted![emitted!.length - 1][0] as any[]
+    expect(updatedSteps[0].selector).toBe('#new')
+    expect(updatedSteps[0].wire.selector).toBe('#new')
+  })
+
+  it('should emit clear-results when modelValue becomes empty', async () => {
+    wrapper = mountJourney({
+      modelValue: [{ id: 's1', action: 'click', name: 'Step 1', code: '' }],
+    })
+
+    // Clearing all steps should trigger the length watcher to emit clear-results
+    // so the replay pass/fail banner does not persist.
+    await wrapper.setProps({ modelValue: [] })
+
+    expect(wrapper.emitted('clear-results')).toBeTruthy()
   })
 })

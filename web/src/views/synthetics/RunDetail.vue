@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="currentRun.timestamp"
       :back="{
         label: t('synthetics.results.monitors'),
-        to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
+        to: { name: 'synthetics-monitor-results', params: { id: monitorId } },
         dataTest: 'synthetics-run-detail-back-btn',
       }"
     >
@@ -384,7 +384,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailSelector') }}</dt>
                             <dd class="text-text-secondary">{{ row.detail }}</dd>
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.runDetail.detailUrl') }}</dt>
-                            <dd class="truncate text-text-secondary">{{ row.detail }}</dd>
+                            <dd class="truncate text-text-secondary">{{ row.url || currentRun.url }}</dd>
                             <dt class="text-sm font-semibold text-text-secondary capitalize tracking-wide">{{ t('synthetics.results.duration') }}</dt>
                             <dd class="text-text-secondary">{{ row.durStr }}</dd>
                           </dl>
@@ -700,6 +700,7 @@ interface StepRow {
   action: string;
   name: string;
   detail: string;
+  url: string;
   duration: number;
   status: "pass" | "fail";
   icon: string;
@@ -734,6 +735,7 @@ function buildSteps(detail: SyntheticRunDetail | null): StepRow[] {
         recorded?.url ||
         ex.step_id.slice(0, 8),
       detail: recorded?.selector ?? recorded?.url ?? ex.step_id,
+      url: recorded?.url ?? "",
       duration: ex.duration_ms,
       status: isFail ? ("fail" as const) : ("pass" as const),
       icon: recorded ? actionIcon(recorded.action) : "radio_button_checked",

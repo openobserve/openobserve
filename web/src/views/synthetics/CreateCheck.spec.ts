@@ -21,9 +21,10 @@ import i18n from "@/locales";
 
 const mockPush = vi.fn();
 const mockRouteQuery: Record<string, string | string[] | undefined> = {};
+const mockRouteParams: Record<string, string | string[] | undefined> = {};
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({ query: mockRouteQuery }),
+  useRoute: () => ({ query: mockRouteQuery, params: mockRouteParams }),
   useRouter: () => ({ push: mockPush }),
   RouterLink: { name: "RouterLinkStub", template: "<a><slot /></a>" },
 }));
@@ -92,8 +93,9 @@ describe("CreateCheck", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset route query
+    // Reset route state
     Object.keys(mockRouteQuery).forEach((k) => delete mockRouteQuery[k]);
+    Object.keys(mockRouteParams).forEach((k) => delete mockRouteParams[k]);
   });
 
   afterEach(() => {
@@ -193,7 +195,7 @@ describe("CreateCheck", () => {
 
   describe("edit mode", () => {
     it("should show skeleton while resolving the type (before service responds)", () => {
-      mockRouteQuery.edit = "mon-http-1";
+      mockRouteParams.id = "mon-http-1";
       // Don't await — check the immediate render before the promise resolves
       wrapper = makeWrapper();
 
@@ -203,7 +205,7 @@ describe("CreateCheck", () => {
     });
 
     it("should render CreateProtocolCheck after resolving edit monitor type from API", async () => {
-      mockRouteQuery.edit = "mon-tcp-1";
+      mockRouteParams.id = "mon-tcp-1";
       vi.mocked(mockedService.get).mockResolvedValueOnce({
         data: { type: "tcp", name: "TCP Monitor", id: "mon-tcp-1" },
       });
@@ -225,7 +227,7 @@ describe("CreateCheck", () => {
     });
 
     it("should default to CreateBrowserTest when edit monitor has an unknown type", async () => {
-      mockRouteQuery.edit = "mon-unknown-1";
+      mockRouteParams.id = "mon-unknown-1";
       vi.mocked(mockedService.get).mockResolvedValueOnce({
         data: { type: "bizarre-type", name: "Unknown Monitor", id: "mon-unknown-1" },
       });
@@ -239,7 +241,7 @@ describe("CreateCheck", () => {
     });
 
     it("should default to CreateBrowserTest when the API call fails", async () => {
-      mockRouteQuery.edit = "mon-non-existent";
+      mockRouteParams.id = "mon-non-existent";
       vi.mocked(mockedService.get).mockRejectedValueOnce(new Error("Not found"));
 
       wrapper = makeWrapper();
@@ -252,7 +254,7 @@ describe("CreateCheck", () => {
     });
 
     it("should pass edit-id to CreateProtocolCheck when resolving a protocol monitor", async () => {
-      mockRouteQuery.edit = "proto-http-1";
+      mockRouteParams.id = "proto-http-1";
       vi.mocked(mockedService.get).mockResolvedValueOnce({
         data: { type: "http", name: "HTTP Monitor", id: "proto-http-1" },
       });
