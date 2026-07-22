@@ -1818,6 +1818,12 @@ pub struct Compact {
     pub enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
     pub interval: u64,
+    #[env_config(
+        name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
+        default = 3600,
+        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+    )] // seconds
+    pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
     pub old_data_interval: u64,
     #[env_config(name = "ZO_COMPACT_STRATEGY", default = "file_time")]
@@ -3191,6 +3197,9 @@ fn check_compact_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.compact.delete_files_delay_hours = 2;
     }
 
+    if cfg.compact.data_retention_interval < 1 {
+        cfg.compact.data_retention_interval = 3600;
+    }
     if cfg.compact.old_data_interval < 1 {
         cfg.compact.old_data_interval = 3600;
     }
