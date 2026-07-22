@@ -6,6 +6,7 @@ import type { BrowserCheck, SyntheticCheckType, SyntheticsLocation, SyntheticsFo
 import CheckDetails from './CheckDetails.vue'
 import CheckAuthNetwork from './CheckAuthNetwork.vue'
 import CheckSchedule from './CheckSchedule.vue'
+import CheckRetries from './CheckRetries.vue'
 import CheckAlerts from './CheckAlerts.vue'
 import CheckLocations from './CheckLocations.vue'
 import CheckBrowserDevices from './CheckBrowserDevices.vue'
@@ -78,6 +79,12 @@ function handleUpdate(value: BrowserCheck) {
         :check="check"
         :validation-errors="props.validationErrors ?? {}"
         data-test="synthetics-check-configure-schedule"
+        @update:check="handleUpdate"
+      />
+      <CheckRetries
+        :check="check"
+        :validation-errors="props.validationErrors ?? {}"
+        data-test="synthetics-check-configure-retries"
         @update:check="handleUpdate"
       />
       <CheckAlerts
