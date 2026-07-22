@@ -1357,7 +1357,9 @@ describe("HeatmapConverter", () => {
 
     it("falls back to the series name when metric labels are absent", () => {
       const data = histogramData();
-      data[0].series = data[0].series.map(({ metric, ...rest }) => rest) as any;
+      data[0].series = data[0].series.map(
+        ({ metric: _metric, ...rest }) => rest,
+      ) as any;
 
       const result: any = converter.convert(
         data,

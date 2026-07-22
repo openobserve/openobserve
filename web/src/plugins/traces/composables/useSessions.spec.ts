@@ -67,9 +67,7 @@ beforeEach(() => {
 
 describe("useSessions — fetchPage: loading state", () => {
   it("sets loading=true during fetch and false after", async () => {
-    let capturedLoading = false;
     mockSessionsList.mockImplementation(() => {
-      capturedLoading = true; // we can't observe mid-promise, so check after
       return Promise.resolve({ data: { hits: [], total: 0 } });
     });
 

@@ -79,6 +79,7 @@ export default defineComponent({
           return "Your trial period has expired.";
         }
       }
+      return undefined;
     },
   },
   setup() {

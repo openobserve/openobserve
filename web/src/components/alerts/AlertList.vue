@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div class="flex items-center gap-2 w-full">
                     <OToggleGroup
                       :model-value="activeTab"
-                      @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
+                      @update:model-value="(v) => { activeTab = v as string; filterAlertsByTab(); }"
                     >
                       <OToggleGroupItem value="all" size="sm" data-test="tab-all">
                         <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
@@ -681,9 +681,7 @@ import {
   ref,
   onBeforeMount,
   onActivated,
-  onDeactivated,
   onBeforeUnmount,
-  onUnmounted,
   watch,
   defineAsyncComponent,
   onMounted,
@@ -707,39 +705,33 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
-import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
 import {
   getImageURL,
   getUUID,
   verifyOrganizationStatus,
 } from "@/utils/zincutils";
-import { getFoldersListByType } from "@/utils/commons";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
-import type { Alert, AlertListItem } from "@/ts/interfaces/index";
+import type { Alert } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import { toRaw } from "vue";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import anomalyDetectionService from "@/services/anomaly_detection";
 import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
 import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
 import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
 import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -748,7 +740,6 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -760,14 +751,12 @@ export default defineComponent({
   name: "AlertList",
   components: {
     OPageLayout,
-    OSeparator,
     AddAlert: defineAsyncComponent(
       () => import("@/components/alerts/AddAlert.vue"),
     ),
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
-    DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
     OToggleGroup,
@@ -776,7 +765,6 @@ export default defineComponent({
     OTooltip,
     SelectFolderDropDown,
     AlertHistoryDrawer,
-    O2AIContextAddBtn,
     OButton,
     OIcon,
     ODialog,
@@ -1385,10 +1373,7 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
     // Normalizes an anomaly-detection item returned by the merged alerts list API
     // (alert_type === "anomaly_detection") into the standard alert row shape.
-    const normalizeAnomalyToAlertRow = (
-      anomaly: any,
-      counter: number,
-    ): any => ({
+    const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
@@ -1448,23 +1433,19 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
 
     const getAlertsByFolderId = async (store: any, folderId: any) => {
-      try {
-        //this is the condition where we are fetching the alerts from the server
-        // assigning it to the allAlertsListByFolderId in the store
-        if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
-          await getAlertsFn(store, folderId);
-        } else {
-          //this is the condition where we are assigning the alerts to the filteredResults so whenever
-          // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-          allAlerts.value =
-            store.state.organizationData.allAlertsListByFolderId[folderId];
-          // Data is served synchronously from cache — clear the loading flag
-          // (it starts true to avoid the empty-state flash) so the table renders
-          // the cached rows instead of staying stuck on the skeleton.
-          loading.value = false;
-        }
-      } catch (error) {
-        throw error;
+      //this is the condition where we are fetching the alerts from the server
+      // assigning it to the allAlertsListByFolderId in the store
+      if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
+        await getAlertsFn(store, folderId);
+      } else {
+        //this is the condition where we are assigning the alerts to the filteredResults so whenever
+        // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
+        allAlerts.value =
+          store.state.organizationData.allAlertsListByFolderId[folderId];
+        // Data is served synchronously from cache — clear the loading flag
+        // (it starts true to avoid the empty-state flash) so the table renders
+        // the cached rows instead of staying stuck on the skeleton.
+        loading.value = false;
       }
     };
     const getAlertsFn = async (
@@ -2277,7 +2258,7 @@ export default defineComponent({
       );
       const alertToBeExported = res.data;
 
-      if (alertToBeExported.hasOwnProperty("id")) {
+      if (Object.prototype.hasOwnProperty.call(alertToBeExported, "id")) {
         delete alertToBeExported.id;
       }
 
@@ -2570,7 +2551,7 @@ export default defineComponent({
       });
     });
 
-    const openMenu = (event: Event, row: any) => {
+    const openMenu = (event: Event, _row?: unknown) => {
       event.stopPropagation();
     };
 
@@ -2594,7 +2575,7 @@ export default defineComponent({
               alertId,
             );
             const data = res.data;
-            if (data.hasOwnProperty("id")) delete data.id;
+            if (Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
             return data;
           }),
         );

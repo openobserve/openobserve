@@ -1,14 +1,33 @@
 {
-  "include": ["env.d.ts", "src/**/*", "src/**/*.vue", "src/**/*.{ts,tsx,js}"],
-  "exclude": ["src/**/__tests__/*", "node_modules", "dist", "src/**/*.spec.{ts,js}"],
+  "include": ["env.d.ts", "src/**/*", "src/**/*.vue"],
+  "exclude": [
+    "src/**/__tests__/*",
+    "node_modules",
+    "dist",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.js",
+    "src/**/*.bench.spec.ts",
+    "src/test/**/*"
+  ],
   "compilerOptions": {
     "composite": true,
+    "strict": true,
+    "noImplicitReturns": true,
+    "baseUrl": ".",
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "useDefineForClassFields": true,
+    "jsx": "preserve",
+    "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "resolveJsonModule": true,
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "vuex": ["./node_modules/vuex/types/index.d.ts"]
     }
   }
 }

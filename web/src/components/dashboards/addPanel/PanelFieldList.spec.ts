@@ -352,9 +352,6 @@ describe("FieldList", () => {
     it("should render drag indicator when draggable", () => {
       wrapper = mountComponent();
       // OFieldList with draggable=true should render drag indicators
-      const dragIndicator = wrapper.find(
-        '[data-test="o-field-list-drag-indicator"]',
-      );
       // Only appears when fields are present — no fields means no indicators
       expect(wrapper.find('[data-test="o-field-list"]').exists()).toBe(true);
     });

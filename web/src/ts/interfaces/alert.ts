@@ -20,11 +20,6 @@ export interface Condition {
   value: string;
 }
 
-interface TimingFunction {
-  unit: "Minutes";
-  value: number;
-}
-
 // Alert payload which is sent to backend
 export interface Alert {
   id?: string;
@@ -136,13 +131,16 @@ export interface DestinationPayload {
   method?: string;
   skip_tls_verify?: boolean;
   headers?: Headers;
-  template?: string | Template;
+  template?: string; // Persisted/sent as the template name
   emails?: string[];
   type: "http" | "email" | "sns" | "action";
   action_id?: string;
   output_format?: "json" | "ndjson" | "nestedevent" | string | any; // string allows esbulk with dynamic index, any for stringseparated object
   destination_type?: string; // New field added
   separator?: string; // For stringseparated format separator value
+  // Persisted on saved records (may arrive as a JSON string or parsed object);
+  // used to restore prebuilt destination_type and credentials in edit mode.
+  metadata?: string | DestinationMetadata;
 }
 
 // Destination object which is modified in frontend to display in table and form

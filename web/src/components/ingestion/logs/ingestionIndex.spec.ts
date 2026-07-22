@@ -17,7 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { nextTick, ref } from "vue";
+import { nextTick } from "vue";
 import { createRouter, createMemoryHistory } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -63,15 +63,6 @@ describe("IngestLogs Index Component", () => {
 
   const mockProps = {
     currOrgIdentifier: "test-org"
-  };
-
-  const mockRouter = {
-    currentRoute: {
-      value: {
-        name: "curl"
-      }
-    },
-    push: vi.fn()
   };
 
   beforeEach(() => {
@@ -122,6 +113,7 @@ describe("IngestLogs Index Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "loongcollector",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
@@ -309,7 +301,8 @@ describe("IngestLogs Index Component", () => {
         "fluentbit", 
         "fluentd",
         "vector",
-        "syslogNg"
+        "syslogNg",
+        "loongcollector"
       ];
       
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);

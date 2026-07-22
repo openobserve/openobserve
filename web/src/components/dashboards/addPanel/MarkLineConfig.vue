@@ -17,7 +17,7 @@
 <template>
   <div>
     <div
-      v-for="(,index) in dashboardPanelData.data.config.mark_line"
+      v-for="(_, index) in dashboardPanelData.data.config.mark_line"
       :key="index"
     >
       <div

@@ -149,10 +149,9 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import OButton from '@/lib/core/Button/OButton.vue';
-import { formatTimestamp } from "@/utils/date";
+import { formatDate } from "@/utils/date";
 import type { TestResult } from '@/utils/prebuilt-templates/types';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -163,11 +162,12 @@ import { ref } from 'vue';
 
 // Define component props
 interface Props {
-  result?: TestResult | null;
+  // Backend test responses also include responseTime (ms); shared TestResult omits it.
+  result?: (TestResult & { responseTime?: number }) | null;
   isLoading?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   result: null,
   isLoading: false
 });
@@ -177,7 +177,7 @@ interface Emits {
   (e: 'retry'): void;
 }
 
-const emit = defineEmits<Emits>();
+defineEmits<Emits>();
 
 // Composables
 const { t } = useI18n();
@@ -189,7 +189,7 @@ function formatTimestamp(timestamp?: number | string): string {
   if (!timestamp) return '';
 
   const ts = typeof timestamp === 'string' ? new Date(timestamp) : new Date(timestamp);
-  return formatTimestamp(ts, "MMM DD, HH:mm:ss");
+  return formatDate(ts, "MMM DD, HH:mm:ss");
 }
 
 function getFailureMessage(result: TestResult): string {

@@ -924,8 +924,18 @@ pub struct Common {
     pub is_local_storage: bool,
     #[env_config(name = "ZO_CLUSTER_COORDINATOR", default = "nats")]
     pub cluster_coordinator: String,
-    #[env_config(name = "ZO_QUEUE_STORE", default = "nats")]
+    #[env_config(
+        name = "ZO_QUEUE_STORE",
+        default = "",
+        help = "Queue backend: nats or memory. Unset resolves to memory in local mode and nats in cluster mode."
+    )]
     pub queue_store: String,
+    #[env_config(
+        name = "ZO_MEMORY_QUEUE_MAX_SIZE_MB",
+        default = 64,
+        help = "Aggregate accounted memory limit in MB across all topics for the in-memory queue backend (ZO_QUEUE_STORE=memory)."
+    )]
+    pub memory_queue_max_size: usize,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
@@ -3015,13 +3025,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     check_file_format_config(cfg);
 
     // check queue store
-    if cfg.common.queue_store.is_empty() {
-        cfg.common.queue_store = "nats".to_string();
-    }
-    cfg.common.queue_store = cfg.common.queue_store.to_lowercase();
-    if !cfg.common.queue_store.starts_with("nats") {
-        return Err(anyhow::anyhow!("Queue store only supports nats."));
-    }
+    check_queue_store_config(cfg)?;
 
     // format metadata storage
     if cfg.common.meta_store.is_empty() {
@@ -3143,6 +3147,41 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.common.log_page_default_field_list = "uds".to_string();
     }
 
+    Ok(())
+}
+
+fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.common.queue_store.is_empty() {
+        // smart default: a local single process needs no NATS server
+        cfg.common.queue_store = if cfg.common.local_mode {
+            "memory".to_string()
+        } else {
+            "nats".to_string()
+        };
+    }
+    cfg.common.queue_store = cfg.common.queue_store.to_lowercase();
+    let queue_store =
+        crate::meta::queue_store::QueueStore::try_from(cfg.common.queue_store.as_str())
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+    if queue_store == crate::meta::queue_store::QueueStore::Memory && !cfg.common.local_mode {
+        return Err(anyhow::anyhow!(
+            "ZO_QUEUE_STORE=memory is only supported in local mode (ZO_LOCAL_MODE=true); it is a process-local, non-durable queue."
+        ));
+    }
+    if cfg.common.memory_queue_max_size == 0 {
+        cfg.common.memory_queue_max_size = 64; // MB
+    }
+    // convert MB to bytes; the config value is bytes after this point
+    cfg.common.memory_queue_max_size = cfg
+        .common
+        .memory_queue_max_size
+        .checked_mul(1024 * 1024)
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "ZO_MEMORY_QUEUE_MAX_SIZE_MB is too large: {} MB overflows the byte limit.",
+                cfg.common.memory_queue_max_size
+            )
+        })?;
     Ok(())
 }
 
@@ -4248,6 +4287,73 @@ mod tests {
         assert_eq!(cfg.pipeline.remote_stream_wal_dir, "/custom/wal/");
         assert_eq!(cfg.pipeline.offset_flush_interval, 5);
         assert_eq!(cfg.pipeline.remote_request_max_retry_time, 3600);
+    }
+
+    #[test]
+    fn test_check_queue_store_config_smart_default() {
+        // the check runs once per config load, so use a fresh config per case
+        // (the MB-to-bytes conversion is not idempotent)
+
+        // unset resolves to nats in cluster mode
+        let mut cfg = Config::default();
+        cfg.common.local_mode = false;
+        cfg.common.queue_store = "".to_string();
+        check_queue_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.queue_store, "nats");
+
+        // unset resolves to memory in local mode
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
+        cfg.common.queue_store = "".to_string();
+        check_queue_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.queue_store, "memory");
+
+        // explicit values are honored and lowercased
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
+        cfg.common.queue_store = "NATS".to_string();
+        check_queue_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.queue_store, "nats");
+    }
+
+    #[test]
+    fn test_check_queue_store_config_rejects_unknown_values() {
+        let mut cfg = Config::default();
+        for value in ["sqlite", "natsx", "postgres", "auto"] {
+            cfg.common.queue_store = value.to_string();
+            assert!(
+                check_queue_store_config(&mut cfg).is_err(),
+                "queue store {value} must be rejected instead of falling back"
+            );
+        }
+    }
+
+    #[test]
+    fn test_check_queue_store_config_memory_requires_local_mode() {
+        let mut cfg = Config::default();
+        cfg.common.queue_store = "memory".to_string();
+        cfg.common.memory_queue_max_size = 64;
+        cfg.common.local_mode = true;
+        check_queue_store_config(&mut cfg).unwrap();
+        cfg.common.local_mode = false;
+        assert!(check_queue_store_config(&mut cfg).is_err());
+    }
+
+    #[test]
+    fn test_check_queue_store_config_memory_size_validation() {
+        let mut cfg = Config::default();
+        cfg.common.queue_store = "memory".to_string();
+        cfg.common.local_mode = true;
+        // zero falls back to the 64 MB default, converted to bytes
+        cfg.common.memory_queue_max_size = 0;
+        assert!(check_queue_store_config(&mut cfg).is_ok());
+        assert_eq!(cfg.common.memory_queue_max_size, 64 * 1024 * 1024);
+        cfg.common.memory_queue_max_size = usize::MAX;
+        assert!(check_queue_store_config(&mut cfg).is_err());
+        // the config value is converted from MB to bytes during validation
+        cfg.common.memory_queue_max_size = 32;
+        assert!(check_queue_store_config(&mut cfg).is_ok());
+        assert_eq!(cfg.common.memory_queue_max_size, 32 * 1024 * 1024);
     }
 
     #[test]

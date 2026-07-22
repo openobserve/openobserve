@@ -131,7 +131,34 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const invoiceHistory = ref([]);
+interface Invoice {
+  period_start: number;
+  period_end: number;
+  paid: boolean;
+  total: number;
+  currency: string;
+  amount_paid: number;
+  amount_due: number;
+  attempt_count: number;
+  statue: string;
+  invoice_pdf: string;
+}
+
+interface InvoiceRow {
+  id: number;
+  start_date: number;
+  end_date: number;
+  paid: string;
+  amount: string;
+  amount_paid: number;
+  amount_due: number;
+  attempt_count: number;
+  status: string;
+  pdf: string;
+  action: string;
+}
+
+const invoiceHistory = ref<InvoiceRow[]>([]);
 
 const getInvoiceHistory = () => {
   const dismiss = toast({
@@ -147,7 +174,7 @@ const getInvoiceHistory = () => {
       dismiss();
       const invoiceList = res.data.invoices;
       if (invoiceList.length > 0) {
-        invoiceHistory.value = invoiceList.map((invoice, index) => {
+        invoiceHistory.value = invoiceList.map((invoice: Invoice, index: number) => {
           return {
             id: ++index,
             start_date: invoice.period_start,

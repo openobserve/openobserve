@@ -48,6 +48,11 @@ use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use transform::vector_enrichment::TableRegistry;
 
+// Only used by the enterprise pattern-extraction path (per-pattern volume buckets).
+#[cfg(feature = "enterprise")]
+use crate::service::search::sql::visitor::histogram_interval::{
+    convert_histogram_interval_to_seconds, generate_histogram_interval,
+};
 #[cfg(feature = "enterprise")]
 use crate::service::{http::map_error_to_http_response, self_reporting::audit};
 use crate::{
@@ -456,6 +461,7 @@ pub async fn process_search_stream_request(
                 backup_query_fn,
                 &all_streams,
                 is_multi_stream_search,
+                extract_patterns,
             )
             .instrument(search_span.clone())
             .await
@@ -590,6 +596,7 @@ pub async fn process_search_stream_request(
             backup_query_fn,
             &all_streams,
             is_multi_stream_search,
+            extract_patterns,
         )
         .instrument(search_span.clone())
         .await
@@ -732,12 +739,27 @@ pub async fn process_search_stream_request(
 
         // Extract patterns if we have logs
         if stats.accumulated_logs > 0 {
+            // Bucket interval (seconds) for per-pattern volume sparklines, computed
+            // only here (pattern extraction) rather than on every streaming search.
+            // Reuse the query's histogram interval when it has one; otherwise derive
+            // it from the window, since pattern queries carry no histogram() call.
+            let pattern_histogram_interval = if req.query.histogram_interval > 0 {
+                req.query.histogram_interval
+            } else {
+                convert_histogram_interval_to_seconds(generate_histogram_interval((
+                    start_time, end_time,
+                )))
+                .unwrap_or(0)
+            };
             match o2_enterprise::enterprise::log_patterns::extract_patterns_from_stream(
                 &trace_id,
                 accumulator,
                 all_streams.clone(),
                 pattern_config.unwrap(),
                 stats.total_logs_seen, // Use actual logs seen, not file metadata
+                start_time,
+                end_time,
+                pattern_histogram_interval,
             )
             .await
             {

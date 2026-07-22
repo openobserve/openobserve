@@ -202,12 +202,13 @@ watch(
 
 // ── Search ──────────────────────────────────────────────────────────
 
-function onSearchChange(value: string) {
-  searchModel.value = value;
+function onSearchChange(value: string | number) {
+  const search = String(value);
+  searchModel.value = search;
   // Reset to first page when search changes
   internalCurrentPage.value = 1;
   emit("update:currentPage", 1);
-  emit("update:search", value);
+  emit("update:search", search);
 }
 
 // ── Filtering ───────────────────────────────────────────────────────
@@ -265,7 +266,7 @@ const isLastPage = computed(
   () => internalCurrentPage.value >= totalPages.value,
 );
 
-function setPageSize(size: number) {
+function setPageSize() {
   internalCurrentPage.value = 1;
   emit("update:currentPage", 1);
 }

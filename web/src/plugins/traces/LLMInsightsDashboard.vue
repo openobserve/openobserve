@@ -266,6 +266,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -287,7 +288,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { LLM_INSIGHTS_PANELS } from "./config/llmInsightsPanels";
 import { kpiCache, selectionKey } from "./llmInsightsCache";
 import useStreams from "@/composables/useStreams";
@@ -530,7 +530,7 @@ function ensureStreamsLoaded(): Promise<void> {
 async function loadTraceStreams() {
   streamsLoaded.value = false;
   try {
-    const res = await getStreams("traces", false, false);
+    const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
     const llmStreams = list.filter(
       (stream: any) => stream?.settings?.is_llm_stream !== false,
@@ -801,7 +801,9 @@ async function loadInsights(
   }
 }
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(
+  mode: boolean | AcceptableValue | AcceptableValue[],
+) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;

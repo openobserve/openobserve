@@ -6,7 +6,8 @@
 import http from "@/services/http";
 
 export interface CreateTemplateRequest {
-  org_id: string;
+  /** Optional: org is carried in the URL path; callers don't include it in the body */
+  org_id?: string;
   response_type: string;
   name: string;
   description?: string;

@@ -76,7 +76,7 @@ export default defineComponent({
     },
   },
   emits: ["close", "update:open"],
-  setup(props, { emit }) {
+  setup(props) {
     const { t } = useI18n();
     const store = useStore();
     const jsonContent = ref("");

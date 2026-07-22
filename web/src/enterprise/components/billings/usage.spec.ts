@@ -28,6 +28,7 @@ import { nextTick } from "vue";
 vi.mock("@/services/billings", () => ({
   default: {
     get_data_usage: vi.fn(),
+    get_ai_usage: vi.fn(),
   },
 }));
 
@@ -122,6 +123,9 @@ describe("Usage Component", () => {
       }
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
+    mockBillingService.get_ai_usage.mockResolvedValue({
+      data: { mode: "free", credits_used: 0, credits_limit: 1000, credits_remaining: 1000, requires_additional_credits: false },
+    });
 
     wrapper = mount(Usage, {
       attachTo: "#app",
@@ -191,6 +195,21 @@ describe("Usage Component", () => {
       remotepipeline: "0.00",
       ai_credits: "0.00"
     });
+  });
+
+  it("should direct exhausted contract organizations to add AI credits", async () => {
+    wrapper.vm.aiUsage = {
+      mode: "exhausted",
+      requires_additional_credits: true,
+    };
+    await nextTick();
+
+    expect(
+      wrapper.find('[data-test="contract-ai-credits-exhausted"]').exists(),
+    ).toBe(true);
+    expect(wrapper.text()).toContain(
+      "Contact your account manager to add more AI credits",
+    );
   });
 
   // Test 5: Chart data initial state

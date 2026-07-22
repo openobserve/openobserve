@@ -274,6 +274,7 @@ export const convertMultiSQLData = async (
     // check if series name is available
     // if series name is not available then that is anotation series
     if (!series.name) return true;
+    return undefined;
   };
 
   const chartType = panelSchema.type;

@@ -16,6 +16,7 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
+import LoongCollector from "@/components/ingestion/logs/LoongCollector.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
@@ -219,6 +220,14 @@ const useIngestionRoutes = () => {
                   path: "syslogng",
                   name: "syslogNg",
                   component: SyslogNg,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "loongcollector",
+                  name: "loongcollector",
+                  component: LoongCollector,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -808,6 +817,10 @@ const useIngestionRoutes = () => {
           },
           children: [
             {
+              // Named so the router doesn't warn about an unnamed empty-path
+              // child under a named parent. Nothing navigates to this name; it
+              // exists only to land /ai-integrations on the first integration.
+              name: "ai-integrations-default",
               path: "",
               redirect: () => {
                 const first = aiCategories[0].integrations[0];

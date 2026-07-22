@@ -226,8 +226,6 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const groups = ref([]);
-
 onBeforeMount(() => {
   setupGroups();
 });
@@ -294,11 +292,6 @@ const setupGroups = async () => {
       loading.value = false;
     });
 };
-
-const hideAddGroup = () => {
-  showAddGroup.value = false;
-};
-
 
 const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)

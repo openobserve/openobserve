@@ -196,38 +196,6 @@ describe("IncidentTimeline - getUserId", () => {
   });
 });
 
-describe("IncidentTimeline - getInitials", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
-  });
-
-  it("returns S for System", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    expect((w.vm as any).getInitials("System")).toBe("S");
-  });
-
-  it("returns first two chars for single word", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    expect((w.vm as any).getInitials("bob")).toBe("BO");
-  });
-
-  it("returns first letters of two words", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    expect((w.vm as any).getInitials("john doe")).toBe("JD");
-  });
-
-  it("handles email addresses", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const result = (w.vm as any).getInitials("john.doe@example.com");
-    expect(result).toBe("JD");
-  });
-});
-
 describe("IncidentTimeline - getEventIcon", () => {
   beforeEach(() => {
     vi.clearAllMocks();

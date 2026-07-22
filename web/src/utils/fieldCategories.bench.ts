@@ -62,7 +62,7 @@ function makeFields(n: number): Array<{ name: string; type: string }> {
 
 /** Minimal semantic aliases that mirror a real org config. */
 function makeAliases(): FieldAlias[] {
-  return NAMESPACES.map((ns, i) => ({
+  return NAMESPACES.map((ns) => ({
     id: `alias_${ns}`,
     display: ns.charAt(0).toUpperCase() + ns.slice(1),
     fields: [`${ns}_service`, `${ns}_name`, `${ns}_id`],

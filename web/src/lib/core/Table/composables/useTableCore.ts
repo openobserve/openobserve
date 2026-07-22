@@ -6,13 +6,20 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useVueTable,
-  type AggregationFns,
+  type AggregationFn,
   type ColumnDef,
   type Row,
-  type Table,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
 import { TABLE_INDEX_COL_SIZE, type OTableColumnDef } from "../OTable.types";
+
+// Register the custom "avg" fn (provided via table options below) so
+// OTableColumnDef.aggregate values type-check against AggregationFnOption.
+declare module "@tanstack/table-core" {
+  interface AggregationFns {
+    avg: AggregationFn<unknown>;
+  }
+}
 
 /**
  * Creates and manages the TanStack Table instance.
@@ -48,7 +55,7 @@ export function useTableCore<TData>(
     /** When true, do not auto-reset page index when data changes */
     keepPageOnDataChange?: boolean;
   },
-  emit: any,
+  _emit?: unknown,
 ) {
   // ── Effective columns ───────────────────────────────────────────
   // When `showIndex` is set (and the caller hasn't already declared a `#`
@@ -227,7 +234,7 @@ export function useTableCore<TData>(
         accessorKey: col.accessorKey ?? col.id,
         accessorFn: col.accessorFn as any,
         cell: col.cell
-          ? ((info: any) => {
+          ? (() => {
               if (typeof col.cell === "string") return col.cell;
               return col.cell;
             })
@@ -277,7 +284,7 @@ export function useTableCore<TData>(
   );
 
   // Built-in aggregation functions for footer totals
-  const aggregationFns: AggregationFns<TData> = {
+  const aggregationFns: Record<string, AggregationFn<TData>> = {
     sum: (columnId: string, leafRows: Row<TData>[]) => {
       return leafRows.reduce((sum, row) => sum + (Number(row.getValue(columnId)) || 0), 0);
     },

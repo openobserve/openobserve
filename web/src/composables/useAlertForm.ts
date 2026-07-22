@@ -62,6 +62,7 @@ import {
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
   stripFormExtras,
   type PayloadContext,
+  type PayloadFormData,
   type SaveAlertContext,
 } from "@/utils/alerts/alertPayload";
 // Pure cron helpers — used by the cron save gate in runImperativeQueryChecks.
@@ -210,6 +211,16 @@ export interface AlertFormEmit {
   (e: "refresh:templates"): void;
 }
 
+// The full value set held by the ONE OForm: the alert payload shape plus the
+// form-only extras seeded by withFormExtras (logGroupBy / _ui / _meta). Typing
+// the form generic with this makes `form.state.values.*` reads (the synchronous
+// source of truth) typed instead of `unknown`.
+export type AlertFormValues = PayloadFormData & {
+  logGroupBy: string[];
+  _ui: Record<string, unknown>;
+  _meta: Record<string, unknown>;
+} & Record<string, unknown>;
+
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
   const { t } = useI18n();
@@ -316,8 +327,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     (config.isEnterprise === "true" || config.isCloud === "true") &&
       store.state.zoConfig?.workflows_enabled === true,
   );
-  const form = useOForm({
-    defaultValues: buildDefaultForm() as Record<string, unknown>,
+  const form = useOForm<AlertFormValues>({
+    defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
     onSubmit: async () => {
       await performSave();
@@ -533,8 +544,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const validationErrors = ref([]);
   const isLoadingPanelData = ref(false);
 
-  const activeFolderId = ref(
-    router.currentRoute.value.query.folder || "default",
+  const folderQuery = router.currentRoute.value.query.folder;
+  const activeFolderId = ref<string>(
+    (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
   );
   const alertType = ref(
     router.currentRoute.value.query.alert_type || "all",

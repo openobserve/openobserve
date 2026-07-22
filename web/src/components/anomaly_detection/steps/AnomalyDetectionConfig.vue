@@ -681,6 +681,7 @@ import {
   hasTimestampAliasInSql,
   makeAnomalyFilterRow,
   type AnomalyDetectionConfigForm,
+  type AnomalyFilterRow,
 } from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
@@ -760,7 +761,9 @@ export default defineComponent({
     // Reactive reads via form.useStore.
     const queryMode = form.useStore((s: any) => s.values.query_mode);
     const customSql = form.useStore((s: any) => s.values.custom_sql);
-    const filterRows = form.useStore((s: any) => s.values.filters ?? []);
+    const filterRows = form.useStore(
+      (s: any): AnomalyFilterRow[] => s.values.filters ?? [],
+    );
     const detectionFunction = form.useStore(
       (s: any) => s.values.detection_function,
     );

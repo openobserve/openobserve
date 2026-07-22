@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="add-action-script-section"
     :title="isEditingActionScript ? t('actions.update') : t('actions.add')"
     :back="{
+      label: t('actions.header'),
       onClick: () => router.back(),
       dataTest: 'add-action-script-back-btn',
     }"
@@ -252,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             name="cron"
                             class="showLabelOnTop w-full"
                             type="text"
-                            debounce="300"
+                            :debounce="300"
                             :disabled="isEditingActionScript"
                             :readonly="isEditingActionScript"
                           />
@@ -460,31 +461,24 @@ import { ref, nextTick, onMounted, watch } from "vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import DateTime from "@/components/DateTime.vue";
 import {
   getUUID,
-  useLocalTimezone,
-  isValidResourceName,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
-import VariablesInput from "@/components/alerts/VariablesInput.vue";
 import { useStore } from "vuex";
-import dashboardService from "@/services/dashboards";
 import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { DateTime as _DateTime } from "luxon";
 import actions from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import CronExpressionParser from "cron-parser";
-import { convertDateToTimestamp } from "@/utils/date";
 import service_accounts from "@/services/service_accounts";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormFile from "@/lib/forms/File/OFormFile.vue";
@@ -560,17 +554,6 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const timeTabs = [
-  {
-    label: "Schedule now",
-    value: "scheduleNow",
-  },
-  {
-    label: "Schedule later",
-    value: "scheduleLater",
-  },
-];
-
 const frequencyTabs = [
   {
     label: "Cron Job",
@@ -582,23 +565,7 @@ const frequencyTabs = [
   },
 ];
 
-const selectedTimeTab = ref("scheduleNow");
-
 const store = useStore();
-
-const filteredTimezone: any = ref([]);
-
-const folderOptions: Ref<{ label: string; value: string }[]> = ref([]);
-
-const dashboardOptions: Ref<
-  { label: string; value: string; tabs: any[]; version: number }[]
-> = ref([]);
-
-const dashboardTabOptions: Ref<{ label: string; value: string }[]> = ref([]);
-
-const options: Ref<{ [key: string]: any[] }> = ref({});
-
-const emails = ref("");
 
 const isEditingActionScript = ref(false);
 
@@ -632,9 +599,9 @@ const getCronError = (cron: string): string => {
   const value = String(cron ?? "").trim();
   if (!value) return "Invalid cron expression!";
   try {
+    // cron-parser v5 dropped the `utc` option; parse validity is tz-independent here.
     CronExpressionParser.parse(value, {
       currentDate: new Date(),
-      utc: true,
     });
   } catch {
     return "Invalid cron expression!";
@@ -736,7 +703,8 @@ watch(formType, (t) => {
 // whether to advance.
 const validateStepFields = async (fields: string[]): Promise<boolean> => {
   let valid = true;
-  for (const name of fields) {
+  // Field names are validated dynamically; cast to the form's DeepKeys union.
+  for (const name of fields as FormFieldPath<EditScriptForm>[]) {
     await form.validateField(name, "submit");
     const errors = form.getFieldMeta(name)?.errors ?? [];
     if (errors.length > 0) valid = false;
@@ -752,13 +720,13 @@ const goToStep = async (fields: string[], next: number) => {
 // Map a Zod issue path to its OForm field name so we can match issues to the
 // field that owns them: ["cron"] → "cron". Actions only has flat scalar fields,
 // but keep the same helper reports uses (handles nested array paths too) for parity.
-const issuePathToName = (path: readonly (string | number)[]): string =>
+const issuePathToName = (path: readonly PropertyKey[]): string =>
   path.reduce<string>(
     (acc, seg) =>
       typeof seg === "number"
         ? `${acc}[${seg}]`
         : acc
-          ? `${acc}.${seg}`
+          ? `${acc}.${String(seg)}`
           : String(seg),
     "",
   );
@@ -779,7 +747,9 @@ watch(
     const invalidNames = new Set(
       res.success ? [] : res.error.issues.map((i) => issuePathToName(i.path)),
     );
-    for (const name of Object.keys(form.state.fieldMeta ?? {})) {
+    for (const name of Object.keys(
+      form.state.fieldMeta ?? {},
+    ) as FormFieldPath<EditScriptForm>[]) {
       const meta = form.getFieldMeta(name);
       if (!meta) continue;
       const hasError = (meta.errors?.length ?? 0) > 0;
@@ -824,7 +794,7 @@ watch(
 
 watch(
   () => router.currentRoute.value.query?.id,
-  async (action_id) => {
+  async () => {
     await handleActionScript();
   },
 );
@@ -832,37 +802,6 @@ watch(
 onBeforeMount(async () => {
   await handleActionScript();
 });
-
-const scheduling = ref({
-  date: "",
-  time: "",
-  timezone: "",
-});
-
-const currentTimezone =
-  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-const timezone = ref(currentTimezone);
-
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
 
 // @ts-ignore
 let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
@@ -1087,14 +1026,6 @@ const deleteApiHeader = (header: any) => {
 
   if (!environmentalVariables.value.length) addApiHeader();
 };
-const isRequiredKey = (value: any) => {
-  return value && value.trim() !== "" ? true : "Key is required";
-};
-
-const isRequiredValue = (value: any) => {
-  return value && value.trim() !== "" ? true : "Value is required";
-};
-
 const handleActionScript = async () => {
   isEditingActionScript.value = !!router.currentRoute.value.query?.id;
   // Fresh load starts with an unedited cron field (edit-load re-seeds via
@@ -1140,14 +1071,6 @@ const filteredServiceAccounts: Ref<{ label: string; value: string }[]> = ref(
   [],
 );
 const isFetchingServiceAccounts = ref(false);
-
-const filterServiceAccounts = (val: string, update: Function) => {
-  filteredServiceAccounts.value = filterColumns(
-    serviceAccountsOptions,
-    val,
-    update,
-  );
-};
 
 const serviceAccountsOptions: any[] = [];
 

@@ -1618,24 +1618,8 @@ export const convertServiceGraphToNetwork = (
 
   const edges = Array.from(edgeMap.entries()).map(
     ([edgeKey, edge]: [string, any]) => {
-      const errorRate =
-        edge.total_requests > 0
-          ? (edge.failed_requests / edge.total_requests) * 100
-          : 0;
-
       // Get the assigned curvature for this edge
       const curveness = edgeCurvature.get(edgeKey) || 0;
-
-      // Format latency values
-      const formatLatency = (ns: number) => {
-        if (!ns || ns === 0) return "N/A";
-        const ms = ns / 1000000;
-        return ms >= 1000 ? (ms / 1000).toFixed(2) + "s" : ms.toFixed(2) + "ms";
-      };
-
-      const p50 = formatLatency(edge.p50_latency_ns || 0);
-      const p95 = formatLatency(edge.p95_latency_ns || 0);
-      const p99 = formatLatency(edge.p99_latency_ns || 0);
 
       const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 

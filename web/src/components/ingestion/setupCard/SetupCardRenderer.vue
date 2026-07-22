@@ -138,7 +138,7 @@ const viewData = async () => {
     stream: watchedStream.value,
     period: "15m",
     refresh: "0",
-    query: b64EncodeUnicode(props.content.detect.filter),
+    query: b64EncodeUnicode(props.content.detect.filter) ?? "",
   };
   if (isLogsStream.value) {
     query.stream_type = "logs";

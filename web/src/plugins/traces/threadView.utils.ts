@@ -326,9 +326,9 @@ export function looksLikeAgentInjection(text: string): boolean {
     return true;
   }
 
-  if (/^for context\s*[:\-]/i.test(head)) return true;
+  if (/^for context\s*[:-]/i.test(head)) return true;
 
-  if (/^\[?[\w._-]+\]?\s+said[:\-]/i.test(head)) return true;
+  if (/^\[?[\w._-]+\]?\s+said[:-]/i.test(head)) return true;
 
   return false;
 }

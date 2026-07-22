@@ -113,7 +113,6 @@ import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import OrganizationDeduplicationSettings from "@/components/alerts/OrganizationDeduplicationSettings.vue";
 import DiscoveredServices from "@/components/settings/DiscoveredServices.vue";
 import ServiceIdentitySetup from "@/components/settings/ServiceIdentitySetup.vue";
-import AppTabs from "@/components/common/AppTabs.vue";
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -127,7 +126,6 @@ export default defineComponent({
     OrganizationDeduplicationSettings,
     DiscoveredServices,
     ServiceIdentitySetup,
-    AppTabs,
     SemanticFieldGroupsConfig,
     OTabs,
     OTab,
@@ -266,7 +264,8 @@ export default defineComponent({
       });
     };
 
-    const onTabChange = async (tab: string) => {
+    const onTabChange = async (value: string | number) => {
+      const tab = String(value);
       if (activeTab.value === "field-aliases" && tab !== "field-aliases") {
         const proceed = await confirmDiscardUnsaved();
         if (!proceed) return;

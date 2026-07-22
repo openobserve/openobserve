@@ -42,13 +42,11 @@ import {
 // Real parser setup — NO MOCKS
 // ============================================================================
 
-let parser: any;
-
 beforeAll(async () => {
   const Parser: any = await import(
     "@openobserve/node-sql-parser/build/datafusionsql"
   );
-  parser = new Parser.default.Parser();
+  new Parser.default.Parser();
 });
 
 // ============================================================================

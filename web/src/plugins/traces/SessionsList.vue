@@ -240,6 +240,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import type { AcceptableValue } from "reka-ui";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
@@ -507,7 +508,7 @@ function ensureStreamsLoaded(): Promise<void> {
 async function loadTraceStreams() {
   streamsLoaded.value = false;
   try {
-    const res = await getStreams("traces", false, false);
+    const res: any = await getStreams("traces", false, false);
     const list = res?.list || [];
     const llmStreams = list.filter(
       (stream: any) => stream?.settings?.is_llm_stream !== false,
@@ -641,7 +642,9 @@ function onStreamChange() {
   loadSessions(undefined, undefined, true);
 }
 
-function onFilterModeChange(mode?: string | number | null) {
+function onFilterModeChange(
+  mode?: AcceptableValue | AcceptableValue[] | boolean,
+) {
   const next = mode === "agent" ? "agent" : "stream";
   if (next === filterMode.value) return;
   filterMode.value = next;

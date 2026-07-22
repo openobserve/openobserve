@@ -60,7 +60,7 @@
             searchable
             label-position="inside"
             :disabled="dashboardPanelDataPageKey === 'logs'"
-            :title="currentStream"
+            :title="currentStream ?? undefined"
             option-tooltip
             @search="onStreamSearch"
             @update:model-value="onStreamChange"
@@ -79,7 +79,7 @@
       </template>
 
       <!-- Field row -->
-      <template #field-row="{ row, index, draggable, isDragEnabled }">
+      <template #field-row="{ row, draggable, isDragEnabled }">
         <OFieldRow>
           <OIcon
             v-if="draggable"
@@ -100,7 +100,7 @@
           <template #actions>
             <!-- Standard chart actions -->
             <div
-              v-if="showStandardActions(row, index)"
+              v-if="showStandardActions(row)"
               class="flex items-center gap-0.5"
             >
               <OButton
@@ -174,7 +174,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -182,7 +184,7 @@
 
         <!-- Geomap actions -->
         <div
-          v-if="showGeomapActions(row, index)"
+          v-if="showGeomapActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -238,7 +240,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -246,7 +250,7 @@
 
         <!-- Maps actions -->
         <div
-          v-if="showMapsActions(row, index)"
+          v-if="showMapsActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -279,7 +283,9 @@
             variant="ghost-neutral"
             size="chip"
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -287,7 +293,7 @@
 
         <!-- Sankey actions -->
         <div
-          v-if="showSankeyActions(row, index)"
+          v-if="showSankeyActions(row)"
           class="flex items-center gap-0.5"
         >
           <OButton
@@ -343,7 +349,9 @@
               )
             "
             data-test="dashboard-add-filter-data"
-            @click.stop="addFilteredItem(row)"
+            @click.stop="
+              addFilteredItem(row as { name: string; stream: string })
+            "
           >
             +F
           </OButton>
@@ -438,7 +446,6 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { useLoading } from "@/composables/useLoading";
 import useStreams from "@/composables/useStreams";
 import {
   applyPromqlSeed,
@@ -453,6 +460,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OFieldList from "@/lib/lists/FieldList/OFieldList.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
@@ -471,7 +479,7 @@ const dashboardPanelDataPageKey: string = inject(
 
 const store = useStore();
 const { t } = useI18n();
-const { getStreams, getStream } = useStreams();
+const { getStreams } = useStreams();
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
 const emit = defineEmits<{ collapse: [] }>();
@@ -546,7 +554,7 @@ const currentStream = computed(
       ?.fields?.stream,
 );
 
-function onStreamTypeChange(val: string) {
+function onStreamTypeChange(val: SelectModelValue) {
   const fields =
     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
       .fields;
@@ -554,7 +562,7 @@ function onStreamTypeChange(val: string) {
   fields.stream_type = val;
 }
 
-function onStreamChange(val: string) {
+function onStreamChange(val: SelectModelValue) {
   dashboardPanelData.data.queries[
     dashboardPanelData.layout.currentQueryIndex
   ].fields.stream = val;
@@ -681,13 +689,6 @@ const streamOptions = computed(() =>
   }),
 );
 
-// ── Stream fields ──────────────────────────────────────────────────────
-
-const getStreamFields = useLoading(
-  async (fieldName: string, streamType: string) => {
-    return await getStream(fieldName, streamType, true);
-  },
-);
 
 // ── Query stream tracking ──────────────────────────────────────────────
 
@@ -823,7 +824,8 @@ watch(
 
             if (isAutoSeededQuery(slot?.query, metricName, streams, seedOpts)) {
               applyPromqlSeed(dashboardPanelData, streamName, {
-                previousStream: metricName,
+                // callee uses `?? `, so null and undefined behave identically
+                previousStream: metricName ?? undefined,
               });
             }
           }
@@ -923,7 +925,7 @@ const flattenGroupedFields = computed(() => {
     });
 
     if (
-      group.settings.hasOwnProperty("defined_schema_fields") &&
+      Object.prototype.hasOwnProperty.call(group.settings, "defined_schema_fields") &&
       group.settings.defined_schema_fields.length > 0
     ) {
       flattenedFields.push({
@@ -937,7 +939,7 @@ const flattenGroupedFields = computed(() => {
       for (const field of group.schema) {
         if (
           store.state.zoConfig.user_defined_schemas_enabled &&
-          group.settings.hasOwnProperty("defined_schema_fields") &&
+          Object.prototype.hasOwnProperty.call(group.settings, "defined_schema_fields") &&
           group.settings.defined_schema_fields.length > 0
         ) {
           if (group.settings.defined_schema_fields.includes(field.name)) {
@@ -1018,7 +1020,7 @@ const customFieldNames = computed(() => {
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────
 
-function isRowDragEnabled(row: FieldItem, _index: number): boolean {
+function isRowDragEnabled(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   const currentQuery =
@@ -1029,14 +1031,14 @@ function isRowDragEnabled(row: FieldItem, _index: number): boolean {
   return true;
 }
 
-function onDragStart(row: FieldItem, _event: DragEvent) {
+function onDragStart(row: FieldItem) {
   dashboardPanelData.meta.dragAndDrop.dragging = true;
   dashboardPanelData.meta.dragAndDrop.dragElement = row;
   dashboardPanelData.meta.dragAndDrop.dragSource = "fieldList";
   dashboardPanelData.meta.dragAndDrop.dragSourceIndex = null;
 }
 
-function onDragEnd(_row: FieldItem, _event: DragEvent) {
+function onDragEnd() {
   cleanupDraggingFields();
 }
 
@@ -1058,7 +1060,7 @@ function onSearchChange(value: string) {
 
 // ── Action visibility helpers ──────────────────────────────────────────
 
-function showStandardActions(row: FieldItem, _index: number): boolean {
+function showStandardActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1082,7 +1084,7 @@ function showStandardActions(row: FieldItem, _index: number): boolean {
   return true;
 }
 
-function showGeomapActions(row: FieldItem, _index: number): boolean {
+function showGeomapActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1096,7 +1098,7 @@ function showGeomapActions(row: FieldItem, _index: number): boolean {
   return dashboardPanelData.data.type === "geomap";
 }
 
-function showMapsActions(row: FieldItem, _index: number): boolean {
+function showMapsActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;
@@ -1110,7 +1112,7 @@ function showMapsActions(row: FieldItem, _index: number): boolean {
   return dashboardPanelData.data.type === "maps";
 }
 
-function showSankeyActions(row: FieldItem, _index: number): boolean {
+function showSankeyActions(row: FieldItem): boolean {
   if (hideAllFieldsSelection.value) return false;
   if (promqlMode.value) return false;
   if (dashboardPanelDataPageKey === "logs") return false;

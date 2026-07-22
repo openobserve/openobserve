@@ -26,7 +26,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -299,6 +299,7 @@ const wrapperClasses = computed(() => [
         :placeholder="placeholder"
         :disabled="disabled"
         :readonly="readonly"
+        :aria-required="required || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :rows="autogrow ? 1 : rows"
@@ -335,6 +336,7 @@ const wrapperClasses = computed(() => [
         :placeholder="placeholder"
         :disabled="disabled"
         :readonly="readonly"
+        :aria-required="required || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
         :autocomplete="autocomplete"

@@ -413,13 +413,15 @@ const parsedContent = computed(() => {
 
     // Handle nested content structure: {content: [{type: "text", text: "..."}]}
     if (props.content && typeof props.content === "object") {
+      // Arrays fall through this branch; the cast only widens for the key lookup.
+      const contentObj = props.content as Record<string, any>;
       // Check if it has the Anthropic content format
       if (
-        props.content.content &&
-        Array.isArray(props.content.content) &&
-        props.content.content.length > 0
+        contentObj.content &&
+        Array.isArray(contentObj.content) &&
+        contentObj.content.length > 0
       ) {
-        const firstContent = props.content.content[0];
+        const firstContent = contentObj.content[0];
         if (firstContent.type === "text" && firstContent.text) {
           // Try to parse the inner text as JSON
           try {

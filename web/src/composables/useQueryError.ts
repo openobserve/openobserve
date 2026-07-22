@@ -33,7 +33,14 @@
  */
 
 import DOMPurify from "dompurify";
-import { computed, ref, type MaybeRefOrGetter, toValue } from "vue";
+import {
+  computed,
+  ref,
+  type ComputedRef,
+  type Ref,
+  type MaybeRefOrGetter,
+  toValue,
+} from "vue";
 import { useI18n } from "vue-i18n";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -52,33 +59,33 @@ export interface QueryErrorInput {
 
 export interface QueryErrorResult {
   /** Normalized numeric error code (0 = generic). */
-  errorCode: ReturnType<typeof computed<number>>;
+  errorCode: ComputedRef<number>;
   /** Plain text of the error message — HTML stripped, TraceID removed. */
-  cleanMessage: ReturnType<typeof computed<string>>;
+  cleanMessage: ComputedRef<string>;
   /**
    * First sentence (≤ 160 chars) — safe to show inline without overwhelming
    * the UI when the backend appends the full list of valid field names.
    */
-  summaryLine: ReturnType<typeof computed<string>>;
+  summaryLine: ComputedRef<string>;
   /**
    * Everything beyond the summary line + raw errorDetail.
    * Shown in the collapsible "Show details" section.
    */
-  detailBody: ReturnType<typeof computed<string>>;
+  detailBody: ComputedRef<string>;
   /** Whether there is expandable detail content. */
-  hasDetail: ReturnType<typeof computed<boolean>>;
+  hasDetail: ComputedRef<boolean>;
   /** Whether there is any displayable content at all. */
-  hasAnyContent: ReturnType<typeof computed<boolean>>;
+  hasAnyContent: ComputedRef<boolean>;
   /** TraceID extracted from the backend HTML response. */
-  traceId: ReturnType<typeof computed<string>>;
+  traceId: ComputedRef<string>;
   /** True for error codes where "Fix the query" is the right recovery action. */
-  isQueryError: ReturnType<typeof computed<boolean>>;
+  isQueryError: ComputedRef<boolean>;
   /** Default i18n title for the error code. */
-  defaultTitle: ReturnType<typeof computed<string>>;
+  defaultTitle: ComputedRef<string>;
   /** Default i18n description for the error code. */
-  defaultDescription: ReturnType<typeof computed<string>>;
+  defaultDescription: ComputedRef<string>;
   /** UI toggle for the expandable detail section. */
-  showDetail: ReturnType<typeof ref<boolean>>;
+  showDetail: Ref<boolean>;
   /** Copy all error detail to the clipboard. */
   copyErrorDetails: () => void;
 }

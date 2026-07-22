@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import Nodes from "../../components/settings/Nodes.vue";
 import store from "./helpers/store";
 import { createI18n } from "vue-i18n";
-import { nextTick } from "vue";
 import CommonService from "../../services/common";
 
 // Mock services
@@ -210,7 +209,7 @@ describe("Nodes.vue", () => {
     expect(wrapper.vm.filterQuery).toBe("");
     // The component uses OTable's page-size prop (20) for pagination — not a local selectedPerPage.
     // Verify the OTable component has the correct default page size via its prop.
-    const oTable = wrapper.findComponent({ name: "OTable" });
+    wrapper.findComponent({ name: "OTable" });
     // OTable may not render in jsdom with lib stubs, so fall back to checking the component renders
     expect(wrapper.vm.tabledata).toBeDefined();
     expect(wrapper.vm.loading).toBe(false);
@@ -416,7 +415,7 @@ describe("Nodes.vue", () => {
 
   // Test 16: applyFilter with search term
   it("should apply search filter correctly", async () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.filterQuery = "node1";
     wrapper.vm.applyFilter();
@@ -428,7 +427,7 @@ describe("Nodes.vue", () => {
 
   // Test 17: applyFilter with region filter
   it("should apply region filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.selectedRegions = [{ name: "region1" }];
     wrapper.vm.applyFilter();
@@ -439,7 +438,7 @@ describe("Nodes.vue", () => {
 
   // Test 18: applyFilter with cluster filter
   it("should apply cluster filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.selectedClusters = [{ name: "cluster2" }];
     wrapper.vm.applyFilter();
@@ -450,7 +449,7 @@ describe("Nodes.vue", () => {
 
   // Test 19: applyFilter with node type filter
   it("should apply node type filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.selectedNodetypes = [{ name: "query" }];
     wrapper.vm.applyFilter();
@@ -461,7 +460,7 @@ describe("Nodes.vue", () => {
 
   // Test 20: applyFilter with status filter
   it("should apply status filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.selectedStatuses = [{ name: "inactive" }];
     wrapper.vm.applyFilter();
@@ -472,7 +471,7 @@ describe("Nodes.vue", () => {
 
   // Test 21: applyFilter with CPU usage range
   it("should apply CPU usage filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.cpuUsage = { min: 45, max: 55 }; // Only node1 with 50% CPU should match
     wrapper.vm.applyFilter();
@@ -484,7 +483,7 @@ describe("Nodes.vue", () => {
 
   // Test 22: applyFilter with memory usage range
   it("should apply memory usage filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.memoryUsage = { min: 35, max: 45 }; // Only node2 with 40% memory should match
     wrapper.vm.applyFilter();
@@ -496,7 +495,7 @@ describe("Nodes.vue", () => {
 
   // Test 23: applyFilter with TCP established connections range
   it("should apply TCP established connections filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.establishedUsage = { min: 9, max: 11 }; // Only node1 with 10 connections should match
     wrapper.vm.applyFilter();
@@ -508,7 +507,7 @@ describe("Nodes.vue", () => {
 
   // Test 24: applyFilter with TCP close wait connections range
   it("should apply TCP close wait connections filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.closewaitUsage = { min: 4, max: 6 }; // Only node1 with 5 close_wait should match
     wrapper.vm.applyFilter();
@@ -520,7 +519,7 @@ describe("Nodes.vue", () => {
 
   // Test 25: applyFilter with TCP time wait connections range
   it("should apply TCP time wait connections filter correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.waittimeUsage = { min: 7, max: 9 }; // Only node1 with 8 time_wait should match
     wrapper.vm.applyFilter();
@@ -532,7 +531,7 @@ describe("Nodes.vue", () => {
 
   // Test 26: applyFilter with multiple filters combined
   it("should apply multiple filters correctly", () => {
-    const testData = setupFilterTestData();
+    setupFilterTestData();
     
     wrapper.vm.filterQuery = "node1";
     wrapper.vm.selectedRegions = [{ name: "region1" }];

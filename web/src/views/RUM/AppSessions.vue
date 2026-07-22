@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                     <NoData v-else />
                   </template>
-                  <template #cell-action_play="{ row }">
+                  <template #cell-action_play>
                     <OIcon
                       name="play-circle-filled"
                       size="md"
@@ -437,12 +437,11 @@ import {
   b64EncodeUnicode,
 } from "@/utils/zincutils";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
-import { onBeforeRouteUpdate, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useSession from "@/composables/useSessionReplay";
-import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import SessionHealthCell from "@/components/rum/sessionReplay/SessionHealthCell.vue";
@@ -467,7 +466,6 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 interface Session {
@@ -515,7 +513,7 @@ const QueryEditor = defineAsyncComponent(
   () => import("@/components/CodeQueryEditor.vue"),
 );
 
-const props = defineProps({
+defineProps({
   isSessionReplayEnabled: {
     type: Boolean,
     default: false,

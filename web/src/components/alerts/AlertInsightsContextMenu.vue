@@ -116,37 +116,6 @@ const isAlertNameContext = computed(() => {
   );
 });
 
-const formattedValue = computed(() => {
-  if (typeof props.value === "string") {
-    return props.value;
-  }
-
-  // Format numbers
-  if (props.value > 1000000000) {
-    // Likely microseconds timestamp
-    return new Date(props.value / 1000).toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  return Math.round(props.value).toLocaleString();
-});
-
-const selectFilter = (operator: string) => {
-  if (typeof props.value === "number") {
-    emit("filter", {
-      operator,
-      value: props.value,
-      panelId: props.panelId,
-      panelTitle: props.panelTitle,
-    });
-  }
-};
-
 const configureDedupForAlert = () => {
   if (typeof props.value === "string") {
     emit("configure-dedup", props.value);
@@ -168,7 +137,7 @@ const viewAlertHistory = () => {
   }
 };
 
-const handleClickOutside = (event: MouseEvent) => {
+const handleClickOutside = () => {
   emit("close");
 };
 

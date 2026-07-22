@@ -77,14 +77,12 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { computed, inject, ref } from "vue";
 import { defineComponent } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "TabList",
   components: {
     AddTab,
-    ConfirmDialog,
     OTabs,
     OTab,
     OButton,

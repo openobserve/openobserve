@@ -44,11 +44,6 @@ export const localeFileMap: Record<string, string> = {
   vi: "vi-VN",
 };
 
-// Lazy importers — each locale json becomes its own cacheable chunk.
-const localeLoaders = import.meta.glob<{ default: Record<string, unknown> }>(
-  "./languages/*.json",
-);
-
 export const getLocale = () => {
   const cookieLanguage = getLanguage();
   if (cookieLanguage) {
@@ -80,13 +75,20 @@ const i18n = createI18n({
 // without coupling the low-level OTag component to this module graph.
 setBadgeTranslator((key: string) => i18n.global.t(key as never));
 
+type LocaleMessageSchema = Parameters<typeof i18n.global.setLocaleMessage>[1];
+
+const localeLoaders = import.meta.glob<{ default: LocaleMessageSchema }>(
+  "./languages/*.json",
+);
+
 /**
  * Loads and registers the messages for a locale on demand. No-op when the
  * locale is already loaded (e.g. the statically bundled en-us fallback) or
  * unknown (the fallback locale then handles missing keys).
  */
 export const loadLocaleMessages = async (locale: string): Promise<void> => {
-  if (i18n.global.availableLocales.includes(locale)) {
+  const availableLocales: readonly string[] = i18n.global.availableLocales;
+  if (availableLocales.includes(locale)) {
     return;
   }
   const file = localeFileMap[locale];

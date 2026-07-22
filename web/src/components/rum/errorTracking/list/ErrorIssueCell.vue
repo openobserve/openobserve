@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="issue.error_handling"
         :variant="isUnhandled ? 'error-outline' : 'warning-outline'"
         size="xs"
-        shape="rounded-default"
+        shape="rounded"
         class="uppercase shrink-0"
         data-test="rum-error-issue-cell-handling-tag"
       />
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="route"
         variant="default-soft"
         size="xs"
-        shape="rounded-default"
+        shape="rounded"
         class="shrink-0"
         data-test="rum-error-issue-cell-route-tag"
       />

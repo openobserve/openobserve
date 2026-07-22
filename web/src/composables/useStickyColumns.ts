@@ -76,7 +76,6 @@ export function useStickyColumns(props: any, store: any) {
     let css = "";
 
     const stickyColTotals = !!props.stickyColTotals;
-    const stickyRowTotals = !!props.stickyRowTotals;
     const TOTAL_COL_WIDTH = 150;
 
     const scope = `.my-sticky-virtscroll-table[data-sticky-id="${tableId}"]`;

@@ -57,9 +57,12 @@ describe("NightingaleConfig.vue", () => {
     );
   });
 
-  it("contains remote_write and basic_auth sections", () => {
-    expect(wrapper.vm.content).toContain("remote_write:");
-    expect(wrapper.vm.content).toContain("basic_auth:");
+  // Nightingale is configured in TOML via a `[[Pushgw.Writers]]` block — not the
+  // Prometheus YAML (`remote_write:` / `basic_auth:`) the other metrics snippets use.
+  it("contains the Pushgw writer and basic auth credentials", () => {
+    expect(wrapper.vm.content).toContain("[[Pushgw.Writers]]");
+    expect(wrapper.vm.content).toContain("BasicAuthUser =");
+    expect(wrapper.vm.content).toContain("BasicAuthPass =");
   });
 });
 

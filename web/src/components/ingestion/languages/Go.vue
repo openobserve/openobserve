@@ -21,8 +21,8 @@ import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "go";
-const store = useStore();
-const { endpoint, languagesContent, languagesDocURLs } = useIngestion();
+useStore();
+const { languagesContent, languagesDocURLs } = useIngestion();
 const content = languagesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = languagesDocURLs[name];
 </script>
