@@ -195,6 +195,7 @@ onMounted(() => {
   // after mid-session install). The content script sends 'oo-bridge-ready' when
   // chrome.scripting.executeScript injects it, and the composable calls this back.
   recorder.registerAutoDetect(() => {
+    console.log("Register auto detect");
     extensionInstalled.value = true
     extensionReady.value = true
   })
