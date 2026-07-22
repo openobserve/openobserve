@@ -668,7 +668,7 @@ pub async fn delete_stream_cache(
         format!("{org_id}/{stream_type}/{stream_name}")
     };
 
-    match crate::service::search::cluster::cacher::delete_cached_results(path, delete_ts).await {
+    match search_service::cluster::cacher::delete_cached_results(path, delete_ts).await {
         true => (
             StatusCode::OK,
             Json(MetaHttpResponse::message(

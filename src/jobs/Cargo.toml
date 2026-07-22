@@ -15,13 +15,15 @@ enterprise = [
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "openobserve-core/enterprise",
+    "search_service/enterprise",
 ]
 cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
-vectorscan = ["openobserve-core/vectorscan"]
-vortex = ["openobserve-core/vortex"]
+vectorscan = ["openobserve-core/vectorscan", "search_service/vectorscan"]
+vortex = ["openobserve-core/vortex", "search_service/vortex"]
 
 [dependencies]
 openobserve-core.workspace = true
+search_service.workspace = true
 anyhow.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true

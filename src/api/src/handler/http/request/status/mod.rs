@@ -603,7 +603,7 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     #[cfg(feature = "enterprise")]
-    let (total_count, expired_count) = crate::service::search::cardinality::get_cache_stats().await;
+    let (total_count, expired_count) = search_service::cardinality::get_cache_stats().await;
     #[cfg(not(feature = "enterprise"))]
     let (total_count, expired_count) = (0, 0);
     stats.insert(
