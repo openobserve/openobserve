@@ -58,6 +58,21 @@
           </OButton>
         </template>
 
+        <template #subheader>
+          <div
+            class="px-page-edge py-1.5 border-b border-table-row-divider"
+            data-test="eval-job-list-summary"
+          >
+            <OStatStrip
+              :items="summaryStats"
+              :loading="loading"
+              selectable
+              :selected-key="selectedStatKey"
+              @select="onStatSelect"
+            />
+          </div>
+        </template>
+
         <template #empty>
           <div class="flex items-center justify-center py-8">
             <OEmptyState
@@ -165,6 +180,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type {
   EvalJob,
@@ -309,6 +326,69 @@ const filteredRows = computed(() =>
 );
 
 const numberedRows = useNumberedRows(filteredRows);
+
+// Summary strip — colour-coded status counts that double as quick filters
+// (syncs with the status dropdown via `statusFilter`).
+const statusCounts = computed(() => {
+  const rows = props.rows || [];
+  let active = 0;
+  let paused = 0;
+  let degraded = 0;
+  for (const r of rows) {
+    const s = statusOf(r);
+    if (s === "active") active += 1;
+    else if (s === "paused") paused += 1;
+    else if (s === "degraded") degraded += 1;
+  }
+  return { active, paused, degraded, total: rows.length };
+});
+const summaryStats = computed<StatItem[]>(() => {
+  const c = statusCounts.value;
+  const has = c.total > 0;
+  const v = (n: number): string | number => (has ? n : "—");
+  const share = has ? c.total : undefined;
+  return [
+    {
+      key: "all",
+      label: t("alerts.summaryTotal"),
+      value: v(c.total),
+      icon: "format-list-bulleted",
+      tone: "primary",
+      dataTest: "eval-job-summary-total",
+    },
+    {
+      key: "active",
+      label: t("onlineEvals.jobStatus.active"),
+      value: v(c.active),
+      icon: "play-arrow",
+      tone: "success",
+      max: share,
+      dataTest: "eval-job-summary-active",
+    },
+    {
+      key: "paused",
+      label: t("onlineEvals.jobStatus.paused"),
+      value: v(c.paused),
+      icon: "pause",
+      tone: "warning",
+      max: share,
+      dataTest: "eval-job-summary-paused",
+    },
+    {
+      key: "degraded",
+      label: t("onlineEvals.jobStatus.degraded"),
+      value: v(c.degraded),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "eval-job-summary-degraded",
+    },
+  ];
+});
+const selectedStatKey = computed(() => statusFilter.value ?? "all");
+function onStatSelect(key: string) {
+  statusFilter.value = key === "all" ? null : (key as EvalJobStatus);
+}
 
 // Whether the user has narrowed the list with the search box or the status
 // dropdown. Drives OEmptyState's `:filtered` so the body switches between

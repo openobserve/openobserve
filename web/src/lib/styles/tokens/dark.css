@@ -707,6 +707,10 @@
   --color-icon-chip-warning-text: var(--color-warning-400);
   --color-icon-chip-error-bg:     color-mix(in srgb, var(--color-error-500) 15%, transparent);
   --color-icon-chip-error-text:   var(--color-error-400);
+  --color-icon-chip-info-bg:      color-mix(in srgb, var(--color-blue-500) 15%, transparent);
+  --color-icon-chip-info-text:    var(--color-blue-400);
+  --color-icon-chip-orange-bg:    color-mix(in srgb, var(--color-orange-500) 15%, transparent);
+  --color-icon-chip-orange-text:  var(--color-orange-400);
 
   /* Misc dark overrides. */
   --color-cancel-query-bg: #7A3838;

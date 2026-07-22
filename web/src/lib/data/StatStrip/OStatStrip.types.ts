@@ -12,6 +12,8 @@ export type StatTone =
   | "warning"
   | "error"
   | "primary"
+  | "info"
+  | "orange"
   | "neutral";
 
 /** Optional delta shown beside the value (e.g. "▲ 12%"). */

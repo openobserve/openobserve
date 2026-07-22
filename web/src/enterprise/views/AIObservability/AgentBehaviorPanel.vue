@@ -16,6 +16,10 @@
 -->
 <template>
   <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
+    <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
+    <div class="shrink-0" data-test="agent-behavior-summary">
+      <OStatStrip :items="behaviorStats" :loading="loading" />
+    </div>
     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
          panels (LLMErrorTable) so the whole page reads as one surface. -->
     <div
@@ -70,7 +74,11 @@
         pagination="client"
         :empty-message="t('aiObservability.behavior.noFailures')"
         @row-click="(r: any) => openDetail('failure', r)"
-      />
+      >
+        <template #cell-failClass="{ row }">
+          <OTag variant="warning-soft" size="sm">{{ row.failClass }}</OTag>
+        </template>
+      </OTable>
     </div>
 
     <!-- Cost is intentionally NOT a table here — LLM Insights already owns the
@@ -94,6 +102,9 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
 import agentSignalsService, {
   type AgentSignalRecord,
@@ -173,6 +184,45 @@ const failureRows = computed(() =>
     }))
     .sort((a, b) => b.count - a.count),
 );
+
+// Summary strip — at-a-glance behaviour signals. Loops draw attention (warning),
+// failures are the exception (error), agents-affected is the scope (primary).
+const behaviorStats = computed<StatItem[]>(() => {
+  const loops = loopRows.value;
+  const failures = failureRows.value;
+  const agents = new Set(
+    [...loops, ...failures].map((r) => r.agentRaw).filter(Boolean),
+  );
+  const totalFailures = failures.reduce((sum, f) => sum + (f.count || 0), 0);
+  const has = loops.length + failures.length > 0;
+  const v = (n: number): string | number => (has ? n : "—");
+  return [
+    {
+      key: "loops",
+      label: t("aiObservability.behavior.summaryLoops"),
+      value: v(loops.length),
+      icon: "restart-alt",
+      tone: "warning",
+      dataTest: "agent-behavior-summary-loops",
+    },
+    {
+      key: "failures",
+      label: t("aiObservability.behavior.summaryFailures"),
+      value: v(totalFailures),
+      icon: "error-outline",
+      tone: "error",
+      dataTest: "agent-behavior-summary-failures",
+    },
+    {
+      key: "agents",
+      label: t("aiObservability.behavior.summaryAgents"),
+      value: v(agents.size),
+      icon: "account-tree",
+      tone: "primary",
+      dataTest: "agent-behavior-summary-agents",
+    },
+  ];
+});
 
 const loopColumns = computed<OTableColumnDef[]>(() => [
   {

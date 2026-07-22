@@ -64,6 +64,16 @@ const TONES: Record<StatTone, { chip: string; value: string; bar: string }> = {
     value: "text-icon-chip-primary-text",
     bar: "bg-accent",
   },
+  info: {
+    chip: "bg-icon-chip-info-bg text-icon-chip-info-text",
+    value: "text-icon-chip-info-text",
+    bar: "bg-icon-chip-info-text",
+  },
+  orange: {
+    chip: "bg-icon-chip-orange-bg text-icon-chip-orange-text",
+    value: "text-icon-chip-orange-text",
+    bar: "bg-icon-chip-orange-text",
+  },
   neutral: {
     chip: "bg-surface-subtle text-text-secondary",
     value: "text-text-heading",

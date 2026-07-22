@@ -41,38 +41,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :persist-columns="true"
         table-id="alerts-incident-list"
         data-test="incident-list-table"
+        :get-row-style="incidentRowStyle"
         @row-click="viewIncident"
       >
+        <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
+             shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex items-center justify-between gap-2 w-full">
+          <div class="flex items-center gap-2 w-full">
             <OToggleGroup
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
               data-test="incident-status-filter-group"
             >
-              <OToggleGroupItem value="all" size="sm" data-test="incident-status-filter-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("alerts.incidents.allStatuses") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="open" size="sm" data-test="incident-status-filter-open">
+              <OToggleGroupItem value="active" size="sm" data-test="incident-status-filter-active">
                 <template #icon-left><OIcon name="radio-button-unchecked" size="sm" /></template>
-                {{ t("alerts.incidents.statusOpen") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="acknowledged" size="sm" data-test="incident-status-filter-acknowledged">
-                <template #icon-left><OIcon name="visibility" size="sm" /></template>
-                {{ t("alerts.incidents.statusAcknowledged") }}
+                {{ t("alerts.incidents.filterActive") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="resolved" size="sm" data-test="incident-status-filter-resolved">
                 <template #icon-left><OIcon name="task-alt" size="sm" /></template>
                 {{ t("alerts.incidents.statusResolved") }}
               </OToggleGroupItem>
+              <OToggleGroupItem value="all" size="sm" data-test="incident-status-filter-all">
+                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                {{ t("alerts.incidents.filterAll") }}
+              </OToggleGroupItem>
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="w-64"
+              class="flex-1 min-w-0"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
+            />
+          </div>
+        </template>
+        <!-- Severity summary strip below the toolbar (mirrors the Alerts state
+             strip): Total + the four severities as selectable filter tiles. -->
+        <template #subheader>
+          <div
+            class="px-page-edge py-1.5 border-b border-table-row-divider"
+            data-test="incident-list-summary"
+          >
+            <OStatStrip
+              :items="severityStats"
+              :loading="loading"
+              selectable
+              :selected-key="severityFilter"
+              @select="onSeveritySelect"
             />
           </div>
         </template>
@@ -128,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               value="neutral"
               class="shrink-0"
             >
-              +{{ getSortedDimensions(row.group_values).length - 2 }} more
+              {{ t("alerts.incidents.moreDimensions", { count: getSortedDimensions(row.group_values).length - 2 }) }}
               <OTooltip :delay="300" :max-width="'28rem'">
                 <template #content>
                   <div class="space-y-1">
@@ -144,11 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
           </div>
         </template>
+        <template #cell-alert_count="{ row }">
+          <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
+        </template>
         <template #cell-last_alert_at="{ row }">
           <OTimeCell
             :value="row.last_alert_at"
             unit="us"
-            mode="absolute"
+            mode="relative"
             :timezone="store.state.timezone"
             empty-label="—"
           />
@@ -224,6 +242,8 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -243,6 +263,7 @@ export default defineComponent({
     OTag,
     ODimensionChip,
     OTimeCell,
+    OStatStrip,
     OToggleGroup,
     OToggleGroupItem,
 },
@@ -256,14 +277,20 @@ export default defineComponent({
     const loading = ref(false);
     const allIncidents = ref<Incident[]>([]);
     const searchQuery = ref("");
-    const validStatuses = ["all", "open", "acknowledged", "resolved"];
+    // Primary filter groups the lifecycle like other list pages: Active covers
+    // both open and acknowledged (still needs attention), Resolved is done.
+    const validStatuses = ["all", "active", "resolved"];
+    // Default to "active" so the page opens focused on incidents that need
+    // attention (a saved state or ?status= query still wins).
     const statusFilter = ref(
       validStatuses.includes(route.query.status as string)
         ? (route.query.status as string)
-        : "all"
+        : "active"
     );
     const isRestoringState = ref(false);
     const pageSize = ref(20);
+    // Severity facet — independent of status ("all" | "P1".."P4").
+    const severityFilter = ref("all");
 
     const columns: OTableColumnDef[] = [
       {
@@ -355,14 +382,94 @@ export default defineComponent({
       });
     };
 
-    const visibleIncidents = computed(() => {
-      let filtered = allIncidents.value;
-      if (statusFilter.value !== "all") {
-        filtered = filtered.filter((incident) => incident.status === statusFilter.value);
+    // Search first (so the summary counts track the current search); the status
+    // filter is layered on top for the table rows.
+    const searchedIncidents = computed(() =>
+      applyFrontendSearch(allIncidents.value, searchQuery.value),
+    );
+    // Search + status toggle (but NOT severity) — the scope the severity cards
+    // count over, so selecting a status updates the severity breakdown to match.
+    const statusScopedIncidents = computed(() => {
+      const rows = searchedIncidents.value;
+      if (statusFilter.value === "active") {
+        return rows.filter(
+          (i) => i.status === "open" || i.status === "acknowledged",
+        );
       }
-      filtered = applyFrontendSearch(filtered, searchQuery.value);
-      return filtered;
+      if (statusFilter.value === "resolved") {
+        return rows.filter((i) => i.status === "resolved");
+      }
+      return rows;
     });
+    const visibleIncidents = computed(() => {
+      const rows = statusScopedIncidents.value;
+      if (severityFilter.value === "all") return rows;
+      return rows.filter(
+        (incident) =>
+          String(incident.severity).toUpperCase() === severityFilter.value,
+      );
+    });
+
+    // Severity breakdown for the summary strip (over the status-scoped set, so it
+    // tracks the toggle). The four hues (red/orange/amber/blue) match the rail.
+    const severityCounts = computed(() => {
+      const rows = statusScopedIncidents.value;
+      let p1 = 0;
+      let p2 = 0;
+      let p3 = 0;
+      let p4 = 0;
+      for (const i of rows) {
+        const s = String(i.severity).toUpperCase();
+        if (s === "P1") p1 += 1;
+        else if (s === "P2") p2 += 1;
+        else if (s === "P3") p3 += 1;
+        else if (s === "P4") p4 += 1;
+      }
+      return { p1, p2, p3, p4, total: rows.length };
+    });
+    // Severity summary strip — mirrors the Alerts state strip: Total + the four
+    // severities as selectable filter tiles. Keys map to severityFilter values
+    // ("all" | "P1" | "P2" | "P3" | "P4").
+    const severityStats = computed<StatItem[]>(() => {
+      const c = severityCounts.value;
+      const hasData = c.total > 0;
+      const v = (n: number): string | number => (hasData ? n : "—");
+      const share = hasData ? c.total : undefined;
+      return [
+        { key: "P1", label: t("alerts.incidents.severityCritical"), value: v(c.p1), icon: "error", tone: "error", max: share, dataTest: "incident-severity-p1" },
+        { key: "P2", label: t("alerts.incidents.severityHigh"), value: v(c.p2), icon: "warning", tone: "orange", max: share, dataTest: "incident-severity-p2" },
+        { key: "P3", label: t("alerts.incidents.severityMedium"), value: v(c.p3), icon: "flag", tone: "warning", max: share, dataTest: "incident-severity-p3" },
+        { key: "P4", label: t("alerts.incidents.severityLow"), value: v(c.p4), icon: "info", tone: "info", max: share, dataTest: "incident-severity-p4" },
+        { key: "total", label: t("alerts.summaryTotal"), value: v(c.total), icon: "format-list-bulleted", tone: "primary", dataTest: "incident-severity-total" },
+      ];
+    });
+    // Total clears the severity filter (and is never highlighted, like Alerts);
+    // the severity tiles set the facet.
+    const onSeveritySelect = (key: string) => {
+      severityFilter.value = key === "total" ? "all" : key;
+    };
+
+    // Extreme-left rail coloured by severity (P1 red … P4 blue); resolved rows
+    // stand out. The rail answers "does this need action, and how urgently?":
+    //   resolved → green (done, no action needed) ·
+    //   else the severity heat scale (P1 red → P2 orange → P3 amber → P4 blue).
+    // Severity is still fully filterable from the top strip.
+    const incidentRowStyle = (row: any): Record<string, string> => {
+      const s = String(row?.severity || "").toUpperCase();
+      const color =
+        row?.status === "resolved"
+          ? "var(--color-success-500)"
+          : s === "P1"
+            ? "var(--color-error-500)"
+            : s === "P2"
+              ? "var(--color-orange-500)"
+              : s === "P3"
+                ? "var(--color-amber-500)"
+                : s === "P4"
+                  ? "var(--color-blue-500)"
+                  : "var(--color-grey-400)";
+      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+    };
 
     const loadIncidents = async () => {
       loading.value = true;
@@ -420,13 +527,16 @@ export default defineComponent({
 
     const filterByStatus = (value: string) => {
       statusFilter.value = value;
+      // Switching the primary status resets the severity facet back to "all".
+      severityFilter.value = "all";
       store.dispatch('incidents/setStatusFilter', value);
       savePageState();
     };
 
     const clearFilters = () => {
       searchQuery.value = "";
-      filterByStatus("all");
+      severityFilter.value = "all";
+      filterByStatus("active");
     };
 
     const updateStatus = async (incident: Incident, newStatus: "open" | "acknowledged" | "resolved") => {
@@ -614,6 +724,10 @@ export default defineComponent({
       loading,
       allIncidents,
       visibleIncidents,
+      severityStats,
+      severityFilter,
+      onSeveritySelect,
+      incidentRowStyle,
       searchQuery,
       statusFilter,
       filterByStatus,

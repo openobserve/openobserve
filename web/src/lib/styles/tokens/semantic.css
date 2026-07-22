@@ -51,6 +51,10 @@
   --color-icon-chip-warning-text: var(--color-warning-700);
   --color-icon-chip-error-bg:     var(--color-error-50);
   --color-icon-chip-error-text:   var(--color-error-600);
+  --color-icon-chip-info-bg:      var(--color-blue-50);
+  --color-icon-chip-info-text:    var(--color-blue-600);
+  --color-icon-chip-orange-bg:    var(--color-orange-50);
+  --color-icon-chip-orange-text:  var(--color-orange-700);
   /* App chrome (top bar + side rail + the gutter behind the content card) — a
      barely-tinted near-white, just a whisper of brand hue so the white content
      card floats on a calm backdrop. A strong tint reads as "too bright". */
@@ -110,6 +114,10 @@
   --color-icon-chip-warning-text: var(--color-icon-chip-warning-text);
   --color-icon-chip-error-bg:     var(--color-icon-chip-error-bg);
   --color-icon-chip-error-text:   var(--color-icon-chip-error-text);
+  --color-icon-chip-info-bg:      var(--color-icon-chip-info-bg);
+  --color-icon-chip-info-text:    var(--color-icon-chip-info-text);
+  --color-icon-chip-orange-bg:    var(--color-icon-chip-orange-bg);
+  --color-icon-chip-orange-text:  var(--color-icon-chip-orange-text);
   --color-surface-chrome:        var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
