@@ -8980,7 +8980,9 @@
     "cellActions": {
       "copy": "Copy",
       "includeTerm": "Include Term",
-      "excludeTerm": "Exclude Term"
+      "excludeTerm": "Exclude Term",
+      "sendValueToAi": "Send Value to AI",
+      "sendRowToAi": "Send Row to AI"
     },
     "indexList": {
       "noMatchingFields": "No matching fields found",

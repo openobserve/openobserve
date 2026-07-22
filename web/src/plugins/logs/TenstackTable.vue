@@ -32,456 +32,546 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="loading"
       :loadingProgressPercentage="loadingProgressPercentage"
     />
-    <table
-      v-if="table"
-      data-test="logs-search-result-logs-table"
-      class="w-full table-auto logs-table"
-      :style="{
-        minWidth: '100%',
-        ...columnSizeVars,
-        width: !defaultColumns
-          ? table.getCenterTotalSize() + 'px'
-          : wrap
-            ? width
-              ? width - 12 + 'px'
-              : '100%'
-            : '100%',
-      }"
-    >
-      <thead
-        class="sticky top-0 z-10 max-h-11"
-        v-for="headerGroup in table.getHeaderGroups()"
-        :key="headerGroup.id"
-      >
-        <vue-draggable
-          v-model="columnOrder"
-          :element="'table'"
-          :animation="200"
-          :sort="!isResizingHeader || !defaultColumns"
-          handle=".table-head"
-          :class="[
-            { 'cursor-move': table.getState().columnOrder.length > 1 },
-            // Header-row chrome via centralized token utilities (same tokens
-            // OTable uses): background band + full-width underline on the row.
-            'bg-table-header-bg border-b border-table-header-border',
-          ]"
+    <!-- Row/cell actions live in a right-click context menu rather than a hover
+      overlay: the overlay had to cover the cell text to be reachable, and it
+      could only ever be offered on the handful of columns wide enough to host
+      it. The menu is anchored to the pointer, so every cell can offer actions. -->
+    <OContextMenu v-if="table" @update:open="onContextMenuOpenChange">
+      <template #trigger>
+        <table
+          data-test="logs-search-result-logs-table"
+          class="w-full table-auto logs-table"
+          @contextmenu.capture="handleTableContextMenu"
           :style="{
-            width:
-              defaultColumns && wrap
-                ? width - 12 + 'px'
-                : defaultColumns
-                  ? tableRowSize + 'px'
-                  : '100%',
             minWidth: '100%',
+            ...columnSizeVars,
+            width: !defaultColumns
+              ? table.getCenterTotalSize() + 'px'
+              : wrap
+                ? width
+                  ? width - 12 + 'px'
+                  : '100%'
+                : '100%',
           }"
-          tag="tr"
-          @start="(event) => handleDragStart(event)"
-          @end="() => handleDragEnd()"
-          class="flex items-center h-8"
         >
-          <th
-            v-for="(header, headerIndex) in headerGroup.headers"
-            :key="header.id"
-            :id="header.id"
-            class="px-2 relative table-head text-ellipsis"
-            :style="
-              !defaultColumns && headerIndex === headerGroup.headers.length - 1
-                ? { flex: '1 1 auto', minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, width: 'auto', overflow: 'hidden' }
-                : { width: `calc(var(--header-${header?.id}-size) * 1px)`, minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, flexShrink: '0' }
-            "
-            :data-test="`log-search-result-table-th-${header.id}`"
+          <thead
+            class="sticky top-0 z-10 max-h-11"
+            v-for="headerGroup in table.getHeaderGroups()"
+            :key="headerGroup.id"
           >
-            <!-- Column separator / resize handle. The separator LINE renders on
+            <vue-draggable
+              v-model="columnOrder"
+              :element="'table'"
+              :animation="200"
+              :sort="!isResizingHeader || !defaultColumns"
+              handle=".table-head"
+              :class="[
+                { 'cursor-move': table.getState().columnOrder.length > 1 },
+                // Header-row chrome via centralized token utilities (same tokens
+                // OTable uses): background band + full-width underline on the row.
+                'bg-table-header-bg border-b border-table-header-border',
+              ]"
+              :style="{
+                width:
+                  defaultColumns && wrap
+                    ? width - 12 + 'px'
+                    : defaultColumns
+                      ? tableRowSize + 'px'
+                      : '100%',
+                minWidth: '100%',
+              }"
+              tag="tr"
+              @start="(event) => handleDragStart(event)"
+              @end="() => handleDragEnd()"
+              class="flex items-center h-8"
+            >
+              <th
+                v-for="(header, headerIndex) in headerGroup.headers"
+                :key="header.id"
+                :id="header.id"
+                class="px-2 relative table-head text-ellipsis"
+                :style="
+                  !defaultColumns &&
+                  headerIndex === headerGroup.headers.length - 1
+                    ? {
+                        flex: '1 1 auto',
+                        minWidth: `calc(var(--header-${header?.id}-size) * 1px)`,
+                        width: 'auto',
+                        overflow: 'hidden',
+                      }
+                    : {
+                        width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                        minWidth: `calc(var(--header-${header?.id}-size) * 1px)`,
+                        flexShrink: '0',
+                      }
+                "
+                :data-test="`log-search-result-table-th-${header.id}`"
+              >
+                <!-- Column separator / resize handle. The separator LINE renders on
                  EVERY column (even non-resizable ones like timestamp/source, which
                  set enableResizing:false) so the vertical dividers are continuous.
                  The drag interactivity + hover accent only apply when the column
                  is resizable. Matches the OTable spec: short 1px --color-border. -->
-            <div
-              @dblclick="
-                header.column.getCanResize() && header.column.resetSize()
-              "
-              @mousedown.self.prevent.stop="
-                header.column.getCanResize() &&
-                  header.getResizeHandler()?.($event)
-              "
-              @touchstart.self.prevent.stop="
-                header.column.getCanResize() &&
-                  header.getResizeHandler()?.($event)
-              "
-              :class="[
-                'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
-                header.column.getCanResize() ? 'resizer w-1.25 cursor-col-resize' : 'w-2',
-              ]"
-            >
-              <div
-                :class="[
-                  'rounded-full transition-all duration-150',
-                  header.column.getIsResizing()
-                    ? 'w-0.5 h-full bg-table-resize-handle'
-                    : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
-                ]"
-              />
-            </div>
+                <div
+                  @dblclick="
+                    header.column.getCanResize() && header.column.resetSize()
+                  "
+                  @mousedown.self.prevent.stop="
+                    header.column.getCanResize() &&
+                    header.getResizeHandler()?.($event)
+                  "
+                  @touchstart.self.prevent.stop="
+                    header.column.getCanResize() &&
+                    header.getResizeHandler()?.($event)
+                  "
+                  :class="[
+                    'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
+                    header.column.getCanResize()
+                      ? 'resizer w-1.25 cursor-col-resize'
+                      : 'w-2',
+                  ]"
+                >
+                  <div
+                    :class="[
+                      'rounded-full transition-all duration-150',
+                      header.column.getIsResizing()
+                        ? 'w-0.5 h-full bg-table-resize-handle'
+                        : 'w-px h-4 bg-border-default group-hover/resizer:w-0.5 group-hover/resizer:h-full group-hover/resizer:bg-[var(--color-table-resize-handle)]',
+                    ]"
+                  />
+                </div>
 
-            <div
-              v-if="!header.isPlaceholder"
-              :class="[
-                'text-left',
-                header.column.getCanSort() ? 'cursor-pointer select-none' : '',
-              ]"
-              @click="
-                getSortingHandler(
-                  $event,
-                  header.column.getToggleSortingHandler(),
-                )
-              "
-              class="overflow-hidden text-ellipsis text-table-header-text text-xs font-medium"
-            >
-              <FlexRender
-                :render="header.column.columnDef.header"
-                :props="header.getContext()"
-              />
-            </div>
+                <div
+                  v-if="!header.isPlaceholder"
+                  :class="[
+                    'text-left',
+                    header.column.getCanSort()
+                      ? 'cursor-pointer select-none'
+                      : '',
+                  ]"
+                  @click="
+                    getSortingHandler(
+                      $event,
+                      header.column.getToggleSortingHandler(),
+                    )
+                  "
+                  class="overflow-hidden text-ellipsis text-table-header-text text-xs font-medium"
+                >
+                  <FlexRender
+                    :render="header.column.columnDef.header"
+                    :props="header.getContext()"
+                  />
+                </div>
 
-            <div
-              v-if="
-                !header.isPlaceholder &&
-                (
-                  (header.column.columnDef.meta as any).closable ||
-                  (header.column.columnDef.meta as any).showWrap
-                )
-              "
-              :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
-              class="invisible flex items-center absolute right-2 top-0 h-full pl-3 bg-table-header-bg column-actions"
-            >
-              <OIcon
-                v-if="(header.column.columnDef.meta as any).closable"
-                :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
-                name="close"
-                class="close-icon cursor-pointer text-icon-color hover:text-text-heading transition-colors"
-                :title="t('common.close')"
-                size="xs"
-                @click.stop="closeColumn(header.column.columnDef)"
-              />
-            </div>
-          </th>
-        </vue-draggable>
+                <div
+                  v-if="
+                    !header.isPlaceholder &&
+                    ((header.column.columnDef.meta as any).closable ||
+                      (header.column.columnDef.meta as any).showWrap)
+                  "
+                  :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
+                  class="invisible flex items-center absolute right-2 top-0 h-full pl-3 bg-table-header-bg column-actions"
+                >
+                  <OIcon
+                    v-if="(header.column.columnDef.meta as any).closable"
+                    :data-test="`logs-search-result-table-th-remove-${header.column.columnDef.header}-btn`"
+                    name="close"
+                    class="close-icon cursor-pointer text-icon-color hover:text-text-heading transition-colors"
+                    :title="t('common.close')"
+                    size="xs"
+                    @click.stop="closeColumn(header.column.columnDef)"
+                  />
+                </div>
+              </th>
+            </vue-draggable>
 
-
-        <tr v-if="!loading && errMsg != ''" class="w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="font-bold opacity-70"
-          >
-            <div class="text-sm font-medium font-bold bg-warning">
-              <OIcon size="xs"
-name="warning"
-class="mr-1" />
-              {{ errMsg }}
-            </div>
-          </td>
-        </tr>
-        <tr
-          data-test="log-search-result-function-error"
-          v-if="functionErrorMsg != ''"
-        >
-          <td
-            :colspan="columnOrder.length"
-            class="font-bold opacity-60"
-          >
-            <div
-              class="text-sm font-medium font-bold pl-2 bg-status-warning-bg"
+            <tr v-if="!loading && errMsg != ''" class="w-full">
+              <td :colspan="columnOrder.length" class="font-bold opacity-70">
+                <div class="text-sm font-medium font-bold bg-warning">
+                  <OIcon size="xs" name="warning" class="mr-1" />
+                  {{ errMsg }}
+                </div>
+              </td>
+            </tr>
+            <tr
+              data-test="log-search-result-function-error"
+              v-if="functionErrorMsg != ''"
             >
-              <OButton
-                variant="ghost"
-                size="icon-xs"
-                class="mr-1 log-row-expand-btn"
-                data-test="table-row-expand-menu"
-                @click.capture.stop="expandFunctionError"
-                ><OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="sm" /></OButton
-              ><b>
-                <OIcon name="warning" size="sm" />
-                {{ t("search.functionErrorLabel") }}</b
+              <td :colspan="columnOrder.length" class="font-bold opacity-60">
+                <div
+                  class="text-sm font-medium font-bold pl-2 bg-status-warning-bg"
+                >
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs"
+                    class="mr-1 log-row-expand-btn"
+                    data-test="table-row-expand-menu"
+                    @click.capture.stop="expandFunctionError"
+                    ><OIcon
+                      :name="
+                        isFunctionErrorOpen ? 'expand-more' : 'chevron-right'
+                      "
+                      size="sm" /></OButton
+                  ><b>
+                    <OIcon name="warning" size="sm" />
+                    {{ t("search.functionErrorLabel") }}</b
+                  >
+                </div>
+              </td>
+            </tr>
+            <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
+              <td
+                :colspan="columnOrder.length"
+                class="opacity-70 px-2 bg-status-warning-bg"
               >
-            </div>
-          </td>
-        </tr>
-        <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
-          <td
-            :colspan="columnOrder.length"
-            class="opacity-70 px-2 bg-status-warning-bg"
-          >
-            <pre>{{ functionErrorMsg }}</pre>
-          </td>
-        </tr>
-      </thead>
+                <pre>{{ functionErrorMsg }}</pre>
+              </td>
+            </tr>
+          </thead>
 
-      <!-- Skeleton loading body — shown ONLY on first load (no rows yet).
+          <!-- Skeleton loading body — shown ONLY on first load (no rows yet).
         Once rows exist they stay visible while the top progress bar signals an
         in-progress refresh (e.g. streaming_aggs replacing values). -->
-      <tbody
-        v-if="loading && tableRows.length === 0"
-        data-test="logs-table-skeleton-body"
-        aria-busy="true"
-        :aria-label="t('logs.tenstackTable.loadingLogs')"
-      >
-        <!-- Rows use flex to match the real virtual rows exactly -->
-        <tr
-          v-for="r in SKEL_ROW_COUNT"
-          :key="`skel-${r}`"
-          class="logs-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border"
-          :style="{ animationDelay: `${(r - 1) * 40}ms` }"
-        >
-          <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
-          <td v-if="!headers?.length" class="w-full px-4 overflow-hidden">
-            <span
-              class="logs-skel-pill inline-block h-3 rounded-default"
-              :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
-              aria-hidden="true"
-            />
-          </td>
-          <!-- Columns available — per-column aligned shimmer pills -->
-          <template v-else>
-            <td
-              v-for="(header, c) in headers"
-              :key="header.id"
-              class="px-2 overflow-hidden"
-              :class="c === 0 ? 'pl-4' : ''"
-              :style="skelTdStyle(header, c)"
+          <tbody
+            v-if="loading && tableRows.length === 0"
+            data-test="logs-table-skeleton-body"
+            aria-busy="true"
+            :aria-label="t('logs.tenstackTable.loadingLogs')"
+          >
+            <!-- Rows use flex to match the real virtual rows exactly -->
+            <tr
+              v-for="r in SKEL_ROW_COUNT"
+              :key="`skel-${r}`"
+              class="logs-skel-row flex items-center w-full opacity-0 h-[1.8125rem] bg-log-table-row-bg border-b border-log-table-row-border"
+              :style="{ animationDelay: `${(r - 1) * 40}ms` }"
             >
-              <span
-                class="logs-skel-pill inline-block h-3 rounded-default"
-                :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
-                aria-hidden="true"
-              />
-            </td>
-          </template>
-        </tr>
-      </tbody>
+              <!-- No columns loaded yet (first page load) — full-width shimmer bar -->
+              <td v-if="!headers?.length" class="w-full px-4 overflow-hidden">
+                <span
+                  class="logs-skel-pill inline-block h-3 rounded-default"
+                  :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
+                  aria-hidden="true"
+                />
+              </td>
+              <!-- Columns available — per-column aligned shimmer pills -->
+              <template v-else>
+                <td
+                  v-for="(header, c) in headers"
+                  :key="header.id"
+                  class="px-2 overflow-hidden"
+                  :class="c === 0 ? 'pl-4' : ''"
+                  :style="skelTdStyle(header, c)"
+                >
+                  <span
+                    class="logs-skel-pill inline-block h-3 rounded-default"
+                    :style="{
+                      width:
+                        c === 0
+                          ? `${SKEL_TIMESTAMP_PX}px`
+                          : `${skelCellWidth(r - 1, c)}%`,
+                    }"
+                    aria-hidden="true"
+                  />
+                </td>
+              </template>
+            </tr>
+          </tbody>
 
-      <!-- height reserves the full virtual-scroll height (rows are
+          <!-- height reserves the full virtual-scroll height (rows are
            position:absolute and add none of their own). The `.logs-table`
            element/thead/tbody are forced to `display: block` in component.css
            so `position: relative` (containing block for the absolute rows),
            `height`, and the sticky header all behave identically in Firefox —
            Firefox does not honor these on native table-row-group boxes. -->
-      <tbody
-        data-test="logs-search-result-table-body"
-        ref="tableBodyRef"
-        class="relative"
-        :style="{ height: totalSize + 'px' }"
-      >
-        <template
-          v-for="virtualRow in virtualRows"
-          :key="formattedRows[virtualRow.index]?.id"
-        >
-          <tr
-            :data-test="`logs-search-result-detail-${
-              (tableRows[virtualRow.index] as any)[
-                store.state.zoConfig.timestamp_column || '_timestamp'
-              ]
-            }`"
-            :style="{
-              transform: `translateY(${virtualRow.start}px)`,
-              minWidth: '100%',
-              width: (!defaultColumns && !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow) ? '100%' : undefined,
-            }"
-            :data-index="virtualRow.index"
-            :data-expanded="
-              formattedRows?.[virtualRow.index]?.original?.isExpandedRow
-            "
-            :tabindex="
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 0
-                : undefined
-            "
-            :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-            :class="[
-              'absolute flex w-max items-center justify-start border-b',
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'cursor-pointer'
-                : 'cursor-default',
-              defaultColumns &&
-              !wrap &&
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row'
-                : 'flex break-all',
-              (tableRows[virtualRow.index] as any)[
-                store.state.zoConfig.timestamp_column
-              ] === highlightTimestamp &&
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'bg-table-row-selected-bg'
-                : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                  ? 'log-row-base bg-log-table-row-bg'
-                  : '',
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
-                : '',
-            ]"
-            @click="
-              !(formattedRows[virtualRow.index]?.original as any)
-                ?.isExpandedRow &&
-              handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
-            "
-            @keydown="
-              !(formattedRows[virtualRow.index]?.original as any)
-                ?.isExpandedRow &&
-              handleRowKeydown($event, tableRows[virtualRow.index], virtualRow.index)
-            "
+          <tbody
+            data-test="logs-search-result-table-body"
+            ref="tableBodyRef"
+            class="relative"
+            :style="{ height: totalSize + 'px' }"
           >
-            <!-- Status color line for entire row -->
-            <div
-              v-if="
-                !(formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-              "
-              class="absolute left-0 inset-y-0 w-1 z-10"
-              data-test="log-table-row-status-color"
-              :data-test-status-level="getRowStatusLevel(tableRows[virtualRow.index])"
-              :style="{
-                backgroundColor: getRowStatusColor(tableRows[virtualRow.index]),
-              }"
-            />
-            <td
-              v-if="
-                (formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-              "
-              :colspan="columnOrder.length"
-              :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
-              class="w-full relative"
+            <template
+              v-for="virtualRow in virtualRows"
+              :key="formattedRows[virtualRow.index]?.id"
             >
-              <json-preview
-                :value="tableRows[virtualRow.index - 1] as any"
-                show-copy-button
-                class="py-1.5"
-                mode="expanded"
-                :index="calculateActualIndex(virtualRow.index - 1)"
-                :highlight-query="highlightQuery"
-                :hide-view-related="hideViewRelatedButton"
-                :hide-search-term-actions="hideSearchTermActions"
-                @copy="copyLogToClipboard"
-                @add-field-to-table="addFieldToTable"
-                @add-search-term="addSearchTerm"
-                @view-trace="
-                  viewTrace(formattedRows[virtualRow.index - 1]?.original)
+              <tr
+                :data-test="`logs-search-result-detail-${
+                  (tableRows[virtualRow.index] as any)[
+                    store.state.zoConfig.timestamp_column || '_timestamp'
+                  ]
+                }`"
+                :style="{
+                  transform: `translateY(${virtualRow.start}px)`,
+                  minWidth: '100%',
+                  width:
+                    !defaultColumns &&
+                    !(formattedRows[virtualRow.index]?.original as any)
+                      ?.isExpandedRow
+                      ? '100%'
+                      : undefined,
+                }"
+                :data-index="virtualRow.index"
+                :data-expanded="
+                  formattedRows?.[virtualRow.index]?.original?.isExpandedRow
                 "
-                @show-correlation="
-                  showCorrelation(formattedRows[virtualRow.index - 1]?.original)
+                :tabindex="
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow
+                    ? 0
+                    : undefined
                 "
-                :streamName="jsonpreviewStreamName"
-                @send-to-ai-chat="sendToAiChat"
-              />
-            </td>
-            <template v-else>
-              <td
-                v-for="(cell, cellIndex) in formattedRows[
-                  virtualRow.index
-                ].getVisibleCells()"
-                :key="cell.id"
-                :data-test="
-                  'log-table-column-' +
-                  virtualRow.index +
-                  '-' +
-                  cell.column.columnDef.id
+                :ref="
+                  (node: any) => node && rowVirtualizer.measureElement(node)
                 "
-                class="py-none px-2 flex items-center justify-start relative table-cell"
-                :class="[...tableCellClass, { 'pl-4': cellIndex === 0 }]"
-                :style="
-                  !defaultColumns && cellIndex === formattedRows[virtualRow.index].getVisibleCells().length - 1
-                    ? {
-                        flex: '1 1 auto',
-                        minWidth: `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`,
-                        width: 'auto',
-                        overflow: 'hidden',
-                        height: wrap ? '100%' : '20px',
-                      }
-                    : {
-                        width:
-                          cell.column.columnDef.id !== 'source' ||
-                          cell.column.columnDef.enableResizing
-                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
-                            : wrap
-                              ? width - 260 - 12 + 'px'
-                              : 'auto',
-                        minWidth:
-                          cell.column.columnDef.id !== 'source' ||
-                          cell.column.columnDef.enableResizing
-                            ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
-                            : undefined,
-                        flexShrink: '0',
-                        height: wrap ? '100%' : '20px',
-                      }
+                :class="[
+                  'absolute flex w-max items-center justify-start border-b',
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow
+                    ? 'cursor-pointer'
+                    : 'cursor-default',
+                  defaultColumns &&
+                  !wrap &&
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow
+                    ? 'table-row'
+                    : 'flex break-all',
+                  (tableRows[virtualRow.index] as any)[
+                    store.state.zoConfig.timestamp_column
+                  ] === highlightTimestamp &&
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow
+                    ? 'bg-table-row-selected-bg'
+                    : !(formattedRows[virtualRow.index]?.original as any)
+                          ?.isExpandedRow
+                      ? 'log-row-base bg-log-table-row-bg'
+                      : '',
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow
+                    ? 'table-row-hover table-row-focus focus-visible:outline-none transition-[background-color,box-shadow] duration-120 [transition-timing-function:ease-in-out] border-b-log-table-row-border!'
+                    : '',
+                ]"
+                @click="
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow &&
+                  handleDataRowClick(
+                    tableRows[virtualRow.index],
+                    virtualRow.index,
+                  )
                 "
-                @mouseover="handleCellMouseOver(cell)"
-                @mouseleave="handleCellMouseLeave()"
+                @keydown="
+                  !(formattedRows[virtualRow.index]?.original as any)
+                    ?.isExpandedRow &&
+                  handleRowKeydown(
+                    $event,
+                    tableRows[virtualRow.index],
+                    virtualRow.index,
+                  )
+                "
               >
-                <OButton
-                  v-if="cellIndex == 0"
-                  variant="ghost"
-                  size="icon-xs"
-                  class="mr-1 log-row-expand-btn"
-                  data-test="table-row-expand-menu"
-                  @click.capture.stop="handleExpandRow(virtualRow.index)"
-                  ><OIcon
-                    :name="
-                      expandedRowIndices.has(virtualRow.index)
-                        ? 'expand-more'
-                        : 'chevron-right'
-                    "
-                    size="sm"
-                /></OButton>
-
-                <template
-                  v-if="activeCellActionId === `${cell.id}_${cell.column.id}`"
+                <!-- Status color line for entire row -->
+                <div
+                  v-if="
+                    !(formattedRows[virtualRow.index]?.original as any)
+                      ?.isExpandedRow
+                  "
+                  class="absolute left-0 inset-y-0 w-1 z-10"
+                  data-test="log-table-row-status-color"
+                  :data-test-status-level="
+                    getRowStatusLevel(tableRows[virtualRow.index])
+                  "
+                  :style="{
+                    backgroundColor: getRowStatusColor(
+                      tableRows[virtualRow.index],
+                    ),
+                  }"
+                />
+                <td
+                  v-if="
+                    (formattedRows[virtualRow.index]?.original as any)
+                      ?.isExpandedRow
+                  "
+                  :colspan="columnOrder.length"
+                  :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
+                  class="w-full relative"
                 >
-                  <cell-actions
-                    v-if="
-                      (cell.column.columnDef.meta as any)?.closable &&
-                      (cell.row.original as any)[cell.column.id]
-                    "
-                    :column="cell.column"
-                    :row="cell.row.original as any"
-                    :selectedStreamFields="selectedStreamFields"
+                  <json-preview
+                    :value="tableRows[virtualRow.index - 1] as any"
+                    show-copy-button
+                    class="py-1.5"
+                    mode="expanded"
+                    :index="calculateActualIndex(virtualRow.index - 1)"
+                    :highlight-query="highlightQuery"
+                    :hide-view-related="hideViewRelatedButton"
                     :hide-search-term-actions="hideSearchTermActions"
                     @copy="copyLogToClipboard"
-                    @add-search-term="addSearchTerm"
                     @add-field-to-table="addFieldToTable"
+                    @add-search-term="addSearchTerm"
+                    @view-trace="
+                      viewTrace(formattedRows[virtualRow.index - 1]?.original)
+                    "
+                    @show-correlation="
+                      showCorrelation(
+                        formattedRows[virtualRow.index - 1]?.original,
+                      )
+                    "
+                    :streamName="jsonpreviewStreamName"
                     @send-to-ai-chat="sendToAiChat"
                   />
+                </td>
+                <template v-else>
+                  <td
+                    v-for="(cell, cellIndex) in formattedRows[
+                      virtualRow.index
+                    ].getVisibleCells()"
+                    :key="cell.id"
+                    :data-test="
+                      'log-table-column-' +
+                      virtualRow.index +
+                      '-' +
+                      cell.column.columnDef.id
+                    "
+                    class="py-none px-2 flex items-center justify-start relative table-cell"
+                    :class="[...tableCellClass, { 'pl-4': cellIndex === 0 }]"
+                    :style="
+                      !defaultColumns &&
+                      cellIndex ===
+                        formattedRows[virtualRow.index].getVisibleCells()
+                          .length -
+                          1
+                        ? {
+                            flex: '1 1 auto',
+                            minWidth: `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`,
+                            width: 'auto',
+                            overflow: 'hidden',
+                            height: wrap ? '100%' : '20px',
+                          }
+                        : {
+                            width:
+                              cell.column.columnDef.id !== 'source' ||
+                              cell.column.columnDef.enableResizing
+                                ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                                : wrap
+                                  ? width - 260 - 12 + 'px'
+                                  : 'auto',
+                            minWidth:
+                              cell.column.columnDef.id !== 'source' ||
+                              cell.column.columnDef.enableResizing
+                                ? `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`
+                                : undefined,
+                            flexShrink: '0',
+                            height: wrap ? '100%' : '20px',
+                          }
+                    "
+                    @contextmenu="handleCellContextMenu(cell)"
+                  >
+                    <OButton
+                      v-if="cellIndex == 0"
+                      variant="ghost"
+                      size="icon-xs"
+                      class="mr-1 log-row-expand-btn"
+                      data-test="table-row-expand-menu"
+                      @click.capture.stop="handleExpandRow(virtualRow.index)"
+                      ><OIcon
+                        :name="
+                          expandedRowIndices.has(virtualRow.index)
+                            ? 'expand-more'
+                            : 'chevron-right'
+                        "
+                        size="sm"
+                    /></OButton>
+
+                    <span
+                      v-if="
+                        processedResultsMap[
+                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                        ]
+                      "
+                      :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
+                      v-html="
+                        processedResultsMap[
+                          `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                        ]
+                      "
+                    />
+                    <span v-else>
+                      {{ cell.renderValue() }}
+                    </span>
+                  </td>
                 </template>
-                <span
-                  v-if="
-                    processedResultsMap[
-                      `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                    ]
-                  "
-                  :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                  v-html="
-                    processedResultsMap[
-                      `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                    ]
-                  "
-                />
-                <span v-else>
-                  {{ cell.renderValue() }}
-                </span>
-                <div
-                  v-if="cell.column.columnDef.id === store.state.zoConfig.timestamp_column"
-                  class="absolute right-0 top-1/2 -translate-y-1/2 invisible"
-                >
-                  <O2AIContextAddBtn
-                    class="ai-btn"
-                    @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
-                    :size="'2px'"
-                  />
-                </div>
-              </td>
+              </tr>
             </template>
-          </tr>
+          </tbody>
+        </table>
+      </template>
+
+      <!-- Actions apply to the cell that was right-clicked. `contextCell` is
+        recorded by the td's own @contextmenu, which fires before reka-ui opens
+        the menu, so the content is always in sync with the pointer. -->
+      <template v-if="contextCell">
+        <OContextMenuLabel data-test="log-context-menu-field">
+          {{ contextCell.columnId }}
+        </OContextMenuLabel>
+        <OContextMenuSeparator />
+
+        <OContextMenuItem
+          icon-left="content-copy"
+          data-test="log-context-menu-copy-value"
+          @select="copyLogToClipboard(contextCell.value)"
+        >
+          {{ t("logs.cellActions.copy") }}
+        </OContextMenuItem>
+
+        <template v-if="contextCellIsStreamField && !hideSearchTermActions">
+          <OContextMenuItem
+            data-test="log-context-menu-include-term"
+            @select="
+              addSearchTerm(contextCell.columnId, contextCell.value, 'include')
+            "
+          >
+            <!-- size="sm" matches the registry icons on the other items so the
+              labels line up; the glyph itself is inset because it fills its
+              viewBox edge-to-edge, unlike Material Symbols. -->
+            <template #icon-left>
+              <OIcon name="" size="sm">
+                <EqualIcon class="size-3" />
+              </OIcon>
+            </template>
+            {{ t("logs.cellActions.includeTerm") }}
+          </OContextMenuItem>
+
+          <OContextMenuItem
+            data-test="log-context-menu-exclude-term"
+            @select="
+              addSearchTerm(contextCell.columnId, contextCell.value, 'exclude')
+            "
+          >
+            <template #icon-left>
+              <OIcon name="" size="sm">
+                <NotEqualIcon class="size-3" />
+              </OIcon>
+            </template>
+            {{ t("logs.cellActions.excludeTerm") }}
+          </OContextMenuItem>
         </template>
-      </tbody>
-    </table>
+
+        <template v-if="aiEnabled">
+          <OContextMenuSeparator />
+          <OContextMenuItem
+            icon-left="auto-awesome"
+            data-test="log-context-menu-ai-value"
+            @select="sendToAiChat(JSON.stringify(contextCell.value))"
+          >
+            {{ t("logs.cellActions.sendValueToAi") }}
+          </OContextMenuItem>
+          <OContextMenuItem
+            icon-left="auto-awesome"
+            data-test="log-context-menu-ai-row"
+            @select="sendToAiChat(JSON.stringify(contextCell.row), true)"
+          >
+            {{ t("logs.cellActions.sendRowToAi") }}
+          </OContextMenuItem>
+        </template>
+      </template>
+    </OContextMenu>
   </div>
 </template>
 
@@ -510,14 +600,19 @@ import JsonPreview from "./JsonPreview.vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { VueDraggableNext as VueDraggable } from "vue-draggable-next";
-import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import { debounce } from "lodash-es";
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import config from "@/aws-exports";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OContextMenu from "@/lib/overlay/ContextMenu/OContextMenu.vue";
+import OContextMenuItem from "@/lib/overlay/ContextMenu/OContextMenuItem.vue";
+import OContextMenuLabel from "@/lib/overlay/ContextMenu/OContextMenuLabel.vue";
+import OContextMenuSeparator from "@/lib/overlay/ContextMenu/OContextMenuSeparator.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
 
 interface StreamField {
@@ -661,7 +756,31 @@ const selectedStreamFtsKeys: ComputedRef<string[] | []> = computed(() => {
 
 const isFunctionErrorOpen = ref(false);
 
-const activeCellActionId = ref("");
+// The cell the user last right-clicked — drives the context menu's contents.
+// Held as plain values (not the TanStack cell) so the menu keeps rendering
+// correctly even if the virtualizer recycles the row underneath it.
+interface ContextCell {
+  columnId: string;
+  value: unknown;
+  row: Record<string, unknown>;
+}
+
+const contextCell = ref<ContextCell | null>(null);
+
+const contextCellIsStreamField = computed(() => {
+  const columnId = contextCell.value?.columnId;
+  if (!columnId) return false;
+  return (
+    props.selectedStreamFields?.find((field) => field.name === columnId)
+      ?.isSchemaField ?? false
+  );
+});
+
+// Mirrors O2AIContextAddBtn's own gate — the AI actions only exist on
+// enterprise builds with AI turned on in the backend config.
+const aiEnabled = computed(
+  () => config.isEnterprise === "true" && !!store.state.zoConfig.ai_enabled,
+);
 
 const highlightQuery = computed(() => {
   return props.highlightQuery;
@@ -833,12 +952,8 @@ watch(
   () => [hasDefaultSourceColumn.value, props.wrap],
   () => {
     tableCellClass.value = [
-      hasDefaultSourceColumn.value && !props.wrap
-        ? "table-cell"
-        : "block",
-      !props.wrap
-        ? "overflow-hidden text-ellipsis whitespace-nowrap"
-        : "",
+      hasDefaultSourceColumn.value && !props.wrap ? "table-cell" : "block",
+      !props.wrap ? "overflow-hidden text-ellipsis whitespace-nowrap" : "",
       props.wrap ? "break-all" : "",
     ];
   },
@@ -879,12 +994,12 @@ const headers = computed<any[]>(() => headerGroups.value.headers);
 // Skeleton loading helpers — mirrors OTable shimmer pattern
 const SKEL_ROW_COUNT = 30;
 const SKEL_BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
-const SKEL_JITTER     = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
+const SKEL_JITTER = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
 // Timestamp column: pill sized to "2026-06-02 12:09:00.349" (23 chars × 7.2 px/char in monospace 12 px)
 const SKEL_TIMESTAMP_PX = Math.round("2026-06-02 12:09:00.349".length * 7.2);
 const skelCellWidth = (r: number, c: number): number => {
   const base = SKEL_BASE_WIDTHS[c % SKEL_BASE_WIDTHS.length] ?? 60;
-  const jit  = SKEL_JITTER[(r + c) % SKEL_JITTER.length] ?? 0;
+  const jit = SKEL_JITTER[(r + c) % SKEL_JITTER.length] ?? 0;
   return Math.max(25, Math.min(85, base + jit));
 };
 // Mirror the exact width/flex logic from real cells so the skeleton columns align perfectly.
@@ -892,13 +1007,13 @@ const skelCellWidth = (r: number, c: number): number => {
 // All other columns: fixed width from the CSS variable (same as real rows).
 const skelTdStyle = (header: any, c: number): Record<string, string> => {
   const colId = header.column.id;
-  const isStretchSource = colId === 'source' && !header.column.getCanResize();
-  if (isStretchSource) return { flex: '1 1 0', minWidth: '0' };
+  const isStretchSource = colId === "source" && !header.column.getCanResize();
+  if (isStretchSource) return { flex: "1 1 0", minWidth: "0" };
   const w = `calc(var(--col-${colId}-size) * 1px)`;
   if (!props.defaultColumns && c === headers.value.length - 1) {
-    return { flex: '1 1 auto', minWidth: w, width: 'auto', overflow: 'hidden' };
+    return { flex: "1 1 auto", minWidth: w, width: "auto", overflow: "hidden" };
   }
-  return { width: w, minWidth: w, flexShrink: '0' };
+  return { width: w, minWidth: w, flexShrink: "0" };
 };
 
 watch(
@@ -1177,25 +1292,39 @@ const handleRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
 const expandFunctionError = () => {
   isFunctionErrorOpen.value = !isFunctionErrorOpen.value;
 };
-// Specific function that updates the active cell action ID
-const updateActiveCell = (cell?: { id: string; column: { id: string } }) => {
-  if (!cell) {
-    activeCellActionId.value = "";
-  } else {
-    activeCellActionId.value = `${cell.id}_${cell.column.id}`;
+// Capture-phase gate on the whole table, so it runs before the per-cell handler
+// below. Only data cells offer actions — right-clicking a header or the
+// expanded JSON row would otherwise open an empty menu. reka-ui checks
+// `defaultPrevented` before opening, so preventing here suppresses it.
+const DATA_CELL_SELECTOR = "td[data-test^='log-table-column-']";
+
+const handleTableContextMenu = (event: MouseEvent) => {
+  contextCell.value = null;
+  const target = event.target;
+  if (!(target instanceof Element) || !target.closest?.(DATA_CELL_SELECTOR)) {
+    event.preventDefault();
   }
 };
 
-// Debounced version of the function
-const debounceCellAction = debounce(updateActiveCell, 250);
-
-// Event handlers for mouse over and mouse leave
-const handleCellMouseOver = (cell: { id: string; column: { id: string } }) => {
-  debounceCellAction(cell);
+// Records which cell the right-click landed on. Runs on the td, so it fires
+// before OContextMenu's own handler on the table (which defers a tick) — by the
+// time the menu renders, `contextCell` already describes the clicked cell.
+const handleCellContextMenu = (cell: {
+  column: { id: string };
+  row: { original: unknown };
+}) => {
+  const row = (cell.row.original ?? {}) as Record<string, unknown>;
+  contextCell.value = {
+    columnId: cell.column.id,
+    value: row[cell.column.id],
+    row,
+  };
 };
 
-const handleCellMouseLeave = () => {
-  activeCellActionId.value = "";
+// Drop the reference once the menu closes so a recycled virtual row can't be
+// held alive by a stale row object.
+const onContextMenuOpenChange = (open: boolean) => {
+  if (!open) contextCell.value = null;
 };
 
 const viewTrace = (row: any) => {
@@ -1291,11 +1420,6 @@ defineExpose({
   box-shadow: inset 0.1875rem 0 0 var(--color-accent) !important;
 }
 
-.table-row-hover:hover .ai-btn {
-  visibility: visible !important;
-  z-index: 2;
-}
-
 /* This "table" lays out entirely with flexbox + explicit column widths — it does
    not use native table column layout. Rendering table/thead/tbody as block boxes
    makes position:relative (the containing block for the position:absolute
@@ -1342,26 +1466,41 @@ defineExpose({
 .logs-skel-pill {
   background: linear-gradient(
     90deg,
-    var(--color-skeleton-base)      0%,
+    var(--color-skeleton-base) 0%,
     var(--color-skeleton-highlight) 50%,
-    var(--color-skeleton-base)      100%
+    var(--color-skeleton-base) 100%
   );
   background-size: 200% 100%;
   animation: logs-skel-shimmer 1.5s ease-in-out infinite;
 }
 
 @keyframes logs-skel-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes logs-skel-row-in {
-  from { opacity: 0; transform: translateY(0.125rem); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(0.125rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .logs-skel-row  { opacity: 1; animation: none; }
-  .logs-skel-pill { animation: none; }
+  .logs-skel-row {
+    opacity: 1;
+    animation: none;
+  }
+  .logs-skel-pill {
+    animation: none;
+  }
 }
 </style>
