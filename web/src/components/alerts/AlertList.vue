@@ -924,6 +924,7 @@ import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
+import useIncidents from "@/composables/useIncidents";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
 import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
 import {
@@ -1159,6 +1160,8 @@ export default defineComponent({
         store.state.zoConfig.anomaly_detection_enabled === true,
     );
 
+    const { isIncidentsEnabled } = useIncidents();
+
     // Initialize activeTab from URL query parameter, default to "all".
     // Prevent forcing anomalyDetection tab when the feature is not available.
     const rawTab = (router.currentRoute.value.query.tab as string) || "all";
@@ -1319,8 +1322,10 @@ export default defineComponent({
           sortable: true,
           style: "width: 150px",
         },
-        // Anomaly Detection columns — shown on anomalyDetection and all tabs
-        ...(activeTab.value === "anomalyDetection" || activeTab.value === "all"
+        // Anomaly Detection columns — shown on anomalyDetection and all tabs,
+        // and only when incidents are enabled.
+        ...(isIncidentsEnabled.value &&
+        (activeTab.value === "anomalyDetection" || activeTab.value === "all")
           ? [
               {
                 name: "last_trained_at",
