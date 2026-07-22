@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::db::{functions as db_functions, scheduler};
 use config::meta::{
     pipeline::{
         Pipeline, PipelineKind,
@@ -23,17 +24,15 @@ use config::meta::{
     triggers::{Trigger, TriggerModule},
 };
 
-use super::db::{
-    functions as db_functions,
-    pipeline::{self, PipelineError},
-    scheduler,
-};
+use self::store as pipeline;
+pub use self::store::PipelineError;
 use crate::common::{
     meta::authz::Authz,
     utils::auth::{remove_ownership, set_ownership},
 };
 
 pub mod batch_execution;
+pub mod store;
 
 /// Validates that no JavaScript functions are used in the pipeline.
 /// JavaScript functions are restricted from pipelines in ALL organizations (including _meta).

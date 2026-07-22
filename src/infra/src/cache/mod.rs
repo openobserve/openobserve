@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod bytes_cache;
+pub mod deleting_streams;
 pub mod file_data;
 pub mod file_downloader;
 pub mod meta;

@@ -101,7 +101,7 @@ pub async fn get_latest_sessions(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -666,7 +666,7 @@ pub async fn get_session_details(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -762,10 +762,11 @@ pub async fn get_session_details(
         stream_type,
     )
     .await;
-    let validated = match schema.as_ref() {
+    let (validated, session_id_columns) = match schema.as_ref() {
         Some(s) => match super::schema_compat::validate_llm_schema(s, &stream_name) {
             Ok(v) => {
-                if s.field_with_name(v.columns.session_id).is_err() {
+                let session_id_columns = traces::session::session_id_columns(s);
+                if session_id_columns.is_empty() {
                     return MetaHttpResponse::json(PaginatedResponse {
                         took: 0,
                         total: 0,
@@ -776,24 +777,20 @@ pub async fn get_session_details(
                         function_error: String::new(),
                     });
                 }
-                v
+                (v, session_id_columns)
             }
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         },
-        None => super::schema_compat::ValidatedLlmSchema::fallback(false),
+        None => {
+            let validated = super::schema_compat::ValidatedLlmSchema::fallback(false);
+            let session_id_columns = vec![validated.columns.session_id.to_string()];
+            (validated, session_id_columns)
+        }
     };
-    let session_id_col = validated.columns.session_id;
-    let safe_session_id = escape_sql_string(&session_id);
     let use_cache = get_use_cache_from_request(&query);
     let user_id_opt = Some(user_id.to_string());
 
-    let query_sql = format!(
-        "SELECT trace_id, min({TIMESTAMP_COL_NAME}) as zo_sql_timestamp \
-         FROM \"{stream_name}\" \
-         WHERE {session_id_col} = '{safe_session_id}' \
-         GROUP BY trace_id \
-         ORDER BY zo_sql_timestamp DESC"
-    );
+    let query_sql = traces::session::trace_ids_sql(&stream_name, &session_id_columns, &session_id);
 
     let mut req = config::meta::search::Request {
         query: config::meta::search::Query {
@@ -852,7 +849,7 @@ pub async fn get_session_details(
         }
     };
 
-    let trace_ids = trace_ids_from_hits(&resp_search.hits);
+    let trace_ids = traces::session::trace_ids_from_hits(&resp_search.hits);
     if trace_ids.is_empty() {
         return MetaHttpResponse::json(PaginatedResponse {
             took: 0,
@@ -973,7 +970,7 @@ async fn fetch_session_trace_hits(
     start_time: i64,
     end_time: i64,
 ) -> Result<Vec<SessionTraceResponseItem>, infra::errors::Error> {
-    let trace_ids_sql = trace_ids.join("','");
+    let trace_id_predicate = traces::session::trace_id_predicate(trace_ids);
     let service_key_expr = if has_infer {
         "COALESCE(infer_service_name, service_name)"
     } else {
@@ -984,7 +981,7 @@ async fn fetch_session_trace_hits(
         validated,
         has_ref_parent_id,
         service_key_expr,
-        &trace_ids_sql,
+        &trace_id_predicate,
     );
     req.query.from = 0;
     req.query.size = trace_ids.len() as i64;
@@ -1021,7 +1018,7 @@ async fn fetch_session_trace_hits(
     }
 
     if !multi_service_tids.is_empty() {
-        let multi_ids_str = multi_service_tids.join("','");
+        let multi_trace_id_predicate = traces::session::trace_id_predicate(&multi_service_tids);
         let svc_type_select = if has_infer {
             ", max(infer_service_type) AS service_type"
         } else {
@@ -1030,7 +1027,7 @@ async fn fetch_session_trace_hits(
         let svc_sql = format!(
             "SELECT trace_id, {service_key_expr} AS service_name{svc_type_select}, \
              count(*) AS svc_count, max(duration) AS svc_duration \
-             FROM \"{stream_name}\" WHERE trace_id IN ('{multi_ids_str}') \
+             FROM \"{stream_name}\" WHERE {multi_trace_id_predicate} \
              GROUP BY trace_id, {service_key_expr}"
         );
         req.query.sql = svc_sql;
@@ -1092,7 +1089,7 @@ fn build_session_trace_details_sql(
     validated: &super::schema_compat::ValidatedLlmSchema,
     has_ref_parent_id: bool,
     service_key_expr: &str,
-    trace_ids_sql: &str,
+    trace_id_predicate: &str,
 ) -> String {
     let (root_service_name_expr, root_operation_name_expr) = if has_ref_parent_id {
         (
@@ -1178,7 +1175,7 @@ fn build_session_trace_details_sql(
             {first_msg_clause} as gen_ai_input_messages, \
             {trace_selects} \
             FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
+            WHERE {trace_id_predicate} \
             GROUP BY trace_id"
         )
     } else {
@@ -1204,7 +1201,7 @@ fn build_session_trace_details_sql(
             {first_msg_clause} as gen_ai_input_messages, \
             {trace_selects} \
             FROM \"{stream_name}\" \
-            WHERE trace_id IN ('{trace_ids_sql}') \
+            WHERE {trace_id_predicate} \
             GROUP BY trace_id"
         )
     }
@@ -1335,33 +1332,6 @@ fn build_session_trace_response_item(
     };
 
     Some((tid, service_count, hit))
-}
-
-fn trace_ids_from_hits(hits: &[json::Value]) -> Vec<String> {
-    let mut seen = HashSet::with_capacity(hits.len());
-    let mut trace_ids = Vec::with_capacity(hits.len());
-    for item in hits {
-        let Some(tid) = item.get("trace_id").and_then(|v| v.as_str()) else {
-            continue;
-        };
-        let sanitized = sanitize_trace_id_for_sql(tid);
-        if sanitized.is_empty() || !seen.insert(sanitized.clone()) {
-            continue;
-        }
-        trace_ids.push(sanitized);
-    }
-    trace_ids
-}
-
-fn sanitize_trace_id_for_sql(trace_id: &str) -> String {
-    trace_id
-        .chars()
-        .filter(|c| c.is_ascii_hexdigit() || *c == '-')
-        .collect()
-}
-
-fn escape_sql_string(value: &str) -> String {
-    value.replace('\'', "''")
 }
 
 fn optional_sum_expr(has_field: bool, column: &str, alias: &str) -> String {
@@ -1640,10 +1610,10 @@ mod tests {
             &validated,
             true,
             "service_name",
-            "trace-1','trace-2",
+            "\"trace_id\" IN ('trace-1', 'trace-2')",
         );
 
-        assert!(sql.contains("WHERE trace_id IN ('trace-1','trace-2')"));
+        assert!(sql.contains("WHERE \"trace_id\" IN ('trace-1', 'trace-2')"));
         assert!(
             sql.contains("sum(CASE WHEN span_status = 'ERROR' THEN 1 ELSE 0 END) AS error_count")
         );
@@ -1681,14 +1651,17 @@ mod tests {
     }
 
     #[test]
-    fn trace_ids_from_hits_sanitizes_and_deduplicates() {
+    fn shared_trace_ids_from_hits_preserves_exact_ids_and_deduplicates() {
         let hits = vec![
             json!({"trace_id": "abc-123"}),
             json!({"trace_id": "abc-123"}),
             json!({"trace_id": "bad';drop"}),
         ];
 
-        assert_eq!(trace_ids_from_hits(&hits), vec!["abc-123", "badd"]);
+        assert_eq!(
+            traces::session::trace_ids_from_hits(&hits),
+            vec!["abc-123", "bad';drop"]
+        );
     }
 
     #[test]

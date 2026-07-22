@@ -1,0 +1,20 @@
+[package]
+name = "openobserve-cipher"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise"]
+
+[dependencies]
+hashbrown.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+parking_lot.workspace = true
+serde.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

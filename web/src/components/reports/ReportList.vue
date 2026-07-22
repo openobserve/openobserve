@@ -262,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         icon-left="delete"
                         variant="outline-destructive"
                         size="sm-action"
+                        :loading="bulkDeleteLoading"
                         @click="openBulkDeleteDialog"
                       >
                         {{ t('common.delete') }}
@@ -399,6 +400,7 @@ const deleteDialog = ref({
   data:    null as any, // { report_id, name }
 });
 const confirmBulkDelete = ref<boolean>(false);
+const bulkDeleteLoading = ref<boolean>(false);
 
 const columns = computed<OTableColumnDef[]>(() => {
   const base: OTableColumnDef[] = [
@@ -707,6 +709,7 @@ const deleteReport = () => {
 const openBulkDeleteDialog = () => { confirmBulkDelete.value = true; };
 
 const bulkDeleteReports = async () => {
+  bulkDeleteLoading.value = true;
   const dismiss = toast({ variant: "loading", message: "Deleting reports...", timeout: 0 });
   try {
     if (!selectedReports.value.length) {
@@ -744,6 +747,8 @@ const bulkDeleteReports = async () => {
     if (error.response?.status !== 403) {
       toast({ variant: "error", message: msg });
     }
+  } finally {
+    bulkDeleteLoading.value = false;
   }
   confirmBulkDelete.value = false;
 };

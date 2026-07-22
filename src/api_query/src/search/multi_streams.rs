@@ -36,6 +36,8 @@ use config::{
 use futures::stream::StreamExt;
 use hashbrown::HashMap;
 use infra::errors;
+#[cfg(feature = "enterprise")]
+use search_service::sql::visitor::cipher_key::get_cipher_key_names;
 use tokio::sync::mpsc;
 use tracing::{Instrument, Span};
 #[cfg(feature = "cloud")]
@@ -44,8 +46,6 @@ use {
     axum::http::StatusCode as AxumStatusCode,
 };
 
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 #[cfg(feature = "enterprise")]
 use crate::{common::meta::search::AuditContext, service::self_reporting::audit};
 use crate::{
@@ -1491,9 +1491,9 @@ pub async fn search_multi_stream(
     // the top-level query_fn for post-hoc application. When needs_post_vrl is false,
     // query_fn is already set on individual requests and this param is unused.
     tokio::spawn(process_search_stream_request_multi(
+        trace_id.clone(),
         org_id.clone(),
         user_id,
-        trace_id.clone(),
         queries,
         stream_type,
         http_span,

@@ -259,7 +259,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
         <OTab
-          v-if="isLLMSpan"
+          v-if="canPreviewSpan"
           name="preview"
           :label="t('traces.traceDetailsSidebar.preview')"
           data-test="trace-details-sidebar-tabs-preview"
@@ -341,7 +341,7 @@ grow
 class="h-full overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
         <OTabPanel
-          v-if="isLLMSpan"
+          v-if="canPreviewSpan"
           name="preview"
           class="llm-preview-panel p-3"
         >
@@ -375,8 +375,8 @@ class="h-full overflow-y-auto">
                       variant="outline"
                       size="icon"
                       :title="t('traces.traceDetailsSidebar.copyInput')"
-                      @click="copyContent(span.gen_ai_input_messages, 'input')"
-                      :disabled="!hasContent(span.gen_ai_input_messages)"
+                      @click="copyContent(previewInput, 'input')"
+                      :disabled="!hasContent(previewInput)"
                     >
                       <OIcon name="content-copy" size="xs" />
                     </OButton>
@@ -401,15 +401,15 @@ class="h-full overflow-y-auto">
                     </OCollapsible>
                   </div>
                   <div
-                    v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
+                    v-if="!hasContent(previewInput) && !parsedSystemInstructions"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
                     {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
-</div>
+                  </div>
                   <LLMContentRenderer
-                    v-if="hasContent(span.gen_ai_input_messages)"
-                    :content="span.gen_ai_input_messages"
-                    :observation-type="span.gen_ai_operation_name"
+                    v-if="hasContent(previewInput)"
+                    :content="previewInput"
+                    :observation-type="previewOperationName"
                     content-type="input"
                     :span="span"
                     view-mode="formatted"
@@ -442,8 +442,8 @@ class="h-full overflow-y-auto">
                       variant="outline"
                       size="icon"
                       :title="t('traces.traceDetailsSidebar.copyOutput')"
-                      @click="copyContent(span.gen_ai_output_messages, 'output')"
-                      :disabled="!hasContent(span.gen_ai_output_messages)"
+                      @click="copyContent(previewOutput, 'output')"
+                      :disabled="!hasContent(previewOutput)"
                     >
                       <OIcon name="content-copy" size="xs" />
                     </OButton>
@@ -451,15 +451,15 @@ class="h-full overflow-y-auto">
                 </div>
                 <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
                   <div
-                    v-if="!hasContent(span.gen_ai_output_messages)"
+                    v-if="!hasContent(previewOutput)"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
                     {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
-</div>
+                  </div>
                   <LLMContentRenderer
                     v-else
-                    :content="span.gen_ai_output_messages"
-                    :observation-type="span.gen_ai_operation_name"
+                    :content="previewOutput"
+                    :observation-type="previewOperationName"
                     content-type="output"
                     :span="span"
                     view-mode="formatted"
@@ -891,6 +891,7 @@ import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
 import {
+  hasTracePreview,
   isLLMTrace,
   parseUsageDetails,
   parseCostDetails,
@@ -1007,6 +1008,22 @@ export default defineComponent({
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
+    const canPreviewSpan = computed(() => hasTracePreview(props.span));
+    const previewInput = computed(
+      () =>
+        props.span?.gen_ai_input_messages ??
+        props.span?.attributes_prompt ??
+        "",
+    );
+    const previewOutput = computed(
+      () =>
+        props.span?.gen_ai_output_messages ??
+        props.span?.attributes_response ??
+        "",
+    );
+    const previewOperationName = computed(
+      () => props.span?.gen_ai_operation_name ?? "evaluator",
+    );
 
     const spanDetails: any = ref({
       attrs: {},
@@ -2079,6 +2096,10 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      canPreviewSpan,
+      previewInput,
+      previewOutput,
+      previewOperationName,
       hasDbSpan,
       llmMetrics,
       copyContent,

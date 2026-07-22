@@ -8,8 +8,11 @@ import { useLLMStreamQuery } from "@/plugins/traces/composables/useLLMStreamQuer
 import {
   buildEvaluatorAgentFilterWhere,
   buildScoresAgentFilterWhere,
+  combineWhere,
   type AgentFilterSelection,
 } from "../utils/agentFilterSql";
+import { latestScoresFromSql } from "../utils/latestScoreSql";
+import { scopeCountsFromRow, type ScopeCounts } from "../utils/qualityScope";
 
 export type TimeRangeKey = "last1h" | "last24h" | "last7d" | "last30d";
 
@@ -35,9 +38,9 @@ export function chooseBucketInterval(windowMs: number): string {
 
 export interface KpiCard {
   id:
-    | "evaluated"
+    | "scoreResults"
     | "evaluationCost"
-    | "jobSuccess"
+    | "scorerSuccess"
     | "scorerFailures"
     | "latencyP95";
   value: number | null;
@@ -46,10 +49,15 @@ export interface KpiCard {
   sparkline: number[];
   healthyDirection: HealthyDirection;
   format: "percent" | "currency" | "count" | "seconds";
+  /** Current-window result volume split by evaluated target scope. */
+  scopeCounts?: ScopeCounts;
 }
 
 interface ScoresAggRow {
-  evaluated_count?: number | string;
+  score_results?: number | string;
+  span_count?: number | string;
+  trace_count?: number | string;
+  session_count?: number | string;
 }
 
 interface EvaluatorAggRow {
@@ -62,7 +70,7 @@ interface EvaluatorAggRow {
 
 interface ScoresBucketRow {
   bucket?: string | number;
-  evaluated_c?: number | string;
+  score_results_c?: number | string;
 }
 
 interface EvaluatorBucketRow {
@@ -83,12 +91,12 @@ function toNumber(v: unknown): number | null {
 function emptyKpis(): KpiCard[] {
   return [
     {
-      id: "evaluated",
+      id: "scoreResults",
       value: null,
       prevValue: null,
       sparkline: [],
-      healthyDirection: "up",
-      format: "percent",
+      healthyDirection: "neutral",
+      format: "count",
     },
     {
       id: "evaluationCost",
@@ -99,7 +107,7 @@ function emptyKpis(): KpiCard[] {
       format: "currency",
     },
     {
-      id: "jobSuccess",
+      id: "scorerSuccess",
       value: null,
       prevValue: null,
       sparkline: [],
@@ -125,11 +133,9 @@ function emptyKpis(): KpiCard[] {
   ];
 }
 
-// Org-wide KPI aggregate over `_llm_scores`. Only the evaluated-spans count
-// is surfaced here — per-config unhealthy counts live on the table
-// in `useQualityScoreConfigs`. Scores are written per-span (each evaluated
-// span produces one row per scorer), so distinct span_id is the right unit
-// for "evaluated"; a single trace can have many evaluated spans.
+// Org-wide score-result aggregate. latestScoresFromSql() normalizes legacy
+// span/trace/session identity and removes superseded score versions before
+// this combined-scope count runs.
 function whereLines(whereClause: string | null): string[] {
   return whereClause ? [`WHERE ${whereClause}`] : [];
 }
@@ -137,9 +143,11 @@ function whereLines(whereClause: string | null): string[] {
 function scoresSql(whereClause: string | null): string {
   return [
     "SELECT",
-    "  COUNT(DISTINCT span_id) AS evaluated_count",
-    'FROM "_llm_scores"',
-    ...whereLines(whereClause),
+    "  COUNT(*) AS score_results,",
+    "  COUNT(CASE WHEN _target_scope = 'span' THEN 1 END) AS span_count,",
+    "  COUNT(CASE WHEN _target_scope = 'trace' THEN 1 END) AS trace_count,",
+    "  COUNT(CASE WHEN _target_scope = 'session' THEN 1 END) AS session_count",
+    `FROM ${latestScoresFromSql(whereClause)}`,
   ].join("\n");
 }
 
@@ -156,11 +164,11 @@ function scoresSql(whereClause: string | null): string {
 function evaluatorSql(whereClause: string | null): string {
   return [
     "SELECT",
-    "  COUNT(*) AS total_runs,",
+    "  COUNT(CASE WHEN attributes_status IN ('success', 'error', 'timeout') THEN 1 END) AS total_runs,",
     "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success_runs,",
     "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failure_runs,",
-    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms,",
-    "  SUM(gen_ai_usage_cost) AS total_cost_usd",
+    "  approx_percentile_cont(CASE WHEN attributes_status IN ('success', 'error', 'timeout') THEN TRY_CAST(attributes_latency_ms AS DOUBLE) END, 0.95) AS latency_p95_ms,",
+    "  SUM(CASE WHEN attributes_status IN ('success', 'error', 'timeout') THEN gen_ai_usage_cost END) AS total_cost_usd",
     'FROM "_evaluator"',
     ...whereLines(whereClause),
   ].join("\n");
@@ -170,13 +178,11 @@ function scoresSparklineSql(
   interval: string,
   whereClause: string | null,
 ): string {
-  // Same span-level rollup as scoresSql() — distinct span_id per bucket.
   return [
     "SELECT",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
-    "  COUNT(DISTINCT span_id) AS evaluated_c",
-    'FROM "_llm_scores"',
-    ...whereLines(whereClause),
+    "  COUNT(*) AS score_results_c",
+    `FROM ${latestScoresFromSql(whereClause)}`,
     "GROUP BY bucket",
     "ORDER BY bucket",
   ].join("\n");
@@ -189,11 +195,11 @@ function evaluatorSparklineSql(
   return [
     "SELECT",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
-    "  COUNT(*) AS total,",
+    "  COUNT(CASE WHEN attributes_status IN ('success', 'error', 'timeout') THEN 1 END) AS total,",
     "  COUNT(CASE WHEN attributes_status = 'success' THEN 1 END) AS success,",
     "  COUNT(CASE WHEN attributes_status IN ('error', 'timeout') THEN 1 END) AS failures,",
-    "  approx_percentile_cont(TRY_CAST(attributes_latency_ms AS DOUBLE), 0.95) AS latency_p95_ms,",
-    "  SUM(gen_ai_usage_cost) AS cost_usd",
+    "  approx_percentile_cont(CASE WHEN attributes_status IN ('success', 'error', 'timeout') THEN TRY_CAST(attributes_latency_ms AS DOUBLE) END, 0.95) AS latency_p95_ms,",
+    "  SUM(CASE WHEN attributes_status IN ('success', 'error', 'timeout') THEN gen_ai_usage_cost END) AS cost_usd",
     'FROM "_evaluator"',
     ...whereLines(whereClause),
     "GROUP BY bucket",
@@ -253,7 +259,10 @@ export function useQualityData(
       const windowMs = windowUs / 1000;
       const interval = chooseBucketInterval(windowMs);
       const selectedAgent = agentFilter?.value ?? null;
-      const scoresWhere = buildScoresAgentFilterWhere(selectedAgent);
+      const scoresWhere = combineWhere(
+        "score_config_id IS NOT NULL",
+        buildScoresAgentFilterWhere(selectedAgent),
+      );
       const evaluatorWhere = buildEvaluatorAgentFilterWhere(selectedAgent);
       const [
         scoresNow,
@@ -307,10 +316,10 @@ export function useQualityData(
         ),
       ]);
 
-      const evaluatedSpark = scoresSeries.map(
-        (r) => toNumber(r.evaluated_c) ?? 0,
+      const scoreResultsSpark = scoresSeries.map(
+        (r) => toNumber(r.score_results_c) ?? 0,
       );
-      const jobSuccessSpark = evalSeries.map((r) => {
+      const scorerSuccessSpark = evalSeries.map((r) => {
         const tot = toNumber(r.total) ?? 0;
         const ok = toNumber(r.success) ?? 0;
         return tot > 0 ? (ok / tot) * 100 : 0;
@@ -322,19 +331,19 @@ export function useQualityData(
       });
       const costSpark = evalSeries.map((r) => toNumber(r.cost_usd) ?? 0);
 
-      const evaluatedNow = toNumber(scoresNow?.evaluated_count);
-      const evaluatedPrev = toNumber(scoresPrev?.evaluated_count);
+      const scoreResultsNow = toNumber(scoresNow?.score_results);
+      const scoreResultsPrev = toNumber(scoresPrev?.score_results);
 
       const totalNow = toNumber(evalNow?.total_runs);
       const successNow = toNumber(evalNow?.success_runs);
       const totalPrev = toNumber(evalPrev?.total_runs);
       const successPrev = toNumber(evalPrev?.success_runs);
 
-      const jobSuccessNow =
+      const scorerSuccessNow =
         totalNow && totalNow > 0 && successNow != null
           ? (successNow / totalNow) * 100
           : null;
-      const jobSuccessPrev =
+      const scorerSuccessPrev =
         totalPrev && totalPrev > 0 && successPrev != null
           ? (successPrev / totalPrev) * 100
           : null;
@@ -347,12 +356,13 @@ export function useQualityData(
 
       kpis.value = [
         {
-          id: "evaluated",
-          value: evaluatedNow,
-          prevValue: evaluatedPrev,
-          sparkline: evaluatedSpark,
-          healthyDirection: "up",
+          id: "scoreResults",
+          value: scoreResultsNow,
+          prevValue: scoreResultsPrev,
+          sparkline: scoreResultsSpark,
+          healthyDirection: "neutral",
           format: "count",
+          scopeCounts: scoresNow ? scopeCountsFromRow(scoresNow) : undefined,
         },
         {
           // Total USD spent by the evaluator (LLM-judge scorer calls) over
@@ -368,10 +378,10 @@ export function useQualityData(
           format: "currency",
         },
         {
-          id: "jobSuccess",
-          value: jobSuccessNow,
-          prevValue: jobSuccessPrev,
-          sparkline: jobSuccessSpark,
+          id: "scorerSuccess",
+          value: scorerSuccessNow,
+          prevValue: scorerSuccessPrev,
+          sparkline: scorerSuccessSpark,
           healthyDirection: "up",
           format: "percent",
         },

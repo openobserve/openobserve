@@ -167,6 +167,25 @@ pub struct MemoryAckHandle {
 }
 
 impl MemoryAckHandle {
+    /// Extend the visibility deadline for the current delivery attempt.
+    pub(crate) fn progress(&self) {
+        if self.acked.load(Ordering::SeqCst) {
+            return;
+        }
+        let Some(shared) = self.shared.upgrade() else {
+            return;
+        };
+        let mut inner = shared.lock_inner();
+        let Some(topic) = inner.topics.get_mut(self.topic.as_ref()) else {
+            return;
+        };
+        if let Some(in_flight) = topic.in_flight.get_mut(&self.sequence)
+            && in_flight.token == self.token
+        {
+            in_flight.delivered_at = Instant::now();
+        }
+    }
+
     /// Idempotent: a second ack, or an ack racing with expiration, timeout
     /// redelivery, or topic removal, is a successful no-op.
     pub(crate) fn ack(&self) {
@@ -803,6 +822,40 @@ mod tests {
         // an acked message is never redelivered
         expect_empty(&mut rx).await;
         assert_eq!(q.used_bytes(), topic_overhead(TOPIC));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_progress_extends_visibility_timeout() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        q.publish(TOPIC, Bytes::from_static(b"x")).await.unwrap();
+        let mut rx = take_receiver(q.consume(TOPIC, None).await.unwrap());
+        let first = recv_one(&mut rx).await;
+
+        tokio::time::sleep(VISIBILITY_TIMEOUT - Duration::from_secs(1)).await;
+        first.progress().await.unwrap();
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        expect_empty(&mut rx).await;
+
+        tokio::time::sleep(VISIBILITY_TIMEOUT).await;
+        let second = recv_one(&mut rx).await;
+        assert_eq!(second.message().as_ref(), b"x");
+        second.ack().await.unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn test_double_ack_completes_message() {
+        let q = MemoryQueue::new(1024 * 1024);
+        q.create(TOPIC).await.unwrap();
+        q.publish(TOPIC, Bytes::from_static(b"x")).await.unwrap();
+        let mut rx = take_receiver(q.consume(TOPIC, None).await.unwrap());
+        let msg = recv_one(&mut rx).await;
+
+        msg.double_ack().await.unwrap();
+
+        assert_eq!(q.used_bytes(), topic_overhead(TOPIC));
+        drop(msg);
+        expect_empty(&mut rx).await;
     }
 
     #[tokio::test(start_paused = true)]

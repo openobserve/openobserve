@@ -799,7 +799,7 @@ async fn merge_files(
     .await;
 
     // clear session data
-    crate::service::search::datafusion::storage::file_list::clear(&trace_id);
+    search_service::datafusion::storage::file_list::clear(&trace_id);
 
     let buf = match merge_result {
         Ok(v) => v,

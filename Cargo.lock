@@ -914,6 +914,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "audit"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "config",
+ "log",
+ "o2_enterprise",
+ "proto",
+ "tokio",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3596,6 +3609,43 @@ name = "datasketches"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46c4cf71a36b46dcfc00e5014c0c20ccad2b1b6a008304d7d57d2749b2d41b3d"
+
+[[package]]
+name = "db"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "cron",
+ "dashmap",
+ "hashbrown 0.16.1",
+ "hashlink 0.11.0",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "o2_openfga",
+ "openobserve-cipher",
+ "parquet",
+ "proto",
+ "rayon",
+ "regex",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "svix-ksuid",
+ "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tracing",
+ "transform",
+]
 
 [[package]]
 name = "dbl"
@@ -6741,6 +6791,7 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "sea-orm",
+ "search_service",
  "segment",
  "serde",
  "serde_json",
@@ -6827,6 +6878,7 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-api-management",
  "openobserve-api-query",
+ "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
  "opentelemetry",
@@ -6840,6 +6892,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.2",
  "rust-embed-for-web",
+ "search_service",
  "serde",
  "serde_json",
  "snap",
@@ -6929,6 +6982,7 @@ dependencies = [
  "openobserve-core",
  "promql-parser",
  "proto",
+ "search_service",
  "serde",
  "serde_json",
  "tokio",
@@ -6936,6 +6990,18 @@ dependencies = [
  "tower",
  "tracing",
  "transform",
+ "utoipa",
+]
+
+[[package]]
+name = "openobserve-cipher"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.16.1",
+ "o2_enterprise",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
  "utoipa",
 ]
 
@@ -6949,6 +7015,7 @@ dependencies = [
  "arrow-schema",
  "async-recursion",
  "async-trait",
+ "audit",
  "aws-config",
  "aws-credential-types",
  "aws-sdk-sns",
@@ -6965,6 +7032,7 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
+ "db",
  "expect-test",
  "flate2",
  "flight",
@@ -7006,6 +7074,7 @@ dependencies = [
  "rustls-native-certs",
  "sea-orm",
  "search",
+ "search_service",
  "serde",
  "serde_json",
  "snap",
@@ -7023,6 +7092,7 @@ dependencies = [
  "tracing-opentelemetry",
  "transform",
  "url",
+ "usage_reporting",
  "utoipa",
  "version-compare",
  "vortex",
@@ -7056,6 +7126,7 @@ dependencies = [
  "regex",
  "report_server",
  "reqwest 0.13.2",
+ "search_service",
  "serde_json",
  "tokio",
  "tonic",
@@ -9651,6 +9722,7 @@ dependencies = [
  "memchr",
  "o2_enterprise",
  "object_store",
+ "openobserve-cipher",
  "opentelemetry",
  "parking_lot 0.12.5",
  "parquet",
@@ -9676,6 +9748,51 @@ dependencies = [
  "utoipa",
  "vortex",
  "vortex-datafusion",
+]
+
+[[package]]
+name = "search_service"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "arrow-schema",
+ "async-recursion",
+ "audit",
+ "bytes",
+ "chrono",
+ "common",
+ "config",
+ "datafusion",
+ "datafusion-functions-json",
+ "datafusion-proto",
+ "db",
+ "expect-test",
+ "flight",
+ "float-cmp",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "opentelemetry",
+ "parking_lot 0.12.5",
+ "parquet",
+ "proto",
+ "rand 0.10.1",
+ "rayon",
+ "search",
+ "serde_json",
+ "sqlparser",
+ "svix-ksuid",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "transform",
+ "usage_reporting",
+ "wal",
 ]
 
 [[package]]
@@ -11746,6 +11863,17 @@ name = "urlencoding"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
+
+[[package]]
+name = "usage_reporting"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "config",
+ "log",
+ "tokio",
+]
 
 [[package]]
 name = "utf-8"

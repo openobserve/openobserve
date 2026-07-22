@@ -33,6 +33,8 @@ exceptions = [
     { name = "transform", allow = ["AGPL-3.0"] },
     { name = "super_cluster_queue", allow = ["AGPL-3.0"] },
     { name = "search", allow = ["AGPL-3.0"] },
+    { name = "openobserve-cipher", allow = ["AGPL-3.0"] },
+    { name = "db", allow = ["AGPL-3.0"] },
     { name = "promql", allow = ["AGPL-3.0"] },
     # Empty dependency-resolution stubs for the private enterprise crates.
     { name = "o2_dex", allow = ["AGPL-3.0"] },

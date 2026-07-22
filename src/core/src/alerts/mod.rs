@@ -511,7 +511,13 @@ impl QueryConditionExt for QueryCondition {
             records.len()
         );
         eval_results.query_took = Some(resp.took as i64);
-        eval_results.data = if self.search_event_type.is_none() {
+        // Apply the threshold when the search event type is unset or explicitly
+        // set to `Alerts`. Any other search event type bypasses the threshold.
+        let apply_threshold = match self.search_event_type {
+            None => true,
+            Some(search_event_type) => search_event_type == SearchEventType::Alerts,
+        };
+        eval_results.data = if apply_threshold {
             let threshold = trigger_condition.threshold as usize;
             match trigger_condition.operator {
                 Operator::EqualTo => (records.len() == threshold).then_some(records),

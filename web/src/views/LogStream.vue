@@ -635,7 +635,38 @@ export default defineComponent({
       confirmBatchDelete.value = true;
     };
 
+    // Prune deleted streams locally; re-fetch is racy (list is async-cached).
+    const removeStreamsFromTable = (
+      items: { name: string; stream_type: string }[],
+    ) => {
+      if (!items.length) return;
+
+      const removedKeys = new Set(
+        items.map((s) => `${s.name}-${s.stream_type}`),
+      );
+
+      // Prune the table first so the UI updates even if cache eviction fails.
+      const before = logStream.value.length;
+      logStream.value = logStream.value.filter(
+        (s: any) => !removedKeys.has(s._rowKey),
+      );
+      duplicateStreamList.value = duplicateStreamList.value.filter(
+        (s: any) => !removedKeys.has(s._rowKey),
+      );
+
+      const removedCount = before - logStream.value.length;
+      totalCount.value = Math.max(0, totalCount.value - removedCount);
+      resultTotal.value = logStream.value.length;
+
+      selectedIds.value = [];
+
+      items.forEach((stream) => {
+        removeStream(stream.name, stream.stream_type);
+      });
+    };
+
     const deleteStream = () => {
+      isDeleting.value = true;
       streamService
         .delete(
           store.state.selectedOrganization.identifier,
@@ -649,9 +680,9 @@ export default defineComponent({
               message: "Stream deleted successfully.",
               variant: "success",
             });
-            removeStream(deleteStreamName, deleteStreamType);
-            selectedIds.value = [];
-            getLogStream();
+            removeStreamsFromTable([
+              { name: deleteStreamName, stream_type: deleteStreamType },
+            ]);
           }
         })
         .catch((err: any) => {
@@ -664,6 +695,7 @@ export default defineComponent({
         })
         .finally(() => {
           deleteAssociatedAlertsPipelines.value = true;
+          isDeleting.value = false;
         });
     };
     const deleteBatchStream = () => {
@@ -705,13 +737,7 @@ export default defineComponent({
             });
           }
 
-          // Remove deleted streams from the list
-          items.forEach((stream: any) => {
-            removeStream(stream.name, stream.stream_type);
-          });
-
-          selectedIds.value = [];
-          getLogStream();
+          removeStreamsFromTable(items);
         })
         .catch((error) => {
           if (error.response.status != 403) {

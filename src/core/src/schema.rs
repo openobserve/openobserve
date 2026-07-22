@@ -50,6 +50,7 @@ use infra::schema::{
 use serde_json::{Map, Value};
 
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
+pub use crate::schema_watcher::watch;
 use crate::{
     common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
     service::db,
