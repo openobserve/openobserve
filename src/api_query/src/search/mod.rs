@@ -496,14 +496,14 @@ pub async fn search(
         .as_ref()
         .is_some_and(|o| o.mode == AgentSearchMode::Partition);
     let res = if use_partition_mode {
-        search_partition_mode(
+        SearchService::streaming::collect::search_partition_mode(
             &org_id,
             user_id,
             &trace_id,
             &mut req,
             stream_type,
             stream_names,
-            &url_query,
+            get_fallback_order_by_col_from_request(&url_query),
             range_error,
             http_span,
             is_multi_stream_search,
@@ -562,64 +562,6 @@ pub async fn search(
             error_utils::map_error_to_http_response(&err, Some(trace_id))
         }
     }
-}
-
-/// `agent_options.mode = partition`: run the partitioned streaming pipeline
-/// (the SSE-era backend partition loop) and collect it into a single
-/// response. See `streaming::collect` for the fold semantics.
-#[allow(clippy::too_many_arguments)]
-async fn search_partition_mode(
-    org_id: &str,
-    user_id: &str,
-    trace_id: &str,
-    req: &mut Request,
-    stream_type: StreamType,
-    stream_names: Vec<String>,
-    url_query: &HashMap<String, String>,
-    range_error: String,
-    http_span: Span,
-    is_multi_stream_search: bool,
-) -> Result<config::meta::search::Response, infra::errors::Error> {
-    // the partition loop requires a populated search_type
-    if req.search_type.is_none() {
-        req.search_type = Some(SearchEventType::Other);
-    }
-
-    // partition scan direction follows the query's ORDER BY
-    let sql = crate::service::search::sql::Sql::new(
-        &req.query.clone().into(),
-        org_id,
-        stream_type,
-        req.search_type,
-    )
-    .await?;
-    let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
-    let fallback_order_by_col = get_fallback_order_by_col_from_request(url_query);
-
-    let mut res = SearchService::streaming::collect::search_stream_collect(
-        org_id,
-        user_id,
-        trace_id,
-        req.clone(),
-        stream_type,
-        stream_names,
-        req_order_by,
-        fallback_order_by_col,
-        http_span,
-        is_multi_stream_search,
-    )
-    .await?;
-
-    // attach the range-clamp note the same way the cache path does
-    if !range_error.is_empty() {
-        res.is_partial = true;
-        res.new_start_time = Some(req.query.start_time);
-        res.new_end_time = Some(req.query.end_time);
-        if !res.function_error.contains(&range_error) {
-            res.function_error.push(range_error);
-        }
-    }
-    Ok(res)
 }
 
 /// SearchAround

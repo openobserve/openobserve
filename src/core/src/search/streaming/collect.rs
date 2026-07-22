@@ -21,7 +21,7 @@
 //! request (client disconnect) does not keep scanning.
 
 use config::meta::{
-    search::{Request, Response, StreamResponses},
+    search::{Request, Response, SearchEventType, StreamResponses},
     sql::OrderBy,
     stream::StreamType,
 };
@@ -33,8 +33,64 @@ use super::process_search_stream_request;
 /// event per partition; the consumer only folds, so a small buffer suffices.
 const EVENT_CHANNEL_SIZE: usize = 100;
 
+/// Entry point for `agent_options.mode = partition`: run the partitioned
+/// streaming pipeline and return the folded single response.
 #[allow(clippy::too_many_arguments)]
-pub async fn search_stream_collect(
+pub async fn search_partition_mode(
+    org_id: &str,
+    user_id: &str,
+    trace_id: &str,
+    req: &mut Request,
+    stream_type: StreamType,
+    stream_names: Vec<String>,
+    fallback_order_by_col: Option<String>,
+    range_error: String,
+    http_span: tracing::Span,
+    is_multi_stream_search: bool,
+) -> Result<Response, infra::errors::Error> {
+    // the partition loop requires a populated search_type
+    if req.search_type.is_none() {
+        req.search_type = Some(SearchEventType::Other);
+    }
+
+    // partition scan direction follows the query's ORDER BY
+    let sql = crate::service::search::sql::Sql::new(
+        &req.query.clone().into(),
+        org_id,
+        stream_type,
+        req.search_type,
+    )
+    .await?;
+    let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
+
+    let mut res = search_stream_collect(
+        org_id,
+        user_id,
+        trace_id,
+        req.clone(),
+        stream_type,
+        stream_names,
+        req_order_by,
+        fallback_order_by_col,
+        http_span,
+        is_multi_stream_search,
+    )
+    .await?;
+
+    // attach the range-clamp note the same way the cache path does
+    if !range_error.is_empty() {
+        res.is_partial = true;
+        res.new_start_time = Some(req.query.start_time);
+        res.new_end_time = Some(req.query.end_time);
+        if !res.function_error.contains(&range_error) {
+            res.function_error.push(range_error);
+        }
+    }
+    Ok(res)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn search_stream_collect(
     org_id: &str,
     user_id: &str,
     trace_id: &str,
