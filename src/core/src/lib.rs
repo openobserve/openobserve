@@ -84,6 +84,7 @@ pub mod sourcemaps;
 pub mod stream;
 pub mod stream_utils;
 pub mod synthetics;
+pub mod system_settings;
 pub mod tantivy;
 pub mod tls;
 pub mod traces;

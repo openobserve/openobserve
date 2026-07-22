@@ -63,7 +63,7 @@ pub async fn process_agent_signals_stream(
     // → embedded fallback), not a hardcoded set. Keep ONLY the configured columns
     // that actually exist on this stream — referencing a missing column is a hard
     // search error, so the SQL must COALESCE existing columns only.
-    let taxonomy = crate::service::db::system_settings::get_agent_signals_taxonomy(org_id).await;
+    let taxonomy = crate::service::system_settings::get_agent_signals_taxonomy(org_id).await;
     let detail_fields: Vec<String> = taxonomy
         .error_detail_fields
         .iter()

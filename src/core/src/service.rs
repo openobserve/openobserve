@@ -24,8 +24,8 @@ pub use crate::{
     enrichment_table, file_downloader, file_list, file_list_dump, folders, functions, github, grpc,
     http, ingestion, ingestion_tokens, ingestion_types, kv, logs, metadata, metrics, model_pricing,
     node, org_cleanup, organization, pipeline, promql, runtime_metrics, schema, search,
-    self_reporting, session, short_url, sourcemaps, stream, stream_utils, synthetics, tantivy, tls,
-    traces, users,
+    self_reporting, session, short_url, sourcemaps, stream, stream_utils, synthetics,
+    system_settings, tantivy, tls, traces, users,
 };
 #[cfg(feature = "enterprise")]
 pub use crate::{
