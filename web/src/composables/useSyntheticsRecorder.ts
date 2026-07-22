@@ -51,7 +51,7 @@ const useSyntheticsRecorder = () => {
   // ---- Bridge transport ----
 
   const BRIDGE_CHANNEL = 'oo-bridge';
-  const COMMAND_TIMEOUT_MS = 5000;
+  const COMMAND_TIMEOUT_MS = 20000;
 
   let nonceCounter = 0;
   function nextNonce(): string {
@@ -77,6 +77,7 @@ const useSyntheticsRecorder = () => {
     // click after mid-session install). Auto-trigger detection.
     if (event.data?.ch === 'oo-bridge-ready') {
       detectExtension().then((installed: boolean) => {
+        console.log("IS INstalled ---", installed);
         if (installed) onAutoDetected?.();
       }).catch(() => {});
       return;
@@ -97,6 +98,9 @@ const useSyntheticsRecorder = () => {
     if (nonce && pendingCommands.has(nonce)) {
       const resolve = pendingCommands.get(nonce)!;
       pendingCommands.delete(nonce);
+      // Content script unwraps synthetics-response → forwards msg.response.
+      // msg?.response is only set when the content script passes through
+      // a not-fully-unwrapped envelope; normally msg IS the response object.
       resolve(msg?.response ?? msg);
       return;
     }
@@ -231,6 +235,12 @@ const useSyntheticsRecorder = () => {
     currentUrl.value = targetUrl
     mode.value = 'recording'
 
+    // Ensure bridge is alive — the port may have died since detectExtension()
+    // ran (SW suspend, tab backgrounding, etc.). Sending the probe re-activates
+    // the bridge before we send the startRecording command.
+    window.postMessage({ ch: 'oo-bridge-probe' }, '*');
+    await new Promise(r => setTimeout(r, 200));
+
     bridgeConnect()
     bridgeDisconnectHandler = () => {
       if (onExternalStop && isRecording.value) {
@@ -239,7 +249,6 @@ const useSyntheticsRecorder = () => {
       isRecording.value = false
     }
 
-    console.log("Start Recording -----");
     const res = await sendCommand<RecorderStartResponse>({ action: 'startRecording', targetUrl })
     if (!res?.success) {
       console.debug("Disconnect ---", res);
