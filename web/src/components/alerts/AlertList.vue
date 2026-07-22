@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      while loading) so data arriving never shifts the layout. -->
                 <template #subheader>
                   <div
-                    class="px-page-edge pt-3 pb-3 border-b border-table-row-divider"
+                    class="px-page-edge py-1.5 border-b border-table-row-divider"
                     data-test="alert-list-summary"
                   >
                     <OStatStrip

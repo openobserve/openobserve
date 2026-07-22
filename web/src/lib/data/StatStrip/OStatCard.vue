@@ -82,11 +82,15 @@ const isMuted = computed(() => {
   const v = props.value;
   return v === 0 || v === "0" || v === "" || v == null || v === "—";
 });
-// Proportion-bar fill %, or null when there's no meaningful bar to draw.
+// Proportion-bar fill %. The track is ALWAYS rendered (so height never shifts as
+// data loads); only the fill width changes:
+//   empty / "—" / 0  → 0% (empty track)
+//   value, no max    → 100% (a full line, e.g. the Total tile)
+//   value with max   → its share of the total
 const pct = computed(() => {
-  if (props.max == null || props.max <= 0) return null;
+  if (isMuted.value) return 0;
   const v = Number(props.value);
-  if (!Number.isFinite(v)) return null;
+  if (props.max == null || props.max <= 0 || !Number.isFinite(v)) return 100;
   return Math.max(0, Math.min(100, (v / props.max) * 100));
 });
 const trendArrow = computed(() =>
@@ -107,7 +111,7 @@ const trendClass = computed(() =>
   <component
     :is="clickable ? 'button' : 'div'"
     :type="clickable ? 'button' : undefined"
-    class="flex flex-col justify-center gap-2.5 rounded-default border bg-surface-base px-4 py-3 min-w-0 text-left transition-colors"
+    class="flex flex-col justify-center gap-1.5 rounded-default border bg-surface-base px-4 py-1.5 min-w-0 text-left transition-colors"
     :class="[
       selected ? 'border-accent' : 'border-border-default',
       clickable ? 'cursor-pointer' : '',
@@ -115,31 +119,27 @@ const trendClass = computed(() =>
     ]"
     :data-test="dataTest"
   >
-    <div class="flex items-start justify-between gap-3 min-w-0">
-      <div class="min-w-0">
-        <div class="flex items-baseline gap-1.5 min-w-0">
-          <span
-            class="text-3xl font-semibold leading-none truncate"
-            :class="isMuted ? 'text-text-muted' : tc.value"
-          >
-            <slot name="value">{{ displayValue }}</slot>
-          </span>
-          <span
-            v-if="trend"
-            class="shrink-0 text-2xs font-semibold"
-            :class="trendClass"
-          >{{ trendArrow }} {{ trend.label }}</span>
-        </div>
-        <div
-          v-if="label"
-          class="mt-2 truncate text-xs font-medium text-text-secondary"
+    <div class="flex items-center justify-between gap-2 min-w-0">
+      <div class="flex items-baseline gap-1.5 min-w-0">
+        <span
+          class="text-2xl font-semibold leading-none truncate"
+          :class="isMuted ? 'text-text-muted' : tc.value"
         >
-          {{ label }}
-        </div>
+          <slot name="value">{{ displayValue }}</slot>
+        </span>
+        <span
+          v-if="label"
+          class="truncate text-xs font-medium text-text-secondary"
+        >{{ label }}</span>
+        <span
+          v-if="trend"
+          class="shrink-0 text-2xs font-semibold"
+          :class="trendClass"
+        >{{ trendArrow }} {{ trend.label }}</span>
       </div>
       <span
         v-if="icon || slots.icon"
-        class="w-10 h-10 shrink-0 grid place-items-center rounded-full"
+        class="w-8 h-8 shrink-0 grid place-items-center rounded-full"
         :class="tc.chip"
       >
         <slot name="icon">
@@ -147,10 +147,9 @@ const trendClass = computed(() =>
         </slot>
       </span>
     </div>
-    <div
-      v-if="pct !== null"
-      class="h-1 rounded-full bg-surface-subtle overflow-hidden"
-    >
+    <!-- Track is always rendered so the card height never shifts as data loads;
+         only the fill width changes. -->
+    <div class="h-1 rounded-full bg-surface-subtle overflow-hidden">
       <div
         class="h-full rounded-full transition-all duration-300"
         :class="tc.bar"
