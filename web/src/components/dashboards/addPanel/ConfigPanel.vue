@@ -28,25 +28,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div v-else class="pb-8">
-    <!-- Search bar -->
+    <!-- Search bar (sticky; h-11 matches the config section headers' sticky top) -->
     <div
-      class="sticky p-1 top-0 z-20 bg-card-glass-solid"
+      class="sticky top-0 z-20 flex h-11 items-center gap-1 px-2 bg-card-glass-solid"
       data-test="dashboard-config-search-wrapper"
     >
-      <div class="flex flex-nowrap items-center gap-1">
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click="toggleAllSections"
-          data-test="dashboard-config-toggle-all-sections-btn"
-        >
-          <template #icon-left><OIcon
-              :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
-              size="sm"
-          /></template>
-        </OButton>
-        <ConfigPanelSearch v-model="searchQuery" />
-      </div>
+      <ConfigPanelSearch v-model="searchQuery" class="flex-1 min-w-0" />
+      <OButton
+        variant="ghost"
+        size="icon"
+        @click="toggleAllSections"
+        data-test="dashboard-config-toggle-all-sections-btn"
+        :aria-label="
+          allSectionsExpanded
+            ? t('dashboard.collapseAllSections')
+            : t('dashboard.expandAllSections')
+        "
+      >
+        <template #icon-left><OIcon
+            :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
+            size="sm"
+        /></template>
+        <OTooltip
+          :content="
+            allSectionsExpanded
+              ? t('dashboard.collapseAllSections')
+              : t('dashboard.expandAllSections')
+          "
+        />
+      </OButton>
     </div>
 
     <!-- No results empty state -->
@@ -63,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: General -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('general')"
       :model-value="isExpanded('general')"
       :icon="SECTION_ICONS.general"
@@ -196,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: PromQL Table Configuration -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="promqlMode && dashboardPanelData.data.type === 'table'"
       v-show="isSectionVisible('promqlTable')"
       :model-value="isExpanded('promqlTable')"
@@ -219,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Geographic Configuration -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="
         promqlMode &&
         (dashboardPanelData.data.type === 'geomap' ||
@@ -243,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Legend -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('legend')"
       :model-value="isExpanded('legend')"
       :icon="SECTION_ICONS.legend"
@@ -471,7 +481,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Data -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('data')"
       :model-value="isExpanded('data')"
       :icon="SECTION_ICONS.data"
@@ -716,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Axis -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('axis')"
       :model-value="isExpanded('axis')"
       :icon="SECTION_ICONS.axis"
@@ -819,7 +829,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Labels -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('labels')"
       :model-value="isExpanded('labels')"
       :icon="SECTION_ICONS.labels"
@@ -932,7 +942,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Line Style -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('lineStyle')"
       :model-value="isExpanded('lineStyle')"
       :icon="SECTION_ICONS.lineStyle"
@@ -993,7 +1003,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Table -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('table')"
       :model-value="isExpanded('table')"
@@ -1075,7 +1085,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Pivot Table -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('pivotTable')"
       :model-value="isExpanded('pivotTable')"
       :icon="SECTION_ICONS.pivotTable"
@@ -1196,7 +1206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Value Transformations -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
@@ -1225,7 +1235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Field Overrides -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('fieldOverrides')"
       :model-value="isExpanded('fieldOverrides')"
@@ -1257,7 +1267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Map -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="
         dashboardPanelData.data.type == 'geomap' ||
         dashboardPanelData.data.type == 'maps'
@@ -1450,7 +1460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Gauge -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type === 'gauge'"
       v-show="isSectionVisible('gauge')"
       :model-value="isExpanded('gauge')"
@@ -1516,7 +1526,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Layout -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="showTrellisConfig"
       v-show="isSectionVisible('layout')"
       :model-value="isExpanded('layout')"
@@ -1646,7 +1656,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Colors -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="showColorPalette"
       v-show="isSectionVisible('colors')"
       :model-value="isExpanded('colors')"
@@ -1667,7 +1677,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Drilldown -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey)"
       v-show="isSectionVisible('drilldown')"
       :model-value="isExpanded('drilldown')"
@@ -1700,7 +1710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Comparison -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="
         shouldShowTimeShift(
           dashboardPanelData,
@@ -1773,7 +1783,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Mark Lines -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
       v-show="isSectionVisible('markLines')"
       :model-value="isExpanded('markLines')"
@@ -1806,7 +1816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Background -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'metric'"
       v-show="isSectionVisible('background')"
       :model-value="isExpanded('background')"
@@ -1836,7 +1846,15 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
-import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  nextTick,
+  onBeforeMount,
+  onMounted,
+  ref,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -2632,6 +2650,17 @@ export default defineComponent({
       showColorPalette,
       isPivotMode,
     );
+
+    // Focus the search box when the config panel opens so users can start
+    // filtering settings right away.
+    onMounted(() => {
+      nextTick(() => {
+        const searchInput = document.getElementById(
+          "dashboard-config-panel-search-input",
+        ) as HTMLInputElement | null;
+        searchInput?.focus();
+      });
+    });
 
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {

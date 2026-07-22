@@ -95,30 +95,31 @@ watch(
     <!-- Trigger -->
     <CollapsibleTrigger
       :class="[
-        'group w-full flex items-center gap-2 text-start cursor-pointer select-none',
+        'w-full flex items-center gap-2 text-start cursor-pointer select-none',
         'transition-colors duration-150 outline-none',
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
         'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
-        variant === 'sidebar'
+        variant === 'config'
           ? [
-              'px-3 py-0 min-h-9 rounded-none',
+              'group px-3 py-0 min-h-9 rounded-none',
+              'sticky top-11 z-10 bg-surface-panel',
               'border-l-2 border-l-transparent',
               'data-[state=open]:bg-collapsible-trigger-open-bg',
               'data-[state=open]:border-l-collapsible-open-accent',
             ]
-          : 'px-2 py-2 rounded-default',
+          : variant === 'sidebar'
+            ? 'px-3 py-0 min-h-9 rounded-none'
+            : 'px-2 py-2 rounded-default',
         triggerClass,
       ]"
     >
       <!--
-        Sidebar variant: one consistent frame for every section header —
-        [section icon] [content] [right chevron] — so sections that supply a
-        custom #trigger (e.g. with an info tooltip) match the icon+chevron
-        layout of the plain-label ones instead of falling back to a bare
-        left-chevron row.
+        Config variant (dashboard panel config only): one consistent frame for
+        every section header — [section icon] [content] [right chevron] — with
+        an open-state accent and a sticky header. Sections that supply a custom
+        #trigger (e.g. an info tooltip) get the same icon+chevron frame.
       -->
-      <template v-if="variant === 'sidebar'">
-        <!-- Leading section icon -->
+      <template v-if="variant === 'config'">
         <OIcon
           v-if="icon && isOIcon"
           :name="(icon as any)"
@@ -132,7 +133,6 @@ watch(
           >{{ icon }}</span
         >
 
-        <!-- Content: custom trigger slot, or the default label/caption column -->
         <span
           v-if="hasCustomTrigger"
           class="flex flex-1 items-center gap-2 min-w-0"
@@ -151,7 +151,6 @@ watch(
           >
         </span>
 
-        <!-- Right chevron -->
         <OIcon
           name="chevron-right"
           size="md"
@@ -160,12 +159,23 @@ watch(
         />
       </template>
 
-      <!-- Default variant -->
+      <!-- default / sidebar variants -->
       <template v-else>
-        <!-- Custom trigger slot replaces label/icon/chevron -->
+        <!-- Sidebar: left-side chevron (always before slot or label) -->
+        <OIcon
+          v-if="variant === 'sidebar'"
+          name="chevron-right"
+          size="md"
+          class="text-collapsible-icon transition-transform duration-200"
+          :class="isOpen ? 'rotate-90' : 'rotate-0'"
+        />
+
+        <!-- Custom trigger slot -->
         <template v-if="hasCustomTrigger">
           <slot name="trigger" :open="isOpen" />
         </template>
+
+        <!-- Default trigger — icon / label / caption / chevron -->
         <template v-else>
           <OIcon
             v-if="icon && isOIcon"
@@ -181,9 +191,13 @@ watch(
           >
 
           <span class="flex flex-col flex-1 min-w-0">
-            <span class="font-medium text-collapsible-label truncate text-sm">{{
-              label
-            }}</span>
+            <span
+              :class="[
+                'font-medium text-collapsible-label truncate',
+                variant === 'sidebar' ? 'text-compact' : 'text-sm',
+              ]"
+              >{{ label }}</span
+            >
             <span
               v-if="caption"
               class="text-xs text-collapsible-caption truncate"
@@ -191,7 +205,9 @@ watch(
             >
           </span>
 
+          <!-- Right chevron — default variant only -->
           <OIcon
+            v-if="variant === 'default'"
             name="expand-more"
             size="md"
             class="text-collapsible-icon transition-transform duration-200"

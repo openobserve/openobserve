@@ -3324,6 +3324,8 @@
     "seriesName": "Series Name",
     "seriesValue": "Series Value",
     "axisValue": "Axis Value",
+    "expandAllSections": "Expand all sections",
+    "collapseAllSections": "Collapse all sections",
     "configSectionGeneral": "General",
     "configSectionPromqlTable": "PromQL Table Mode",
     "configSectionGeographic": "Geographic Configuration",
