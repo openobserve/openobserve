@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { ref, watch, computed, type Ref } from "vue";
+import { ref, computed, type Ref } from "vue";
 
 /**
  * Manages column resize, drag-reorder, and visibility state.
@@ -36,7 +36,7 @@ export function useTableColumnManagement(
     }, 100);
   }
 
-  function onDragStart(event: any) {
+  function onDragStart() {
     isDragging.value = true;
     // state tracking only — event flows through header emit
   }

@@ -22,16 +22,16 @@ import { isTimeSeries, isTimeStamp } from "@/utils/dashboard/dateTimeUtils";
 
 // Mock external dependencies
 vi.mock("date-fns-tz", () => ({
-  toZonedTime: vi.fn((date, timezone) => new Date(date)),
+  toZonedTime: vi.fn((date) => new Date(date)),
 }));
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((unitValue) => unitValue?.value || "0"),
-  getUnitValue: vi.fn((value, unit, customUnit, decimals) => ({ value: value?.toString() || "0", unit: unit || "" })),
+  getUnitValue: vi.fn((value, unit) => ({ value: value?.toString() || "0", unit: unit || "" })),
 }));
 
 vi.mock("@/utils/dashboard/panelValidation", () => ({
-  findFirstValidMappedValue: vi.fn((value, mappings, type) => {
+  findFirstValidMappedValue: vi.fn((value, mappings) => {
     if (mappings && mappings.length > 0) {
       const mapping = mappings.find((m: any) => m.from === value);
       return mapping ? { text: mapping.to } : null;
@@ -41,7 +41,7 @@ vi.mock("@/utils/dashboard/panelValidation", () => ({
 }));
 
 vi.mock("@/utils/dashboard/dateTimeUtils", () => ({
-  formatDate: vi.fn((date) => "2024-01-01 12:00:00"),
+  formatDate: vi.fn(() => "2024-01-01 12:00:00"),
   isTimeSeries: vi.fn(() => false),
   isTimeStamp: vi.fn(() => false),
 }));

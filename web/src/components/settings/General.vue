@@ -1270,11 +1270,6 @@ export default defineComponent({
         });
     };
 
-    interface CounterLabelParams {
-      totalSize: string;
-      filesNumber: number;
-    }
-
     /**
      * When navigating away from General Settings without saving, clear temp preview
      * colors and restore the correct colors for the current mode.

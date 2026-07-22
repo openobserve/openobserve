@@ -256,10 +256,37 @@ jobs:
         working-directory: web
         run: ./coverage.sh check
 
+  ui_code_quality:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_ui_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Type-check (any error fails)
+        working-directory: web
+        run: npm run type-check:app
+
   unit_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, backend_unit_tests, ui_unit_tests]
+    needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
     if: always()
     steps:
       - name: Check test results
@@ -280,6 +307,13 @@ jobs:
             echo "UI tests passed or skipped"
           else
             echo "UI tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.ui_code_quality.result }}" == "success" ] || [ "${{ needs.ui_code_quality.result }}" == "skipped" ]; then
+            echo "UI code quality passed or skipped"
+          else
+            echo "UI code quality failed"
             exit 1
           fi
 

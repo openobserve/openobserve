@@ -98,7 +98,6 @@ import { useTheme } from "@/composables/useTheme";
 import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
-import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -107,7 +106,6 @@ export default defineComponent({
   name: "IncidentServiceGraph",
   components: {
     ChartRenderer,
-    DropzoneBackground,
     OButton,
     OSpinner,
     OIcon,

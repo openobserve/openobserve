@@ -454,7 +454,7 @@ export default defineComponent({
   name: "ServiceAccountsList",
   components: { OEmptyState, AddServiceAccount, ConfirmDialog, OButton, ODialog, OIcon, OPageLayout, OTooltip, OTable, OTag, OCodeCell, OUserCell, OSearchInput, OTabs, OTab, OTabPanels, OTabPanel, OSpinner },
   emits: [],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const router = useRouter();
     const { t } = useI18n();
@@ -463,7 +463,6 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const selectedUser: any = ref({});
     const orgData: any = ref(store.state.selectedOrganization);
-    const qTable: any = ref(null);
     const isUpdated = ref(false);
     const showAddUserDialog = ref(false);
     const { serviceAccountsState } = usePermissions();
@@ -472,9 +471,7 @@ export default defineComponent({
     const isShowToken = ref(false);
     const confirmRefresh  = ref(false);
     const filterQuery = ref("");
-    const toBeRefreshed = ref({
-
-    });
+    const toBeRefreshed = ref<{ email?: string }>({});
 
     const serviceToken  = ref("");
     const tokenAccountEmail = ref("");
@@ -699,8 +696,6 @@ export default defineComponent({
     let deleteUserEmail = "";
     const deleteUserEmailIdentifier = ref("");
 
-    const currentUser = computed(() => store.state.userInfo.email);
-
     const selectedAccountEmails = computed(() =>
       selectedAccounts.value.map((a: any) => a.email),
     );
@@ -751,7 +746,7 @@ export default defineComponent({
 
             resolve(true);
           })
-          .catch((err) => {
+          .catch(() => {
             dismiss();
             reject(false);
           })

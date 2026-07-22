@@ -167,15 +167,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                     >
                                       <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
                                       <span class="text-2xs flex-1 text-right pr-1">
-                                        {{ formatTimeWithSuffix(durationPercentiles[p.key]) }}
+                                        {{ formatPercentile(durationPercentiles[p.key]) }}
                                       </span>
                                       <div class="flex w-[2.7rem]">
                                         <OButton
                                           v-if="p.key !== 'max'"
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration >= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration>='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration>='${formatPercentile(durationPercentiles[p.key])}'`)"
                                           class="ml-0.5! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-forward-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
@@ -183,8 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                         <OButton
                                           variant="ghost"
                                           size="icon-xs-circle"
-                                          :title="`duration <= ${formatTimeWithSuffix(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration<='${formatTimeWithSuffix(durationPercentiles[p.key])}'`)"
+                                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                                          @click.stop="addFieldSearchTerm(`duration<='${formatPercentile(durationPercentiles[p.key])}'`)"
                                           class="ml-auto! mr-2! border! border-card-glass-border!"
                                         >
                                           <OIcon name="arrow-back-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
@@ -306,7 +306,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :key="index"
                         >
                           <div
-                            :data-test="`scheduled-pipeline-group-by-${index + 1}`"
+                            :data-test="`scheduled-pipeline-group-by-${Number(index) + 1}`"
                             class="flex justify-start items-center flex-nowrap o2-input"
                           >
                             <div
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               size="icon-xs-sq"
                               class="mb-2 ml-1 mr-2"
                               :title="t('alert_templates.delete')"
-                              @click="deleteGroupByColumn(index)"
+                              @click="deleteGroupByColumn(Number(index))"
                               icon-left="delete"
                             />
                           </div>
@@ -985,28 +985,22 @@ import {
   onMounted,
   onBeforeMount,
 } from "vue";
-import FieldsInput from "@/components/alerts/FieldsInput.vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import {
   getImageURL,
-  useLocalTimezone,
   timestampToTimezoneDate,
   formatTimeWithSuffix,
   b64EncodeUnicode,
   queryIndexSplit,
 } from "@/utils/zincutils";
-import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import { toggleFullscreen } from "@/utils/dom";
 import { copyToClipboard } from "@/utils/clipboard";
 import CronExpressionParser from "cron-parser";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
-import IndexList from "@/plugins/logs/IndexList.vue";
-import { split } from "postcss/lib/list";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
-import SearchResult from "@/plugins/logs/SearchResult.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1019,17 +1013,13 @@ import { inject } from "vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 
-import DateTime from "@/components/DateTime.vue";
-
 import useLogs from "@/composables/useLogs";
 
 import GroupedFieldList from "@/components/common/GroupedFieldList.vue";
 import FieldRow from "@/components/common/FieldRow.vue";
-import FieldListPagination from "@/components/common/FieldListPagination.vue";
 import useStreams from "@/composables/useStreams";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
-import AppTabs from "@/components/common/AppTabs.vue";
 import {
   applyFieldGrouping,
   buildSemanticIndex,
@@ -1056,7 +1046,6 @@ import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { createPipelinesContextProvider } from "@/composables/contextProviders/pipelinesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   getFieldFromExpression,
   hasFieldCondition,
@@ -1118,7 +1107,13 @@ const emits = defineEmits([
   "update:delay",
 ]);
 const { pipelineObj } = useDragAndDrop();
-const { searchObj } = useLogs();
+// `searchObj` is provided by the logs search state, not the job-focused
+// useLogs return; type it as optional so the guarded write stays type-safe.
+const {
+  searchObj,
+}: ReturnType<typeof useLogs> & {
+  searchObj?: { data?: { stream?: { pipelineQueryStream?: string[] } } };
+} = useLogs();
 const { getStream, getStreams } = useStreams();
 const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
   useServiceCorrelation();
@@ -1249,19 +1244,12 @@ const query = ref(
     : (initialQc.sql ?? props.sql),
 );
 
-const promqlQuery = ref(initialQc.promql ?? props.promql);
-
-const stream_type = ref(
-  form.state.values?.stream_type ?? props.streamType ?? "logs",
-);
 const collapseFields = ref(false);
 
 
 
 const store = useStore();
 const { isDark } = useTheme();
-
-const functionEditorPlaceholderFlag = ref(true);
 
 const queryEditorPlaceholderFlag = ref(true);
 const pipelineEditorRef: any = ref(null);
@@ -1284,7 +1272,12 @@ const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
 const step = ref(1);
-const dateTime = ref({
+const dateTime = ref<{
+  startTime: number | null;
+  endTime: number | null;
+  relativeTimePeriod: string | null;
+  valueType: string;
+}>({
   startTime: null,
   endTime: null,
   relativeTimePeriod: null,
@@ -1356,6 +1349,11 @@ const {
 const hasDurationPercentiles = computed(() =>
   PERCENTILE_LABELS.some((p) => durationPercentiles.value[p.key] !== null),
 );
+
+// Percentile values are `number | null`; formatTimeWithSuffix already renders
+// null as "0us", so `?? 0` preserves runtime output while satisfying its `number` param.
+const formatPercentile = (value: number | null) =>
+  formatTimeWithSuffix(value ?? 0);
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
@@ -1743,10 +1741,6 @@ const formIsSubmitting = form.useStore((s: any) => s.isSubmitting);
 
 const filteredNumericColumns = ref(getNumericColumns.value);
 
-const currentTimezone =
-  useLocalTimezone() || Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-const browserTimezone = ref(currentTimezone);
 const streamTypes = ["logs", "metrics", "traces"];
 
 const rows = ref([]);
@@ -1765,14 +1759,6 @@ timezoneOptions.unshift(browserTime);
 
 filteredTimezone.value = [...timezoneOptions];
 
-const timezoneFilterFn = (val: string, update: Function) => {
-  filteredTimezone.value = filterColumns(timezoneOptions, val, update);
-};
-
-const addField = () => {
-  emits("field:add");
-};
-
 var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<"]);
 
 const isCronMode = computed({
@@ -1783,10 +1769,6 @@ const isCronMode = computed({
 });
 
 const selectedFunction = ref("");
-
-const removeField = (field: any) => {
-  emits("field:remove", field);
-};
 
 const updateQueryValue = (value: string) => {
   _sqlOnQueryChange();
@@ -1810,7 +1792,8 @@ const updateQueryValue = (value: string) => {
 
   // Feed auto-suggest with the current query and context
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex = pipelineEditorRef.value?.getCursorIndex() ?? -1;
+  autoCompleteData.value.cursorIndex =
+    pipelineEditorRef.value?.getCursorIndex() ?? -1;
   autoCompleteData.value.popup.open = pipelineEditorRef.value?.triggerAutoComplete;
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStreamType.value;
@@ -1840,13 +1823,6 @@ const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   }
 }, 600);
 
-const updateStreamType = () => {
-  if (stream_type.value != "metrics") {
-    tab.value = "sql";
-  }
-  emits("update:stream_type", stream_type.value);
-};
-
 const updateFrequency = async () => {
   // Mirror frequency into period for the minutes mode (form-owned, single SoT).
   setTrigger("period", Number(triggerData.value.frequency));
@@ -1855,9 +1831,9 @@ const updateFrequency = async () => {
 function convertCronToMinutes(cronExpression: string) {
   // Parse the cron expression using cron-parser v5
   try {
+    // cron-parser v5 dropped the `utc` option (it was already ignored at runtime).
     const interval = CronExpressionParser.parse(cronExpression, {
       currentDate: new Date(),
-      utc: true,
     });
     // Get the first and second execution times
     const firstExecution = interval.next();
@@ -1934,15 +1910,6 @@ const vrlFunctionContent = computed({
   },
 });
 
-const isVrlFunctionEnabled = computed({
-  get() {
-    return props.showVrlFunction;
-  },
-  set(value) {
-    emits("update:showVrlFunction", value);
-  },
-});
-
 const updateQuery = () => {
   if (tab.value === "promql") {
     query.value = `${selectedStreamName.value}{}`;
@@ -1991,61 +1958,10 @@ const updateAggregation = () => {
   }
 };
 
-const filterFields = (val: string, update: Function) => {
-  filteredFields.value = filterColumns(props.columns, val, update);
-};
-
-const filterColumns = (options: string[], val: string, update: Function) => {
-  let filteredOptions: any[] = [];
-
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-  }
-
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter((column: any) => {
-      // Check if type of column is object or string and then filter
-      if (typeof column === "object") {
-        return column.value.toLowerCase().indexOf(value) > -1;
-      }
-
-      if (typeof column === "string") {
-        return column.toLowerCase().indexOf(value) > -1;
-      }
-    });
-  });
-
-  return filteredOptions;
-};
-
-const filterNumericColumns = (val: string, update: Function) => {
-  if (val === "") {
-    update(() => {
-      filteredNumericColumns.value = [...getNumericColumns.value];
-    });
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredNumericColumns.value = getNumericColumns.value.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
-    );
-  });
-};
 
 const updateAggregationToggle = () => {
   _isAggregationEnabled.value =
     tab.value === "custom" && !!aggregationData.value;
-};
-
-const filterFunctionOptions = (val: string, update: any) => {
-  update(() => {
-    functionOptions.value = functionsList.value.filter((fn: any) => {
-      return fn.name.toLowerCase().indexOf(val.toLowerCase()) > -1;
-    });
-  });
 };
 
 const onBlurQueryEditor = debounce(async () => {
@@ -2211,16 +2127,6 @@ function closeField(fieldName: string) {
   }
   expandedRows.value[fieldName] = false;
   expandedIds.value = expandedIds.value.filter((id) => id !== fieldName);
-}
-
-function onFieldRowClick(row: any) {
-  if (!isFieldExpandable(row)) return;
-  const currentlyExpanded = expandedRows.value[row.name];
-  if (currentlyExpanded) {
-    closeField(row.name);
-  } else {
-    openFilterCreator(row);
-  }
 }
 
 const handleSearchFieldValues = (fieldName: string, term: string) => {
@@ -2602,6 +2508,7 @@ const runQuery = async () => {
       previewPromqlQueryRef.value.refreshData();
     }
   }
+  return undefined;
 };
 
 const isFullscreen = ref(false);
@@ -2668,13 +2575,11 @@ const registerAiContextHandler = () => {
 };
 
 const getContext = async () => {
-  return new Promise(async (resolve, reject) => {
     try {
       const payload: any = {};
 
       if (!selectedStreamType.value || !selectedStreamName.value) {
-        resolve("");
-        return;
+        return "";
       }
 
       const schema = streamFields.value.map((field: any) => {
@@ -2710,12 +2615,11 @@ const getContext = async () => {
       payload["schema_"] =
         userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
 
-      resolve(payload);
+      return payload;
     } catch (error) {
       console.error("Error in getContext for logs page", error);
-      resolve("");
+      return "";
     }
-  });
 };
 
 const removeAiContextHandler = () => {

@@ -210,14 +210,20 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                     );
                 }
                 Err(e) => {
-                    if crate::service::trial_quota::org_has_active_subscription(org_id_str).await {
+                    let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                        org_id_str,
+                    )
+                    .await;
+                    if policy.allows_metered_overage() {
                         crate::service::trial_quota::record_billable_ai_usage(
                             org_id_str,
                             &usage_ctx,
                             crate::service::trial_quota::TrialQuotaFeature::AiChat,
                         );
                     } else {
-                        return MetaHttpResponse::payment_required(e.to_string());
+                        return MetaHttpResponse::payment_required(
+                            policy.quota_exhausted_message(e.as_ref()),
+                        );
                     }
                 }
             }
@@ -642,14 +648,20 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                     );
                 }
                 Err(e) => {
-                    if crate::service::trial_quota::org_has_active_subscription(&org_id_str).await {
+                    let policy = o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                        &org_id_str,
+                    )
+                    .await;
+                    if policy.allows_metered_overage() {
                         crate::service::trial_quota::record_billable_ai_usage(
                             &org_id_str,
                             &usage_ctx,
                             crate::service::trial_quota::TrialQuotaFeature::AiChat,
                         );
                     } else {
-                        return MetaHttpResponse::payment_required(e.to_string());
+                        return MetaHttpResponse::payment_required(
+                            policy.quota_exhausted_message(e.as_ref()),
+                        );
                     }
                 }
             }

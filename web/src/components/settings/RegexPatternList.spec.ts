@@ -19,7 +19,6 @@ import { mount, flushPromises } from '@vue/test-utils';
 import { createStore } from 'vuex';
 import regexPatternsService from '@/services/regex_pattern';
 import { convertUnixToDateFormat } from '@/utils/zincutils';
-import config from '@/aws-exports';
 
 // Mock dependencies
 vi.mock('@/services/regex_pattern', () => ({

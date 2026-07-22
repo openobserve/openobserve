@@ -15,15 +15,12 @@
 
 // @ts-ignore
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
-import { config } from "@vue/test-utils";
-import { inject } from "vue";
 
 import { setupServer } from "msw/node";
 
 import "../../__mocks__/index";
 
 import { restHandlers } from "./handlers";
-import store from "./store";
 
 // Wire the badge registry's i18n resolver for tests WITHOUT pulling in vue-i18n
 // (some specs mock it). Resolve OTag `labelKey`s against the raw English JSON so
@@ -244,7 +241,7 @@ beforeAll(() => {
   server.listen();
 
   // Handle unhandled promise rejections to prevent CI/CD failures
-  process.on('unhandledRejection', (reason: any, promise) => {
+  process.on('unhandledRejection', (reason: any) => {
     // Suppress expected error messages from tests that intentionally test error scenarios
     const reasonStr = String(reason?.message || reason);
 

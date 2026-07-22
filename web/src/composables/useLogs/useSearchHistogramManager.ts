@@ -16,13 +16,11 @@
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
-import { useRouter } from "vue-router";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
 import { convertDateToTimestamp } from "@/utils/date";
 
 export const useSearchHistogramManager = () => {
   let histogramResults: any = [];
-  const router = useRouter();
 
   const {
     fnParsedSQL,
@@ -140,7 +138,7 @@ export const useSearchHistogramManager = () => {
           is_ui_histogram: true,
         };
 
-        const requestId = initializeSearchConnection(payload);
+        initializeSearchConnection(payload);
 
         addTraceId(payload.traceId);
       }
@@ -268,7 +266,7 @@ export const useSearchHistogramManager = () => {
     const dateToBePassed = `${day}-${month}-${year}`;
     const hours = String(now.getHours()).padStart(2, "0");
     let minutes = String(now.getMinutes()).padStart(2, "0");
-    if (searchObj.data.histogramInterval / 1000 <= 9999) {
+    if ((searchObj.data.histogramInterval ?? 0) / 1000 <= 9999) {
       minutes = String(now.getMinutes() + 1).padStart(2, "0");
     }
 
@@ -362,7 +360,7 @@ export const useSearchHistogramManager = () => {
     searchObj.loadingHistogram = true;
     searchObj.loadingHistogramProgressPercentage = 0;
 
-    const requestId = initializeSearchConnection(payload);
+    initializeSearchConnection(payload);
 
     addTraceId(payload.traceId);
   };

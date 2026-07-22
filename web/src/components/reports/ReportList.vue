@@ -239,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
 
                 <!-- Table footer: pagination + bulk actions -->
-                <template #bottom="scope">
+                <template #bottom>
                   <div class="flex items-center justify-between w-full h-12">
                     <!-- Left: count + action buttons grouped together -->
                     <div class="flex items-center gap-2">
@@ -322,7 +322,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18n } from "vue-i18n";
 import reports from "@/services/reports";
-import { cloneDeep, debounce } from "lodash-es";
+import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
@@ -332,7 +332,6 @@ import OInput from '@/lib/forms/Input/OInput.vue';
 import OIcon from '@/lib/core/Icon/OIcon.vue';
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -351,7 +350,6 @@ const store = useStore();
 
 
 // ── Folder state ──────────────────────────────────────────────────────────────
-const splitterModel = ref(200);
 const activeFolderId = ref<string>(
   (router.currentRoute.value.query.folder as string) ?? "default",
 );
@@ -393,8 +391,6 @@ const tabs = reactive([
 ]);
 
 const resultTotal = ref<number>(0);
-const pageSize = ref(20);
-const pageSizeOptions = [20, 50, 100, 250, 500];
 
 const deleteDialog = ref({
   show:    false,
@@ -612,8 +608,6 @@ const visibleRows = computed(() => {
   if (!filterQuery.value || searchAcrossFolders.value) return reportsTableRows.value ?? [];
   return filterData(reportsTableRows.value ?? [], filterQuery.value);
 });
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
 watch(visibleRows, (rows) => { resultTotal.value = rows.length; }, { immediate: true });
 
 // ── Actions ───────────────────────────────────────────────────────────────────

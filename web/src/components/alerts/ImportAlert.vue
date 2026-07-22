@@ -119,8 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!userSelectedAlertName[index]?.toString().trim()"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedAlertName[index] = val;
-                        updateAlertName(val, index);
+                        userSelectedAlertName[index] = val as string;
+                        updateAlertName(val as string, index);
                       }"
                     />
                   </div>
@@ -144,8 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!userSelectedStreamName[index]"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedStreamName[index] = val;
-                        updateStreamFields(val, index);
+                        userSelectedStreamName[index] = val as string;
+                        updateStreamFields(val as string, index);
                       }"
                     />
                   </div>
@@ -171,8 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!userSelectedDestinations[index]?.length"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedDestinations[index] = val;
-                        updateUserSelectedDestinations(val, index);
+                        userSelectedDestinations[index] = val as string[];
+                        updateUserSelectedDestinations(val as string[], index);
                       }"
                     />
                   </div>
@@ -195,8 +195,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!userSelectedStreamType[index]"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedStreamType[index] = val;
-                        updateStreams(val, index);
+                        userSelectedStreamType[index] = val as string;
+                        updateStreams(val as string, index);
                       }"
                     />
                   </div>
@@ -221,8 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="!userSelectedTimezone[index]"
                       error-message="Field is required!"
                       @update:model-value="(val) => {
-                        userSelectedTimezone[index] = val;
-                        updateTimezone(val, index);
+                        userSelectedTimezone[index] = val as string;
+                        updateTimezone(val as string, index);
                       }"
                     />
                   </div>
@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       valueKey="value"
                       @update:model-value="(val) => {
                         userSelectedOrgId[index] = val;
-                        updateOrgId(val?.value || val, index);
+                        updateOrgId(((val as unknown as { value?: string })?.value || val) as string, index);
                       }"
                     />
                   </div>
@@ -490,7 +490,7 @@ export default defineComponent({
       getActiveFolderAlerts(activeFolderId.value as string);
     });
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       alertErrorsToDisplay.value = [];
       templateErrorsToDisplay.value = [];
       destinationErrorsToDisplay.value = [];
@@ -639,8 +639,6 @@ export default defineComponent({
           field: "alert_name",
         });
       }
-      const organizationData = store.state.organizations;
-      const orgList = organizationData.map((org: any) => org.identifier);
 
       // 2. Validate 'org_id' field
       if (
@@ -954,7 +952,7 @@ export default defineComponent({
 
       if (
         (input.trigger_condition.frequency_type == "cron" &&
-          !input.trigger_condition.hasOwnProperty("timezone")) ||
+          !Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) ||
         input.trigger_condition.timezone === ""
       ) {
         alertErrors.push({
@@ -997,19 +995,19 @@ export default defineComponent({
     };
 
     const createAlert = async (input: any, index: any, folderId: any) => {
-      if (!input.hasOwnProperty("context_attributes")) {
+      if (!Object.prototype.hasOwnProperty.call(input, "context_attributes")) {
         input.context_attributes = {};
       }
-      if (!input.trigger_condition.hasOwnProperty("timezone")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) {
         input.trigger_condition.timezone = store.state.timezone;
       }
-      if (!input.trigger_condition.hasOwnProperty("tolerance_in_secs")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "tolerance_in_secs")) {
         input.trigger_condition.tolerance_in_secs = null;
       }
       input.folder_id = folderId;
       input.owner = store.state.userInfo.email;
       input.last_edited_by = store.state.userInfo.email;
-      if (input.hasOwnProperty("id")) delete input.id;
+      if (Object.prototype.hasOwnProperty.call(input, "id")) delete input.id;
 
       // VERSION DETECTION AND CONVERSION
       // Convert V0 and V1 conditions to V2 format before creating alert

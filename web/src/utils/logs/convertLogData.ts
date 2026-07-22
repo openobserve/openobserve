@@ -15,7 +15,7 @@ export const convertLogData = (
     title: any;
     unparsed_x_data: any;
     timezone: string;
-    itemStyle: any;
+    itemStyle?: any;
   },
 ) => {
   const options: any = {

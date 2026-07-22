@@ -64,6 +64,7 @@ import {
   transformCompositeTermsForSave,
   stripFormExtras,
   type PayloadContext,
+  type PayloadFormData,
   type SaveAlertContext,
 } from "@/utils/alerts/alertPayload";
 import { validateCompositeExpression } from "@/utils/alerts/compositeExpression";
@@ -214,6 +215,16 @@ export interface AlertFormEmit {
   (e: "refresh:templates"): void;
 }
 
+// The full value set held by the ONE OForm: the alert payload shape plus the
+// form-only extras seeded by withFormExtras (logGroupBy / _ui / _meta). Typing
+// the form generic with this makes `form.state.values.*` reads (the synchronous
+// source of truth) typed instead of `unknown`.
+export type AlertFormValues = PayloadFormData & {
+  logGroupBy: string[];
+  _ui: Record<string, unknown>;
+  _meta: Record<string, unknown>;
+} & Record<string, unknown>;
+
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
   const { t } = useI18n();
@@ -309,12 +320,19 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // delivered to a destination OR a workflow, which relaxes "destinations ≥ 1"
   // into "at least one of the two". In OSS this stays false and the rule (and
   // its message) is byte-identical to before.
+  // Also respects the backend /config flag: on an enterprise build with
+  // workflows switched OFF the picker has no Workflows group, so relaxing the
+  // rule would surface "destination or workflow required" for a choice the user
+  // cannot make. Falls back to the strict "destination required" rule, which is
+  // the same rule OSS gets. (Built once in setup — if /config has not landed
+  // yet this is the stricter of the two, which is the safe direction.)
   const addAlertSchema = makeAddAlertSchema(
     t,
-    config.isEnterprise === "true" || config.isCloud === "true",
+    (config.isEnterprise === "true" || config.isCloud === "true") &&
+      store.state.zoConfig?.workflows_enabled === true,
   );
-  const form = useOForm({
-    defaultValues: buildDefaultForm() as Record<string, unknown>,
+  const form = useOForm<AlertFormValues>({
+    defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
     onSubmit: async () => {
       await performSave();
@@ -552,8 +570,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const validationErrors = ref([]);
   const isLoadingPanelData = ref(false);
 
-  const activeFolderId = ref(
-    router.currentRoute.value.query.folder || "default",
+  const folderQuery = router.currentRoute.value.query.folder;
+  const activeFolderId = ref<string>(
+    (Array.isArray(folderQuery) ? folderQuery[0] : folderQuery) || "default",
   );
   const alertType = ref(
     router.currentRoute.value.query.alert_type || "all",

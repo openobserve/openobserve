@@ -50,7 +50,7 @@ describe("MetricLegends", () => {
   let wrapper: any;
   let router: any;
 
-  const createWrapper = async (storeConfig = {}) => {
+  const createWrapper = async () => {
     // Create router for complete component setup
     router = createRouter({
       history: createWebHistory('/'),

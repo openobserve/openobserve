@@ -41,7 +41,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type Ref, type PropType } from "vue";
+import { computed, defineComponent, ref, watch, type Ref, type PropType } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { useI18n } from "vue-i18n";
@@ -51,7 +51,6 @@ import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.v
 import SelectDashboardDropdown from "@/components/dashboards/SelectDashboardDropdown.vue";
 import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import OInput from '@/lib/forms/Input/OInput.vue';
 import OForm from '@/lib/forms/Form/OForm.vue';
 import OFormInput from '@/lib/forms/Input/OFormInput.vue';
 import { useRouter } from "vue-router";
@@ -66,7 +65,6 @@ export default defineComponent({
     SelectDashboardDropdown,
     SelectTabDropdown,
     ODialog,
-    OInput,
     OForm,
     OFormInput,
   },
@@ -94,6 +92,12 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
+
+    // Alias to the SAME shared reactive panel-state object the parent passed
+    // one-way (:dashboard-panel-data, no v-model). Mutating dashboardPanelData
+    // .value.data.* keeps that reference, so in-place writes propagate exactly
+    // as before — satisfies vue/no-mutating-props with no behavior change.
+    const dashboardPanelData = computed(() => props.dashboardPanelData);
     const filteredDashboards: Ref<any[]> = ref([]);
     const selectedDashboard: any = ref(null);
 
@@ -166,14 +170,14 @@ export default defineComponent({
             await addPanel(store, dashboardId, panelData, folderId, tabId);
           }
         } else {
-          props.dashboardPanelData.data.id = getPanelId();
+          dashboardPanelData.value.data.id = getPanelId();
           // panel name will come from add to dashboard component
-          props.dashboardPanelData.data.title = panelTitle;
+          dashboardPanelData.value.data.title = panelTitle;
           // to create panel dashboard id, paneldata and folderId is required
           await addPanel(
             store,
             dashboardId,
-            props.dashboardPanelData.data,
+            dashboardPanelData.value.data,
             folderId,
             tabId,
           );

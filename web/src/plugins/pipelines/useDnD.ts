@@ -63,7 +63,7 @@ const defaultObject = {
     type:"",
   },
   dialog: dialogObj,
-  nodeTypes: [],
+  nodeTypes: [] as Array<{ label: string; icon: string; isSectionHeader: boolean; subtype?: string; io_type?: string; tooltip?: string }>,
   currentSelectedPipeline: defaultPipelineObj,
   pipelineWithoutChange: defaultPipelineObj,
   functions: {},
@@ -206,7 +206,7 @@ export default function useDragAndDrop() {
   // an intentional no-op (kept because the template binds to it).
   function onNodeChange() {}
 
-  function onNodesChange(changes:any) {
+  function onNodesChange() {
     hasInputNodeFn();
 
   }
@@ -259,7 +259,7 @@ export default function useDragAndDrop() {
   // normalizes edge endpoints, so it accepts both plain source/target and
   // VueFlow's runtime-enriched sourceNode/targetNode.
 
-  function validateConnection({ source, target, sourceHandle, targetHandle }:any) {
+  function validateConnection({ source, target }:any) {
     // Example validation rules
     const sourceNode = pipelineObj.currentSelectedPipeline.nodes.find(
       (node:any) => node.id === source,
@@ -354,7 +354,7 @@ export default function useDragAndDrop() {
         newEdge,
       ];
     }
-        if(newNode.hasOwnProperty('meta') && newNode.meta.hasOwnProperty('append_data')){
+        if(Object.prototype.hasOwnProperty.call(newNode, 'meta') && Object.prototype.hasOwnProperty.call(newNode.meta, 'append_data')){
           pipelineObj.currentSelectedNodeData.meta = newNode.meta;
           delete newNode.meta;
           delete pipelineObj.currentSelectedNodeData.data.meta;
@@ -467,7 +467,7 @@ export default function useDragAndDrop() {
   const getInputNodeStream = () => {
     const nodes = pipelineObj.currentSelectedPipeline?.nodes ?? [];
     const inputNode = nodes.find((node: any) => node.io_type === "input");
-    if(inputNode?.data.hasOwnProperty('node_type') &&  inputNode.data.node_type === 'stream'){
+    if(Object.prototype.hasOwnProperty.call(inputNode?.data, 'node_type') &&  inputNode.data.node_type === 'stream'){
       return inputNode?.data?.stream_name?.value || inputNode.data.stream_name || "";
     }
     else {

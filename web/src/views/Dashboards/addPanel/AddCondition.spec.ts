@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { shallowMount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
@@ -47,7 +47,6 @@ Object.defineProperty(Element.prototype, "removeAttribute", {
 
 describe("AddCondition.vue", () => {
   let wrapper: any;
-  let mockLoadFilterItem: any;
 
   const defaultProps = {
     condition: {
@@ -118,7 +117,6 @@ describe("AddCondition.vue", () => {
   };
 
   beforeEach(() => {
-    mockLoadFilterItem = vi.fn();
     vi.clearAllMocks();
   });
 

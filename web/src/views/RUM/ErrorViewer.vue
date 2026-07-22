@@ -61,13 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref } from "vue";
+import { computed, onActivated, ref } from "vue";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
 import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
 import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
 import { useRouter } from "vue-router";
-import useQuery from "@/composables/useQuery";
 import { useStore } from "vuex";
 import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
@@ -81,7 +80,6 @@ const { t } = useI18n();
 
 const isLoading = ref<boolean[]>([]);
 const router = useRouter();
-const { getTimeInterval, parseQuery, buildQueryPayload } = useQuery();
 const store = useStore();
 const { errorTrackingState } = useErrorTracking();
 const errorDetails = ref<any>({});

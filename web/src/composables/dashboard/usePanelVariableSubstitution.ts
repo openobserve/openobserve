@@ -98,10 +98,6 @@ export const usePanelVariableSubstitution = ({
       });
 
   const getDynamicVariablesData = () => {
-    const sqlQueryStreams =
-      panelSchema.value.queryType == "sql"
-        ? panelSchema.value.queries.map((q: any) => getStreamFromQuery(q.query))
-        : [];
     const adHocVariables = variablesData.value?.values
       ?.filter((it: any) => it.type === "dynamic_filters")
       ?.map((it: any) => it?.value)
@@ -219,7 +215,7 @@ export const usePanelVariableSubstitution = ({
   const ifPanelVariablesCompletedLoading = () => {
     // STEP 1: Check if there are any dynamic variables that are still loading
     log("Step1: checking if dynamic variables are loading, starting...");
-    const newDynamicVariablesData = getDynamicVariablesData();
+    getDynamicVariablesData();
 
     if (areDynamicVariablesStillLoading()) {
       log("Step1: dynamic variables still loading..., returning false");
@@ -430,6 +426,7 @@ export const usePanelVariableSubstitution = ({
       log("Step4: 4: variables values has changed, returning true");
       return true;
     }
+    return;
   };
 
   // Query substitution
@@ -608,7 +605,7 @@ export const usePanelVariableSubstitution = ({
               value: queryType === "sql" ? value : valueToUse.join("|"),
             },
             {
-              placeHolder: `\$${variable.name}`,
+              placeHolder: `$${variable.name}`,
               value: queryType === "sql" ? value : valueToUse.join("|"),
             },
           ];
@@ -703,7 +700,7 @@ export const usePanelVariableSubstitution = ({
     }
 
     if (queryType === "sql") {
-      const queryStream = await getStreamFromQuery(query);
+      await getStreamFromQuery(query);
 
       const applicableAdHocVariables = adHocVariables;
       // .filter((it: any) => {

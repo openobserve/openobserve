@@ -305,7 +305,6 @@ import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
 import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
 import TrendingUpFilled from "~icons/material-symbols/trending-up";
-import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
 import ViewInAr from "~icons/material-symbols/view-in-ar-outline";
 import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";

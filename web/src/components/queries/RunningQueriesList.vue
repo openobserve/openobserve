@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { ref, type Ref, defineComponent, computed } from "vue";
+import { ref, defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
@@ -151,7 +151,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getDuration, durationFormatter } from "@/utils/zincutils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -160,7 +159,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, OEmptyState, OButton, OTooltip, OToggleGroup, OToggleGroupItem, ODrawer, OSpinner, OTable, OUserCell, OTag },
+  components: { QueryList, OEmptyState, OButton, OTooltip, OToggleGroup, OToggleGroupItem, ODrawer, OTable, OUserCell, OTag },
   props: {
     rows: {
       type: Array,

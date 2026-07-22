@@ -242,16 +242,16 @@ const useDurationPercentiles = () => {
             }
           }
         },
-        error: (_p: any, _r: any) => {
+        error: () => {
           errMsg.value = "Failed to load percentiles";
           isLoading.value = false;
           currentTraceId = null;
         },
-        complete: (_p: any, _r: any) => {
+        complete: () => {
           isLoading.value = false;
           currentTraceId = null;
         },
-        reset: (_p: any, _r: any) => {
+        reset: () => {
           // no-op — percentile fetches are not retriable via reset
         },
       },

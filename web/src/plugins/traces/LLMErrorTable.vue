@@ -95,7 +95,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   type LLMPanelDef,
   renderPanelSql,
@@ -145,7 +145,7 @@ const timezone = computed(() => store.state.timezone || "UTC");
 const rows = ref<any[]>([]);
 const loading = ref(false);
 
-const columns = [
+const columns: OTableColumnDef[] = [
   {
     id: "time",
     header: t("traces.lLMErrorTable.time"),

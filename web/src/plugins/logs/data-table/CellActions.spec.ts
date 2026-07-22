@@ -65,6 +65,23 @@ describe("CellActions", () => {
     vi.clearAllMocks();
   });
 
+  // The include/exclude glyphs are custom SVGs, not registry icons. Wrapping
+  // them in <OIcon> (whose `name` is required) meant every rendered log cell
+  // logged "Missing required prop: name" — the icons only appeared via OIcon's
+  // slot, which exists for co-locating a tooltip, not for supplying an icon.
+  it("renders its icons without triggering a Vue prop warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      mountComponent();
+      const warnings = warn.mock.calls.map((c) => String(c[0] ?? ""));
+      expect(
+        warnings.filter((w) => w.includes("Missing required prop")),
+      ).toEqual([]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   // ── Component Initialization ─────────────────────────────────────────────────
   describe("Component Initialization", () => {
     it("mounts successfully", () => {

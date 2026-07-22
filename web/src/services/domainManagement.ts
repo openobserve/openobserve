@@ -22,10 +22,6 @@ interface DomainRestriction {
   allowedEmails: string[];
 }
 
-interface DomainSettings {
-  domains: DomainRestriction[];
-}
-
 const domainManagement = {
   getDomainRestrictions: (metaOrg: string) => {
     return http().get(`/api/${metaOrg}/domain_management`);

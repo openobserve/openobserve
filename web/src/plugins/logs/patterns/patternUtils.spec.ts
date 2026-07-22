@@ -20,6 +20,8 @@ import {
   buildPatternSqlQuery,
   buildAlertNameFromPattern,
   buildPatternAlertData,
+  compactCount,
+  formatBucketDuration,
 } from "./patternUtils";
 
 describe("extractConstantsFromPattern", () => {
@@ -241,5 +243,53 @@ describe("buildPatternAlertData", () => {
     expect(data.patternFrequency).toBe(0);
     expect(data.patternPercentage).toBe(0);
     expect(data.isAnomaly).toBe(false);
+  });
+});
+
+describe("compactCount", () => {
+  it("keeps small numbers verbatim", () => {
+    expect(compactCount(0)).toBe("0");
+    expect(compactCount(812)).toBe("812");
+  });
+
+  it("formats thousands with one decimal below 10K", () => {
+    expect(compactCount(1234)).toBe("1.2K");
+    expect(compactCount(9950)).toBe("9.9K");
+  });
+
+  it("formats larger thousands without decimals", () => {
+    expect(compactCount(45600)).toBe("46K");
+    expect(compactCount(206275)).toBe("206K");
+  });
+
+  it("formats millions and billions", () => {
+    expect(compactCount(1_234_567)).toBe("1.2M");
+    expect(compactCount(2_500_000_000)).toBe("2.5B");
+  });
+});
+
+describe("formatBucketDuration", () => {
+  // Stand-in for vue-i18n's plural handling: pick the form by n.
+  const t = (key: string, named: Record<string, unknown>) => {
+    const n = Number(named.n);
+    const unit = key.replace("logs.patternList.duration", "").toLowerCase();
+    const word = n === 1 ? unit.slice(0, -1) : unit;
+    return `${n} ${word}`;
+  };
+
+  it("uses the largest whole unit that fits", () => {
+    expect(formatBucketDuration(1680, t)).toBe("28 minutes");
+    expect(formatBucketDuration(3600, t)).toBe("1 hour");
+    expect(formatBucketDuration(7200, t)).toBe("2 hours");
+    expect(formatBucketDuration(86400, t)).toBe("1 day");
+  });
+
+  it("falls back to seconds when it isn't a whole minute", () => {
+    expect(formatBucketDuration(45, t)).toBe("45 seconds");
+    expect(formatBucketDuration(90, t)).toBe("90 seconds");
+  });
+
+  it("never reports a zero-length bucket", () => {
+    expect(formatBucketDuration(0, t)).toBe("1 second");
   });
 });

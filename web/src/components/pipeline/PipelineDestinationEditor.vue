@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { defineProps, defineEmits } from "vue";
 import { useI18n } from "vue-i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -54,7 +53,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 const { t } = useI18n();
 
 // Props
-const props = defineProps<{
+defineProps<{
   destination?: any;
 }>();
 

@@ -84,7 +84,6 @@ const setupIDBMock = () => {
   }
 
   const store = makeStore();
-  const txCompleteCbs: (() => void)[] = [];
 
   const tx: any = {
     objectStore: () => store,

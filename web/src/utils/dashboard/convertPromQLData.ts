@@ -139,10 +139,9 @@ export const convertPromQLData = async (
 
       // Apply annotations if present (only for ECharts-based charts)
       if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
-        const annotationResults = await getAnnotationsData(
+        const annotationResults = getAnnotationsData(
           annotations,
-          store,
-          panelSchema,
+          store.state.timezone,
         );
         if (annotationResults && result.options) {
           result.options.annotations = annotationResults;
@@ -184,7 +183,6 @@ export const convertPromQLData = async (
     if (!queryData || !queryData.result) {
       return queryData;
     }
-    const originalCount = queryData.result.length;
     const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
@@ -619,7 +617,7 @@ export const convertPromQLData = async (
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
@@ -628,7 +626,7 @@ export const convertPromQLData = async (
   }
   if (options.yAxis) {
     (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
@@ -853,6 +851,7 @@ export const convertPromQLData = async (
           }
         }
       }
+      // falls through — unknown resultType has no series to build
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
@@ -1060,7 +1059,6 @@ export const convertPromQLData = async (
 
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
-              const values = [metric.value];
               return {
                 name: JSON.stringify(metric.metric),
                 value: metric?.value?.length > 1 ? metric.value[1] : "",

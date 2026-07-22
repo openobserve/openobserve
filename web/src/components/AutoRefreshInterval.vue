@@ -172,20 +172,21 @@ import {
   onActivated,
   onDeactivated,
   onMounted,
+  type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
-  components: { OSeparator, OButton, ODropdown, ODropdownSeparator, OTooltip, OIcon },
+  components: { OButton, ODropdown, ODropdownSeparator, OTooltip, OIcon },
   props: {
     modelValue: {
       type: Number,
@@ -208,7 +209,7 @@ export default defineComponent({
       default: false,
     },
     variant: {
-      type: String,
+      type: String as PropType<ButtonVariant>,
       default: "outline",
     },
   },

@@ -122,11 +122,9 @@ import { ScheduledDashboardReport } from "@/ts/interfaces/report";
 import NoData from "@/components/shared/grid/NoData.vue";
 import { convertUnixToDateFormat } from "@/utils/date";
 import { useStore } from "vuex";
-import { getImageURL } from "@/utils/zincutils";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -191,11 +189,18 @@ const createScheduledReport = () => {
   });
 };
 
-const scheduledReports = ref<ScheduledDashboardReport[]>(
-  props.reports as ScheduledDashboardReport[],
+// Row shape for the list: adds the raw sort keys not on the shared interface.
+// "#" is provided by OTable's show-index, so rows built here omit it.
+type ScheduledReportRow = Omit<ScheduledDashboardReport, "#"> & {
+  last_triggered_at_raw: number | null;
+  created_at_raw: number | null;
+};
+
+const scheduledReports = ref<ScheduledReportRow[]>(
+  props.reports as ScheduledReportRow[],
 );
 
-const formattedReports = ref<ScheduledDashboardReport[]>([]);
+const formattedReports = ref<ScheduledReportRow[]>([]);
 
 const store = useStore();
 
@@ -252,13 +257,13 @@ const filterReports = () => {
   // filter reports based on the selected tab
   // If reports are cached, show only cached reports
   if (scheduledActiveTab.value === "cached") {
-    formattedReports.value = (
-      scheduledReports.value as ScheduledDashboardReport[]
-    ).filter((report) => report.isCached);
+    formattedReports.value = scheduledReports.value.filter(
+      (report) => report.isCached,
+    );
   } else {
-    formattedReports.value = (
-      scheduledReports.value as ScheduledDashboardReport[]
-    ).filter((report) => !report.isCached);
+    formattedReports.value = scheduledReports.value.filter(
+      (report) => !report.isCached,
+    );
   }
 };
 
@@ -317,8 +322,6 @@ const selectedPerPage = ref(20);
 
 const perPageOptionsList = [5, 10, 20, 50, 100];
 
-const resultTotal = ref(0);
-
 const displayReports = computed(() => {
   let reports = formattedReports.value;
   if (scheduledFilterQuery.value) {
@@ -329,7 +332,6 @@ const displayReports = computed(() => {
       ),
     );
   }
-  resultTotal.value = reports.length;
   return reports;
 });
 

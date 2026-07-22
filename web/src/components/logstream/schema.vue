@@ -508,10 +508,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="max-w-55"
                           @update:model-value="markFormDirty"
                         />
-                        <small v-if="dataRetentionDays > 0 && dataRetentionDays != ''">
+                        <!-- casts: number input can hold "" at runtime while cleared -->
+                        <small v-if="dataRetentionDays > 0 && (dataRetentionDays as any) != ''">
                           Global retention is {{ store.state.zoConfig.data_retention_days }} days
                         </small>
-                        <small v-if="dataRetentionDays <= 0 || dataRetentionDays == ''" class="text-status-error-text">
+                        <small v-if="dataRetentionDays <= 0 || (dataRetentionDays as any) == ''" class="text-status-error-text">
                           Retention period must be at least 1 day
                         </small>
                       </div>
@@ -609,7 +610,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           disable-relative
                           hide-relative-time
                           hide-relative-timezone
-                          :minDate="minDate"
+                          :minDate="minDate ?? undefined"
                         />
                       </div>
                       <span class="font-bold"> (UTC Timezone) </span>
@@ -822,14 +823,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-// @ts-nocheck
 import {
   computed,
   defineComponent,
   onBeforeMount,
-  reactive,
   ref,
-  onMounted,
   watch,
 } from "vue";
 import { useI18n } from "vue-i18n";
@@ -850,14 +848,13 @@ import {
 import config from "@/aws-exports";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useStreams from "@/composables/useStreams";
-import { useRouter } from "vue-router";
 import StreamFieldsInputs from "@/components/logstream/StreamFieldInputs.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -870,7 +867,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -881,6 +877,7 @@ import { makeSchemaFieldsSchema } from "./Schema.schema";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
+import type { AcceptableValue } from "reka-ui";
 
 const defaultValue: any = () => {
   return {
@@ -928,12 +925,11 @@ export default defineComponent({
     OSelect,
     OSwitch,
     OTooltip,
-    OCheckbox,
     OCard,
     OCardSection,
     OForm,
   },
-  setup({ modelValue }) {
+  setup({ modelValue }: { modelValue: Record<string, unknown> }) {
     type PatternAssociation = {
       field: string;
       pattern_name: string;
@@ -941,6 +937,27 @@ export default defineComponent({
       policy: string;
       apply_at: string;
     };
+    interface SchemaField {
+      name: string;
+      type?: string;
+      index_type?: string[];
+      isUserDefined?: boolean;
+      delete?: boolean;
+      level?: string;
+    }
+    interface NewSchemaField {
+      name: string;
+      type: string;
+      index_type?: string[];
+    }
+    interface MissingPerformanceField {
+      name: string;
+      type: string;
+    }
+    interface ExtendedRetentionRange {
+      start: number;
+      end: number;
+    }
     const { t } = useI18n();
     const store = useStore();
     const { isDark } = useTheme();
@@ -951,22 +968,30 @@ export default defineComponent({
     const storeOriginalData = ref(false);
     const enableDistinctFields = ref(false);
     const maxQueryRange = ref(0);
-    const flattenLevel = ref(null);
+    const flattenLevel = ref<number | undefined>(undefined);
     const confirmQueryModeChangeDialog = ref(false);
     const confirmDeleteDatesDialog = ref(false);
     const confirmAddPerformanceFieldsDialog = ref(false);
-    const missingPerformanceFields = ref([]);
-    const pendingSelectedFields = ref([]);
+    const missingPerformanceFields = ref<MissingPerformanceField[]>([]);
+    const pendingSelectedFields = ref<string[]>([]);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
     const rowsPerPage = ref(20);
     const filterField = ref("");
-    const router = useRouter();
     const qTable = ref(null);
-    const minDate = ref(null);
-    const selectedDateFields = ref([]);
+    const minDate = ref<string | null>(null);
+    const selectedDateFields = ref<Array<RedBtnRow | ExtendedRetentionRange>>(
+      [],
+    );
     const IsdeleteBtnVisible = ref(false);
-    const redBtnRows = ref([]);
+    interface RedBtnRow {
+      index: string;
+      original_start: number;
+      original_end: number;
+      start: string;
+      end: string;
+    }
+    const redBtnRows = ref<RedBtnRow[]>([]);
 
     const patternIdToApplyAtMap = new Map();
 
@@ -1003,8 +1028,7 @@ export default defineComponent({
         }
       },
     );
-    const patternAssociations = ref([]);
-    const redDaysList = ref([]);
+    const redDaysList = ref<ExtendedRetentionRange[]>([]);
     const resultTotal = ref<number>(0);
     const perPageOptions: any = [
       { label: "20", value: 20 },
@@ -1024,7 +1048,16 @@ export default defineComponent({
     const pagination: any = ref({
       rowsPerPage: 20,
     });
-    const patternAssociationDialog = ref({
+    // Holds Record<field, PatternAssociation[]> after grouping, PatternAssociation[]
+    // transiently while saving — hence `any`.
+    const patternAssociations = ref<any>([]);
+    // Loading-toast dismisser created in getSchema; also used by setSchema.
+    let dismiss: () => void = () => {};
+    const patternAssociationDialog = ref<{
+      show: boolean;
+      data: PatternAssociation[];
+      fieldName: string;
+    }>({
       show: false,
       data: [],
       fieldName: "",
@@ -1032,7 +1065,7 @@ export default defineComponent({
 
     const assocPatternsRef = ref<any>(null);
 
-    const selectedFields = ref([]);
+    const selectedFields = ref<SchemaField[]>([]);
 
     const filteredSchemaData = computed(() => {
       const rows = indexData.value.schema || [];
@@ -1214,7 +1247,7 @@ export default defineComponent({
       return store.state.zoConfig.user_defined_schemas_enabled;
     });
 
-    const markFormDirty = () => {
+    const markFormDirty = (..._args: unknown[]) => {
       formDirtyFlag.value = true;
     };
     const deleteFields = async () => {
@@ -1224,7 +1257,8 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           indexData.value.name,
           indexData.value.stream_type,
-          selectedFields.value.map((field) => field.name),
+          // Cast: service signature mistypes `fields` as the empty tuple `[]`.
+          selectedFields.value.map((field: any) => field.name) as [],
         )
         .then(async (res) => {
           loadingState.value = false;
@@ -1258,7 +1292,7 @@ export default defineComponent({
         });
     };
 
-    const getFieldIndices = (property, settings) => {
+    const getFieldIndices = (property: any, settings: any) => {
       const fieldIndices = [];
       if (
         settings.full_text_search_keys.length > 0 &&
@@ -1286,19 +1320,21 @@ export default defineComponent({
       if (
         settings.partition_keys &&
         Object.values(settings.partition_keys).some(
-          (v) => !v.disabled && v.field === property.name,
+          (v: any) => !v.disabled && v.field === property.name,
         )
       ) {
-        const [level, partition] = Object.entries(settings.partition_keys).find(
+        const matchedEntry = Object.entries<{ field: string; types?: string | { hash?: string } }>(settings.partition_keys).find(
           ([, partition]) => partition["field"] === property.name,
         );
+        if (!matchedEntry) return fieldIndices;
+        const [level, partition] = matchedEntry;
 
         property.level = level;
 
         if (partition.types === "value") fieldIndices.push("keyPartition");
         if (partition.types === "prefix") fieldIndices.push("prefixPartition");
 
-        if (partition.types?.hash)
+        if (typeof partition.types === "object" && partition.types.hash)
           fieldIndices.push(`hashPartition_${partition.types.hash}`);
       }
 
@@ -1307,8 +1343,8 @@ export default defineComponent({
       return fieldIndices;
     };
 
-    const setSchema = (streamResponse) => {
-      const schemaMapping = new Set([]);
+    const setSchema = (streamResponse: any) => {
+      const schemaMapping = new Set<string>();
 
       //here lets add the pattern associations to the streamResponse
       streamResponse.settings.pattern_associations =
@@ -1332,20 +1368,22 @@ export default defineComponent({
       if (!streamResponse.schema?.length) {
         streamResponse.schema = [];
         if (streamResponse.settings.defined_schema_fields?.length)
-          streamResponse.settings.defined_schema_fields.forEach((field) => {
-            streamResponse.schema.push({
-              name: field,
-              delete: false,
-              index_type: [],
-            });
-          });
+          streamResponse.settings.defined_schema_fields.forEach(
+            (field: string) => {
+              streamResponse.schema.push({
+                name: field,
+                delete: false,
+                index_type: [],
+              });
+            },
+          );
       }
       if (Array.isArray(streamResponse.settings.extended_retention_days)) {
         redBtnRows.value = [];
         indexData.value.extended_retention_days =
           streamResponse.settings.extended_retention_days;
         streamResponse.settings.extended_retention_days.forEach(
-          (field, index) => {
+          (field: ExtendedRetentionRange, index: number) => {
             redBtnRows.value.push({
               index: String(index),
               original_start: field.start,
@@ -1402,7 +1440,7 @@ export default defineComponent({
       calculateDateRange();
 
       maxQueryRange.value = streamResponse.settings.max_query_range || 0;
-      flattenLevel.value = streamResponse.settings.flatten_level || null;
+      flattenLevel.value = streamResponse.settings.flatten_level || undefined;
       storeOriginalData.value =
         streamResponse.settings.store_original_data || false;
       enableDistinctFields.value =
@@ -1426,9 +1464,9 @@ export default defineComponent({
         fieldIndices.length = 0;
       }
 
-      indexData.value.defined_schema_fields.forEach((field) => {
+      indexData.value.defined_schema_fields.forEach((field: string) => {
         if (!schemaMapping.has(field)) {
-          const property = {
+          const property: SchemaField = {
             name: field,
             delete: false,
             index_type: [],
@@ -1445,7 +1483,7 @@ export default defineComponent({
     };
 
     const getSchema = async () => {
-      const dismiss = toast({
+      dismiss = toast({
         variant: "loading",
         message: "Please wait while loading stats...",
               timeout: 0,
@@ -1464,7 +1502,7 @@ export default defineComponent({
           loadingState.value = false;
           dismiss();
         })
-        .catch((err) => {
+        .catch(() => {
           loadingState.value = false;
         });
     };
@@ -1487,7 +1525,23 @@ export default defineComponent({
       patternAssociations.value = ungroupPatternAssociations(
         patternAssociations.value,
       );
-      let settings = {
+      interface StreamSettingsPayload {
+        fields: { name: string; type: string }[];
+        partition_keys: { field: string; types: string | { hash: number } }[];
+        index_fields: string[];
+        full_text_search_keys: string[];
+        bloom_filter_fields: string[];
+        defined_schema_fields: string[];
+        extended_retention_days: { start: number; end: number }[];
+        pattern_associations: PatternAssociation[];
+        max_query_range?: number;
+        data_retention?: number;
+        store_original_data?: boolean;
+        enable_distinct_fields?: boolean;
+        approx_partition?: boolean;
+        flatten_level?: number;
+      }
+      let settings: StreamSettingsPayload = {
         fields: [], // only used for add new fields
         partition_keys: [],
         index_fields: [],
@@ -1521,12 +1575,12 @@ export default defineComponent({
       settings["enable_distinct_fields"] = enableDistinctFields.value;
       settings["approx_partition"] = approxPartition.value;
 
-      if (flattenLevel.value !== null) {
+      if (flattenLevel.value !== undefined) {
         settings["flatten_level"] = Number(flattenLevel.value);
       }
 
-      const newSchemaFieldSet = new Set(
-        newSchemaFields.value.map((field) => {
+      const newSchemaFieldSet = new Set<{ name: string; type: string }>(
+        newSchemaFields.value.map((field: NewSchemaField) => {
           return {
             name: field.name
               .trim()
@@ -1537,8 +1591,8 @@ export default defineComponent({
           };
         }),
       );
-      const newSchemaFieldNameSet = new Set(
-        newSchemaFields.value.map((field) =>
+      const newSchemaFieldNameSet = new Set<string>(
+        newSchemaFields.value.map((field: NewSchemaField) =>
           field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_"),
         ),
       );
@@ -1561,7 +1615,8 @@ export default defineComponent({
         });
       }
 
-      let added_part_keys = [];
+      let added_part_keys: { field: string; types: string | { hash: number } }[] =
+        [];
       for (var property of indexData.value.schema) {
         property.index_type?.forEach((index: string) => {
           if (index === "fullTextSearchKey") {
@@ -1680,7 +1735,7 @@ export default defineComponent({
           indexData.value.stream_type,
           modifiedSettings,
         )
-        .then(async (res) => {
+        .then(async () => {
           if (
             store.state.logs?.logs?.data?.stream?.selectedStream?.includes(
               indexData.value.name,
@@ -1740,6 +1795,7 @@ export default defineComponent({
         // the return value; tests await it).
         return onSubmit();
       }
+      return undefined;
     };
 
     const showPartitionColumn = computed(() => {
@@ -1758,7 +1814,7 @@ export default defineComponent({
         modelValue.stream_type !== "enrichment_tables",
     );
 
-    const disableOptions = (schema, option) => {
+    const disableOptions = (schema: any, option: any) => {
       let selectedHashPartition = "";
 
       let selectedIndices = "";
@@ -1817,11 +1873,11 @@ export default defineComponent({
     const filterFieldFn = (rows: any, terms: any) => {
       let [field, fieldType] = terms.split("@");
 
-      var filtered = [];
+      var filtered: any[] = [];
       const searchTerm = field?.toLowerCase() || "";
 
       // Map labels -> values for index types
-      const labelToValueMap = {};
+      const labelToValueMap: Record<string, string> = {};
       streamIndexType.forEach(({ label, value }) => {
         labelToValueMap[label.toLowerCase()] = value;
       });
@@ -1842,7 +1898,7 @@ export default defineComponent({
               }
               // Match by index_type (convert search label to value)
               else if (
-                row.index_type.some((t) => {
+                row.index_type.some((t: string) => {
                   // check if search is label
                   return (
                     t.toLowerCase().includes(searchTerm) || // direct match with stored value
@@ -1864,7 +1920,7 @@ export default defineComponent({
             }
             // Match by index_type
             else if (
-              row.index_type.some((t) => {
+              row.index_type.some((t: string) => {
                 return (
                   t.toLowerCase().includes(searchTerm) ||
                   labelToValueMap[searchTerm] === t
@@ -1884,7 +1940,7 @@ export default defineComponent({
       return filtered;
     };
 
-    const columns = [
+    const columns: OTableColumnDef<any>[] = [
       {
         id: "name",
         header: t("logStream.propertyName"),
@@ -1895,6 +1951,7 @@ export default defineComponent({
       },
       {
         id: "settings",
+        header: "",
         accessorFn: (row: any) => (row.isUserDefined ? 0 : 1),
         sortable: true,
         size: COL.method,
@@ -1931,7 +1988,7 @@ export default defineComponent({
         : []),
     ];
 
-    const redBtnColumns = [
+    const redBtnColumns: OTableColumnDef<any>[] = [
       {
         id: "start",
         header: t("logStream.extendedStartDate"),
@@ -1962,7 +2019,10 @@ export default defineComponent({
       }
     };
 
-    const updateActiveTab = (tab) => {
+    const updateActiveTab = (
+      tab: boolean | AcceptableValue | AcceptableValue[],
+    ) => {
+      if (typeof tab !== "string") return;
       activeTab.value = tab;
       if (tab === "schemaFields") {
         resultTotal.value = indexData.value.defined_schema_fields.length;
@@ -1971,29 +2031,29 @@ export default defineComponent({
       }
     };
 
-    const updateActiveMainTab = (tab) => {
+    const updateActiveMainTab = (tab: string) => {
       activeMainTab.value = tab;
     };
 
     // Function to get missing FTS and Secondary Index fields
-    const getMissingPerformanceFields = (selectedFieldsSet) => {
-      const missingFields = [];
+    const getMissingPerformanceFields = (selectedFieldsSet: Set<string>) => {
+      const missingFields: MissingPerformanceField[] = [];
       const currentSchema = indexData.value.schema;
       const currentSchemaFieldNames = new Set(
-        currentSchema.map((field) => field.name),
+        currentSchema.map((field: SchemaField) => field.name),
       );
 
       // Get FTS fields from settings
-      const ftsFieldsFromSettings = new Set();
-      currentSchema.forEach((field) => {
+      const ftsFieldsFromSettings = new Set<string>();
+      currentSchema.forEach((field: SchemaField) => {
         if (field.index_type?.includes("fullTextSearchKey")) {
           ftsFieldsFromSettings.add(field.name);
         }
       });
 
       // Get Secondary Index fields from settings
-      const secondaryIndexFieldsFromSettings = new Set();
-      currentSchema.forEach((field) => {
+      const secondaryIndexFieldsFromSettings = new Set<string>();
+      currentSchema.forEach((field: SchemaField) => {
         if (field.index_type?.includes("secondaryIndexKey")) {
           secondaryIndexFieldsFromSettings.add(field.name);
         }
@@ -2003,7 +2063,7 @@ export default defineComponent({
       // iterate over all the be default fts keys and check if they pressent in currentschemafieldnames if they are there
       // we should add them to ftsfields from settings
       const defaultFtsKeys = store.state.zoConfig.default_fts_keys || [];
-      defaultFtsKeys.forEach((key) => {
+      defaultFtsKeys.forEach((key: string) => {
         if (currentSchemaFieldNames.has(key)) {
           ftsFieldsFromSettings.add(key);
         }
@@ -2014,7 +2074,7 @@ export default defineComponent({
       // we should add them to secondarykeys from settings
       const defaultSecondaryIndexKeys =
         store.state.zoConfig.default_secondary_index_fields || [];
-      defaultSecondaryIndexKeys.forEach((key) => {
+      defaultSecondaryIndexKeys.forEach((key: string) => {
         if (currentSchemaFieldNames.has(key)) {
           secondaryIndexFieldsFromSettings.add(key);
         }
@@ -2092,7 +2152,7 @@ export default defineComponent({
     };
 
     // Function to proceed with adding fields
-    const proceedWithAddingFields = (selectedFieldsSet) => {
+    const proceedWithAddingFields = (selectedFieldsSet: Set<string>) => {
       markFormDirty();
 
       if (selectedFieldsSet.has(allFieldsName.value))
@@ -2164,7 +2224,7 @@ export default defineComponent({
       if (activeTab.value === "schemaFields") {
         indexData.value.defined_schema_fields =
           indexData.value.defined_schema_fields.filter(
-            (field) => !selectedFieldsSet.has(field),
+            (field: string) => !selectedFieldsSet.has(field),
           );
 
         if (!indexData.value.defined_schema_fields.length) {
@@ -2182,12 +2242,12 @@ export default defineComponent({
       selectedFields.value = [];
     };
 
-    const updateStreamResponse = (streamResponse) => {
-      if (streamResponse.settings.hasOwnProperty("defined_schema_fields")) {
+    const updateStreamResponse = (streamResponse: any) => {
+      if (Object.prototype.hasOwnProperty.call(streamResponse.settings, "defined_schema_fields")) {
         const userDefinedSchema = streamResponse.settings.defined_schema_fields;
 
         // Map through the schema and add `isUserDefined` field
-        const updatedSchema = streamResponse.schema.map((field) => ({
+        const updatedSchema = streamResponse.schema.map((field: SchemaField) => ({
           ...field,
           isUserDefined: userDefinedSchema.includes(field.name), // Mark true if in userDefinedSchema
         }));
@@ -2195,10 +2255,12 @@ export default defineComponent({
         // Find fields in userDefinedSchema that are not in the schema
         const additionalFields = userDefinedSchema
           .filter(
-            (name) =>
-              !streamResponse.schema.some((field) => field.name === name),
+            (name: string) =>
+              !streamResponse.schema.some(
+                (field: SchemaField) => field.name === name,
+              ),
           )
-          .map((name) => ({
+          .map((name: string) => ({
             name,
             isUserDefined: true,
             // Optionally, add default values for other properties (e.g., type, index_type, etc.)
@@ -2229,7 +2291,7 @@ export default defineComponent({
         ],
       });
     };
-    const updateResultTotal = (streamResponse) => {
+    const updateResultTotal = (streamResponse: any) => {
       if (activeTab.value === "schemaFields") {
         resultTotal.value =
           streamResponse.settings?.defined_schema_fields?.length;
@@ -2240,7 +2302,7 @@ export default defineComponent({
     // Date only: this column shows a retention window, not an instant.
     const convertUnixToDateFormat = (unixMicroseconds: any) =>
       convertUnixToFormat(unixMicroseconds, "DD-MM-YYYY");
-    function formatDate(dateString) {
+    function formatDate(dateString: string) {
       const date = new Date(dateString); // Convert to Date object
       const day = String(date.getDate()).padStart(2, "0"); // Get day with leading zero
       const month = String(date.getMonth() + 1).padStart(2, "0"); // Get month with leading zero
@@ -2249,7 +2311,11 @@ export default defineComponent({
       return `${day}-${month}-${year}`; // Return formatted date
     }
 
-    const dateChangeValue = (value) => {
+    const dateChangeValue = (value: {
+      userChangedValue?: boolean;
+      selectedDate?: { from: string; to: string };
+      relativeTimePeriod?: string | null;
+    }) => {
       // Ignore programmatic / mount-replay emits from <date-time>. On mount (and
       // on every remount triggered by loadingState toggling), DateTime emits an
       // `on:date-change` for its default range with `userChangedValue: false`.
@@ -2259,20 +2325,21 @@ export default defineComponent({
       // Apply carries `userChangedValue: true`.
       if (value.userChangedValue === false) return;
       const selectedFromDate =
-        value.hasOwnProperty("selectedDate") &&
-        formatDate(value.selectedDate.from);
+        Object.prototype.hasOwnProperty.call(value, "selectedDate") &&
+        formatDate(value.selectedDate!.from);
       const selectedToDate =
-        value.hasOwnProperty("selectedDate") &&
-        formatDate(value.selectedDate.to);
+        Object.prototype.hasOwnProperty.call(value, "selectedDate") &&
+        formatDate(value.selectedDate!.to);
       if (value.relativeTimePeriod == null) {
         try {
+          // selectedDate is present on this branch (guarded by hasOwnProperty above).
           const startTimestamp = convertDateToTimestamp(
-            selectedFromDate,
+            selectedFromDate as string,
             "00:00",
             "UTC",
           ).timestamp;
           const endTimestamp = convertDateToTimestamp(
-            selectedToDate,
+            selectedToDate as string,
             "00:00",
             "UTC",
           ).timestamp;
@@ -2294,11 +2361,6 @@ export default defineComponent({
       const currentDate = new Date(today);
       currentDate.setDate(today.getDate() - (dataRetentionDays.value - 1)); // Adjust to the desired number of days (dataRetentionDays of  days in this case)
 
-      const formattedDate = timestampToTimezoneDate(
-        new Date().getTime(), // Current timestamp
-        store.state.timezone, // Get the timezone from the store
-        "yyyy/MM/dd", // Desired format
-      );
       // Format minDate using timestampToTimezoneDate for a custom format
       minDate.value = timestampToTimezoneDate(
         currentDate.getTime(),
@@ -2308,7 +2370,10 @@ export default defineComponent({
     };
 
     const deleteDates = () => {
-      selectedDateFields.value = selectedDateFields.value.map((field) => {
+      // deleteDates only runs on table-selected rows, which are always RedBtnRow.
+      selectedDateFields.value = (
+        selectedDateFields.value as RedBtnRow[]
+      ).map((field) => {
         return {
           start: field.original_start,
           end: field.original_end,
@@ -2410,7 +2475,7 @@ export default defineComponent({
     //this is used to compute the index_type value based on the env
     //so instead of directly showing the value of the index_type we will add the values of fulltextsearchkey and secondaryindexkey if it is set by the env
     //and if it is not set by the env then we will not add the values of fulltextsearchkey and secondaryindexkey becuase those will be already there and we don't want to show them twice
-    const computedIndexType = (props) => {
+    const computedIndexType = (props: { row: SchemaField }) => {
       return computed(() => {
         let keysToBeDisplayed = props.row.index_type || [];
         // return the actual index_type value from the row
@@ -2439,7 +2504,10 @@ export default defineComponent({
     //if present then we will return true else false
     //this is used to show the tooltip in the select for disabled options
     //why there are disabled
-    const checkIfOptionPresentInDefaultEnv = (name, option) => {
+    const checkIfOptionPresentInDefaultEnv = (
+      name: string,
+      option: { value: string },
+    ) => {
       if (
         store.state.zoConfig.default_fts_keys.indexOf(name) > -1 &&
         option.value == "fullTextSearchKey"
@@ -2456,7 +2524,10 @@ export default defineComponent({
       return false;
     };
     //this is used to upate the model value of the index_type
-    const updateIndexType = (props, value) => {
+    const updateIndexType = (
+      props: { row: SchemaField },
+      value: string[] | null | undefined,
+    ) => {
       props.row.index_type = filterValueBasedOnEnv(props, value ?? []);
       markFormDirty(props.row.name, "fts");
     };
@@ -2481,7 +2552,10 @@ export default defineComponent({
     //we don't give access to the user to change the value of the env set by the env
     //and if it is empty then we will return empty array
     //if the value is not empty then we will remove the value if it is set by the env
-    const filterValueBasedOnEnv = (props, value) => {
+    const filterValueBasedOnEnv = (
+      props: { row: SchemaField },
+      value: string[],
+    ) => {
       if (value.length == 0) {
         return [];
       }
@@ -2647,7 +2721,7 @@ export default defineComponent({
       this.getSchema();
     } else {
       /* v8 ignore next */ // unreachable in tests: Vue 3 Options API auto-unwraps refs on `this`, so loadingState here is a primitive boolean not a Ref
-      this.loadingState.value = false;
+      (this.loadingState as unknown as { value: boolean }).value = false;
     }
   },
 });

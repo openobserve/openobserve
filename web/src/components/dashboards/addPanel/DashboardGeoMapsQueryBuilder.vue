@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, computed, nextTick } from "vue";
+import { defineComponent, ref, reactive, watch, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -419,7 +419,7 @@ export default defineComponent({
     OTooltip,
   },
   props: ["dashboardData"],
-  setup(props) {
+  setup() {
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
     const expansionItems = reactive({
@@ -444,7 +444,6 @@ export default defineComponent({
       addFilteredItem,
       promqlMode,
       cleanupDraggingFields,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -582,11 +581,11 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
     const onDragEnter = (e: any, area: string, index: any) => {
@@ -614,7 +613,7 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-    const Hint = computed((e: any) => {
+    const Hint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "geomap":
           return t("dashboard.oneFieldMessage");
@@ -623,7 +622,7 @@ export default defineComponent({
       }
     });
 
-    const WeightHint = computed((e: any) => {
+    const WeightHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "geomap":
           return t("dashboard.oneFieldConfigMessage");

@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 
 // Mock utilities that have heavy dependencies (vuex, services, async parser)
 vi.mock("@/utils/query/sqlUtils", () => ({
-  addLabelsToSQlQuery: vi.fn(async (query: string, _vars: any[]) => query),
+  addLabelsToSQlQuery: vi.fn(async (query: string) => query),
   getStreamFromQuery: vi.fn(async () => "test_stream"),
 }));
 

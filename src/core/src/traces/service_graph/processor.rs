@@ -156,6 +156,19 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
             log::error!("[ServiceGraph] Failed to process stream {org_id}/{stream_name}: {e}");
             continue; // Don't fail entire job if one stream fails
         }
+
+        // Agent-signals rollup: co-located, same window, same node. Self-guards on config.
+        if let Err(e) = crate::service::traces::agent_signals::process_agent_signals_stream(
+            &org_id,
+            &stream_name,
+            last_updated_at,
+            next_updated_at,
+        )
+        .await
+        {
+            log::error!("[AgentSignals] Failed for stream {org_id}/{stream_name}: {e}");
+            // Non-fatal: agent signals must never break the service graph.
+        }
     }
 
     // update last updated at
@@ -605,7 +618,7 @@ async fn process_stream(
 /// the raw result hits. Shared by the instrumented self-join query and the
 /// inferred-dependency query.
 #[cfg(feature = "enterprise")]
-async fn run_graph_search(
+pub(crate) async fn run_graph_search(
     org_id: &str,
     sql: String,
     start_time: i64,

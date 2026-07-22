@@ -245,7 +245,7 @@ describe("SearchJobInspector — formatTimeRange timezone handling", () => {
 
   it("TC13: store timezone badge shows 'UTC' when timezone is not set", () => {
     store.commit("setTimezone", "");
-    const wrapper = mountComponent();
+    mountComponent();
 
     // The template renders: store.state.timezone || 'UTC'
     const effective = store.state.timezone || "UTC";

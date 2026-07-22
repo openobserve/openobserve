@@ -36,6 +36,8 @@ use tracing::{Instrument, Span};
 
 #[cfg(feature = "cloud")]
 use crate::service::ingestion::check_ingestion_allowed;
+// Re-export agent-signals read API handler
+pub use crate::service::traces::agent_signals::get_agent_signals;
 // Re-export service graph API handlers
 pub use crate::service::traces::service_graph::{self, get_current_topology, get_edge_history};
 use crate::{
@@ -325,7 +327,19 @@ pub async fn get_latest_traces(
         0
     };
 
-    if start_time_from_trace_id > 0 {
+    // A UUID v7 trace_id encodes its creation time, which lets us narrow the
+    // scan to a tight [t-60s, t+1h] window instead of the caller's broad range.
+    // BUT only when that encoded time actually falls inside the window the
+    // caller asked for. If it doesn't — e.g. spans re-ingested with a
+    // `_timestamp` shifted away from the trace_id's embedded time — the encoded
+    // time points at an empty window and the lookup would spuriously return
+    // "trace not found". In that case we trust the caller's window, which is
+    // where the data actually is. (On real data the two always agree, so this
+    // is a safety net, not a behavior change for normal traffic.)
+    if start_time_from_trace_id > 0
+        && start_time_from_trace_id >= start_time
+        && start_time_from_trace_id <= end_time
+    {
         start_time = start_time_from_trace_id - 60 * 1_000_000; //60 seconds earlier
         end_time = std::cmp::min(now_micros(), start_time_from_trace_id + 3600 * 1_000_000); //1 hour later
     }
@@ -476,6 +490,7 @@ pub async fn get_latest_traces(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     req.use_cache = get_use_cache_from_request(&query);
@@ -1296,6 +1311,7 @@ async fn process_latest_traces_stream(
         use_cache,
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     // Get time partitions

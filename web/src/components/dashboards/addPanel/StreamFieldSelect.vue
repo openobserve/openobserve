@@ -20,6 +20,7 @@ import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 
 // Composite key separator — unlikely to appear in stream/field names
 const SEP = "\x00";
@@ -83,7 +84,7 @@ export default defineComponent({
 
     // Derive the currently selected string key from the modelValue object.
     // Computed from `groups` (reactive ref) so it re-runs after fields load.
-    const selectValue = computed<string | null>(() => {
+    const selectValue = computed<string | null | undefined>(() => {
       const mv = props.modelValue;
 
       if (!mv?.field) return undefined;
@@ -154,8 +155,8 @@ export default defineComponent({
       );
     }
 
-    function onSelect(key: string | null) {
-      if (!key) return;
+    function onSelect(key: SelectModelValue) {
+      if (!key || typeof key !== "string") return;
       const mapped = valueMap.get(key);
       if (mapped) {
         emit("update:modelValue", { ...mapped });

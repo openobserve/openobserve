@@ -28,6 +28,24 @@ const syntheticsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// Workflows routes are gated on the backend /config flag `workflows_enabled`
+// (enterprise O2_WORKFLOWS_ENABLED). The enterprise/cloud build check is already
+// implicit — this whole block only runs for those builds.
+//
+// Checks `=== false`, NOT `!== true`, and that is deliberate: /config is fetched
+// without await, so the flag is briefly undefined at startup. Redirecting on
+// "not yet known" would bounce a bookmarked /workflows to home on a cold load.
+// The sidebar entry takes the opposite stance (it requires `=== true`, so it
+// never flashes in) — the two are not meant to match. Same split as
+// syntheticsRouteGuard above.
+const workflowsRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.workflows_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const IdentityAccessManagement = () =>
   import("@/views/IdentityAccessManagement.vue");
 
@@ -236,7 +254,7 @@ const useEnterpriseRoutes = () => {
         title: "Workflows",
       },
       beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
+        workflowsRouteGuard(to, from, next);
       },
       children: [
         {
@@ -245,7 +263,7 @@ const useEnterpriseRoutes = () => {
           component: WorkflowEditor,
           meta: { title: "New Workflow" },
           beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
+            workflowsRouteGuard(to, from, next);
           },
         },
         {
@@ -254,7 +272,7 @@ const useEnterpriseRoutes = () => {
           component: WorkflowEditor,
           meta: { title: "Edit Workflow" },
           beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
+            workflowsRouteGuard(to, from, next);
           },
         },
         {
@@ -266,7 +284,7 @@ const useEnterpriseRoutes = () => {
           component: WorkflowRuns,
           meta: { title: "Workflow Runs" },
           beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
+            workflowsRouteGuard(to, from, next);
           },
         },
       ],

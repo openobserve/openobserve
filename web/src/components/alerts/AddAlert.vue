@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="flex items-center gap-1.5 shrink-0">
               <div class="text-xs font-semibold whitespace-nowrap text-text-heading">{{ t('alerts.folder') }}</div>
               <InlineSelectFolderDropdown
-                :model-value="activeFolderId"
+                :model-value="(activeFolderId as string)"
                 type="alerts"
                 class="topbar-folder-select min-w-15 max-w-35"
                 @update:model-value="updateActiveFolderId({ value: $event })"
@@ -380,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
             <AnomalyAlerting
               :config="anomalyConfig"
-              :destinations="destinations"
+              :destinations="(destinations as (SelectOption & { name: string })[])"
               @refresh:destinations="$emit('refresh:destinations')"
             />
           </div>
@@ -518,6 +518,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, watch, ref, provide } from "vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
 import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
@@ -542,7 +543,6 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -601,7 +601,6 @@ export default defineComponent({
     ODrawer,
     OTag,
     OTooltip,
-    OInput,
     OForm,
     OFormInput,
     OFormSelect,

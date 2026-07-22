@@ -39,7 +39,7 @@ const baseProps = {
   workflows: [] as string[],
   destinationOptions: [] as any[],
   workflowOptions: [] as any[],
-  isEnterprise: false,
+  workflowsEnabled: false,
 };
 
 function createWrapper(props: Record<string, any> = {}) {
@@ -70,7 +70,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper({
         destinations: ["slack", "pagerduty"],
         workflows: ["wf-1"],
-        isEnterprise: true,
+        workflowsEnabled: true,
       });
       expect(select(wrapper).props("modelValue")).toEqual([
         "dest:slack",
@@ -98,7 +98,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper({
         destinationOptions: ["slack", "email"],
         workflowOptions: [{ label: "Escalate", value: "wf-1" }],
-        isEnterprise: false,
+        workflowsEnabled: false,
       });
       expect(select(wrapper).props("options")).toEqual([
         { label: "slack", value: "dest:slack" },
@@ -110,7 +110,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper({
         destinationOptions: ["slack"],
         workflowOptions: [{ label: "Escalate", value: "wf-1" }],
-        isEnterprise: true,
+        workflowsEnabled: true,
       });
       expect(select(wrapper).props("options")).toEqual([
         { header: true, label: "Destinations" },
@@ -132,7 +132,7 @@ describe("AlertTargetsSelect", () => {
     it("normalizes plain-string workflow options", () => {
       const wrapper = createWrapper({
         workflowOptions: ["wf-1"],
-        isEnterprise: true,
+        workflowsEnabled: true,
       });
       expect(select(wrapper).props("options")).toContainEqual({
         label: "wf-1",
@@ -153,7 +153,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper({
         destinationOptions: undefined as any,
         workflowOptions: null as any,
-        isEnterprise: true,
+        workflowsEnabled: true,
       });
       // headers still render, both groups empty
       expect(select(wrapper).props("options")).toEqual([
@@ -165,7 +165,7 @@ describe("AlertTargetsSelect", () => {
 
   describe("selection change (splitting the tagged values)", () => {
     it("splits a mixed selection back into destinations + workflows", async () => {
-      const wrapper = createWrapper({ isEnterprise: true });
+      const wrapper = createWrapper({ workflowsEnabled: true });
       select(wrapper).vm.$emit("update:modelValue", [
         "dest:slack",
         "wf:wf-1",
@@ -219,7 +219,7 @@ describe("AlertTargetsSelect", () => {
   describe("ordered model (anti-shake)", () => {
     it("keeps the click order across a props round-trip (no reorder, no re-sync)", async () => {
       const wrapper = createWrapper({
-        isEnterprise: true,
+        workflowsEnabled: true,
         destinationOptions: ["slack"],
         workflowOptions: [{ label: "Escalate", value: "wf-1" }],
       });
@@ -243,7 +243,7 @@ describe("AlertTargetsSelect", () => {
     });
 
     it("DOES re-sync when the incoming set genuinely differs (external edit load)", async () => {
-      const wrapper = createWrapper({ isEnterprise: true });
+      const wrapper = createWrapper({ workflowsEnabled: true });
       await wrapper.setProps({ destinations: ["slack", "email"], workflows: [] });
       await wrapper.vm.$nextTick();
       expect(select(wrapper).props("modelValue")).toEqual([
@@ -256,10 +256,10 @@ describe("AlertTargetsSelect", () => {
   describe("collapsible groups gate", () => {
     it("enables collapsible groups only in enterprise", () => {
       expect(
-        select(createWrapper({ isEnterprise: true })).props("collapsibleGroups"),
+        select(createWrapper({ workflowsEnabled: true })).props("collapsibleGroups"),
       ).toBe(true);
       expect(
-        select(createWrapper({ isEnterprise: false })).props("collapsibleGroups"),
+        select(createWrapper({ workflowsEnabled: false })).props("collapsibleGroups"),
       ).toBe(false);
     });
   });
@@ -279,14 +279,14 @@ describe("AlertTargetsSelect", () => {
 
   describe("empty slot", () => {
     it("OSS: says no destinations are available", () => {
-      const wrapper = createWrapper({ isEnterprise: false });
+      const wrapper = createWrapper({ workflowsEnabled: false });
       expect(wrapper.find(".o-select-empty").text()).toBe(
         "No destinations available",
       );
     });
 
     it("enterprise: says no destinations OR workflows are available", () => {
-      const wrapper = createWrapper({ isEnterprise: true });
+      const wrapper = createWrapper({ workflowsEnabled: true });
       expect(wrapper.find(".o-select-empty").text()).toBe(
         "No Destinations Or Workflows Available",
       );
@@ -309,14 +309,14 @@ describe("AlertTargetsSelect", () => {
     });
 
     it("hides the Create Workflow button in OSS", () => {
-      const wrapper = createWrapper({ isEnterprise: false });
+      const wrapper = createWrapper({ workflowsEnabled: false });
       expect(wrapper.find('[data-test="create-workflow-btn"]').exists()).toBe(
         false,
       );
     });
 
     it("shows and emits create-workflow in enterprise", async () => {
-      const wrapper = createWrapper({ isEnterprise: true });
+      const wrapper = createWrapper({ workflowsEnabled: true });
       const btn = wrapper.find('[data-test="create-workflow-btn"]');
       expect(btn.exists()).toBe(true);
       await btn.trigger("click");
@@ -350,7 +350,7 @@ describe("AlertTargetsSelect", () => {
 
     it("drops object options whose value is missing", () => {
       const wrapper = createWrapper({
-        isEnterprise: true,
+        workflowsEnabled: true,
         workflowOptions: [
           { label: "no value" },
           { id: "wf-1", name: "nope" },
@@ -367,7 +367,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper({
         destinationOptions: [undefined, undefined],
         workflowOptions: [undefined],
-        isEnterprise: true,
+        workflowsEnabled: true,
       });
       const rows = (select(wrapper).props("options") as any[]).filter(
         (o) => !o.header,
@@ -379,7 +379,7 @@ describe("AlertTargetsSelect", () => {
       const wrapper = createWrapper({
         destinations: [undefined, "slack", null] as any,
         workflows: [null, "wf-1"] as any,
-        isEnterprise: true,
+        workflowsEnabled: true,
       });
       expect(select(wrapper).props("modelValue")).toEqual([
         "dest:slack",
@@ -388,7 +388,7 @@ describe("AlertTargetsSelect", () => {
     });
 
     it("ignores non-string values coming back from the control", async () => {
-      const wrapper = createWrapper({ isEnterprise: true });
+      const wrapper = createWrapper({ workflowsEnabled: true });
       await select(wrapper).vm.$emit("update:modelValue", [
         null,
         "dest:slack",

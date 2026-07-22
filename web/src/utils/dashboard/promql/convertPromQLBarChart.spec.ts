@@ -36,16 +36,16 @@ vi.mock("./shared/dataProcessor", () => ({
 }));
 
 vi.mock("./shared/axisBuilder", () => ({
-  buildCategoryXAxis: vi.fn((categories, panelSchema) => ({
+  buildCategoryXAxis: vi.fn((categories) => ({
     type: "category",
     data: categories,
   })),
-  buildCategoryYAxis: vi.fn((categories, panelSchema) => ({
+  buildCategoryYAxis: vi.fn((categories) => ({
     type: "category",
     data: categories,
     axisLabel: {},
   })),
-  buildValueAxis: vi.fn((panelSchema) => ({
+  buildValueAxis: vi.fn(() => ({
     type: "value",
   })),
   buildTooltip: vi.fn((panelSchema, triggerType) => ({
@@ -58,7 +58,7 @@ vi.mock("./shared/gridBuilder", () => ({
 }));
 
 vi.mock("../colorPalette", () => ({
-  getSeriesColor: vi.fn((colorConfig, name, values, min, max, theme, colorBySeries) => {
+  getSeriesColor: vi.fn((colorConfig, name) => {
     const colors: Record<string, string> = {
       series1: "#FF0000",
       series2: "#00FF00",

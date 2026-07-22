@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     :title="t('logs.searchJobInspector.title')"
-    :back="{ onClick: goBack, dataTest: 'inspector-close-button' }"
+    :back="{ label: t('logs.searchJobInspector.title'), onClick: goBack, dataTest: 'inspector-close-button' }"
     bleed
   >
       <template #title>
@@ -333,13 +333,10 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useTheme } from "@/composables/useTheme";
 
@@ -384,7 +381,6 @@ export default defineComponent({
     OButton,
     ODrawer,
     ODialog,
-    OSpinner,
     OTooltip,
     OIcon,
     OTable,
@@ -700,6 +696,7 @@ export default defineComponent({
       copySql,
       store,
       hasNoData,
+      isDark,
       t,
     };
   },

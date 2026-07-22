@@ -216,11 +216,6 @@ export const convertSQLChartData = async (
   // for metric, gauge we does not have data field
   if (!["metric", "gauge"].includes(panelSchema.type)) {
     options.series = options.series.filter((it: any) => it.data?.length);
-    if (panelSchema.type == "h-bar" || panelSchema.type == "h-stacked") {
-      options.xAxis = options.xAxis;
-    } else if (!["pie", "donut"].includes(panelSchema.type)) {
-      options.yAxis = options.yAxis;
-    }
   }
   // allowed to zoom, only if timeseries
   options.toolbox.show = options.toolbox.show && isTimeSeriesFlag;

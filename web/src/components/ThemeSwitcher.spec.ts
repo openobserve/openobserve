@@ -76,7 +76,7 @@ describe('ThemeSwitcher', () => {
       });
 
       expect(() => {
-        const wrapper = mountComponent();
+        mountComponent();
       }).not.toThrow();
     });
 

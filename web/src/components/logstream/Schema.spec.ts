@@ -15,7 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import i18n from "@/locales";
 // @ts-ignore
 import store from "@/test/unit/helpers/store";
@@ -118,12 +117,6 @@ const ODrawerStub = {
     </div>
   `,
 };
-
-const globalMountOptions = (storeOverride: any = store) => ({
-  provide: { store: storeOverride },
-  plugins: [i18n],
-  stubs: { ODrawer: ODrawerStub },
-});
 
 describe("Schema Component Tests", () => {
   let wrapper: any;
@@ -2256,7 +2249,7 @@ describe("Schema Component Tests", () => {
     });
 
     it("should handle deleteFields error gracefully", async () => {
-      const { mockStreamServiceDeleteFields } = vi.hoisted(() => ({
+      vi.hoisted(() => ({
         mockStreamServiceDeleteFields: vi.fn(),
       }));
       // We need to intercept the streamService mock

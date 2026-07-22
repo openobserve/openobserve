@@ -90,7 +90,7 @@ export interface ButtonProps extends PrimitiveProps {
   active?: boolean;
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
-  /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
+  /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */
   block?: boolean;  /**
    * Renders an OIcon to the left of the label.
    * If the #icon-left slot is also provided, the slot takes precedence.

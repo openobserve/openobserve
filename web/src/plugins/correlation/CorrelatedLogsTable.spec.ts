@@ -610,7 +610,6 @@ describe("CorrelatedLogsTable.vue", () => {
 
     it("should handle copy operation", async () => {
       wrapper = createWrapper();
-      const log = { field: "value" };
 
       // Just ensure the function exists and can be called without throwing
       expect(typeof wrapper.vm.handleCopy).toBe("function");
@@ -882,23 +881,6 @@ describe("CorrelatedLogsTable.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.draggedIndex).toBeNull();
-    });
-  });
-
-  describe("handleResetFilters", () => {
-    it("should call resetFilters from composable", async () => {
-      const mockResetFilters = vi.fn();
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
-      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
-        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
-        resetFilters: mockResetFilters,
-      });
-
-      wrapper = createWrapper();
-      wrapper.vm.handleResetFilters();
-      await nextTick();
-
-      expect(mockResetFilters).toHaveBeenCalled();
     });
   });
 

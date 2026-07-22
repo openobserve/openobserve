@@ -1448,9 +1448,9 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::Error> {
     if o2cfg.rate_limit.rate_limit_enabled {
-        let meta_store: config::meta::meta_store::MetaStore =
-            cfg.common.queue_store.as_str().into();
-        if meta_store != config::meta::meta_store::MetaStore::Nats {
+        let queue_store =
+            config::meta::queue_store::QueueStore::try_from(cfg.common.queue_store.as_str());
+        if queue_store != Ok(config::meta::queue_store::QueueStore::Nats) {
             return Err(anyhow::anyhow!(
                 "ZO_QUEUE_STORE must be nats when ratelimit is enabled"
             ));

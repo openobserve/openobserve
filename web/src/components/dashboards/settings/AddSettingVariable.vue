@@ -564,7 +564,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
@@ -648,12 +648,14 @@ export default defineComponent({
 
     // Programmatic writes (cascades, edit-prefill, scope resets, array add/remove)
     // all go through the single form — never by mutating a mirror.
+    type FieldPath = FormFieldPath<AddSettingVariableForm>;
+    type ArrayFieldPath = Parameters<typeof form.pushFieldValue>[0];
     const setFormField = (name: string, val: unknown) =>
-      form.setFieldValue(name, val);
+      form.setFieldValue(name as FieldPath, val as never);
     const formPush = (name: string, val: unknown) =>
-      form.pushFieldValue(name, val);
+      form.pushFieldValue(name as ArrayFieldPath, val as never);
     const formRemove = (name: string, index: number) =>
-      form.removeFieldValue(name, index);
+      form.removeFieldValue(name as ArrayFieldPath, index);
 
     // Reactive READS of the form values (form.useStore, NOT a local copy).
     const formValues = form.useStore((s: any) => s.values);
@@ -667,10 +669,10 @@ export default defineComponent({
     // truth. (Nested writes must use setFormField with a dotted path.)
     const fieldView = (key: string) => ({
       get: () => formValues.value?.[key],
-      set: (v: unknown) => form.setFieldValue(key, v),
+      set: (v: unknown) => form.setFieldValue(key as FieldPath, v as never),
       enumerable: true,
     });
-    const variableData: any = Object.defineProperties(
+    const variableData = Object.defineProperties(
       {},
       {
         scope: fieldView("scope"),
@@ -681,14 +683,14 @@ export default defineComponent({
         query_data: {
           get: () => formValues.value?.query_data ?? {},
           set: (v: unknown) => {
-            form.setFieldValue("query_data", v);
+            form.setFieldValue("query_data", v as never);
           },
           enumerable: true,
         },
         options: {
           get: () => formValues.value?.options ?? [],
           set: (v: unknown) => {
-            form.setFieldValue("options", v);
+            form.setFieldValue("options", v as never);
           },
           enumerable: true,
         },
@@ -698,13 +700,13 @@ export default defineComponent({
         customMultiSelectValue: {
           get: () => formValues.value?.customMultiSelectValue ?? [],
           set: (v: unknown) => {
-            form.setFieldValue("customMultiSelectValue", v);
+            form.setFieldValue("customMultiSelectValue", v as never);
           },
           enumerable: true,
         },
         escapeSingleQuotes: fieldView("escapeSingleQuotes"),
       },
-    );
+    ) as AddSettingVariableForm;
     // Form-driven Save spinner for the footer (outside <OForm>, linked by
     // form-id). isSubmitting resets even if the save throws.
     const isSavingVariable = form.useStore((s: any) => s.isSubmitting);
