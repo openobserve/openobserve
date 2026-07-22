@@ -10,6 +10,8 @@
  * 35 entries and do NOT match the 50 --color-span-* token values.
  */
 
+import { chartColor } from "../chartTheme";
+
 /**
  * Light-mode span colours — 35-entry raw-hex fallback for getSpanColorHex (NOT the
  * --color-span-* token set; see the file header). Used only where a CSS var can't go.
@@ -113,12 +115,13 @@ export const getSpanColor = (index: number): string => {
  */
 export const getSpanColorHex = (
   index: number,
-  theme: "light" | "dark" = "light",
+  _theme: "light" | "dark" = "light",
 ): string => {
-  const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  const colorIndex =
-    (((index - 1) % colors.length) + colors.length) % colors.length;
-  return colors[colorIndex];
+  // Light/dark swap lives in the --color-trace-span-* tokens (base/dark css);
+  // `_theme` kept for call-site compatibility, ignored — CSS owns the swap.
+  const n = LIGHT_SPAN_COLORS.length;
+  const colorIndex = (((index - 1) % n) + n) % n;
+  return chartColor(`--color-trace-span-${colorIndex + 1}`);
 };
 
 /**
@@ -182,11 +185,13 @@ export const getSpanColorWithOpacity = (
  * @returns Array of hex color strings
  */
 export const getAllSpanColors = (
-  theme: "light" | "dark" = "light",
+  _theme: "light" | "dark" = "light",
 ): string[] => {
-  const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  // Return reversed order to maintain existing behavior
-  return [...colors].reverse();
+  // Tokens own the light/dark swap; reversed to maintain existing behavior.
+  const n = LIGHT_SPAN_COLORS.length;
+  return Array.from({ length: n }, (_v, i) =>
+    chartColor(`--color-trace-span-${i + 1}`),
+  ).reverse();
 };
 
 /**

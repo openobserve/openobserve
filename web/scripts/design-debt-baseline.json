@@ -1,9 +1,9 @@
 {
   "totals": {
     "rawProjectRamp": 8,
-    "rawVarInComponent": 584,
+    "rawVarInComponent": 566,
     "arbZ": 0,
-    "darkMechanism": 20,
+    "darkMechanism": 8,
     "unscopedStyle": 2,
     "stylePxUnit": 84
   },
@@ -112,7 +112,7 @@
       "rawVarInComponent": 6
     },
     "enterprise/components/onlineEvals/forms/ScorerDetail.vue": {
-      "rawVarInComponent": 47
+      "rawVarInComponent": 29
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
       "rawVarInComponent": 1
@@ -286,27 +286,12 @@
       "rawVarInComponent": 1
     },
     "utils/dashboard/colorPalette.ts": {
-      "darkMechanism": 5
-    },
-    "utils/dashboard/convertPromQLData.ts": {
       "darkMechanism": 2
     },
-    "utils/dashboard/sql/charts/convertSQLHeatmapChart.ts": {
-      "darkMechanism": 1
-    },
-    "utils/dashboard/sql/charts/convertSQLLineAreaChart.ts": {
+    "utils/dashboard/convertPromQLData.ts": {
       "darkMechanism": 1
     },
     "utils/dashboard/sql/charts/convertSQLMetricChart.ts": {
-      "darkMechanism": 2
-    },
-    "utils/dashboard/sql/charts/convertSQLStackedChart.ts": {
-      "darkMechanism": 1
-    },
-    "utils/dashboard/sql/shared/contextBuilder.ts": {
-      "darkMechanism": 1
-    },
-    "utils/dashboard/sqlTimeSeriesConverter.ts": {
       "darkMechanism": 2
     },
     "utils/logs/convertLogData.ts": {
@@ -314,9 +299,6 @@
     },
     "utils/themeManager.ts": {
       "darkMechanism": 1
-    },
-    "utils/traces/traceColors.ts": {
-      "darkMechanism": 2
     },
     "views/Dashboards/DashboardSettings.vue": {
       "rawVarInComponent": 3

@@ -487,7 +487,7 @@ export const convertPromQLData = async (
           fontSize: 12,
           precision: panelSchema.config?.decimals,
           show: true,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (name: any) {
             if (name.axisDimension == "y")
               return formatUnitValue(
