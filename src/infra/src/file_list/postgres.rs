@@ -1180,33 +1180,6 @@ DO UPDATE SET
         Ok(())
     }
 
-    async fn reset_stream_stats_min_ts(
-        &self,
-        _org_id: &str,
-        stream: &str,
-        min_ts: i64,
-    ) -> Result<()> {
-        let pool = CLIENT.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["update", "stream_stats"])
-            .inc();
-        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
-            .bind(min_ts)
-            .bind(stream)
-            .execute(&pool)
-            .await?;
-        DB_QUERY_NUMS
-            .with_label_values(&["update", "stream_stats"])
-            .inc();
-        sqlx::query(
-            r#"UPDATE stream_stats SET max_ts = min_ts WHERE stream = $1 AND max_ts < min_ts;"#,
-        )
-        .bind(stream)
-        .execute(&pool)
-        .await?;
-        Ok(())
-    }
-
     async fn len(&self) -> usize {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -1316,6 +1289,17 @@ DO UPDATE SET
         limit: i64,
         fast_mode: bool,
     ) -> Result<Vec<super::MergeJobRecord>> {
+        // quick check without the advisory lock, if there are no pending jobs we can skip the
+        // locked transaction.
+        let pool = CLIENT_RO.clone();
+        let has_pending = sqlx::query("SELECT id FROM file_list_jobs WHERE status = $1 LIMIT 1;")
+            .bind(super::FileListJobStatus::Pending)
+            .fetch_optional(&pool)
+            .await?;
+        if has_pending.is_none() {
+            return Ok(Vec::new());
+        }
+
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";

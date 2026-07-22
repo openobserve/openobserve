@@ -163,12 +163,6 @@ pub trait FileList: Sync + Send + 'static {
         is_recent: bool,
     ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
-    async fn reset_stream_stats_min_ts(
-        &self,
-        org_id: &str,
-        stream: &str,
-        min_ts: i64,
-    ) -> Result<()>;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
@@ -487,13 +481,6 @@ pub async fn set_stream_stats(
 #[inline]
 pub async fn reset_stream_stats() -> Result<()> {
     CLIENT.reset_stream_stats().await
-}
-
-#[inline]
-pub async fn reset_stream_stats_min_ts(org_id: &str, stream: &str, min_ts: i64) -> Result<()> {
-    CLIENT
-        .reset_stream_stats_min_ts(org_id, stream, min_ts)
-        .await
 }
 
 #[inline]
