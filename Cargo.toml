@@ -86,10 +86,10 @@ inherits = "release"
 debug = true
 strip = false
 
-# tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
-# feature on the jemalloc sys crate that jemalloc_pprof requires.
+# tikv-jemalloc-sys is a link-time dependency; prettytable-rs exposes the
+# `prettytable` crate name, which cargo-machete does not associate with it.
 [package.metadata.cargo-machete]
-ignored = ["tikv-jemalloc-sys"]
+ignored = ["prettytable-rs", "tikv-jemalloc-sys"]
 
 [dependencies]
 axum.workspace = true

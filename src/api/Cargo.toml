@@ -128,8 +128,4 @@ flight.workspace = true
 async-stream.workspace = true
 
 [dev-dependencies]
-expect-test.workspace = true
 base64.workspace = true
-float-cmp.workspace = true
-multer.workspace = true
-rcgen.workspace = true

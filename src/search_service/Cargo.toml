@@ -61,7 +61,3 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 wal.workspace = true
 usage_reporting.workspace = true
-
-[dev-dependencies]
-expect-test.workspace = true
-float-cmp.workspace = true

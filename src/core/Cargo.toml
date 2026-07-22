@@ -62,7 +62,6 @@ http.workspace = true
 http-body-util.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
-async-recursion.workspace = true
 aws-config = { workspace = true, optional = true }
 aws-credential-types = { workspace = true, optional = true }
 aws-sdk-sns.workspace = true
@@ -73,8 +72,6 @@ cron.workspace = true
 csv.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
-datafusion-proto.workspace = true
-datafusion-functions-json.workspace = true
 arrow.workspace = true
 arrow-json.workspace = true
 arrow-schema.workspace = true
@@ -83,7 +80,6 @@ object_store.workspace = true
 vortex = { workspace = true, optional = true }
 flate2.workspace = true
 futures.workspace = true
-hashlink.workspace = true
 hashbrown.workspace = true
 itertools.workspace = true
 jsonwebtoken.workspace = true
@@ -112,7 +108,6 @@ sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 snap.workspace = true
-sqlparser.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true
 time.workspace = true
@@ -135,10 +130,8 @@ tantivy.workspace = true
 tantivy_utils.workspace = true
 zip.workspace = true
 futures-util.workspace = true
-flight.workspace = true
 sourcemap.workspace = true
 
 [dev-dependencies]
-expect-test.workspace = true
 multer.workspace = true
 rcgen.workspace = true

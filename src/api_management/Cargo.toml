@@ -56,4 +56,3 @@ utoipa.workspace = true
 
 [dev-dependencies]
 cron.workspace = true
-tower.workspace = true
