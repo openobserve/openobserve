@@ -68,9 +68,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Copy Trace ID Button -->
               <OButton
                 data-test="trace-details-copy-trace-id-btn"
-                name="content-copy"
-                size="xs"
-                class="cursor-pointer hover:text-text-body"
+                variant="ghost"
+                size="icon-xs"
+                icon-left="content-copy"
                 :title="t('traces.copyTraceId')"
                 @click="copyTraceId"
               />
@@ -90,9 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
                 <OButton
                   data-test="trace-details-copy-session-id-btn"
-                  name="content-copy"
-                  size="xs"
-                  class="cursor-pointer hover:text-text-body"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
                   :title="t('traces.traceDetails.copySessionId')"
                   @click="copySessionId"
                 />
@@ -248,9 +248,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Copy Trace ID Button -->
                 <OButton
                   data-test="trace-details-copy-trace-id-btn"
-                  name="content-copy"
-                  size="xs"
-                  class="cursor-pointer hover:text-text-body"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
@@ -272,9 +272,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                   <OButton
                     data-test="trace-details-copy-session-id-btn"
-                    name="content-copy"
-                    size="xs"
-                    class="cursor-pointer hover:text-text-body"
+                    variant="ghost"
+                    size="icon-xs"
+                    icon-left="content-copy"
                     :title="t('traces.traceDetails.copySessionId')"
                     @click="copySessionId"
                   />
@@ -284,9 +284,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
-                  class="cursor-pointer hover:text-theme-accent"
-                  size="xs"
-                  name="open-in-new"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="open-in-new"
                   :title="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
                 />

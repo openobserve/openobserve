@@ -328,6 +328,29 @@ describe("TraceDetails", () => {
       );
     });
 
+    // Regression: these were written as <OButton name="content-copy" /> but
+    // `name` is not an OButton prop (ButtonProps exposes iconLeft/iconRight).
+    // It fell through to the native <button name> attribute, so the buttons
+    // rendered EMPTY — and OButton defaults to variant="primary", so they
+    // showed as solid filled blocks. The old test below hid this because it
+    // only queried by data-test, which still resolved.
+    it("renders the copy buttons with their icon, not as empty buttons", () => {
+      const copyBtn = wrapper.find(
+        '[data-test="trace-details-copy-trace-id-btn"]',
+      );
+
+      expect(copyBtn.exists()).toBe(true);
+      // OIcon resolves to an SVG component, so the icon NAME never reaches the
+      // DOM — the observable difference is simply that a broken button renders
+      // no children at all.
+      expect(copyBtn.element.children.length).toBeGreaterThan(0);
+      // A stray `name` attribute means the icon prop was mis-spelled again and
+      // fell through $attrs onto the native <button>.
+      expect(copyBtn.attributes("name")).toBeUndefined();
+      // Icon-only buttons must not render as a filled primary block.
+      expect(copyBtn.attributes("data-o2-variant")).toBe("ghost");
+    });
+
     it("should copy trace ID when copy button is clicked", async () => {
       const copyBtn = wrapper.find(
         '[data-test="trace-details-copy-trace-id-btn"]',
