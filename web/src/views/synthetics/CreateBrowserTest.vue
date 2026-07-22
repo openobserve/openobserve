@@ -757,9 +757,20 @@ function onClearResults() {
           <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
             {{ t('common.cancel') }}
           </OButton>
-          <OButton variant="primary" size="sm" data-test="synthetics-create-continue-btn" @click="onContinueToConfigure">
+          <OButton variant="outline" size="sm" data-test="synthetics-create-continue-btn" @click="onContinueToConfigure">
             {{ t('synthetics.createBrowserTest.continue') }}
             <template #suffix><OIcon name="chevron-right" size="sm" /></template>
+          </OButton>
+          <OButton
+            v-if="editId"
+            variant="primary"
+            size="sm"
+            :loading="isSaving"
+            data-test="synthetics-create-save-from-journey-btn"
+            @click="saveCheck"
+          >
+            {{ t('synthetics.newCheck.updateCheck') }}
+            <template #suffix><OIcon name="save" size="sm" /></template>
           </OButton>
         </template>
 
