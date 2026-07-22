@@ -14,7 +14,7 @@
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OTag variant="primary-soft" size="sm" shape="pill">1</OTag>
-          <span class="font-medium text-text-primary">
+          <span class="font-medium text-text-heading">
             {{ t("synthetics.privateLocations.setup.step1Title") }}
           </span>
         </div>
@@ -62,7 +62,7 @@
 
           <div class="relative">
             <pre
-              class="bg-surface-subtle border border-border-default rounded-md p-3 text-xs font-mono overflow-x-auto whitespace-pre"
+              class="bg-surface-subtle border border-border-default rounded-default p-3 text-xs font-mono overflow-x-auto whitespace-pre"
               data-test="synthetics-agent-setup-install-cmd"
               >{{ composedCommand }}</pre
             >
@@ -81,7 +81,7 @@
         <!-- Legacy fallback: server-composed docker one-liner -->
         <div v-else-if="install" class="relative">
           <pre
-            class="bg-surface-subtle border border-border-default rounded-md p-3 text-xs font-mono overflow-x-auto whitespace-pre"
+            class="bg-surface-subtle border border-border-default rounded-default p-3 text-xs font-mono overflow-x-auto whitespace-pre"
             data-test="synthetics-agent-setup-install-cmd"
             >{{ install }}</pre
           >
@@ -107,7 +107,7 @@
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OTag variant="primary-soft" size="sm" shape="pill">2</OTag>
-          <span class="font-medium text-text-primary">
+          <span class="font-medium text-text-heading">
             {{ t("synthetics.privateLocations.setup.step2Title") }}
           </span>
         </div>
@@ -120,7 +120,7 @@
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <OTag variant="primary-soft" size="sm" shape="pill">3</OTag>
-          <span class="font-medium text-text-primary">
+          <span class="font-medium text-text-heading">
             {{ t("synthetics.privateLocations.setup.step3Title") }}
           </span>
         </div>

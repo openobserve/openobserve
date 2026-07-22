@@ -36,7 +36,7 @@
     <div class="flex-1 min-h-0 overflow-y-auto">
       <div v-if="detail" class="flex flex-col gap-6 p-6">
         <!-- Summary strip -->
-        <div class="flex flex-wrap items-center gap-6 rounded-md border border-border-default bg-surface-subtle px-4 py-3 text-sm">
+        <div class="flex flex-wrap items-center gap-6 rounded-default border border-border-default bg-surface-subtle px-4 py-3 text-sm">
           <div class="flex flex-col">
             <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.agents") }}</span>
             <span class="font-medium">{{ detail.live_agents }}/{{ detail.agents_total }}</span>
@@ -65,7 +65,7 @@
 
         <!-- Agents (read-only, self-registered) -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-primary">
+          <h3 class="text-sm font-medium text-text-heading">
             {{ t("synthetics.privateLocations.detail.agentsTitle") }}
           </h3>
           <p class="text-xs text-text-muted">
@@ -111,7 +111,7 @@
 
         <!-- Assigned checks -->
         <div class="flex flex-col gap-2">
-          <h3 class="text-sm font-medium text-text-primary">
+          <h3 class="text-sm font-medium text-text-heading">
             {{ t("synthetics.privateLocations.detail.checksTitle") }}
           </h3>
           <OTable
