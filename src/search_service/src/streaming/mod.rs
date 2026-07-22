@@ -53,7 +53,7 @@ use transform::vector_enrichment::TableRegistry;
 
 // Only used by the enterprise pattern-extraction path (per-pattern volume buckets).
 #[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::histogram_interval::{
+use crate::sql::visitor::histogram_interval::{
     convert_histogram_interval_to_seconds, generate_histogram_interval,
 };
 use crate::{

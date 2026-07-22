@@ -176,21 +176,28 @@ pub async fn report_request_usage_stats(
 }
 
 pub fn report_usage(usages: Vec<UsageData>) {
+    tokio::spawn(publish_usage(usages));
+}
+
+async fn publish_usage(usages: Vec<UsageData>) {
     #[cfg(not(feature = "enterprise"))]
-    if !get_config().common.usage_enabled {
-        return;
+    {
+        let cfg = get_config();
+        if !cfg.common.usage_enabled {
+            return;
+        }
     }
 
-    tokio::spawn(async move {
-        for usage in usages {
-            if let Err(error) = USAGE_QUEUE
-                .enqueue(ReportingData::Usage(Box::new(usage)))
-                .await
-            {
-                log::error!("[USAGE-REPORTING] failed to enqueue usage data: {error}");
-            }
+    for usage in usages {
+        if let Err(e) = USAGE_QUEUE
+            .enqueue(ReportingData::Usage(Box::new(usage)))
+            .await
+        {
+            log::error!(
+                "[SELF-REPORTING] Failed to send usage data to background ingesting job: {e}"
+            );
         }
-    });
+    }
 }
 
 pub async fn start() -> Result<(), String> {
