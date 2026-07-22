@@ -192,21 +192,23 @@ impl Message {
     }
 
     pub async fn progress(&self) -> Result<()> {
-        match self {
-            Message::Nats(msg) => msg
+        match &self.ack {
+            AckHandle::Nats(msg) => msg
                 .ack_with(AckKind::Progress)
                 .await
                 .map_err(|e| Error::Message(format!("progress ack error:{e}")))?,
+            AckHandle::Memory(handle) => handle.progress(),
         }
         Ok(())
     }
 
     pub async fn double_ack(&self) -> Result<()> {
-        match self {
-            Message::Nats(msg) => msg
+        match &self.ack {
+            AckHandle::Nats(msg) => msg
                 .double_ack()
                 .await
                 .map_err(|e| Error::Message(format!("double ack error:{e}")))?,
+            AckHandle::Memory(handle) => handle.ack(),
         }
         Ok(())
     }

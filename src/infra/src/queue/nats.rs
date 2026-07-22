@@ -57,7 +57,7 @@ impl NatsPullConsumer {
         messages
             .try_next()
             .await
-            .map(|message| message.map(super::Message::Nats))
+            .map(|message| message.map(super::Message::from_nats))
             .map_err(|e| Error::Message(format!("failed to receive NATS message: {e}")))
     }
 }
