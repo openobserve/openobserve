@@ -182,10 +182,19 @@ const useEnterpriseRoutes = () => {
 
     routes.push(
       {
-        path: "synthetics/new",
-        name: "synthetics-new",
+        path: "synthetics/add",
+        name: "synthetics-add",
         component: () => import("@/views/synthetics/CreateCheck.vue"),
-        meta: { title: "New Check" },
+        meta: { title: "Add Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetics/edit/:id",
+        name: "synthetics-edit",
+        component: () => import("@/views/synthetics/CreateCheck.vue"),
+        meta: { title: "Edit Check" },
         beforeEnter(to: any, from: any, next: any) {
           syntheticsRouteGuard(to, from, next);
         },

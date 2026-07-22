@@ -336,7 +336,7 @@ function onJumpToWindow(startTime: number, endTime: number) {
 }
 
 function editMonitor() {
-  router.push({ name: "synthetics-new", query: { edit: monitorId.value } });
+  router.push({ name: "synthetics-edit", params: { id: monitorId.value } });
 }
 
 function openRunDetail(runId: string, executionId: string) {

@@ -425,12 +425,6 @@ async function initPage() {
 
   // Load locations after monitors — not critical for initial render.
   loadLocations()
-
-  const editId = route.query.edit
-  if (typeof editId === 'string' && editId) {
-    const monitor = monitors.value.find((m) => String(m.id) === editId)
-    if (monitor) openEdit(monitor)
-  }
 }
 
 onMounted(() => {
@@ -799,7 +793,7 @@ const onEmptyAction = (actionId: string) => {
 }
 
 const openCreate = (type: SyntheticCheckType = 'browser') =>
-  router.push({ name: 'synthetics-new', query: { folder: activeFolderId.value, type } })
+  router.push({ name: 'synthetics-add', query: { folder: activeFolderId.value, type } })
 
 const onTypeSelected = (type: SyntheticCheckType) => {
   showTypePicker.value = false
@@ -808,8 +802,9 @@ const onTypeSelected = (type: SyntheticCheckType) => {
 
 const openEdit = (m: any) => {
   router.push({
-    name: 'synthetics-new',
-    query: { edit: String(m.id), folder: activeFolderId.value },
+    name: 'synthetics-edit',
+    params: { id: String(m.id) },
+    query: { folder: activeFolderId.value },
   })
 }
 
