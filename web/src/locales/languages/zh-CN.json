@@ -8525,7 +8525,7 @@
         "chipSampling": "采样控制"
       },
       "descriptionPlaceholder": "此作业监控什么？",
-      "samplingValueHelp": "JSON：rate 是 0-1 之间的数字，count 是正整数。",
+      "samplingValueHelp": "请输入 0 到 1 之间的采样率。",
       "samplingValueAllHelp": "当模式为“全部”时不适用 — 每个匹配的事件都将被评估。",
       "samplingHelp": "在筛选器之后应用。控制成本 — 只有匹配的 span 计入比率。",
       "presets": {
@@ -8544,6 +8544,7 @@
         "sampling": "采样"
       },
       "targetSection": "目标",
+      "filteringSection": "筛选",
       "scorersSection": "评分器和制图",
       "nameLabel": "名称",
       "namePlaceholder": "任务名称",
@@ -8553,7 +8554,7 @@
       "streamTypePlaceholder": "追踪",
       "descriptionLabel": "描述",
       "samplingModeLabel": "采样模式",
-      "samplingValueLabel": "采样值 JSON",
+      "samplingValueLabel": "采样率",
       "samplingModes": {
         "rate": "采样率",
         "all": "全部",

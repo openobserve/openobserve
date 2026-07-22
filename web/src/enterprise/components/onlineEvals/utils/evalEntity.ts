@@ -1,13 +1,14 @@
 import type {
   EvalJob,
   EvalJobScorerRef,
+  EvalTargetScope,
   Provider,
   ScoreConfig,
   Scorer,
   ScorerType,
 } from "@/services/online-evals.service";
 
-export function valueOf(row: any, camelKey: string, snakeKey: string) {
+export function valueOf<T = any>(row: any, camelKey: string, snakeKey: string): T | undefined {
   return row?.[camelKey] ?? row?.[snakeKey];
 }
 
@@ -41,6 +42,10 @@ export function dataTypeOf(row: ScoreConfig) {
 
 export function streamTypeOf(row: EvalJob) {
   return String(valueOf(row, "streamType", "stream_type") || "traces");
+}
+
+export function targetScopeOf(row: EvalJob): EvalTargetScope {
+  return (valueOf(row, "targetScope", "target_scope") || "span") as EvalTargetScope;
 }
 
 export function samplingModeOf(row: EvalJob) {
