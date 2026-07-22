@@ -30,11 +30,8 @@ use crate::{
     service::{
         alerts::alert::AlertError,
         dashboards::{DashboardError, reports::ReportError},
-        db::{
-            alerts::{destinations::DestinationError, templates::TemplateError},
-            pipeline::PipelineError,
-        },
-        folders::FolderError,
+        db::alerts::{destinations::DestinationError, templates::TemplateError},
+        pipeline::PipelineError,
     },
 };
 
@@ -147,34 +144,30 @@ impl From<AlertError> for Response {
     }
 }
 
-impl From<DestinationError> for Response {
-    fn from(value: DestinationError) -> Self {
-        match &value {
-            DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
-                MetaHttpResponse::conflict(value)
-            }
-            DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            DestinationError::NotFound => MetaHttpResponse::not_found(value),
-            other_err => MetaHttpResponse::bad_request(other_err),
+pub fn destination_error_response(value: DestinationError) -> Response {
+    match &value {
+        DestinationError::UsedByAlert(_) | DestinationError::UsedByPipeline(_) => {
+            MetaHttpResponse::conflict(value)
         }
+        DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        DestinationError::NotFound => MetaHttpResponse::not_found(value),
+        other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
 
-impl From<TemplateError> for Response {
-    fn from(value: TemplateError) -> Self {
-        match value {
-            TemplateError::InfraError(e) => {
-                MetaHttpResponse::internal_error(TemplateError::InfraError(e))
-            }
-            TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
-            TemplateError::DeleteWithDestination(e) => {
-                MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(e))
-            }
-            TemplateError::PrebuiltReadOnly(name) => {
-                MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
-            }
-            other_err => MetaHttpResponse::bad_request(other_err),
+pub fn template_error_response(value: TemplateError) -> Response {
+    match value {
+        TemplateError::InfraError(err) => {
+            MetaHttpResponse::internal_error(TemplateError::InfraError(err))
         }
+        TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
+        TemplateError::DeleteWithDestination(destination) => {
+            MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
+        }
+        TemplateError::PrebuiltReadOnly(name) => {
+            MetaHttpResponse::forbidden(TemplateError::PrebuiltReadOnly(name))
+        }
+        other_err => MetaHttpResponse::bad_request(other_err),
     }
 }
 
@@ -255,36 +248,6 @@ impl From<ReportError> for Response {
     }
 }
 
-impl From<FolderError> for Response {
-    fn from(value: FolderError) -> Self {
-        match value {
-            FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::MissingName => {
-                MetaHttpResponse::bad_request("Folder name cannot be empty")
-            }
-            FolderError::UpdateDefaultFolder => {
-                MetaHttpResponse::bad_request("Can't update default folder")
-            }
-            FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
-                "Folder contains dashboards, please move/delete dashboards from folder",
-            ),
-            FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
-                "Folder contains alerts, please move/delete alerts from folder",
-            ),
-            FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
-                "Folder contains reports, please move/delete reports from folder",
-            ),
-            FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
-            FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
-            FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
-            FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
-                "Folder with this name already exists in this organization",
-            ),
-        }
-    }
-}
-
 impl From<PipelineError> for Response {
     fn from(value: PipelineError) -> Self {
         match value {
@@ -309,9 +272,9 @@ impl From<EvalJobError> for Response {
                 log::error!("[EvalJob] reconciler error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")
             }
-            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
-                MetaHttpResponse::bad_request(value)
-            }
+            EvalJobError::InvalidStatus(_)
+            | EvalJobError::InvalidStatusTransition { .. }
+            | EvalJobError::InvalidJob(_) => MetaHttpResponse::bad_request(value),
         }
     }
 }

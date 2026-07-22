@@ -76,6 +76,16 @@ pub struct WorkflowResult {
 }
 
 #[cfg(feature = "enterprise")]
+fn eval_sampling_key(record: &json::Value, idx: usize) -> String {
+    record
+        .get("span_id")
+        .and_then(|v| v.as_str())
+        .or_else(|| record.get("trace_id").and_then(|v| v.as_str()))
+        .map(str::to_owned)
+        .unwrap_or_else(|| idx.to_string())
+}
+
+#[cfg(feature = "enterprise")]
 fn should_sample_eval_record(record: &json::Value, idx: usize, sampling_rate: f64) -> bool {
     if sampling_rate >= 1.0 {
         return true;
@@ -84,12 +94,7 @@ fn should_sample_eval_record(record: &json::Value, idx: usize, sampling_rate: f6
         return false;
     }
 
-    let sample_key = record
-        .get("trace_id")
-        .and_then(|v| v.as_str())
-        .or_else(|| record.get("span_id").and_then(|v| v.as_str()))
-        .map(str::to_owned)
-        .unwrap_or_else(|| idx.to_string());
+    let sample_key = eval_sampling_key(record, idx);
 
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     sample_key.hash(&mut hasher);
@@ -520,6 +525,7 @@ impl ExecutablePipeline {
             let function_runtime: Option<CompiledFunctionRuntime> =
                 self.function_map.get(node_id).cloned();
             let pipeline_name = pipeline_name.clone();
+            let pipeline_kind = self.kind.clone();
             let stream_name = stream_name.clone();
             let inv_id_cp = inv_id.to_string();
 
@@ -547,6 +553,7 @@ impl ExecutablePipeline {
                 node_idx: idx,
                 org_id: org_id_cp,
                 pipeline_name,
+                pipeline_kind,
                 stream_name,
                 source_stream_name,
                 source_stream_type,
@@ -819,6 +826,7 @@ impl ExecutablePipeline {
                 node_idx: idx,
                 org_id: org_id_cp,
                 pipeline_name,
+                pipeline_kind: PipelineKind::User,
                 stream_name: None,
                 source_stream_type: StreamType::Logs,
                 inv_id: inv_id_cp,
@@ -1131,6 +1139,7 @@ struct ProcessMetadata {
     node_idx: usize,
     org_id: String,
     pipeline_name: String,
+    pipeline_kind: PipelineKind,
     stream_name: Option<String>,
     source_stream_name: String,
     source_stream_type: StreamType,
@@ -1302,6 +1311,17 @@ async fn process_node(
 }
 
 #[cfg(feature = "enterprise")]
+fn is_allowed_eval_source(
+    pipeline_kind: &PipelineKind,
+    stream_name: &str,
+    stream_type: StreamType,
+) -> bool {
+    matches!(pipeline_kind, PipelineKind::Evaluation)
+        && stream_type == StreamType::Traces
+        && !infra::table::online_eval_jobs::is_reserved_eval_source_stream(stream_name)
+}
+
+#[cfg(feature = "enterprise")]
 async fn process_llm_evaluation_node(
     params: &config::meta::pipeline::components::LlmEvaluationParams,
     metadata: ProcessMetadata,
@@ -1309,6 +1329,23 @@ async fn process_llm_evaluation_node(
 ) -> usize {
     let mut count: usize = 0;
     let inv_id = metadata.inv_id;
+    if !is_allowed_eval_source(
+        &metadata.pipeline_kind,
+        &metadata.source_stream_name,
+        metadata.source_stream_type,
+    ) {
+        log::error!(
+            "[Pipeline] {} [inv={inv_id}]: LLM evaluation node {} blocked source {}:{}",
+            metadata.pipeline_name,
+            metadata.node_idx,
+            metadata.source_stream_type,
+            metadata.source_stream_name
+        );
+        while channels.receiver.recv().await.is_some() {
+            count += 1;
+        }
+        return count;
+    }
     if !o2_enterprise::enterprise::common::config::get_config()
         .common
         .online_evals_enabled
@@ -1350,6 +1387,7 @@ async fn process_llm_evaluation_node(
         {
             let eval_run_id = config::ider::generate();
             ctx.eval_run_id = Some(eval_run_id.clone());
+            ctx.job_version = params.job_version;
             ctx.sampling_rate = Some(params.sampling_rate);
             let sampled = should_sample_eval_record(&item.record, item.idx, params.sampling_rate);
             ctx.sampled = Some(sampled);
@@ -1360,8 +1398,14 @@ async fn process_llm_evaluation_node(
                         crate::service::llm_evaluations::evaluator_trace::EvaluatorTraceInput {
                             org_id: ctx.org_id.clone(),
                             evaluator_trace_id: ctx.evaluator_trace_id.clone(),
+                            evaluator_span_id: None,
+                            parent_span_id: None,
+                            is_root: false,
+                            target_scope: ctx.target_scope.clone(),
+                            target_id: ctx.target_id.clone(),
                             target_span_id: ctx.span_id.clone(),
                             target_trace_id: ctx.trace_id.clone(),
+                            target_session_id: ctx.session_id.clone(),
                             target_stream: ctx.source_stream.clone(),
                             target_stream_type: ctx.source_stream_type.clone(),
                             target_agent_name: ctx.agent_name.clone(),
@@ -1370,9 +1414,13 @@ async fn process_llm_evaluation_node(
                             scorer_version: None,
                             scorer_type: None,
                             job_id: ctx.job_id.clone(),
+                            job_version: ctx.job_version.map(|version| version.to_string()),
                             score_config_id: None,
                             score_config_version: None,
                             eval_run_id: Some(eval_run_id),
+                            task_id: None,
+                            score_id: None,
+                            evaluation_key: None,
                             provider_id: None,
                             provider_name: None,
                             provider_type: None,
@@ -1412,9 +1460,11 @@ async fn process_llm_evaluation_node(
                 pipeline_name: metadata.pipeline_name.clone(),
                 node_idx: metadata.node_idx,
                 ctx,
+                job_version: params.job_version,
+                input_mapping: params.input_mapping.clone(),
                 scorer_refs: scorer_refs.clone(),
             };
-            if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_span_observation(observation) {
+            if let Err(e) = o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::enqueue_span_observation(observation).await {
                 o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::log_enqueue_error(
                     &metadata.pipeline_name,
                     metadata.node_idx,
@@ -2631,6 +2681,8 @@ mod tests {
                         sampling_rate: 1.0,
                         scorers: Vec::new(),
                         job_id: Some("job-1".to_string()),
+                        job_version: Some(1),
+                        input_mapping: None,
                     },
                 ),
                 children: Vec::new(),
@@ -2658,12 +2710,15 @@ mod tests {
             sampling_rate: 1.0,
             scorers: Vec::new(),
             job_id: Some("job-1".to_string()),
+            job_version: Some(1),
+            input_mapping: None,
         };
         let metadata = ProcessMetadata {
             pipeline_id: "pipeline-1".to_string(),
             node_idx: 1,
             org_id: "org-1".to_string(),
             pipeline_name: "eval-pipeline".to_string(),
+            pipeline_kind: PipelineKind::Evaluation,
             stream_name: Some("traces".to_string()),
             source_stream_name: "traces".to_string(),
             source_stream_type: StreamType::Traces,
@@ -2703,6 +2758,56 @@ mod tests {
 
         assert_eq!(count, 1);
         assert!(child_rx.try_recv().is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_llm_evaluation_node_rejects_reserved_source_streams() {
+        assert!(!is_allowed_eval_source(
+            &PipelineKind::Evaluation,
+            "_evaluator",
+            StreamType::Traces
+        ));
+        assert!(!is_allowed_eval_source(
+            &PipelineKind::Evaluation,
+            "_llm_scores",
+            StreamType::Traces
+        ));
+        assert!(!is_allowed_eval_source(
+            &PipelineKind::Evaluation,
+            "customer-logs",
+            StreamType::Logs
+        ));
+        assert!(!is_allowed_eval_source(
+            &PipelineKind::User,
+            "customer-traces",
+            StreamType::Traces
+        ));
+        assert!(is_allowed_eval_source(
+            &PipelineKind::Evaluation,
+            "customer-traces",
+            StreamType::Traces
+        ));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_llm_eval_sampling_prefers_span_identity() {
+        let first_span = json::json!({
+            "span_id": "span-a",
+            "trace_id": "same-trace",
+        });
+        let second_span = json::json!({
+            "span_id": "span-b",
+            "trace_id": "same-trace",
+        });
+        let trace_only = json::json!({
+            "trace_id": "same-trace",
+        });
+
+        assert_eq!(eval_sampling_key(&first_span, 0), "span-a");
+        assert_eq!(eval_sampling_key(&second_span, 0), "span-b");
+        assert_eq!(eval_sampling_key(&trace_only, 99), "same-trace");
     }
 
     #[test]

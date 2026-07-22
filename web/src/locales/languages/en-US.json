@@ -7802,7 +7802,7 @@
       "sessions": "Browse and inspect agent sessions turn by turn",
       "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
-      "quality": "Score and track the quality of your LLM responses",
+      "quality": "Track score quality across span, trace, and session evaluations",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
@@ -7952,7 +7952,22 @@
     },
     "quality": {
       "scopeLabel": "All quality dimensions in this workspace",
+      "agentLabel": "Agent",
       "agentPlaceholder": "All agents",
+      "kpisAriaLabel": "Tier 1 KPIs",
+      "dataTypes": {
+        "numericShort": "Num",
+        "categoricalShort": "Cat",
+        "booleanShort": "Bool"
+      },
+      "scopes": {
+        "filterLabel": "Score scope",
+        "filterHint": "Compare this Score Config across evaluation target scopes.",
+        "all": "All",
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Session"
+      },
       "timeRange": {
         "label": "Time range",
         "last1h": "Past 1 hour",
@@ -7966,20 +7981,20 @@
       },
       "refresh": "Refresh",
       "kpis": {
-        "evaluated": {
-          "title": "Evaluated Spans",
+        "scoreResults": {
+          "title": "Score Results",
           "unit": "",
-          "hint": "Distinct span IDs in _llm_scores within the window"
+          "hint": "Latest score results across span, trace, and session evaluations in the window"
         },
         "evaluationCost": {
           "title": "Evaluation Cost",
           "unit": "$",
           "hint": "Sum of LLM Judge scorer cost in the window"
         },
-        "jobSuccess": {
-          "title": "Job Success",
+        "scorerSuccess": {
+          "title": "Scorer Success",
           "unit": "%",
-          "hint": "Online Eval Job run success rate"
+          "hint": "Successful scorer invocations as a percentage of all scorer invocations"
         },
         "scorerFailures": {
           "title": "Scorer Failures",
@@ -7987,11 +8002,12 @@
           "hint": "Failed scorer invocations in the window"
         },
         "latencyP95": {
-          "title": "Latency p95",
+          "title": "Scorer Latency p95",
           "unit": "s",
-          "hint": "Scorer-call p95 latency"
+          "hint": "95th percentile scorer invocation latency"
         },
         "vsPrev": "vs prev",
+        "noPriorData": "no prior data",
         "noData": "—"
       },
       "loading": "Loading quality data…",
@@ -8000,7 +8016,9 @@
         "noData": "No scores yet for this config in this window.",
         "empty": {
           "title": "Waiting for your first scores",
-          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs."
+          "titleScoped": "No {scope} scores in this window",
+          "description": "No scores have landed for this config in the selected time range. They'll appear here automatically once a scorer using it runs.",
+          "descriptionScoped": "No {scope} scores have landed for this config in the selected time range. Choose another scope or widen the time range."
         },
         "drillTitle": "Drill to traces",
         "trendTitle": "Trend",
@@ -8009,12 +8027,18 @@
         "compositionTitle": "Composition over time",
         "categoryDistributionTitle": "Category distribution",
         "passRateTitle": "Pass rate over time",
+        "healthyRateTitle": "Healthy rate over time",
+        "trueRateTitle": "True rate over time",
         "trueFalseTitle": "True vs False",
         "legendAvg": "Avg",
         "legendP95": "p95",
         "legendThreshold": "threshold {direction} {value}",
         "legendHealthy": "healthy",
         "legendUnhealthy": "unhealthy",
+        "legendHealthyRate": "Healthy rate",
+        "legendTrueRate": "True rate",
+        "legendTrueCount": "true ({count})",
+        "legendFalseCount": "false ({count})",
         "kpis": {
           "average": "Average",
           "p50": "P50",
@@ -8022,11 +8046,49 @@
           "p50p95": "P50 / P95",
           "unhealthy": "Unhealthy",
           "healthy": "Healthy",
-          "coverage": "Coverage"
+          "trueRate": "True rate",
+          "falseRate": "False rate",
+          "coverage": "Coverage",
+          "targetsScored": "Targets scored"
+        },
+        "health": {
+          "title": "Health status",
+          "noThreshold": "No healthy threshold is configured. Scores cannot be classified as healthy or degrading yet.",
+          "thresholdOnly": "Healthy if {threshold}",
+          "summary": "{percent}% below threshold · Healthy if {threshold}"
+        }
+      },
+      "runs": {
+        "title": "Evaluation scores",
+        "hint": "Scores and reasoning come from _llm_scores. Select a run to open its evaluator trace for further investigation.",
+        "filterLabel": "Filter evaluation scores",
+        "footerTitle": "Evaluation Scores",
+        "noThresholdHint": "Set a healthy threshold on this Score Config to classify and highlight unhealthy scores.",
+        "noReasoning": "No reasoning recorded",
+        "unknownAgent": "Unknown agent",
+        "unknownScope": "Unknown scope",
+        "queryError": "Evaluation scores could not be refreshed. The last successful page is still shown.",
+        "empty": "No evaluation scores in this time range.",
+        "emptyUnhealthy": "No unhealthy scores in this time range.",
+        "filters": {
+          "all": "All scores",
+          "unhealthy": "Unhealthy"
+        },
+        "health": {
+          "healthy": "Healthy",
+          "unhealthy": "Unhealthy"
+        },
+        "columns": {
+          "time": "Evaluated",
+          "result": "Score",
+          "reasoning": "Reasoning",
+          "target": "Target",
+          "agent": "Agent"
         }
       },
       "sidebar": {
         "allConfigs": "All configs",
+        "scoreCount": "{count} scores",
         "empty": "No configs match this filter."
       },
       "overview": {
@@ -8043,13 +8105,30 @@
         "waitingPrimaryCta": "Open Eval Jobs",
         "waitingRefreshCta": "Refresh",
         "noThreshold": "no threshold",
+        "relativeTime": {
+          "daysAgo": "{day}d ago",
+          "monthsAgo": "{month}mo ago"
+        },
+        "status": {
+          "healthy": "Healthy",
+          "unhealthy": "Needs attention",
+          "noThreshold": "Threshold not set",
+          "noData": "No score data"
+        },
+        "health": {
+          "thresholdSummary": "{percent}% below · Healthy if {threshold}",
+          "noThresholdHint": "Set a healthy threshold",
+          "noDataHint": "No scores in this window"
+        },
         "columns": {
+          "health": "Health",
           "scoreConfig": "Score Config",
           "type": "Type",
+          "quality": "Quality",
           "totalScores": "Total Scores",
-          "coverage": "Coverage",
+          "scopeMix": "Scope Mix",
           "unhealthy": "Unhealthy",
-          "trend": "Trend",
+          "volumeTrend": "Volume Trend",
           "threshold": "Healthy if",
           "updated": "Updated"
         }
@@ -8077,11 +8156,10 @@
     "buttons": {
       "cancel": "Cancel",
       "close": "Close",
-      "create": "Create",
       "remove": "Remove",
       "save": "Save",
       "saveAsDraft": "Save as Draft",
-      "createAndActivate": "Create & Activate"
+      "createAndActivate": "Save & Activate"
     },
     "scorerTypeDialog": {
       "title": "Create a New Scorer",
@@ -8165,8 +8243,7 @@
         "createdLabel": "Created",
         "updatedLabel": "Updated"
       },
-      "createTitle": "Create Score Config",
-      "editTitlePrefix": "Edit",
+      "createTitle": "New Score Config",
       "subtitle": "Soft-schema dimensions that scorers produce.",
       "eyebrow": "Score Configs",
       "sectionTitle": "Score Configs",
@@ -8175,8 +8252,6 @@
       "searchPlaceholder": "Search configs",
       "allTypes": "All types",
       "newButton": "New score config",
-      "saveButton": "Save changes",
-      "createButton": "Create",
       "columns": {
         "index": "#",
         "name": "Name",
@@ -8381,14 +8456,13 @@
       "backTo": "Back to Scorers",
       "badgeRemote": "Remote",
       "badgeLlm": "LLM Judge",
-      "createTitleRemote": "Create Remote Scorer",
-      "createTitleLlm": "Create LLM Judge Scorer",
-      "editTitleRemote": "Edit Remote Scorer",
-      "editTitleLlm": "Edit LLM Judge Scorer",
+      "createTitleRemote": "New Remote Scorer",
+      "createTitleLlm": "New LLM Judge Scorer",
+      "editTitleRemote": "Update Remote Scorer",
+      "editTitleLlm": "Update LLM Judge Scorer",
       "subtitleRemote": "Call an HTTP endpoint you host. We render the request, you return a score.",
-      "subtitleLlm": "A language model judges each trace using the prompt you provide.",
+      "subtitleLlm": "A language model judges each evaluation target using the prompt you provide.",
       "descriptionPlaceholder": "A short summary of what this scorer measures.",
-      "producesScoreHelp": "What dimension does this scorer measure?",
       "providerHelp": "Choose the LLM Provider this judge calls. Manage providers in {settingsLink}.",
       "providerHelpSettingsLink": "Settings",
       "refreshProviders": "Refresh Providers",
@@ -8401,8 +8475,49 @@
       "rangeLabel": "Range:",
       "healthyLabel": "Healthy:",
       "typeLabel": "Type:",
-      "promptVariablesLabel": "Variables:",
-      "promptHelp": "Focus on the evaluation logic. Use {inputVar} and {outputVar} as placeholders.",
+      "promptVariablesLabel": "Variables in this prompt:",
+      "promptVariableGuide": {
+        "title": "Available Prompt Variables",
+        "description": "These variables can be used in the prompt above. How each one is filled in depends on what the Eval Job evaluates.",
+        "columns": {
+          "variable": "Prompt variable"
+        },
+        "scopes": {
+          "span": "Span",
+          "trace": "Trace",
+          "session": "Session"
+        },
+        "statuses": {
+          "jobMapped": "Map in Eval Job",
+          "systemProvided": "System provided",
+          "requiresSelector": "System provided · requires Span Selector",
+          "selectorRequired": "Span Selector required",
+          "unavailable": "Not available"
+        },
+        "variables": {
+          "inputOutput": {
+            "span": "Map these to the span fields holding the input and output.",
+            "trace": "Input and output from the trace's root span.",
+            "session": "Not available \u2014 a session has no single input or output."
+          },
+          "statistics": {
+            "span": "Map this name like any other scorer variable when evaluating a single span.",
+            "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
+            "session": "Session metrics: trace and turn counts, duration, and errors."
+          },
+          "spans": {
+            "span": "Map this name like any other scorer variable when evaluating a single span.",
+            "trace": "A filtered subset of the trace's spans, chosen by the Eval Job's Span Selector.",
+            "session": "Not available for sessions."
+          },
+          "steps": {
+            "span": "Map this name like any other scorer variable when evaluating a single span.",
+            "trace": "Spans in time order; the middle is folded when the trace is very long.",
+            "session": "Traces in time order, represented as conversation turns."
+          }
+        },
+        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable \u2014 indexed access like {indexedVar} is not supported."
+      },
       "identitySection": "Identity",
       "judgeSection": "Judge configuration",
       "endpointSection": "Endpoint",
@@ -8420,10 +8535,9 @@
       "modelPlaceholder": "gpt-4o",
       "promptLabel": "Judge prompt",
       "includeReasoningLabel": "Include Reasoning",
-      "includeReasoningHint": "LLM explains its score. Stored in score.metadata.reasoning.",
-      "extraFieldsLabel": "Extra Metadata Fields",
-      "extraFieldsOptional": "Optional",
-      "extraFieldsHint": "Add fields the LLM should output alongside the score. Stored in score.metadata for later analysis.",
+      "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
+      "extraFieldsLabel": "Extra Metadata Fields (Optional)",
+      "extraFieldsHint": "Ask the judge to return extra values with each score \u2014 a category or a confidence, for example.",
       "extraFields": {
         "colName": "Field Name",
         "colType": "Type",
@@ -8525,9 +8639,12 @@
         "eyebrow": "Eval Job",
         "refresh": "Refresh",
         "descriptionSection": "Description",
-        "targetSection": "Target",
+        "targetSection": "Evaluation Target",
         "streamLabel": "Stream",
         "streamTypeLabel": "Stream Type",
+        "targetScopeLabel": "Evaluate Each",
+        "idleWindowLabel": "Idle Window",
+        "maxAgeLabel": "Max Age",
         "filterLabel": "Filter",
         "filterEmpty": "No filter — every span is evaluated",
         "scorersSection": "Scorers",
@@ -8537,13 +8654,30 @@
         "scorerTypeRemote": "Remote",
         "producesPrefix": "Produces",
         "viewScorerHint": "View",
-        "inputMappingSection": "Input Mapping",
+        "inputMappingSection": "Prompt Variables",
         "samplingSection": "Sampling",
         "samplingModeLabel": "Mode",
         "samplingValueLabel": "Value",
         "samplingAll": "Evaluate every match",
         "samplingRate": "Random sample by rate",
         "samplingCount": "First N matches",
+        "manualSection": "Manual Evaluation",
+        "manualHelp": "Queue this job's scorers for one explicit target. Manual runs bypass automatic sampling and record the reason on the score metadata.",
+        "manualTargetIdLabel": "Target ID",
+        "manualSpanIdLabel": "Span ID",
+        "manualSpanIdPlaceholder": "span_id",
+        "manualTraceIdLabel": "Trace ID",
+        "manualTraceIdPlaceholder": "trace_id",
+        "manualSessionIdLabel": "Session ID",
+        "manualSessionIdPlaceholder": "session_id",
+        "manualReasonLabel": "Reason",
+        "manualReasonPlaceholder": "Why are you re-running this target?",
+        "manualVariablesLabel": "Variables JSON",
+        "manualVariablesObjectError": "Variables must be a JSON object",
+        "manualTargetRequired": "Target ID is required",
+        "manualSubmit": "Run Manual Eval",
+        "manualSuccess": "Queued {count} evaluation task(s)",
+        "manualError": "Manual evaluation failed",
         "metadataSection": "Metadata",
         "versionLabel": "Version",
         "pipelineLabel": "Pipeline ID",
@@ -8596,6 +8730,7 @@
         "name": "Name",
         "status": "Status",
         "stream": "Stream",
+        "targetScope": "Scope",
         "scorers": "Scorers",
         "successRate": "Success rate",
         "created": "Created",
@@ -8609,9 +8744,10 @@
         "chipSampling": "Sampling Control"
       },
       "descriptionPlaceholder": "What does this job monitor?",
-      "samplingValueHelp": "JSON: rate is a number 0-1, count is a positive integer.",
-      "samplingValueAllHelp": "Not applicable when mode is All — every matched event will be evaluated.",
-      "samplingHelp": "Apply after Filter. Controls cost — only matched spans count toward the rate.",
+      "samplingValueHelp": "Enter a rate between 0 and 1.",
+      "samplingValuePreview": "Evaluates {percent}% of matched targets.",
+      "samplingValueAllHelp": "Every matched target is evaluated.",
+      "samplingHelp": "Runs after filtering, to control cost.",
       "presets": {
         "label": "Quick presets",
         "rootSpans": "Root spans only",
@@ -8619,25 +8755,49 @@
         "toolCalls": "Tool calls"
       },
       "backTo": "Back to Eval Jobs",
-      "createTitle": "Create Online Eval Job",
-      "editTitle": "Edit Online Eval Job",
+      "createTitle": "New Eval Job",
+      "editTitle": "Update Eval Job",
       "stepper": {
         "target": "Target",
         "scorers": "Scorers",
         "mapping": "Mapping",
         "sampling": "Sampling"
       },
-      "targetSection": "Target",
+      "detailsSection": "Details",
+      "targetSection": "Evaluation Target",
+      "filteringSection": "Filtering",
       "scorersSection": "Scorers and mapping",
       "nameLabel": "Name",
       "namePlaceholder": "Production Faithfulness Monitor",
-      "streamLabel": "Input stream",
-      "streamPlaceholder": "Select Stream Name",
+      "streamLabel": "Stream",
+      "streamPlaceholder": "Select Stream",
       "streamTypeLabel": "Stream type",
       "streamTypePlaceholder": "traces",
+      "targetScopeLabel": "Evaluate Each",
+      "targetScopes": {
+        "span": "Span",
+        "trace": "Trace",
+        "session": "Session"
+      },
+      "targetScopeHelp": {
+        "span": "Evaluate each matching span independently.",
+        "trace": "Evaluate a whole trace after the completion window closes.",
+        "session": "Evaluate a session across traces after the completion window closes."
+      },
+      "completionSection": "Completion criteria",
+      "completionHelp": {
+        "trace": "The trace is evaluated as soon as the first of these is met.",
+        "session": "The session is evaluated as soon as the first of these is met."
+      },
+      "idleWindowLabel": "Idle window (seconds)",
+      "idleWindowHelp": "Evaluated after {duration} with no new spans.",
+      "idleWindowHelpEmpty": "Evaluated once no new spans arrive.",
+      "maxAgeLabel": "Max age (seconds)",
+      "maxAgeHelp": "Evaluated {duration} after the first span.",
+      "maxAgeHelpEmpty": "Evaluated at a fixed age, even if spans are still arriving.",
       "descriptionLabel": "Description",
       "samplingModeLabel": "Sampling mode",
-      "samplingValueLabel": "Sampling value JSON",
+      "samplingValueLabel": "Sampling rate",
       "samplingModes": {
         "rate": "Rate",
         "all": "All",
@@ -8645,7 +8805,11 @@
       },
       "scorerPicker": {
         "title": "Scorers",
-        "hint": "Select one or more scorers to run for every matched span.",
+        "hint": {
+          "span": "Select one or more scorers to run for every matching span.",
+          "trace": "Select one or more scorers to run for every eligible trace.",
+          "session": "Select one or more scorers to run for every eligible session."
+        },
         "meta": "{type} · v{version}",
         "placeholder": "Select Scorers",
         "searchPlaceholder": "Search scorers…",
@@ -8653,21 +8817,113 @@
       },
       "filter": {
         "title": "Filter condition",
-        "hint": "Only spans matching this condition enter sampling and scoring."
+        "hint": {
+          "span": "Only spans matching this condition enter sampling and scoring.",
+          "trace": "A trace enters sampling and scoring if any of its spans match this condition.",
+          "session": "A session enters sampling and scoring if any of its spans match this condition."
+        }
+      },
+      "selector": {
+        "title": "Which Spans (Optional)",
+        "hint": {
+          "trace": "Leave empty to include every span in the trace."
+        }
+      },
+      "endSignal": {
+        "title": "End signal (optional)",
+        "hint": {
+          "trace": "Define a span condition that closes the trace immediately when any span matches it.",
+          "session": "Define a span condition that closes the session immediately when any span matches it."
+        }
       },
       "inputMapping": {
-        "title": "Input mapping",
-        "hint": "Map span fields into each scorer template variable.",
+        "title": "Prompt variables",
+        "hint": {
+          "span": "Map each variable to the span field that supplies its value.",
+          "trace": "Trace values fill in automatically. Map anything else to a span field.",
+          "session": "Session values fill in automatically. Map anything else to a span field."
+        },
         "selectScorers": "Select scorers to configure their mappings.",
         "noVariables": "This scorer has no template variables to map.",
-        "variableCount": "{count} variables"
+        "variableCount": "{count} variables",
+        "systemProvided": {
+          "title": "{scope} Variables",
+          "description": "OpenObserve supplies these values from the {scope} itself. A scorer prompt can use them directly \u2014 no mapping needed.",
+          "badge": "System provided",
+          "selectorRequired": "Span Selector required",
+          "columns": {
+            "variable": "Prompt variable",
+            "source": "Source",
+            "description": "Value supplied"
+          },
+          "variables": {
+            "input": {
+              "trace": "Input from the trace's root span."
+            },
+            "output": {
+              "trace": "Output from the trace's root span."
+            },
+            "statistics": {
+              "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
+              "session": "Session metrics: trace and turn counts, duration, and errors."
+            },
+            "spans": {
+              "trace": "A filtered subset of spans, chosen by the job's Span Selector."
+            },
+            "steps": {
+              "trace": "Spans in time order; the middle is folded when the trace is very long.",
+              "session": "Traces in time order, represented as conversation turns."
+            }
+          }
+        }
+      },
+      "spanSelector": {
+        "select": "Select Span Selector",
+        "bindingHelp": "Traces can have hundreds of spans. Pick the ones this scorer should look at.",
+        "createForScorer": "Create for scorer",
+        "createForScorerTitle": "Create a Span Selector for this scorer",
+        "editorTitle": "Span Selector",
+        "name": "Selector name",
+        "schemaMode": "Fields To Read",
+        "defaultSchema": "Standard GenAI Fields",
+        "customSchema": "Custom Fields",
+        "defaultSchemaHelp": "These eight fields are read from every matching span. Anything missing comes through empty.",
+        "fields": "Fields",
+        "fieldsHelp": "Only these fields are read \u2014 nothing else is sent to the scorer.",
+        "maximumSpans": "Maximum Spans",
+        "budget": "Limits how many spans are selected from the trace.",
+        "validation": {
+          "name": "Enter a selector name.",
+          "duplicateName": "Selector names must be unique in this job.",
+          "filter": "Complete or remove the unfinished filter condition.",
+          "fields": "Select at least one field for a custom schema.",
+          "maximumSpans": "Maximum spans must be a positive whole number.",
+          "budget": "Too many spans for the fields selected. Lower the span count, or read fewer fields.",
+          "binding": "Select a Span Selector for every scorer."
+        }
       },
       "preview": {
-        "title": "Matched Spans",
-        "hint": "Once you've picked a stream and filter, this panel will show how many spans your job will match.",
-        "matchedSuffix": "spans matched · last 24h",
+        "scopes": {
+          "span": {
+            "title": "Matched Spans",
+            "hint": "Once you've picked a stream and filter, this panel will show how many spans your job will match.",
+            "matchedSuffix": "spans matched · last 24h",
+            "matchedLoading": "Counting matched spans…"
+          },
+          "trace": {
+            "title": "Matched Traces",
+            "hint": "Once you've picked a stream and filter, this panel will show how many traces your job will match.",
+            "matchedSuffix": "traces matched · last 24h",
+            "matchedLoading": "Counting matched traces…"
+          },
+          "session": {
+            "title": "Matched Sessions",
+            "hint": "Once you've picked a stream and filter, this panel will show how many sessions your job will match.",
+            "matchedSuffix": "sessions matched · last 24h",
+            "matchedLoading": "Counting matched sessions…"
+          }
+        },
         "matchedError": "Couldn't load the match count",
-        "matchedLoading": "Counting matched spans…",
         "matchedIncomplete": "Finish the filter condition to update the count.",
         "summaryTitle": "Summary",
         "summaryName": "Name",
@@ -8684,6 +8940,7 @@
       "validation": {
         "nameRequired": "Job name is required",
         "streamRequired": "A stream is required",
+        "idleWindowMinimum": "Idle window must be at least 45 seconds",
         "samplingValueRequired": "A sampling value is required"
       }
     }

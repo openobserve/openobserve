@@ -633,7 +633,7 @@ pub async fn enable_pipeline_bulk(
 mod tests {
     use axum::{http::StatusCode, response::Response};
 
-    use crate::service::db::pipeline::PipelineError;
+    use crate::service::pipeline::store::PipelineError;
 
     fn status(err: PipelineError) -> StatusCode {
         Response::from(err).status()

@@ -244,6 +244,8 @@ members = [
     "src/transform",
     "src/super_cluster_queue",
     "src/search",
+    "src/cipher",
+    "src/db",
     "src/promql",
     "src/jobs",
     "src/mcp",
@@ -279,6 +281,8 @@ common = { path = "src/common" }
 transform = { path = "src/transform" }
 super_cluster_queue = { path = "src/super_cluster_queue" }
 search = { path = "src/search" }
+openobserve-cipher = { path = "src/cipher" }
+db = { path = "src/db" }
 promql = { path = "src/promql" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }

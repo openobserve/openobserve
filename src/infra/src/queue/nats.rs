@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc};
+use std::{cmp::max, sync::Arc, time::Duration};
 
 use async_nats::jetstream::{self, consumer::DeliverPolicy};
 use async_trait::async_trait;
@@ -32,6 +32,34 @@ pub struct NatsQueue {
     prefix: String,
     consumer_name: String,
     is_durable: bool,
+}
+
+pub struct NatsPullConsumer {
+    consumer: jetstream::consumer::PullConsumer,
+    ack_wait: Duration,
+}
+
+impl NatsPullConsumer {
+    pub fn ack_wait(&self) -> Duration {
+        self.ack_wait
+    }
+
+    pub async fn next(&mut self) -> Result<Option<super::Message>> {
+        let mut messages = self
+            .consumer
+            .batch()
+            .max_messages(1)
+            .expires(Duration::from_secs(30))
+            .messages()
+            .await
+            .map_err(|e| Error::Message(format!("failed to request NATS message: {e}")))?;
+
+        messages
+            .try_next()
+            .await
+            .map(|message| message.map(super::Message::from_nats))
+            .map_err(|e| Error::Message(format!("failed to receive NATS message: {e}")))
+    }
 }
 
 impl NatsQueue {
@@ -54,6 +82,38 @@ impl NatsQueue {
             consumer_name: format_key(&consumer_name),
             is_durable,
         }
+    }
+
+    pub async fn pull_consumer(
+        &self,
+        topic: &str,
+        deliver_policy: Option<queue::DeliverPolicy>,
+    ) -> Result<NatsPullConsumer> {
+        let stream_name = format!("{}{}", self.prefix, format_key(topic));
+        let client = get_nats_client().await.clone();
+        let jetstream = jetstream::new(client);
+        let stream = jetstream
+            .get_stream(&stream_name)
+            .await
+            .map_err(|e| Error::Message(format!("failed to get NATS stream {stream_name}: {e}")))?;
+        let config = jetstream::consumer::pull::Config {
+            name: Some(self.consumer_name.clone()),
+            durable_name: self.is_durable.then(|| self.consumer_name.clone()),
+            deliver_policy: get_deliver_policy(deliver_policy),
+            ..Default::default()
+        };
+        let consumer = stream
+            .get_or_create_consumer(&self.consumer_name, config)
+            .await
+            .map_err(|e| {
+                Error::Message(format!(
+                    "failed to get or create NATS consumer {} for stream {stream_name}: {e}",
+                    self.consumer_name
+                ))
+            })?;
+        let ack_wait = consumer.cached_info().config.ack_wait;
+
+        Ok(NatsPullConsumer { consumer, ack_wait })
     }
 }
 

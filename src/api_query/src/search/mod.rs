@@ -27,8 +27,9 @@ use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{
-            Request, ResultSchemaResponse, SearchEventType, SearchHistoryHitResponse,
-            SearchHistoryRequest, SearchPartitionRequest, default_use_cache,
+            AgentSearchMode, Request, ResultSchemaResponse, SearchEventType,
+            SearchHistoryHitResponse, SearchHistoryRequest, SearchPartitionRequest,
+            default_use_cache,
         },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
@@ -55,10 +56,10 @@ use crate::{
             functions,
             http::{
                 get_clear_cache_from_request, get_dashboard_info_from_request,
-                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -227,7 +228,7 @@ async fn can_use_distinct_stream(
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets.",
+            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
             "category": "search",
             "pinned": true
         }))
@@ -383,9 +384,8 @@ pub async fn search(
     }
 
     // get stream settings
-    for stream_name in stream_names {
-        if let Some(settings) =
-            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+    for stream_name in &stream_names {
+        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(user_id))
@@ -405,7 +405,7 @@ pub async fn search(
         // Validate query fields if requested
         if validate_query
             && let Err(e) =
-                utils::validate_query_fields(&org_id, &stream_name, stream_type, &req.query.sql)
+                utils::validate_query_fields(&org_id, stream_name, stream_type, &req.query.sql)
                     .await
         {
             return map_error_to_http_response(&e, Some(trace_id));
@@ -414,7 +414,7 @@ pub async fn search(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         if let Some(res) = check_stream_permissions(
-            &stream_name,
+            stream_name,
             &org_id,
             user_id,
             &stream_type,
@@ -488,20 +488,42 @@ pub async fn search(
         }
     }
 
-    // run search with cache
-    let res = SearchService::cache::search(
-        &trace_id,
-        &org_id,
-        stream_type,
-        Some(user_id.to_string()),
-        &req,
-        range_error,
-        false,
-        dashboard_info,
-        is_multi_stream_search,
-    )
-    .instrument(http_span)
-    .await;
+    // run search with cache; `agent_options.mode = partition` instead drives
+    // the partitioned streaming pipeline (per-partition early termination,
+    // streaming-aggs cache) and collects it into a single response
+    let use_partition_mode = req
+        .agent_options
+        .as_ref()
+        .is_some_and(|o| o.mode == AgentSearchMode::Partition);
+    let res = if use_partition_mode {
+        SearchService::streaming::collect::search_partition_mode(
+            &trace_id,
+            &org_id,
+            user_id,
+            &mut req,
+            stream_type,
+            stream_names,
+            get_fallback_order_by_col_from_request(&url_query),
+            range_error,
+            http_span,
+            is_multi_stream_search,
+        )
+        .await
+    } else {
+        SearchService::cache::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            Some(user_id.to_string()),
+            &req,
+            range_error,
+            false,
+            dashboard_info,
+            is_multi_stream_search,
+        )
+        .instrument(http_span)
+        .await
+    };
     match res {
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);

@@ -556,9 +556,9 @@ pub async fn search_http2_stream(
 
     // Spawn the search task in a separate task
     tokio::spawn(process_search_stream_request(
+        trace_id.clone(),
         org_id.clone(),
         user_id,
-        trace_id.clone(),
         req,
         stream_type,
         stream_names,
@@ -948,9 +948,9 @@ pub async fn values_http2_stream(
 
     // Spawn the search task to process the request
     tokio::spawn(process_search_stream_request(
+        trace_id.clone(),
         org_id.clone(),
         user_id,
-        trace_id.clone(),
         req,
         stream_type,
         stream_names,
