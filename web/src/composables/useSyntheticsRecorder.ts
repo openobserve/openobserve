@@ -70,14 +70,12 @@ const useSyntheticsRecorder = () => {
 
   // Global message listener — processes all bridge messages from the content script.
   window.addEventListener('message', (event: MessageEvent) => {
-    console.log("MEssage", event);
     if (event.source !== window) return;
 
     // Content script announces itself when injected on demand (toolbar icon
     // click after mid-session install). Auto-trigger detection.
     if (event.data?.ch === 'oo-bridge-ready') {
       detectExtension().then((installed: boolean) => {
-        console.log("IS INstalled ---", installed);
         if (installed) onAutoDetected?.();
       }).catch(() => {});
       return;
@@ -131,8 +129,6 @@ const useSyntheticsRecorder = () => {
     const promise = new Promise<T | null>(resolve => {
       pendingCommands.set(nonce, resolve);
     });
-
-    console.log("Post message", command);
     window.postMessage(
       { ch: BRIDGE_CHANNEL, dir: 'to-ext', nonce, msg: { type: 'synthetics-command', command } },
       '*',
@@ -159,7 +155,6 @@ const useSyntheticsRecorder = () => {
     const status = await sendCommand<RecorderStatus>({ action: 'getStatus' })
     isInstalled.value = status !== null
     if (status?.isRecording) isRecording.value = true
-    console.log("detect extension ---", status, isInstalled.value);
     return isInstalled.value
   }
 
@@ -169,7 +164,6 @@ const useSyntheticsRecorder = () => {
   // by sendCommand's nonce-based promise.
   function handleBridgeData(message: unknown) {
     const msg = message as RecorderPortInbound;
-    console.log("MEssage ---", message);
     if (msg.type !== 'synthetics-recorder') return
     const { payload } = msg
     switch (payload.method) {
@@ -272,7 +266,6 @@ const useSyntheticsRecorder = () => {
     await sendCommand<RecorderStopResponse>({ action: 'stopRecording' })
     const steps = [...liveSteps.value]
     isRecording.value = false // set before disconnect so onDisconnect's guard sees isRecording=false
-    console.log("Disconnect ---");
     bridgeDisconnect()
     liveSteps.value = []
     onExternalStop = savedOnExternalStop
@@ -286,7 +279,6 @@ const useSyntheticsRecorder = () => {
     const steps = [...liveSteps.value]
     sendCommand({ action: 'stopRecording' }) // fire-and-forget
     isRecording.value = false
-    console.log("Disconnect ---");
     bridgeDisconnect()
     liveSteps.value = []
     return steps
@@ -301,7 +293,6 @@ const useSyntheticsRecorder = () => {
   function cancelRecording() {
     // Null the callback so onDisconnect doesn't commit discarded steps.
     onExternalStop = null
-    console.log("Disconnect ---");
     bridgeDisconnect()
     liveSteps.value = []
     isRecording.value = false
@@ -356,7 +347,6 @@ const useSyntheticsRecorder = () => {
     const res = await sendCommand<ReplayResponse>({ action: 'replay', steps: plainSteps, targetUrl })
     isReplaying.value = false
     replayResult.value = res
-    console.log("response ----", res);
     if (res) {
       if (res.stopped) replayPhase.value = 'stopped'
       else if (res.passed) replayPhase.value = 'passed'
@@ -385,7 +375,6 @@ const useSyntheticsRecorder = () => {
 
   /** Release the port; call from the host component's onUnmounted. */
   function cleanup() {
-    console.log("Disconnect ---");
     bridgeDisconnect()
   }
 
