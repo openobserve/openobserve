@@ -20,7 +20,7 @@
 //! the Eval Scheduler owns their target detection.
 //!
 //! This module is intentionally side-effect bounded — it only reads/writes
-//! the underlying pipeline via the `service::pipeline` and `service::db::pipeline`
+//! the underlying pipeline via the `service::pipeline` service and store
 //! layers. The caller (`service::llm_evaluations::eval_jobs`) is responsible for persisting any
 //! resulting `pipeline_id` on the job row.
 
@@ -41,7 +41,7 @@ use config::{
 };
 use infra::table::online_eval_jobs::OnlineEvalJob;
 
-use crate::service::db::pipeline::PipelineError;
+use crate::service::pipeline::store::PipelineError;
 
 /// Errors raised by the reconciler.
 #[derive(Debug, thiserror::Error)]
@@ -143,7 +143,7 @@ async fn ensure_pipeline(
         }
         Some(pipeline_id) => {
             // Pipeline should already exist. Fetch and compare.
-            let existing = match crate::service::db::pipeline::get_by_id(pipeline_id).await {
+            let existing = match crate::service::pipeline::store::get_by_id(pipeline_id).await {
                 Ok(p) => p,
                 Err(PipelineError::NotFound(_)) => {
                     // Drift: job thinks a pipeline exists but it's gone. Recreate
