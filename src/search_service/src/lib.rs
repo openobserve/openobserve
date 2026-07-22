@@ -72,6 +72,7 @@ pub mod grpc;
 pub mod grpc_search;
 pub mod grpc_server;
 pub mod partition;
+pub mod query_range;
 mod searcher;
 pub mod streaming;
 #[cfg(feature = "enterprise")]
@@ -594,7 +595,7 @@ pub async fn search_multi(
 pub async fn search_partition(
     trace_id: &str,
     org_id: &str,
-    max_query_range: i64,
+    user_id: Option<&str>,
     stream_type: StreamType,
     req: &search::SearchPartitionRequest,
     skip_max_query_range: bool,
@@ -606,7 +607,7 @@ pub async fn search_partition(
 
     let ctx = PartitionSqlContext::new(req, org_id, stream_type).await?;
 
-    let stream_files = collect_stream_files(trace_id, max_query_range, &ctx).await?;
+    let stream_files = collect_stream_files(trace_id, user_id, &ctx).await?;
 
     let mut resp = search::SearchPartitionResponse {
         trace_id: trace_id.to_string(),
@@ -997,18 +998,18 @@ pub fn server_internal_error(error: impl ToString) -> Error {
 pub async fn search_partition_multi(
     trace_id: &str,
     org_id: &str,
-    max_query_ranges: &[i64],
+    user_id: &str,
     stream_type: StreamType,
     req: &search::MultiSearchPartitionRequest,
 ) -> Result<search::SearchPartitionResponse, Error> {
     let mut res = search::SearchPartitionResponse::default();
     let mut total_rec = 0;
     let mut is_histogram_eligible = true;
-    for (index, query) in req.sql.iter().enumerate() {
+    for query in &req.sql {
         match search_partition(
             trace_id,
             org_id,
-            max_query_ranges.get(index).copied().unwrap_or_default(),
+            Some(user_id),
             stream_type,
             &search::SearchPartitionRequest {
                 start_time: req.start_time,

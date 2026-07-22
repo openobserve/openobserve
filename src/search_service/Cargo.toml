@@ -9,6 +9,7 @@ publish = false
 default = []
 enterprise = [
     "audit/enterprise",
+    "db/enterprise",
     "dep:o2_enterprise",
     "common/enterprise",
     "config/enterprise",
@@ -16,7 +17,12 @@ enterprise = [
     "search/enterprise",
     "usage_reporting/enterprise",
 ]
-vectorscan = ["dep:o2_enterprise", "o2_enterprise/vectorscan", "search/vectorscan"]
+vectorscan = [
+    "db/vectorscan",
+    "dep:o2_enterprise",
+    "o2_enterprise/vectorscan",
+    "search/vectorscan",
+]
 vortex = ["dep:vortex", "config/vortex", "o2_enterprise?/vortex", "search/vortex"]
 
 [dependencies]
@@ -33,6 +39,7 @@ arrow-schema.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 config.workspace = true
+db.workspace = true
 datafusion.workspace = true
 datafusion-proto.workspace = true
 datafusion-functions-json.workspace = true

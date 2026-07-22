@@ -22,8 +22,6 @@ use {
     crate::handler::http::request::search::utils::{
         StreamPermissionResourceType, check_stream_permissions,
     },
-    crate::service::stream_utils::get_max_query_range,
-    config::meta::stream::StreamType,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     search_service::streaming,
     tokio::sync::mpsc,
@@ -194,8 +192,6 @@ pub async fn extract_patterns(
 
         // Spawn the search task with pattern extraction enabled
         let trace_id_clone = trace_id.clone();
-        let max_query_range =
-            get_max_query_range(&stream_names, &org_id, &user_id, StreamType::Logs).await;
         tokio::spawn(async move {
             streaming::process_search_stream_request(
                 org_id,
@@ -204,7 +200,6 @@ pub async fn extract_patterns(
                 req,
                 config::meta::stream::StreamType::Logs,
                 stream_names, // Use resolved stream names from SQL
-                max_query_range,
                 config::meta::sql::OrderBy::default(),
                 tracing::Span::current(),
                 tx,

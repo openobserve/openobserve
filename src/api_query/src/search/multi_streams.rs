@@ -60,7 +60,7 @@ use crate::{
                 get_search_event_context_from_request, get_search_type_from_request,
                 get_stream_type_from_request, get_use_cache_from_request,
             },
-            stream::{get_max_query_range, get_settings_max_query_range},
+            stream::get_settings_max_query_range,
         },
     },
     extractors::Headers,
@@ -804,22 +804,8 @@ pub async fn _search_partition_multi(
         }
     }
 
-    let mut max_query_ranges = Vec::with_capacity(req.sql.len());
-    for sql in &req.sql {
-        let stream_names = match resolve_stream_names(sql) {
-            Ok(stream_names) => stream_names,
-            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
-        };
-        max_query_ranges
-            .push(get_max_query_range(&stream_names, &org_id, user_id, stream_type).await);
-    }
-    let search_fut = SearchService::search_partition_multi(
-        &trace_id,
-        &org_id,
-        &max_query_ranges,
-        stream_type,
-        &req,
-    );
+    let search_fut =
+        SearchService::search_partition_multi(&trace_id, &org_id, user_id, stream_type, &req);
     let search_res = if cfg.common.should_create_span() {
         search_fut.instrument(http_span).await
     } else {
@@ -1500,16 +1486,6 @@ pub async fn search_multi_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
 
-    let mut max_query_ranges = Vec::with_capacity(queries.len());
-    for req in &queries {
-        let stream_names = match resolve_stream_names(&req.query.sql) {
-            Ok(stream_names) => stream_names,
-            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
-        };
-        max_query_ranges
-            .push(get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await);
-    }
-
     // Spawn the multi-stream search task.
     // Pass needs_post_vrl (true only when per_query_response=true AND ResultArray VRL) and
     // the top-level query_fn for post-hoc application. When needs_post_vrl is false,
@@ -1519,7 +1495,6 @@ pub async fn search_multi_stream(
         user_id,
         trace_id.clone(),
         queries,
-        max_query_ranges,
         stream_type,
         http_span,
         tx,

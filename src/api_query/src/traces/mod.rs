@@ -46,7 +46,6 @@ use crate::{
         utils::{
             auth::UserEmail,
             http::{get_or_create_trace_id, get_use_cache_from_request},
-            stream::get_max_query_range,
         },
     },
     extractors::Headers,
@@ -1333,13 +1332,7 @@ async fn process_latest_traces_stream(
     let partitions = match SearchService::search_partition(
         &trace_id,
         &org_id,
-        get_max_query_range(
-            std::slice::from_ref(&stream_name),
-            &org_id,
-            &user_id,
-            stream_type,
-        )
-        .await,
+        Some(user_id.as_str()),
         stream_type,
         &partition_req,
         false,

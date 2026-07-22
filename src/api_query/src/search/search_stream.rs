@@ -62,7 +62,6 @@ use crate::{
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request,
             },
-            stream::get_max_query_range,
         },
     },
     extractors::Headers,
@@ -554,8 +553,6 @@ pub async fn search_http2_stream(
     #[cfg(not(feature = "enterprise"))]
     let audit_ctx = None;
     let search_type = req.search_type;
-    let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await;
-
     // Spawn the search task in a separate task
     tokio::spawn(process_search_stream_request(
         org_id.clone(),
@@ -564,7 +561,6 @@ pub async fn search_http2_stream(
         req,
         stream_type,
         stream_names,
-        max_query_range,
         req_order_by,
         http_span,
         tx,
@@ -947,8 +943,6 @@ pub async fn values_http2_stream(
 
     // Pattern extraction is not supported for values endpoint
     let extract_patterns = false;
-    let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await;
-
     // Spawn the search task to process the request
     tokio::spawn(process_search_stream_request(
         org_id.clone(),
@@ -957,7 +951,6 @@ pub async fn values_http2_stream(
         req,
         stream_type,
         stream_names,
-        max_query_range,
         OrderBy::default(),
         http_span,
         tx,

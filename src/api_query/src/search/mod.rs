@@ -60,7 +60,7 @@ use crate::{
                 get_search_type_from_request, get_stream_type_from_request,
                 get_use_cache_from_request, get_work_group,
             },
-            stream::{get_max_query_range, get_settings_max_query_range},
+            stream::get_settings_max_query_range,
         },
     },
     extractors::Headers,
@@ -1560,31 +1560,30 @@ pub async fn search_partition(
         return MetaHttpResponse::bad_request(e);
     }
 
-    let stream_names = match resolve_stream_names(&req.sql) {
-        Ok(stream_names) => stream_names,
-        Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
-    };
-
     #[cfg(feature = "enterprise")]
-    for stream in stream_names.iter() {
-        if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
-            return (
-                StatusCode::TOO_MANY_REQUESTS,
-                Json(MetaHttpResponse::error(
+    {
+        let stream_names = match resolve_stream_names(&req.sql) {
+            Ok(stream_names) => stream_names,
+            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
+        };
+        for stream in stream_names.iter() {
+            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
+                return (
                     StatusCode::TOO_MANY_REQUESTS,
-                    e.to_string(),
-                )),
-            )
-                .into_response();
+                    Json(MetaHttpResponse::error(
+                        StatusCode::TOO_MANY_REQUESTS,
+                        e.to_string(),
+                    )),
+                )
+                    .into_response();
+            }
         }
     }
-
-    let max_query_range = get_max_query_range(&stream_names, &org_id, user_id, stream_type).await;
 
     let search_res = SearchService::search_partition(
         &trace_id,
         &org_id,
-        max_query_range,
+        Some(user_id),
         stream_type,
         &req,
         false,

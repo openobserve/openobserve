@@ -106,8 +106,7 @@ pub async fn do_partitioned_search(
     let modified_start_time = req.query.start_time;
     let modified_end_time = req.query.end_time;
 
-    let partition_resp =
-        get_partitions(trace_id, org_id, stream_type, req, max_query_range).await?;
+    let partition_resp = get_partitions(trace_id, org_id, stream_type, req, user_id).await?;
 
     let mut partitions = partition_resp.partitions;
 
@@ -662,7 +661,7 @@ pub async fn get_partitions(
     org_id: &str,
     stream_type: StreamType,
     req: &config::meta::search::Request,
-    max_query_range: i64,
+    user_id: &str,
 ) -> Result<SearchPartitionResponse, infra::errors::Error> {
     let search_partition_req = SearchPartitionRequest {
         sql: req.query.sql.clone(),
@@ -682,7 +681,7 @@ pub async fn get_partitions(
     let res = SearchService::search_partition(
         trace_id,
         org_id,
-        max_query_range,
+        Some(user_id),
         stream_type,
         &search_partition_req,
         false,
@@ -751,7 +750,6 @@ pub async fn process_delta(
     accumulated_results: &mut Vec<SearchResultType>,
     curr_res_size: &mut i64,
     user_id: &str,
-    max_query_range: i64,
     remaining_query_range: &mut f64,
     cache_req_duration: i64,
     cache_order_by: &OrderBy,
@@ -769,8 +767,7 @@ pub async fn process_delta(
     req.query.start_time = delta.delta_start_time;
     req.query.end_time = delta.delta_end_time;
 
-    let partition_resp =
-        get_partitions(trace_id, org_id, stream_type, &req, max_query_range).await?;
+    let partition_resp = get_partitions(trace_id, org_id, stream_type, &req, user_id).await?;
     let mut partitions = partition_resp.partitions;
 
     if partitions.is_empty() {

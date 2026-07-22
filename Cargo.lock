@@ -9767,6 +9767,7 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
+ "db",
  "expect-test",
  "flight",
  "float-cmp",

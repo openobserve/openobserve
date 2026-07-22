@@ -59,6 +59,7 @@ use crate::service::search::sql::visitor::histogram_interval::{
 use crate::{
     cache as search_cache,
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
+    query_range::get_max_query_range,
     sql::visitor::histogram_interval::{
         HistogramIntervalVisitor, validate_and_adjust_histogram_interval,
     },
@@ -85,7 +86,6 @@ pub async fn process_search_stream_request(
     mut req: Request,
     stream_type: StreamType,
     stream_names: Vec<String>,
-    max_query_range: i64,
     req_order_by: OrderBy,
     search_span: tracing::Span,
     sender: mpsc::Sender<Result<StreamResponses, infra::errors::Error>>,
@@ -250,6 +250,8 @@ pub async fn process_search_stream_request(
     }
 
     req.query.query_fn = query_fn.clone();
+
+    let max_query_range = get_max_query_range(&stream_names, &org_id, &user_id, stream_type).await;
 
     // HACK: always search from the first partition, this is because to support pagination in http2
     // streaming we need context of no of hits per partition, which currently is not available.
@@ -813,7 +815,6 @@ pub async fn process_search_stream_request_multi(
     user_id: String,
     trace_id: String,
     queries: Vec<Request>,
-    max_query_ranges: Vec<i64>,
     stream_type: StreamType,
     search_span: tracing::Span,
     sender: mpsc::Sender<Result<config::meta::search::StreamResponses, infra::errors::Error>>,
@@ -860,10 +861,6 @@ pub async fn process_search_stream_request_multi(
     let mut query_tasks = Vec::new();
 
     for (query_index, mut req) in queries.into_iter().enumerate() {
-        let max_query_range = max_query_ranges
-            .get(query_index)
-            .copied()
-            .unwrap_or_default();
         let query_trace_id = format!("{trace_id}-q{query_index}");
         let org_id_clone = org_id.clone();
         let user_id_clone = user_id.clone();
@@ -917,7 +914,6 @@ pub async fn process_search_stream_request_multi(
                 req,
                 stream_type,
                 stream_names,
-                max_query_range,
                 OrderBy::default(),
                 search_span_clone.clone(),
                 query_sender,
