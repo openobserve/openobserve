@@ -194,9 +194,9 @@ pub async fn extract_patterns(
         let trace_id_clone = trace_id.clone();
         tokio::spawn(async move {
             streaming::process_search_stream_request(
+                trace_id_clone,
                 org_id,
                 user_id,
-                trace_id_clone,
                 req,
                 config::meta::stream::StreamType::Logs,
                 stream_names, // Use resolved stream names from SQL
