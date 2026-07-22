@@ -70,6 +70,7 @@ use crate::{
 };
 
 pub mod cache;
+pub mod collect;
 pub mod execution;
 pub mod sorting;
 pub mod utils;

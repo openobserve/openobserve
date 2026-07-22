@@ -27,8 +27,9 @@ use config::{
     DISTINCT_FIELDS, META_ORG_ID, TIMESTAMP_COL_NAME, get_config,
     meta::{
         search::{
-            Request, ResultSchemaResponse, SearchEventType, SearchHistoryHitResponse,
-            SearchHistoryRequest, SearchPartitionRequest, default_use_cache,
+            AgentSearchMode, Request, ResultSchemaResponse, SearchEventType,
+            SearchHistoryHitResponse, SearchHistoryRequest, SearchPartitionRequest,
+            default_use_cache,
         },
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::resolve_stream_names,
@@ -55,10 +56,10 @@ use crate::{
             functions,
             http::{
                 get_clear_cache_from_request, get_dashboard_info_from_request,
-                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request, get_work_group,
+                get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+                get_is_ui_histogram_from_request, get_or_create_trace_id,
+                get_search_event_context_from_request, get_search_type_from_request,
+                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
             },
             stream::get_settings_max_query_range,
         },
@@ -383,9 +384,8 @@ pub async fn search(
     }
 
     // get stream settings
-    for stream_name in stream_names {
-        if let Some(settings) =
-            infra::schema::get_settings(&org_id, &stream_name, stream_type).await
+    for stream_name in &stream_names {
+        if let Some(settings) = infra::schema::get_settings(&org_id, stream_name, stream_type).await
         {
             let max_query_range =
                 get_settings_max_query_range(settings.max_query_range, &org_id, Some(user_id))
@@ -405,7 +405,7 @@ pub async fn search(
         // Validate query fields if requested
         if validate_query
             && let Err(e) =
-                utils::validate_query_fields(&org_id, &stream_name, stream_type, &req.query.sql)
+                utils::validate_query_fields(&org_id, stream_name, stream_type, &req.query.sql)
                     .await
         {
             return map_error_to_http_response(&e, Some(trace_id));
@@ -414,7 +414,7 @@ pub async fn search(
         // Check permissions on stream
         #[cfg(feature = "enterprise")]
         if let Some(res) = check_stream_permissions(
-            &stream_name,
+            stream_name,
             &org_id,
             user_id,
             &stream_type,
@@ -488,20 +488,73 @@ pub async fn search(
         }
     }
 
-    // run search with cache
-    let res = SearchService::cache::search(
-        &trace_id,
-        &org_id,
-        stream_type,
-        Some(user_id.to_string()),
-        &req,
-        range_error,
-        false,
-        dashboard_info,
-        is_multi_stream_search,
-    )
-    .instrument(http_span)
-    .await;
+    // run search with cache; `agent_options.mode = ai` instead drives the
+    // partitioned streaming pipeline (per-partition early termination,
+    // streaming-aggs cache) and collects it into a single response
+    let use_partition_mode = req
+        .agent_options
+        .as_ref()
+        .is_some_and(|o| o.mode == AgentSearchMode::Partition);
+    let res = if use_partition_mode {
+        // the partition loop requires a populated search_type
+        if req.search_type.is_none() {
+            req.search_type = Some(SearchEventType::Other);
+        }
+        // partition scan direction follows the query's ORDER BY
+        let req_order_by = match crate::service::search::sql::Sql::new(
+            &req.query.clone().into(),
+            &org_id,
+            stream_type,
+            req.search_type,
+        )
+        .await
+        {
+            Ok(sql) => sql.order_by.first().map(|v| v.1).unwrap_or_default(),
+            Err(e) => {
+                return map_error_to_http_response(&e, Some(trace_id));
+            }
+        };
+        let fallback_order_by_col = get_fallback_order_by_col_from_request(&url_query);
+        let mut res = SearchService::streaming::collect::search_stream_collect(
+            &org_id,
+            user_id,
+            &trace_id,
+            req.clone(),
+            stream_type,
+            stream_names,
+            req_order_by,
+            fallback_order_by_col,
+            http_span,
+            is_multi_stream_search,
+        )
+        .await;
+        // attach the range-clamp note the same way the cache path does
+        if let Ok(res) = res.as_mut()
+            && !range_error.is_empty()
+        {
+            res.is_partial = true;
+            res.new_start_time = Some(req.query.start_time);
+            res.new_end_time = Some(req.query.end_time);
+            if !res.function_error.contains(&range_error) {
+                res.function_error.push(range_error.clone());
+            }
+        }
+        res
+    } else {
+        SearchService::cache::search(
+            &trace_id,
+            &org_id,
+            stream_type,
+            Some(user_id.to_string()),
+            &req,
+            range_error,
+            false,
+            dashboard_info,
+            is_multi_stream_search,
+        )
+        .instrument(http_span)
+        .await
+    };
     match res {
         Ok(mut res) => {
             res.set_took(start.elapsed().as_millis() as usize);
