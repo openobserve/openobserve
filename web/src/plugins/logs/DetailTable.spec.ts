@@ -237,7 +237,7 @@ describe("DetailTable Component", () => {
   });
 
   it("should initialize reactive data correctly", () => {
-    expect(wrapper.vm.tab).toBe("json");
+    expect(wrapper.vm.tab).toBe("table");
     expect(wrapper.vm.selectedRelativeValue).toBe(10);
     expect(wrapper.vm.shouldWrapValues).toBe(true);
     expect(wrapper.vm.recordSizeOptions).toEqual([
@@ -307,10 +307,10 @@ describe("DetailTable Component", () => {
   });
 
   // Test 11-15: Tab Functionality
-  it("should start with JSON tab active", () => {
-    expect(wrapper.vm.tab).toBe("json");
-    const jsonTab = wrapper.find('[data-test="log-detail-json-tab"]');
-    expect(jsonTab.exists()).toBe(true);
+  it("should start with Table tab active", () => {
+    expect(wrapper.vm.tab).toBe("table");
+    const tableTab = wrapper.find('[data-test="log-detail-table-tab"]');
+    expect(tableTab.exists()).toBe(true);
     // OTab uses Tailwind classes for active state
   });
 
