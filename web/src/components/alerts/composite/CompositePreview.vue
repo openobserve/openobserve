@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Evaluated expression: names → states → result -->
     <div v-if="previewResult" class="text-xs flex flex-col gap-1">
       <span class="text-text-secondary">{{ t("alerts.composite.howItEvaluated") }}:</span>
-      <code class="bg-[var(--o2-tab-bg)] rounded px-2 py-1 break-all">
+      <code class="bg-code-bg rounded px-2 py-1 break-all">
         {{ composite.expression }} → {{ substitutedExpression }} = {{ previewResult.result.toUpperCase() }}
       </code>
     </div>
@@ -242,7 +242,7 @@ export default defineComponent({
   padding: 1px 6px;
   font-size: 0.75rem;
   font-weight: 500;
-  font-family: var(--o2-font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   background: color-mix(in srgb, var(--q-primary) 12%, transparent);
   color: var(--q-primary);
   white-space: nowrap;

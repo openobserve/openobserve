@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Checklist -->
     <div class="flex flex-col gap-2">
       <div class="flex items-start gap-2">
-        <OIcon name="check" size="xs" class="text-[var(--o2-positive)] mt-1 shrink-0" />
+        <OIcon name="check" size="xs" class="text-status-positive mt-1 shrink-0" />
         <div class="flex flex-wrap items-center gap-1.5">
           <span class="font-semibold">{{ t("alerts.composite.firesWhen") }}:</span>
           <code class="summary-chip">{{ composite.expression || "—" }}</code>
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="flex items-start gap-2">
-        <OIcon name="check" size="xs" class="text-[var(--o2-positive)] mt-1 shrink-0" />
+        <OIcon name="check" size="xs" class="text-status-positive mt-1 shrink-0" />
         <div class="flex flex-col gap-1 min-w-0">
           <span class="font-semibold">{{ t("alerts.composite.terms") }} ({{ composite.terms.length }})</span>
           <div
@@ -55,25 +55,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="flex items-center gap-2">
-        <OIcon name="check" size="xs" class="text-[var(--o2-positive)] shrink-0" />
+        <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.monitors") }}:</span>
         <span class="summary-chip">{{ triggerCondition.period }} {{ t("alerts.composite.minutes") }}</span>
       </div>
 
       <div class="flex items-center gap-2">
-        <OIcon name="check" size="xs" class="text-[var(--o2-positive)] shrink-0" />
+        <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.checksEvery") }}:</span>
         <span class="summary-chip">{{ triggerCondition.frequency }} {{ t("alerts.composite.minutes") }}</span>
       </div>
 
       <div class="flex items-start gap-2">
-        <OIcon name="check" size="xs" class="text-[var(--o2-positive)] mt-1 shrink-0" />
+        <OIcon name="check" size="xs" class="text-status-positive mt-1 shrink-0" />
         <div class="flex flex-wrap items-center gap-1.5 min-w-0">
           <span class="font-semibold">{{ t("alerts.composite.notifies") }}:</span>
           <template v-if="onCompositeDests.length">
             <span v-for="d in onCompositeDests" :key="`d-${d}`" class="summary-chip">{{ d }}</span>
           </template>
-          <span v-else class="flex items-center gap-1 text-[var(--o2-warning,#b45309)]">
+          <span v-else class="flex items-center gap-1 text-status-warning">
             {{ t("alerts.composite.noDestination") }}
             <OIcon name="warning" size="xs" />
           </span>
@@ -90,13 +90,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="flex items-center gap-2">
-        <OIcon name="check" size="xs" class="text-[var(--o2-positive)] shrink-0" />
+        <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.onError") }}:</span>
         <span class="summary-chip">{{ onErrorSummary }}</span>
       </div>
 
       <div class="flex items-center gap-2">
-        <OIcon name="check" size="xs" class="text-[var(--o2-positive)] shrink-0" />
+        <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.cooldown") }}:</span>
         <span class="summary-chip">{{ triggerCondition.silence }} {{ t("alerts.composite.minutes") }}</span>
       </div>

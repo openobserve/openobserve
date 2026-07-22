@@ -503,7 +503,7 @@ export default defineComponent({
   padding: 1px 6px;
   font-size: 0.75rem;
   font-weight: 500;
-  font-family: var(--o2-font-mono, ui-monospace, monospace);
+  font-family: var(--font-mono);
   background: color-mix(in srgb, var(--q-primary) 12%, transparent);
   color: var(--q-primary);
   white-space: nowrap;
