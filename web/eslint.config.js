@@ -5,6 +5,7 @@ import typescriptParser from "@typescript-eslint/parser";
 import vueParser from "vue-eslint-parser";
 import prettier from "eslint-plugin-prettier";
 import cypress from "eslint-plugin-cypress";
+import vueI18n from "@intlify/eslint-plugin-vue-i18n";
 import fs from "fs";
 
 // Bans the legacy --o2-* CSS custom-property vocabulary anywhere in a .vue/.ts
@@ -71,6 +72,57 @@ const noLegacyO2Tokens = {
   },
 };
 
+// User-facing text props. `vue/no-bare-strings-in-template` checks these as STATIC
+// attributes (label="Save"); the custom rule below checks the SAME names as BOUND
+// literals (:label="'Save'" / :label=`Save`). One list feeds both, so "what counts
+// as translatable text passed to a component" is defined in exactly one place —
+// add a prop name here when a component takes user-facing text through a new prop.
+// The a11y/native entries reproduce the built-in rule's defaults (we replace, not
+// extend, its attribute map). Component props are evidence-based (scan of web/src).
+const TEXT_ATTRS = [
+  "title", "aria-label", "aria-placeholder", "aria-roledescription", "aria-valuetext", "alt",
+  "label", "sub-label", "sublabel", "placeholder", "hint", "tooltip", "message",
+  "content", "help-text", "caption", "description", "subtitle", "header",
+  "empty-label", "error-message", "button-label", "primary-button-label",
+  "secondary-button-label", "confirm-text", "cancel-text",
+];
+const TEXT_ATTR_SET = new Set(TEXT_ATTRS);
+
+// Bans hardcoded text in a BOUND text prop — :label="'Save'" or :label=`Go`.
+// `vue/no-bare-strings-in-template` only inspects STATIC attributes, so a bound
+// string/template literal slips through — meaning a dev could bypass the check by
+// adding a `:`. This closes that gap. t()-bound and variable-bound values are
+// expressions (not literals), so they correctly pass; a literal with no letters
+// (punctuation like :label="'—'") is skipped. Non-<template> files are a no-op.
+noLegacyO2Tokens.rules["no-bare-bound-text-props"] = {
+  meta: { type: "problem", docs: { description: "Ban hardcoded text in bound component text props" } },
+  create(context) {
+    const sourceCode = context.sourceCode ?? context.getSourceCode();
+    const ps = sourceCode.parserServices ?? context.parserServices;
+    if (!ps || !ps.defineTemplateBodyVisitor) return {};
+    return ps.defineTemplateBodyVisitor({
+      VAttribute(node) {
+        if (!node.directive) return; // static attrs → handled by no-bare-strings
+        const key = node.key;
+        if (!key || !key.name || key.name.name !== "bind") return; // only v-bind / :
+        const arg = key.argument;
+        if (!arg || arg.type !== "VIdentifier" || !TEXT_ATTR_SET.has(arg.name)) return;
+        const expr = node.value && node.value.expression;
+        if (!expr) return;
+        let text = null;
+        if (expr.type === "Literal" && typeof expr.value === "string") text = expr.value;
+        else if (expr.type === "TemplateLiteral" && expr.expressions.length === 0)
+          text = expr.quasis[0].value.cooked;
+        if (text == null || !/\p{L}/u.test(text)) return; // must contain a letter
+        context.report({
+          node,
+          message: `Hardcoded text "${text}" in bound prop :${arg.name} — use t('...') with a key in en-US.json.`,
+        });
+      },
+    });
+  },
+};
+
 // Read .gitignore to use as ignore patterns
 const gitignore = fs.existsSync(".gitignore")
   ? fs
@@ -122,9 +174,35 @@ export default [
       "@typescript-eslint": typescript,
       prettier,
       "local": noLegacyO2Tokens,
+      "@intlify/vue-i18n": vueI18n,
+    },
+    // i18n key resolution points at the English source of truth ONLY. The other
+    // locales are generated from en-US.json (scripts/translations) and lag behind,
+    // so validating against them would flag every not-yet-translated key.
+    settings: {
+      "vue-i18n": {
+        localeDir: "./src/locales/languages/en-US.json",
+        messageSyntaxVersion: "^11.0.0",
+      },
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
+
+      // i18n hygiene. `no-missing-keys` (ERROR): every static t('x.y') must exist
+      // in en-US.json, else vue-i18n renders the raw key at runtime. Backlog is
+      // small (~27 real bugs), so it gates the build outright. A dynamically-built
+      // key is ignored by the rule; test fixtures are exempted below.
+      "@intlify/vue-i18n/no-missing-keys": "error",
+      //
+      // `no-bare-strings-in-template` (ERROR): no user-facing string typed straight
+      // into a <template> — text nodes AND static text props (label="Save"). We
+      // REPLACE the built-in attribute map with TEXT_ATTRS so component props, not
+      // just native title/alt/placeholder, are covered. Bound props (:label="'x'")
+      // are caught by the local rule below. (@intlify's own `no-raw-text` is NOT
+      // used — it flags ~1800 literals/punctuation and is too noisy to gate.)
+      "vue/no-bare-strings-in-template": ["error", { attributes: { "/.+/": TEXT_ATTRS } }],
+      // The bound-prop half of the same rule (see TEXT_ATTRS above).
+      "local/no-bare-bound-text-props": "error",
 
       // Dark-mode schema (O2_TOKEN_MIGRATION_PLAN §3.R.3) — warn now, error at Phase G.
       // The two sanctioned seams (useTheme.ts / chartTheme.ts) turn this off below.
@@ -219,6 +297,29 @@ export default [
     files: ["src/composables/useTheme.ts", "src/utils/chartTheme.ts"],
     rules: {
       "no-restricted-syntax": "off",
+    },
+  },
+  {
+    // Query-syntax cheat-sheets — the "text" here is SQL / PromQL / operator
+    // examples and code snippets, not translatable prose. Exempt only these from
+    // the bare-string rule; add a file here only when it is genuinely code, with
+    // a one-line reason.
+    files: [
+      "src/plugins/logs/SyntaxGuide.vue",
+      "src/plugins/traces/SyntaxGuide.vue",
+      "src/plugins/metrics/SyntaxGuideMetrics.vue",
+    ],
+    rules: {
+      "vue/no-bare-strings-in-template": "off",
+      "local/no-bare-bound-text-props": "off",
+    },
+  },
+  {
+    // Tests use throwaway i18n keys as fixtures — don't hold them to the
+    // en-US.json contract.
+    files: ["**/*.{spec,test}.{js,ts,jsx,tsx}", "**/__tests__/**", "**/test/**"],
+    rules: {
+      "@intlify/vue-i18n/no-missing-keys": "off",
     },
   },
   {

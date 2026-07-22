@@ -144,6 +144,32 @@ read it once, it is the backbone of everything below.
    keys added to `web/src/locales/languages/en-US.json` (other locales follow from
    there — never hand-edit them).
 
+   > **Three ESLint rules in `eslint.config.js` enforce this (all ERROR — they fail
+   > `lint:ci`), and you see every one as you type (editor squiggles) + in
+   > `npm run lint`:**
+   > - **`@intlify/vue-i18n/no-missing-keys`** — a `t('some.key')` whose key is
+   >   absent from `en-US.json` (it would render the literal `some.key` at runtime).
+   >   When you add a `t('x.y')`, add `x.y` to `en-US.json` in the *same* change.
+   >   Keys resolve against **en-US only** (the other locales are generated).
+   >   Dynamically-built keys (`t(varName)`) are ignored — the rule only checks literals.
+   > - **`vue/no-bare-strings-in-template`** — a hardcoded string in a `<template>`,
+   >   covering both **text nodes** (`<div>Save</div>`) and **static text props**
+   >   (`<OButton label="Save" />`).
+   > - **`local/no-bare-bound-text-props`** (custom, in `eslint.config.js`) — the same
+   >   text passed as a **bound literal** (`:label="'Save'"`, `:hint=\`…\`"`), which the
+   >   rule above can't see. So you can't dodge the check by adding a `:`.
+   >
+   > **The component-prop standard:** because the app is built from O2 components (not
+   > raw HTML), user-facing text usually arrives through a *prop* — `label`,
+   > `placeholder`, `hint`, `tooltip`, `message`, `content`, `help-text`,
+   > `*-button-label`, … The exact set lives in **one place**, the `TEXT_ATTRS` array
+   > in `eslint.config.js`, and feeds both the static and bound rules. **When you add
+   > a component prop that carries user-facing text, add its name to `TEXT_ATTRS`** —
+   > that is how the linter learns a new prop needs translating. Correct usage is
+   > always `:prop="t('key')"` (or `<Comp>{{ t('key') }}</Comp>` for slots); a
+   > variable binding (`:label="row.name"`) and punctuation-only literals pass. A file
+   > that is genuinely code examples (SQL/PromQL syntax guides) is exempted by path.
+
 ## Structural decisions
 
 *What* to reach for and *where the code lives* — the recurring calls that
@@ -253,9 +279,14 @@ considering the UI done:
       `--color-*` equivalent.
 - [ ] Any new color/size needed was **registered as a `--color-*` token** (light
       `:root` + `@theme inline` + dark under `.dark`) before use.
-- [ ] No hardcoded user-facing text — every label, title, placeholder, message,
-      and validation string uses `t()` with keys added to
-      `web/src/locales/languages/en-US.json`.
+- [ ] No hardcoded user-facing text **and** no `t()` key missing from the locale
+      file — every label, title, placeholder, message, and validation string (whether
+      a text node, a static prop `label="…"`, or a bound prop `:label="'…'"`) uses
+      `t()` with the key added to `web/src/locales/languages/en-US.json` in the same
+      change. Enforced by three ESLint rules, all **error** (`no-missing-keys`,
+      `vue/no-bare-strings-in-template`, `local/no-bare-bound-text-props`) — a clean
+      `cd web && npm run lint`. New text-carrying component prop → add it to
+      `TEXT_ATTRS` in `eslint.config.js`.
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
