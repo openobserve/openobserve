@@ -37,9 +37,9 @@ const EVENT_CHANNEL_SIZE: usize = 100;
 /// streaming pipeline and return the folded single response.
 #[allow(clippy::too_many_arguments)]
 pub async fn search_partition_mode(
+    trace_id: &str,
     org_id: &str,
     user_id: &str,
-    trace_id: &str,
     req: &mut Request,
     stream_type: StreamType,
     stream_names: Vec<String>,
@@ -105,9 +105,9 @@ async fn search_stream_collect(
     let (tx, mut rx) = mpsc::channel(EVENT_CHANNEL_SIZE);
 
     tokio::spawn(process_search_stream_request(
+        trace_id.to_string(),
         org_id.to_string(),
         user_id.to_string(),
-        trace_id.to_string(),
         req,
         stream_type,
         stream_names,

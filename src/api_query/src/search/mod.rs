@@ -497,9 +497,9 @@ pub async fn search(
         .is_some_and(|o| o.mode == AgentSearchMode::Partition);
     let res = if use_partition_mode {
         SearchService::streaming::collect::search_partition_mode(
+            &trace_id,
             &org_id,
             user_id,
-            &trace_id,
             &mut req,
             stream_type,
             stream_names,

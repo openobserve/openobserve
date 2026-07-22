@@ -1491,9 +1491,9 @@ pub async fn search_multi_stream(
     // the top-level query_fn for post-hoc application. When needs_post_vrl is false,
     // query_fn is already set on individual requests and this param is unused.
     tokio::spawn(process_search_stream_request_multi(
+        trace_id.clone(),
         org_id.clone(),
         user_id,
-        trace_id.clone(),
         queries,
         stream_type,
         http_span,
