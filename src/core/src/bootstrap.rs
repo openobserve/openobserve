@@ -18,21 +18,18 @@ use std::sync::Arc;
 use ::common::infra::wal;
 use config::{cache_instance_id, ider};
 
-use crate::service::db::metas;
+#[cfg(feature = "enterprise")]
+use crate::self_reporting::CoreAuditPublisher;
+use crate::{self_reporting::persistence::CoreBatchPublisher, service::db::metas};
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    // publishers are process-wide singletons, so a repeated init (e.g. in tests)
     // keeps the first registration instead of failing
-    if usage_reporting::set_batch_publisher(Arc::new(
-        crate::self_reporting::persistence::CoreBatchPublisher,
-    ))
-    .is_err()
-    {
-        log::debug!("usage batch publisher is already initialized, keeping existing one");
+    if usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher)).is_err() {
+        log::warn!("usage batch publisher is already initialized, keeping existing one");
     }
     #[cfg(feature = "enterprise")]
-    if audit::set_audit_publisher(Arc::new(crate::self_reporting::CoreAuditPublisher)).is_err() {
-        log::debug!("audit publisher is already initialized, keeping existing one");
+    if audit::set_audit_publisher(Arc::new(CoreAuditPublisher)).is_err() {
+        log::warn!("audit publisher is already initialized, keeping existing one");
     }
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
