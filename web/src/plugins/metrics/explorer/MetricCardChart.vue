@@ -136,6 +136,7 @@ export default defineComponent({
         // just a shape. The heatmap is solid colour, so they'd only add noise.
         show_gridlines: props.chartType !== "heatmap",
         show_symbol: false,
+        connect_nulls: true,
         line_interpolation: "smooth",
         line_thickness: 1.5,
         color: { mode: "fixed", fixedColor: [props.color] },

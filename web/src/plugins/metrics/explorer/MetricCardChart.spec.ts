@@ -119,6 +119,11 @@ describe("MetricCardChart builds the panel schema from its props", () => {
       true,
     );
   });
+
+  it("connects across null gaps so a sparse line is not fragmented", () => {
+    const wrapper = mountChart();
+    expect(panelProp(wrapper, "panelSchema").config.connect_nulls).toBe(true);
+  });
 });
 
 describe("MetricCardChart feeds the queue's results in as injected data", () => {
