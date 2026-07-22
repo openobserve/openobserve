@@ -8,7 +8,10 @@
 import http from "@/services/http";
 
 export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
+export type EvalTargetScope = "span" | "trace" | "session";
 export type SamplingMode = "rate" | "all" | "count";
+export type ConfigurableSamplingMode = "rate" | "all";
+export type SamplingValue = number | { rate?: number; count?: number } | null;
 export type ScorerType = "llm_judge" | "remote";
 export type ScoreDataType = "numeric" | "categorical" | "boolean";
 
@@ -97,6 +100,17 @@ export interface ScorerRef {
   version?: number | null;
 }
 
+export type SpanSelectorFieldMode = "default" | "custom";
+
+export interface SpanSelector {
+  id: string;
+  name: string;
+  filterCondition: any;
+  fieldMode: SpanSelectorFieldMode;
+  fields: string[];
+  maximumSpans: number;
+}
+
 export type EvalJobScorerRef = ScorerRef | string;
 
 export interface EvalJob {
@@ -108,15 +122,25 @@ export interface EvalJob {
   stream: string;
   streamType?: string;
   stream_type?: string;
+  targetScope?: EvalTargetScope;
+  target_scope?: EvalTargetScope;
   filterCondition?: any;
   filter_condition?: any;
   scorers: EvalJobScorerRef[];
   inputMapping?: Record<string, Record<string, string>> | null;
   input_mapping?: Record<string, Record<string, string>> | null;
+  spanSelectors?: SpanSelector[];
+  span_selectors?: SpanSelector[];
+  spanSelectorBindings?: Record<string, string>;
+  span_selector_bindings?: Record<string, string>;
+  traceConfig?: CompletionWindowConfig | null;
+  trace_config?: CompletionWindowConfig | null;
+  sessionConfig?: CompletionWindowConfig | null;
+  session_config?: CompletionWindowConfig | null;
   samplingMode?: SamplingMode;
   sampling_mode?: SamplingMode;
-  samplingValue?: any;
-  sampling_value?: any;
+  samplingValue?: SamplingValue;
+  sampling_value?: SamplingValue;
   status: EvalJobStatus;
   version: number;
   pipelineId?: string | null;
@@ -189,11 +213,38 @@ export interface EvalJobPayload {
   description?: string | null;
   stream: string;
   streamType: string;
+  targetScope: EvalTargetScope;
   filterCondition: any;
   scorers: ScorerRef[];
   inputMapping?: Record<string, Record<string, string>> | null;
-  samplingMode: SamplingMode;
-  samplingValue: any;
+  spanSelectors: SpanSelector[];
+  spanSelectorBindings: Record<string, string>;
+  traceConfig?: CompletionWindowConfig | null;
+  sessionConfig?: CompletionWindowConfig | null;
+  samplingMode: ConfigurableSamplingMode;
+  samplingValue: number | null;
+}
+
+export interface CompletionWindowConfig {
+  idleWindowSecs: number;
+  maxAgeSecs: number;
+  endSignal?: any;
+}
+
+export interface ManualEvalJobPayload {
+  targetId: string;
+  spanId?: string | null;
+  traceId?: string | null;
+  sessionId?: string | null;
+  variables?: Record<string, any>;
+  reason?: string | null;
+}
+
+export interface ManualEvalJobResult {
+  jobId: string;
+  targetScope: EvalTargetScope;
+  targetId: string;
+  tasksCreated: number;
 }
 
 const unwrapList = <T>(response: any, key = "list"): T[] => {
@@ -284,6 +335,12 @@ const onlineEvalsService = {
       (await http().post(`/api/${orgId}/eval_jobs/${jobId}/activate`, {})).data,
     pause: async (orgId: string, jobId: string): Promise<EvalJob> =>
       (await http().post(`/api/${orgId}/eval_jobs/${jobId}/pause`, {})).data,
+    manualEval: async (
+      orgId: string,
+      jobId: string,
+      payload: ManualEvalJobPayload,
+    ): Promise<ManualEvalJobResult> =>
+      (await http().post(`/api/${orgId}/eval_jobs/${jobId}/manual_eval`, payload)).data,
   },
 };
 

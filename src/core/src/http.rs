@@ -270,9 +270,9 @@ impl From<EvalJobError> for Response {
                 log::error!("[EvalJob] reconciler error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")
             }
-            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
-                MetaHttpResponse::bad_request(value)
-            }
+            EvalJobError::InvalidStatus(_)
+            | EvalJobError::InvalidStatusTransition { .. }
+            | EvalJobError::InvalidJob(_) => MetaHttpResponse::bad_request(value),
         }
     }
 }

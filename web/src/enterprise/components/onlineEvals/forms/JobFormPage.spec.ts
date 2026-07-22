@@ -31,7 +31,16 @@ vi.mock("@/services/online-evals.service", () => ({
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStreams: vi.fn().mockResolvedValue({ list: [{ name: "default" }] }),
+    getStreams: vi.fn().mockResolvedValue({
+      list: [{ name: "default" }, { name: "_evaluator" }],
+    }),
+    getStream: vi.fn().mockResolvedValue({
+      schema: [
+        { name: "name", type: "Utf8" },
+        { name: "status", type: "Utf8" },
+        { name: "gen_ai_input_messages", type: "Utf8" },
+      ],
+    }),
   }),
 }));
 
@@ -40,6 +49,55 @@ const store = createStore({
 });
 
 const scorers = [{ id: "s1", entityId: "s1", name: "Scorer 1" }];
+
+const endSignal = {
+  version: 2,
+  conditions: {
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [
+      {
+        filterType: "condition",
+        column: "status",
+        operator: "=",
+        value: "complete",
+        values: [],
+        logicalOperator: "AND",
+      },
+    ],
+  },
+};
+
+function traceJob() {
+  return {
+    id: "job-1",
+    name: "Trace quality",
+    stream: "default",
+    targetScope: "trace",
+    filterCondition: { type: "all" },
+    scorers: [{ id: "s1", version: null }],
+    spanSelectors: [
+      {
+        id: "selector-1",
+        name: "default-spans",
+        filterCondition: { type: "all" },
+        fieldMode: "default",
+        fields: [],
+        maximumSpans: 5,
+      },
+    ],
+    spanSelectorBindings: { s1: "selector-1" },
+    traceConfig: {
+      idleWindowSecs: 45,
+      maxAgeSecs: 900,
+      endSignal,
+    },
+    samplingMode: "all",
+    samplingValue: null,
+    status: "draft",
+    version: 1,
+  } as any;
+}
 
 function createWrapper(props: Record<string, any> = {}) {
   return mount(JobFormPage, {
@@ -88,8 +146,39 @@ describe("JobFormPage", () => {
   it("renders the real OForm with the name + stream fields", () => {
     wrapper = createWrapper();
     expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
-    expect(wrapper.find('[data-test="job-form-name-input"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="job-form-stream-select"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="job-form-name-input"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('[data-test="job-form-stream-select"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("offers each target scope exactly once", () => {
+    wrapper = createWrapper();
+    const scopeSelect = wrapper.findComponent(
+      '[data-test="job-form-target-scope-select"]',
+    );
+    const options = scopeSelect.props("options");
+
+    expect(options).toEqual([
+      { label: "Span", value: "span" },
+      { label: "Trace", value: "trace" },
+      { label: "Session", value: "session" },
+    ]);
+    expect(new Set(options.map((option: any) => option.value)).size).toBe(3);
+  });
+
+  it("excludes evaluator telemetry from source stream options", async () => {
+    wrapper = createWrapper();
+    await flushPromises();
+    const streamSelect = wrapper.findComponent(
+      '[data-test="job-form-stream-select"]',
+    );
+
+    expect(streamSelect.props("options")).toEqual([
+      { label: "default", value: "default" },
+    ]);
   });
 
   it("keeps the create buttons enabled before first submit (R3)", () => {
@@ -115,7 +204,10 @@ describe("JobFormPage", () => {
     expect(oform(wrapper).form.state.isValid).toBe(true);
     expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
     expect(toast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error", message: "Select at least one scorer" }),
+      expect.objectContaining({
+        variant: "error",
+        message: "Select at least one scorer",
+      }),
     );
   });
 
@@ -131,6 +223,86 @@ describe("JobFormPage", () => {
     expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
   });
 
+  // Regression: the help text read `formValues.samplingMode` instead of
+  // `formValues.value.samplingMode`. `formValues` is a TanStack store ref —
+  // templates auto-unwrap it, script does not — so the computed always saw
+  // `undefined` and silently stuck on the static example while the user typed.
+  it("previews the sampling rate as a live percentage", async () => {
+    wrapper = createWrapper();
+
+    setField(wrapper, "samplingMode", "rate");
+    setField(wrapper, "samplingValue", "0.211");
+    await wrapper.vm.$nextTick();
+
+    const help = wrapper
+      .find('[data-test="job-form-sampling-value-input"]')
+      .text();
+    expect(help).toContain("21.1%");
+    expect(help).not.toContain("Enter a rate");
+  });
+
+  // Cleared input must not keep asserting a percentage (or quote an example
+  // rate that isn't set) — it drops back to the range constraint.
+  it("falls back to the range hint when the rate is unusable", async () => {
+    wrapper = createWrapper();
+
+    setField(wrapper, "samplingMode", "rate");
+    setField(wrapper, "samplingValue", "");
+    await wrapper.vm.$nextTick();
+
+    const help = wrapper
+      .find('[data-test="job-form-sampling-value-input"]')
+      .text();
+    expect(help).toContain("Enter a rate between 0 and 1");
+    expect(help).not.toContain("%");
+  });
+
+  // "This long" told the user nothing — the help echoes the entered window in
+  // human units so a bare 1800 reads as 30m.
+  it("shows the completion windows as readable durations", async () => {
+    wrapper = createWrapper();
+
+    setField(wrapper, "targetScope", "trace");
+    setField(wrapper, "idleWindowSecs", 120);
+    setField(wrapper, "maxAgeSecs", 1800);
+    await wrapper.vm.$nextTick();
+
+    expect(
+      wrapper.find('[data-test="job-form-idle-window-input"]').text(),
+    ).toContain("2 min");
+    expect(
+      wrapper.find('[data-test="job-form-max-age-input"]').text(),
+    ).toContain("30 min");
+  });
+
+  it("defaults trace and session idle windows to 120 seconds", async () => {
+    wrapper = createWrapper();
+
+    setField(wrapper, "targetScope", "trace");
+    await wrapper.vm.$nextTick();
+    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(120);
+
+    setField(wrapper, "targetScope", "session");
+    await wrapper.vm.$nextTick();
+    expect(oform(wrapper).form.state.values.idleWindowSecs).toBe(120);
+  });
+
+  it("rejects completion idle windows below 45 seconds", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "trace-job");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    await wrapper.vm.$nextTick();
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    setField(wrapper, "idleWindowSecs", 44);
+
+    await submit(wrapper);
+
+    expect(oform(wrapper).form.state.isValid).toBe(false);
+    expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+  });
+
   it("saves a draft (create only) with the EXACT payload when the schema passes", async () => {
     wrapper = createWrapper();
     setField(wrapper, "name", "  my-job  "); // padded → must be trimmed at save
@@ -141,7 +313,8 @@ describe("JobFormPage", () => {
 
     expect(oform(wrapper).form.state.isValid).toBe(true);
     expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
-    const [org, payload] = (onlineEvalsService.jobs.create as any).mock.calls[0];
+    const [org, payload] = (onlineEvalsService.jobs.create as any).mock
+      .calls[0];
     expect(org).toBe("test-org");
     // EXACT key set — catches any added / dropped / renamed / leaked key.
     expect(Object.keys(payload).sort()).toEqual([
@@ -152,13 +325,23 @@ describe("JobFormPage", () => {
       "samplingMode",
       "samplingValue",
       "scorers",
+      "sessionConfig",
+      "spanSelectorBindings",
+      "spanSelectors",
       "stream",
       "streamType",
+      "targetScope",
+      "traceConfig",
     ]);
     expect(payload.name).toBe("my-job"); // trimmed at save
     expect(payload.description).toBeNull(); // blank → null
     expect(payload.stream).toBe("default");
     expect(payload.streamType).toBe("traces");
+    expect(payload.targetScope).toBe("span");
+    expect(payload.traceConfig).toBeNull();
+    expect(payload.sessionConfig).toBeNull();
+    expect(payload.spanSelectors).toEqual([]);
+    expect(payload.spanSelectorBindings).toEqual({});
     expect(payload.scorers).toEqual([{ id: "s1", version: null }]);
     expect(payload.samplingMode).toBe("rate");
     // The sampling value leaves the text input as a STRING but must reach the
@@ -179,11 +362,60 @@ describe("JobFormPage", () => {
     setField(wrapper, "scorerIds", ["s1"]);
     // The activate button's @click sets the activate flag; drive the form's own
     // submit deterministically (jsdom doesn't auto-submit on button click).
-    await wrapper.find('[data-test="job-form-save-activate-btn"]').trigger("click");
+    await wrapper
+      .find('[data-test="job-form-save-activate-btn"]')
+      .trigger("click");
     await submit(wrapper);
 
     expect(onlineEvalsService.jobs.create).toHaveBeenCalledTimes(1);
-    expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith("test-org", "job-1");
+    expect(onlineEvalsService.jobs.activate).toHaveBeenCalledWith(
+      "test-org",
+      "job-1",
+    );
+  });
+
+  it("allows an incomplete trace selector binding to be saved as a draft", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "trace-draft");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+
+    await submit(wrapper);
+
+    expect(onlineEvalsService.jobs.create).toHaveBeenCalledWith(
+      "test-org",
+      expect.objectContaining({
+        targetScope: "trace",
+        spanSelectors: [],
+        spanSelectorBindings: {},
+      }),
+    );
+    expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
+  });
+
+  it("blocks trace activation until every scorer has a selector binding", async () => {
+    wrapper = createWrapper();
+    setField(wrapper, "name", "trace-active");
+    setField(wrapper, "stream", "default");
+    setField(wrapper, "targetScope", "trace");
+    setField(wrapper, "scorerIds", ["s1"]);
+    setField(wrapper, "samplingMode", "all");
+    await wrapper
+      .find('[data-test="job-form-save-activate-btn"]')
+      .trigger("click");
+
+    await submit(wrapper);
+
+    expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
+    expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "error",
+        message: "Select a Span Selector for every scorer.",
+      }),
+    );
   });
 
   describe("edit mode", () => {
@@ -214,7 +446,8 @@ describe("JobFormPage", () => {
       expect(onlineEvalsService.jobs.create).not.toHaveBeenCalled();
       expect(onlineEvalsService.jobs.activate).not.toHaveBeenCalled();
       expect(onlineEvalsService.jobs.update).toHaveBeenCalledTimes(1);
-      const [org, id, payload] = (onlineEvalsService.jobs.update as any).mock.calls[0];
+      const [org, id, payload] = (onlineEvalsService.jobs.update as any).mock
+        .calls[0];
       expect(org).toBe("test-org");
       expect(id).toBe("job-9");
       expect(payload.name).toBe("existing-job"); // name preserved (locked on edit)
@@ -223,6 +456,49 @@ describe("JobFormPage", () => {
       expect(payload.samplingValue).toBeNull(); // mode 'all' → no sampling value
       expect(payload.scorers).toEqual([{ id: "s1", version: null }]);
       expect(wrapper.emitted("saved")).toBeTruthy();
+    });
+
+    it("shows and preserves an existing trace End Signal when saving", async () => {
+      wrapper = createWrapper({ mode: "edit", row: traceJob() });
+
+      expect(
+        wrapper.get('[data-test="job-form-completion-section"]').exists(),
+      ).toBe(true);
+
+      await submit(wrapper);
+
+      expect(onlineEvalsService.jobs.update).toHaveBeenCalledWith(
+        "test-org",
+        "job-1",
+        expect.objectContaining({
+          targetScope: "trace",
+          traceConfig: {
+            idleWindowSecs: 45,
+            maxAgeSecs: 900,
+            endSignal,
+          },
+          sessionConfig: null,
+        }),
+      );
+    });
+
+    // Section order mirrors execution order: filter narrows the stream, then
+    // sampling takes a fraction of what matched (§OnlineEval-D15).
+    it("places filtering above sampling, with completion last", () => {
+      wrapper = createWrapper({ mode: "edit", row: traceJob() });
+      const sections = wrapper
+        .findAll("section")
+        .map((section: any) => section.attributes("data-test"))
+        .filter(Boolean);
+
+      expect(sections).toEqual([
+        "job-form-details-section",
+        "job-form-target-section",
+        "job-form-filtering-section",
+        "job-form-sampling-section",
+        "job-form-scorers-section",
+        "job-form-completion-section",
+      ]);
     });
   });
 });
