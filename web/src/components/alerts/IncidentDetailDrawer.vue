@@ -709,6 +709,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :rca-loading="rcaLoading"
           :rca-stream-content="rcaStreamContent"
           :formatted-rca-content="formattedRcaContent"
+          :rca-error="rcaError"
+          :rca-cancelling="rcaCancelling"
+          :analysis-elapsed-label="analysisElapsedLabel"
+          :analysis-is-stale="analysisIsStale"
+          :rca-history="rcaHistory"
+          :viewing-archived-index="viewingArchivedIndex"
+          :analyzed-at="rcaAnalyzedAt"
+          @cancel-rca="cancelRca"
+          @view-report="viewReport"
+          @copy-report="copyReport"
+          @download-report="downloadReport"
           :is-dark-mode="isDarkMode"
           :analysis-in-flight="analysisInFlight"
           @trigger-rca="triggerRca"
@@ -1059,6 +1070,7 @@ import incidentsService, {
   IncidentWithAlerts,
   IncidentAlert,
   IncidentCorrelatedStreams,
+  ArchivedRcaReport,
 } from "@/services/incidents";
 import streamService from "@/services/stream";
 import serviceStreamsApi, {
@@ -1231,34 +1243,162 @@ export default defineComponent({
     });
 
     // True when a background AI analysis run has started but not yet completed.
-    // Updated whenever events are fetched (load, tab switch, reopen, etc.) — no polling.
     const analysisInFlight = ref(false);
+    // Epoch micros of the AIAnalysisBegin that is currently in flight, so the panel can
+    // show elapsed time and flag a run that has outlived the server's staleness window.
+    const analysisStartedAt = ref<number | null>(null);
+    // Last terminal failure, surfaced persistently in the panel instead of a transient toast.
+    const rcaError = ref<{ reason: string; details: string } | null>(null);
+    const rcaCancelling = ref(false);
+
+    // Superseded reports (newest first) and which one is being viewed.
+    // null index = the current report.
+    const rcaHistory = ref<ArchivedRcaReport[]>([]);
+    const viewingArchivedIndex = ref<number | null>(null);
+    // Epoch micros of the last ai_analysis_complete, powering "Analyzed X ago".
+    const rcaAnalyzedAt = ref<number | null>(null);
+
+    const loadRcaHistory = async (incidentId: string) => {
+      try {
+        const org = store.state.selectedOrganization.identifier;
+        const response = await incidentsService.getRcaHistory(org, incidentId);
+        rcaHistory.value = response.data?.previous || [];
+      } catch (error) {
+        // History is supplementary — a failure here must not block the report itself.
+        console.error("Failed to load RCA history:", error);
+        rcaHistory.value = [];
+      }
+    };
+
+    const viewReport = (index: number | null) => {
+      viewingArchivedIndex.value = index;
+    };
+
+    // Mirrors the backend stale threshold (reanalysis_cooldown_minutes * 2, default 30*2).
+    // A begin older than this is ignored server-side, so the run is almost certainly dead.
+    const RCA_STALE_AFTER_MS = 60 * 60 * 1000;
+
+    // Ticks while an analysis is in flight so the elapsed-time label stays live.
+    const nowTick = ref(Date.now());
+    let nowTickTimer: ReturnType<typeof setInterval> | null = null;
+
+    const analysisElapsedMs = computed(() => {
+      if (!analysisStartedAt.value) return null;
+      // Event timestamps are microseconds since epoch.
+      return nowTick.value - analysisStartedAt.value / 1000;
+    });
+
+    const analysisIsStale = computed(() => {
+      const elapsed = analysisElapsedMs.value;
+      return elapsed !== null && elapsed > RCA_STALE_AFTER_MS;
+    });
+
+    const analysisElapsedLabel = computed(() => {
+      const elapsed = analysisElapsedMs.value;
+      if (elapsed === null || elapsed < 0) return "";
+      const totalSeconds = Math.floor(elapsed / 1000);
+      if (totalSeconds < 60) return `${totalSeconds}s`;
+      const minutes = Math.floor(totalSeconds / 60);
+      if (minutes < 60) return `${minutes}m`;
+      const hours = Math.floor(minutes / 60);
+      return `${hours}h ${minutes % 60}m`;
+    });
 
     const checkAnalysisInFlight = async (incidentId: string) => {
       try {
         const org = store.state.selectedOrganization.identifier;
         const response = await incidentsService.getEvents(org, incidentId);
         const events: any[] = response.data?.events || [];
+
+        // Walk the log once, tracking the latest begin and the latest terminal event.
+        // Cancelled is terminal alongside complete/failed — it clears the in-flight guard
+        // on the server, so the UI must agree or it would show a phantom running state.
         let lastBegin = -1;
+        let lastTerminal = -1;
+        let lastTerminalEvent: any = null;
         let lastComplete = -1;
         for (const ev of events) {
           if (ev.type === "ai_analysis_begin") lastBegin = ev.timestamp;
-          if (ev.type === "ai_analysis_complete" || ev.type === "ai_analysis_failed") lastComplete = ev.timestamp;
+          if (ev.type === "ai_analysis_complete") lastComplete = ev.timestamp;
+          if (
+            ev.type === "ai_analysis_complete" ||
+            ev.type === "ai_analysis_failed" ||
+            ev.type === "ai_analysis_cancelled"
+          ) {
+            lastTerminal = ev.timestamp;
+            lastTerminalEvent = ev;
+          }
         }
-        const nowInFlight = lastBegin > lastComplete;
+        const nowInFlight = lastBegin > lastTerminal;
 
-        // Transition: banner was showing and analysis just finished — reload to pick up new report
+        // When the report was produced, for the "Analyzed X ago" label.
+        rcaAnalyzedAt.value = lastComplete > 0 ? lastComplete : null;
+
+        analysisStartedAt.value = nowInFlight ? lastBegin : null;
+
+        // Keep the failure visible until the next run starts. Only the most recent
+        // terminal event matters: a later success or cancel clears a older failure.
+        rcaError.value =
+          !nowInFlight && lastTerminalEvent?.type === "ai_analysis_failed"
+            ? {
+                reason: lastTerminalEvent.data?.reason || t("alerts.incidents.rcaFailed"),
+                details: lastTerminalEvent.data?.error_details || "",
+              }
+            : null;
+
+        // Transition: banner was showing and analysis just finished — reload to pick up
+        // the new report. Skipped when the run failed, since there is nothing new to fetch.
         if (analysisInFlight.value && !nowInFlight) {
           analysisInFlight.value = false;
-          await loadDetails(incidentId);
+          if (lastTerminalEvent?.type === "ai_analysis_complete") {
+            await loadDetails(incidentId);
+          }
           timelineRefreshTrigger.value++;
         } else {
           analysisInFlight.value = nowInFlight;
         }
-      } catch {
-        analysisInFlight.value = false;
+      } catch (error) {
+        // A failed events fetch says nothing about the run — leave the last known
+        // in-flight state alone rather than silently claiming "never analyzed".
+        console.error("Failed to check analysis state:", error);
       }
     };
+
+    // Poll while an analysis is in flight so the panel resolves on its own.
+    // Stops as soon as nothing is running to avoid a background request loop.
+    let inFlightPollTimer: ReturnType<typeof setInterval> | null = null;
+
+    const stopInFlightPolling = () => {
+      if (inFlightPollTimer) {
+        clearInterval(inFlightPollTimer);
+        inFlightPollTimer = null;
+      }
+      if (nowTickTimer) {
+        clearInterval(nowTickTimer);
+        nowTickTimer = null;
+      }
+    };
+
+    const startInFlightPolling = () => {
+      if (inFlightPollTimer) return;
+      nowTick.value = Date.now();
+      nowTickTimer = setInterval(() => {
+        nowTick.value = Date.now();
+      }, 1000);
+      inFlightPollTimer = setInterval(() => {
+        const id = incidentDetails.value?.id;
+        if (!id) {
+          stopInFlightPolling();
+          return;
+        }
+        checkAnalysisInFlight(id);
+      }, 10000);
+    };
+
+    watch(analysisInFlight, (running) => {
+      if (running) startInFlightPolling();
+      else stopInFlightPolling();
+    });
 
     // Dark mode via the single sanctioned JS seam
     const { isDark: isDarkMode } = useTheme();
@@ -1681,14 +1821,24 @@ export default defineComponent({
       return [];
     });
 
-    // Computed property for formatted RCA content
-    const formattedRcaContent = computed(() => {
-      const content = rcaLoading.value && rcaStreamContent.value
-        ? rcaStreamContent.value
-        : hasExistingRca.value
+    // The raw markdown currently on screen — streaming chunks, an archived report
+    // the user selected, or the current report. Copy/download operate on this.
+    const activeRcaMarkdown = computed(() => {
+      if (rcaLoading.value && rcaStreamContent.value) return rcaStreamContent.value;
+
+      const archivedIndex = viewingArchivedIndex.value;
+      if (archivedIndex !== null) {
+        return rcaHistory.value[archivedIndex]?.content || '';
+      }
+
+      return hasExistingRca.value
         ? incidentDetails.value?.topology_context?.suggested_root_cause || ''
         : '';
+    });
 
+    // Computed property for formatted RCA content
+    const formattedRcaContent = computed(() => {
+      const content = activeRcaMarkdown.value;
       if (!content) return '';
 
       return formatRcaContent(content);
@@ -1869,6 +2019,9 @@ export default defineComponent({
 
         // Check if a background AI analysis is already running
         await checkAnalysisInFlight(incidentId);
+
+        // Load superseded reports so the version picker is populated
+        await loadRcaHistory(incidentId);
       } catch (error) {
         console.error("Failed to load incident details:", error);
         toast({
@@ -1922,12 +2075,31 @@ export default defineComponent({
     onUnmounted(() => {
       contextRegistry.setActive('');
       contextRegistry.unregister('incidents');
+      // Stop the poll/tick timers and drop any pending manual run so it cannot
+      // resolve against an unmounted component.
+      stopInFlightPolling();
+      rcaAbortController?.abort();
+      rcaAbortController = null;
     });
 
     const close = () => {
       // Clear correlation data when closing
       correlationData.value = null;
       correlationError.value = null;
+
+      // Drop RCA state too, so reopening another incident never shows the previous
+      // incident's error or spinner before the event log is re-read.
+      stopInFlightPolling();
+      rcaAbortController?.abort();
+      rcaAbortController = null;
+      rcaLoading.value = false;
+      rcaStreamContent.value = "";
+      rcaError.value = null;
+      analysisInFlight.value = false;
+      analysisStartedAt.value = null;
+      rcaHistory.value = [];
+      viewingArchivedIndex.value = null;
+      rcaAnalyzedAt.value = null;
 
       // Clear incident context when explicitly closing
       contextRegistry.setActive('');
@@ -2667,16 +2839,63 @@ export default defineComponent({
       return `<div class="rca-report-content">${sanitized}</div>`;
     };
 
-    const triggerRca = async () => {
+    // Aborts the client side of a manual run so closing the drawer or hitting Cancel
+    // stops the pending request instead of letting it resolve against a dead component.
+    let rcaAbortController: AbortController | null = null;
+
+    const copyReport = async () => {
+      const content = activeRcaMarkdown.value;
+      if (!content) return;
+
+      try {
+        await navigator.clipboard.writeText(content);
+        toast({ variant: "success", message: t("alerts.incidents.rcaCopied") });
+      } catch (error) {
+        console.error("Failed to copy RCA report:", error);
+        toast({ variant: "error", message: t("alerts.incidents.rcaCopyFailed") });
+      }
+    };
+
+    const downloadReport = () => {
+      const content = activeRcaMarkdown.value;
+      if (!content || !incidentDetails.value) return;
+
+      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `incident-${incidentDetails.value.id}-rca.md`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    };
+
+    const triggerRca = async (options: { buildOnPrevious?: boolean } = {}) => {
       if (!incidentDetails.value) return;
+
+      const incidentId = incidentDetails.value.id;
+      const org = store.state.selectedOrganization.identifier;
 
       rcaLoading.value = true;
       rcaStreamContent.value = "";
+      // Clear the previous failure so a retry doesn't show a stale error beside the spinner.
+      rcaError.value = null;
+      // A re-run always produces a new current report — drop back from any archived view.
+      viewingArchivedIndex.value = null;
+      analysisStartedAt.value = Date.now() * 1000;
+      startInFlightPolling();
 
-      const org = store.state.selectedOrganization.identifier;
+      rcaAbortController = new AbortController();
 
       try {
-        const response = await incidentsService.triggerRca(org, incidentDetails.value.id);
+        const response = await incidentsService.triggerRca(
+          org,
+          incidentId,
+          // Fresh analysis unless the user explicitly asked to build on the previous one.
+          { build_on_previous: options.buildOnPrevious === true },
+          { signal: rcaAbortController.signal },
+        );
 
         // Set the RCA content immediately
         rcaStreamContent.value = response.data.rca_content;
@@ -2686,17 +2905,71 @@ export default defineComponent({
           message: t("alerts.incidents.rcaCompleted"),
         });
 
-        // Reload incident to get the saved RCA in topology context
-        await loadDetails(incidentDetails.value.id);
+        // Reload incident to get the saved RCA in topology context, and pick up the
+        // report this run just superseded.
+        await loadDetails(incidentId);
+        await loadRcaHistory(incidentId);
       } catch (error: any) {
-        console.error("Failed to trigger RCA:", error);
         rcaStreamContent.value = "";
-        toast({
-          variant: "error",
-          message: error?.response?.data?.message || error?.message || "Failed to perform RCA analysis",
-        });
+
+        // A cancel is a deliberate user action, not a failure — handled by cancelRca.
+        if (error?.name === "CanceledError" || error?.code === "ERR_CANCELED") {
+          return;
+        }
+
+        console.error("Failed to trigger RCA:", error);
+        const message =
+          error?.response?.data?.message ||
+          error?.message ||
+          t("alerts.incidents.rcaFailedGeneric");
+        // Persist the failure in the panel; the toast alone disappears.
+        rcaError.value = { reason: message, details: "" };
+        toast({ variant: "error", message });
+        // Surface the failure event in the Activity timeline too.
+        timelineRefreshTrigger.value++;
       } finally {
         rcaLoading.value = false;
+        rcaAbortController = null;
+        analysisStartedAt.value = null;
+        if (!analysisInFlight.value) stopInFlightPolling();
+      }
+    };
+
+    const cancelRca = async () => {
+      if (!incidentDetails.value || rcaCancelling.value) return;
+
+      const incidentId = incidentDetails.value.id;
+      const org = store.state.selectedOrganization.identifier;
+
+      rcaCancelling.value = true;
+
+      // Drop the client request first so the UI frees up immediately, regardless of
+      // how long the server takes to acknowledge.
+      rcaAbortController?.abort();
+
+      try {
+        await incidentsService.cancelRca(org, incidentId);
+
+        analysisInFlight.value = false;
+        analysisStartedAt.value = null;
+        rcaError.value = null;
+        stopInFlightPolling();
+
+        toast({ variant: "info", message: t("alerts.incidents.rcaCancelled") });
+        timelineRefreshTrigger.value++;
+      } catch (error: any) {
+        console.error("Failed to cancel RCA:", error);
+        toast({
+          variant: "error",
+          message:
+            error?.response?.data?.message ||
+            error?.message ||
+            t("alerts.incidents.rcaCancelFailed"),
+        });
+        // Resync from the event log — the run may have finished while we were cancelling.
+        await checkAnalysisInFlight(incidentId);
+      } finally {
+        rcaCancelling.value = false;
       }
     };
 
@@ -2724,6 +2997,17 @@ export default defineComponent({
       alerts,
       selectedAlertIndex,
       rcaLoading,
+      rcaError,
+      rcaCancelling,
+      analysisElapsedLabel,
+      analysisIsStale,
+      cancelRca,
+      rcaHistory,
+      viewingArchivedIndex,
+      rcaAnalyzedAt,
+      viewReport,
+      copyReport,
+      downloadReport,
       rcaStreamContent,
       hasExistingRca,
       analysisInFlight,

@@ -143,6 +143,8 @@ use crate::{common::meta, handler::http::request};
         request::alerts::incidents::update_incident,
         request::alerts::incidents::get_incident_stats,
         request::alerts::incidents::trigger_incident_rca,
+        request::alerts::incidents::cancel_incident_rca,
+        request::alerts::incidents::get_incident_rca_history,
         request::alerts::templates::list_templates,
         request::alerts::templates::get_template,
         request::alerts::templates::save_template,

@@ -85,6 +85,20 @@ export interface ListIncidentsResponse {
   total: number;
 }
 
+/** A superseded RCA report retained for an incident. */
+export interface ArchivedRcaReport {
+  content: string;
+  /** Microseconds since epoch. */
+  archived_at: number;
+}
+
+export interface RcaHistoryResponse {
+  /** The report currently shown on the incident, or null if none has run. */
+  current: string | null;
+  /** Superseded reports, newest first. */
+  previous: ArchivedRcaReport[];
+}
+
 export interface IncidentStats {
   total_incidents: number;
   open_incidents: number;
@@ -181,12 +195,36 @@ const incidents = {
   triggerRca: (
     org_identifier: string,
     incident_id: string,
-    params: { reanalysis?: boolean } = {}
+    params: { reanalysis?: boolean; build_on_previous?: boolean } = {},
+    config: { signal?: AbortSignal } = {}
   ) => {
     return http().post<{ rca_content: string }>(
       `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`,
       null,
-      { params }
+      { params, signal: config.signal }
+    );
+  },
+
+  /**
+   * Fetch the current RCA report plus any superseded reports retained for this
+   * incident, newest first. Loaded on demand so the incident list stays light.
+   */
+  getRcaHistory: (org_identifier: string, incident_id: string) => {
+    return http().get<RcaHistoryResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca/history`
+    );
+  },
+
+  /**
+   * Cancel the in-flight RCA analysis for an incident.
+   *
+   * Aborts the server-side run when the handling node owns it, and always records a
+   * terminal cancellation event so the in-flight guard is released immediately —
+   * this is what unblocks a retry after a run was stranded by a restart.
+   */
+  cancelRca: (org_identifier: string, incident_id: string) => {
+    return http().delete<{ message: string; aborted_local_task: boolean }>(
+      `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/rca`
     );
   },
 
