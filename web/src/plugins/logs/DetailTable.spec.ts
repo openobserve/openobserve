@@ -442,15 +442,22 @@ describe("DetailTable Component", () => {
     expect(wrapper.vm.shouldWrapValues).toBe(!initialValue);
   });
 
+  // Asserts the handler's observable effect rather than spying on the instance
+  // method: the template captures the handler into the vnode at render time, so
+  // a spy installed on wrapper.vm afterwards is only picked up if something
+  // forces a re-render — which made the old spy-based version silently depend
+  // on `tab` actually changing here.
   it("should call toggleWrapLogDetails when wrap toggle changed", async () => {
-    const spy = vi.spyOn(wrapper.vm, "toggleWrapLogDetails");
-    wrapper.vm.tab = "table";
-    await nextTick();
-    
+    const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+    const initialValue = wrapper.vm.shouldWrapValues;
+
     const wrapToggle = wrapper.find('[data-test="log-detail-wrap-values-toggle-btn"]');
     await wrapToggle.trigger("click");
-    
-    expect(spy).toHaveBeenCalled();
+
+    expect(setItemSpy).toHaveBeenCalledWith(
+      "wrap-log-details",
+      String(!initialValue),
+    );
   });
 
   it("should update localStorage when toggleWrapLogDetails called", () => {
