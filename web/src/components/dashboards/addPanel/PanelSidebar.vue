@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="panel-sidebar-header-expanded"
     >
       <div
-        class="text-sm font-semibold text-text-primary"
+        class="text-sm font-semibold text-text-heading"
         data-test="panel-sidebar-expanded-title"
       >{{ title }}</div>
       <OButton
