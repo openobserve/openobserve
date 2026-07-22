@@ -433,6 +433,7 @@ impl QueryConditionExt for QueryCondition {
                 use_cache: false,
                 clear_cache: false,
                 local_mode: None,
+                agent_options: None,
             };
             log::debug!(
                 "evaluate_scheduled trace_id: {trace_id}, begin to call SearchService::search, {req:?}"

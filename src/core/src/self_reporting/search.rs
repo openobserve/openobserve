@@ -72,6 +72,7 @@ pub async fn get_usage(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     let trace_id = ider::uuid();
