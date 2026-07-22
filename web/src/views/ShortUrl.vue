@@ -1,8 +1,5 @@
 <template>
-  <div
-    data-test="loading-container"
-    class="h-[100vh] flex flex-col items-center justify-center"
-  >
+  <div data-test="loading-container" class="h-[100vh] flex flex-col items-center justify-center">
     <OSpinner size="lg" data-test="spinner" />
     <div data-test="message" class="text-base text-text-secondary">Redirecting...</div>
   </div>
@@ -52,10 +49,7 @@ export default defineComponent({
 
     const fetchAndRedirect = async () => {
       try {
-        const response = await shortURL.get(
-          store.state.selectedOrganization.identifier,
-          props.id,
-        );
+        const response = await shortURL.get(store.state.selectedOrganization.identifier, props.id);
 
         if (typeof response.data === "string") {
           handleOriginalUrl(response.data);
@@ -84,4 +78,3 @@ export default defineComponent({
   },
 });
 </script>
-

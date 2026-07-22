@@ -25,24 +25,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   GET /workflows/{id}/history, mirroring AlertHistory's presentation.
 -->
 <template>
-  <div
-    class="flex flex-col h-full min-h-0"
-    data-test="workflow-runs-panel"
-  >
+  <div class="flex flex-col h-full min-h-0" data-test="workflow-runs-panel">
     <!-- Compact header: title + datetime range picker + refresh -->
     <div
       class="flex items-center justify-between gap-2 px-3 py-2 border-b border-border-default shrink-0"
     >
       <div class="min-w-0">
-        <div
-          class="text-sm font-semibold text-text-body leading-tight"
-        >
+        <div class="text-sm font-semibold text-text-body leading-tight">
           {{ t("workflow.history.title") }}
         </div>
-        <div
-          v-if="workflowName"
-          class="text-xs text-text-secondary truncate leading-tight"
-        >
+        <div v-if="workflowName" class="text-xs text-text-secondary truncate leading-tight">
           {{ workflowName }}
         </div>
       </div>
@@ -143,10 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-status="{ row }">
-            <OBadge
-              :variant="getStatusVariant(row.error ? 'failed' : 'success')"
-              size="sm"
-            >
+            <OBadge :variant="getStatusVariant(row.error ? 'failed' : 'success')" size="sm">
               {{ row.error ? t("workflow.history.failed") : t("workflow.history.success") }}
             </OBadge>
           </template>
@@ -216,8 +205,7 @@ const dateTimeValues = ref({
 // suffixes go through i18n rather than being concatenated, so a locale can
 // relabel or reorder them ("2h 5m" is not universal).
 const formatDuration = (microseconds: number) => {
-  if (!microseconds || microseconds <= 0)
-    return t("workflow.history.durationZero");
+  if (!microseconds || microseconds <= 0) return t("workflow.history.durationZero");
   const seconds = Math.floor(microseconds / 1_000_000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -253,9 +241,7 @@ const rows = computed(() => runs.value);
 // wins over OTable's default/hover row background — keeping the list and canvas
 // in sync without a scoped :deep() override.
 const rowClass = (row: any) =>
-  row.run_id && row.run_id === props.selectedRunId
-    ? "bg-select-item-hover-bg!"
-    : "";
+  row.run_id && row.run_id === props.selectedRunId ? "bg-select-item-hover-bg!" : "";
 
 // Feed the shared timeline: one bar per run, coloured by success/error.
 const timelineHistory = computed(() =>

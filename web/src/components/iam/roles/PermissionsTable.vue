@@ -15,11 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-
   <div
-    :data-test="`iam-${
-      parent ? parent.name : 'main'
-    }-permissions-table-section`"
+    :data-test="`iam-${parent ? parent.name : 'main'}-permissions-table-section`"
     class="iam-permissions-table"
   >
     <div :style="{ marginTop: 0 }" class="app-table-container">
@@ -29,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="w-full text-center mt-4 font-bold text-text-secondary"
         style="margin-top: 64px; font-size: var(--text-lg)"
       >
-        <span> {{ t('iam.permissionsTable.noPermissionsSelected') }} </span>
+        <span> {{ t("iam.permissionsTable.noPermissionsSelected") }} </span>
       </div>
       <div
         data-test="edit-role-permissions-table-loading-resources-loader"
@@ -39,15 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           paddingLeft: level
             ? parent.has_entities
               ? 16 + 8 + level * 20 + 'px'
-              : 16 +
-                8 +
-                (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
-                'px'
+              : 16 + 8 + (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) + 'px'
             : '',
         }"
       >
         <OSpinner size="xs" class="my-2 mx-0 mr-2" />
-        <div>{{ t('iam.permissionsTable.loadingResources') }}</div>
+        <div>{{ t("iam.permissionsTable.loadingResources") }}</div>
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
@@ -56,14 +50,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           paddingLeft: level
             ? parent.has_entities
               ? 16 + 8 + level * 20 + 'px'
-              : 16 +
-                8 +
-                (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
-                'px'
+              : 16 + 8 + (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) + 'px'
             : '',
         }"
       >
-        {{ t('iam.permissionsTable.showing') }} <span class="font-bold"> {{ t('iam.permissionsTable.top50') }} </span> {{ t('iam.permissionsTable.resourcesSearchHint') }}
+        {{ t("iam.permissionsTable.showing") }}
+        <span class="font-bold"> {{ t("iam.permissionsTable.top50") }} </span>
+        {{ t("iam.permissionsTable.resourcesSearchHint") }}
       </div>
       <div
         :data-test="`edit-role-${parent ? parent.name : 'main'}-permissions-table`"
@@ -93,7 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:expanded-ids="handleOTableExpansionChange"
         >
           <template #cell-display_name="{ row }">
-            <span :style="{ paddingLeft: level > 0 ? `${level * 20}px` : undefined }">{{ row.display_name }}</span>
+            <span :style="{ paddingLeft: level > 0 ? `${level * 20}px` : undefined }">{{
+              row.display_name
+            }}</span>
           </template>
           <template v-for="col in permissionColumnIds" :key="col" #[`cell-${col}`]="{ row }">
             <OCheckbox
@@ -114,7 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :customFilteredPermissions="customFilteredPermissions"
                 :parent="row"
                 @updated:permission="handlePermissionChange"
-                @updated:permission-batch="(changes: any) => emits('updated:permission-batch', changes)"
+                @updated:permission-batch="
+                  (changes: any) => emits('updated:permission-batch', changes)
+                "
                 @expand:row="expandPermission"
               />
             </template>
@@ -128,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="edit-role-permissions-table-no-resources-title"
               class="py-2 px-4 text-sm text-text-secondary"
             >
-              {{ t('iam.permissionsTable.noResourcesPresent') }}
+              {{ t("iam.permissionsTable.noResourcesPresent") }}
             </div>
           </template>
         </OTable>
@@ -181,20 +178,22 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["updated:permission", "updated:permission-batch", "expand:row", "update:filter"]);
+const emits = defineEmits([
+  "updated:permission",
+  "updated:permission-batch",
+  "expand:row",
+  "update:filter",
+]);
 
 const { t } = useI18n();
 
 const permissionsTableRef: any = ref(null);
 
 const permissionColumnIds = computed(() =>
-  columns.value
-    .filter((c) => c.id.startsWith("Allow"))
-    .map((c) => c.id),
+  columns.value.filter((c) => c.id.startsWith("Allow")).map((c) => c.id),
 );
 
 const expandedRowIds = ref<string[]>([]);
-
 
 function handleOTableExpansionChange(ids: string[]) {
   const newlyExpanded = ids.filter((id) => !expandedRowIds.value.includes(id));
@@ -224,10 +223,16 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowAll",
-    header: () => h('div', { class: 'flex items-center gap-1.5' }, [
-      h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowAll'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowAll'), class: 'filter-check-box cursor-pointer' }),
-      h('span', {}, t('iam.all')),
-    ]),
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowAll"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowAll"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.all")),
+      ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
     size: 72,
@@ -237,10 +242,16 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowList",
-    header: () => h('div', { class: 'flex items-center gap-1.5' }, [
-      h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowList'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowList'), class: 'filter-check-box cursor-pointer' }),
-      h('span', {}, t('iam.list')),
-    ]),
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowList"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowList"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.list")),
+      ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
     size: 72,
@@ -250,10 +261,16 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowGet",
-    header: () => h('div', { class: 'flex items-center gap-1.5' }, [
-      h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowGet'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowGet'), class: 'filter-check-box cursor-pointer' }),
-      h('span', {}, t('iam.get')),
-    ]),
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowGet"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowGet"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.get")),
+      ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
     size: 72,
@@ -263,10 +280,16 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowPost",
-    header: () => h('div', { class: 'flex items-center gap-1.5 whitespace-nowrap' }, [
-      h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowPost'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowPost'), class: 'filter-check-box cursor-pointer' }),
-      h('span', {}, t('iam.create')),
-    ]),
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5 whitespace-nowrap" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowPost"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowPost"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.create")),
+      ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
     size: 90,
@@ -276,10 +299,16 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowPut",
-    header: () => h('div', { class: 'flex items-center gap-1.5 whitespace-nowrap' }, [
-      h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowPut'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowPut'), class: 'filter-check-box cursor-pointer' }),
-      h('span', {}, t('iam.update')),
-    ]),
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5 whitespace-nowrap" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowPut"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowPut"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.update")),
+      ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
     size: 90,
@@ -289,10 +318,16 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "AllowDelete",
-    header: () => h('div', { class: 'flex items-center gap-1.5 whitespace-nowrap' }, [
-      h(OCheckbox, { 'modelValue': getHeaderCheckboxState('AllowDelete'), 'indeterminateValue': 'indeterminate', 'onUpdate:modelValue': () => toggleColumnAll('AllowDelete'), class: 'filter-check-box cursor-pointer' }),
-      h('span', {}, t('iam.delete')),
-    ]),
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5 whitespace-nowrap" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowDelete"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowDelete"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.delete")),
+      ]),
     accessorKey: "permission",
     cell: (info: any) => info.getValue(),
     size: 90,
@@ -306,19 +341,15 @@ const columns = computed<OTableColumnDef[]>(() => [
 // Child/nested rows inherit permissions through their parent type row,
 // so toggling them individually here is not needed.
 const getTopLevelTypeRows = computed(() => {
-  return props.rows.filter(
-    (row: any) => row?.show && row.type === "Type"
-  );
+  return props.rows.filter((row: any) => row?.show && row.type === "Type");
 });
 
 const getHeaderCheckboxState = (colName: string) => {
   const visibleRows = getTopLevelTypeRows.value.filter(
-    (row: any) => row.permission?.[colName]?.show
+    (row: any) => row.permission?.[colName]?.show,
   );
   if (!visibleRows.length) return false;
-  const checkedCount = visibleRows.filter(
-    (row: any) => row.permission[colName].value
-  ).length;
+  const checkedCount = visibleRows.filter((row: any) => row.permission[colName].value).length;
   if (checkedCount === 0) return false;
   if (checkedCount === visibleRows.length) return true;
   return "indeterminate";
@@ -326,11 +357,9 @@ const getHeaderCheckboxState = (colName: string) => {
 
 const toggleColumnAll = (colName: string) => {
   const visibleRows = getTopLevelTypeRows.value.filter(
-    (row: any) => row.permission?.[colName]?.show
+    (row: any) => row.permission?.[colName]?.show,
   );
-  const allChecked = visibleRows.every(
-    (row: any) => row.permission[colName].value
-  );
+  const allChecked = visibleRows.every((row: any) => row.permission[colName].value);
   const newValue = !allChecked;
   const changedRows = visibleRows
     .filter((row: any) => row.permission[colName].value !== newValue)
@@ -351,7 +380,7 @@ const handlePermissionChange = (row: any, permission: string) => {
 
 const getFilteredRows = computed(() => {
   return props.rows.filter((row: any) => row?.show);
-})
+});
 defineExpose({
   permissionsTableRef,
 });

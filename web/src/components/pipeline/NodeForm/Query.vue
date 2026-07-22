@@ -32,9 +32,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scheduledPipelineRef?.toggleAIChat()"
         data-test="menu-link-ai-item"
         class="bg-[image:var(--color-gradient-ai-subtle)]! transition-[background,box-shadow] duration-300 hover:bg-[image:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)]"
-        :class="store.state.isAiChatEnabled ? 'ai-btn-active bg-[image:var(--color-gradient-ai-subtle)]!' : ''"
+        :class="
+          store.state.isAiChatEnabled
+            ? 'ai-btn-active bg-[image:var(--color-gradient-ai-subtle)]!'
+            : ''
+        "
       >
-        <img :src="scheduledPipelineRef?.getBtnLogo" class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]" :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''" />
+        <img
+          :src="scheduledPipelineRef?.getBtnLogo"
+          class="header-icon ai-icon opacity-70 transition-[transform] duration-[0.6s] ease-[ease]"
+          :class="store.state.isAiChatEnabled ? 'opacity-100!' : ''"
+        />
       </OButton>
       <div class="flex items-center app-tabs-container">
         <AppTabs
@@ -58,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="!scheduledPipelineRef?.selectedStreamName"
         @click="onRunQuery"
       >
-        {{ t('search.runQuery') }}
+        {{ t("search.runQuery") }}
         <OTooltip
           v-if="!scheduledPipelineRef?.selectedStreamName"
           :content="t('search.selectStreamFirst')"
@@ -72,7 +80,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="scheduledPipelineRef?.handleFullScreen()"
       >
         <template #icon-left>
-          <OIcon name="open-in-full" size="sm" v-if="!scheduledPipelineRef?.isFullscreen" class="size-3.5 shrink-0" />
+          <OIcon
+            name="open-in-full"
+            size="sm"
+            v-if="!scheduledPipelineRef?.isFullscreen"
+            class="size-3.5 shrink-0"
+          />
           <OIcon name="close-fullscreen" size="sm" v-else class="size-3.5 shrink-0" />
         </template>
       </OButton>
@@ -82,35 +95,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="w-full h-full stream-routing-section bg-surface-base"
       :class="{ 'fullscreen-mode': isFullscreenMode }"
     >
-    <!-- ── OWNER pattern ──────────────────────────────────────────────
+      <!-- ── OWNER pattern ──────────────────────────────────────────────
          Query OWNS <OForm> (created with useOForm) and hands it to <OForm :form>.
          ScheduledPipeline is rendered INSIDE as a DESCENDANT: it injects the form
          and renders the validated scalar controls as OForm* `name=` fields. The
          form is the SINGLE source of truth — no v-model:trigger/sql/… mirror.
          The SQL editor stays bare so validateSqlQuery() remains a pre-submit
          guard inside saveQueryData (the form's onSubmit). -->
-    <OForm :form="form" class="w-full h-full rounded-default stream-routing-container">
-      <scheduled-pipeline
-        ref="scheduledPipelineRef"
-        :columns="filteredColumns"
-        :conditions="[]"
-        :alertData="streamRoute"
-        :disableThreshold="true"
-        :disableVrlFunction="true"
-        :isValidSqlQuery="isValidSqlQuery"
-        :disableQueryTypeSelection="true"
-        :expandedLogs="expandedLogs"
-        :validatingSqlQuery="validatingSqlQuery"
-        @validate-sql="validateSqlQuery"
-        @submit:form="submitForm"
-        @cancel:form="openCancelDialog"
-        @delete:node="openDeleteDialog"
-        @update:fullscreen="updateFullscreenMode"
-        @update:stream_type="updateStreamType"
-        @expandLog="toggleExpandLog"
-        @update:delay="updateDelay"
-      />
-    </OForm>
+      <OForm :form="form" class="w-full h-full rounded-default stream-routing-container">
+        <scheduled-pipeline
+          ref="scheduledPipelineRef"
+          :columns="filteredColumns"
+          :conditions="[]"
+          :alertData="streamRoute"
+          :disableThreshold="true"
+          :disableVrlFunction="true"
+          :isValidSqlQuery="isValidSqlQuery"
+          :disableQueryTypeSelection="true"
+          :expandedLogs="expandedLogs"
+          :validatingSqlQuery="validatingSqlQuery"
+          @validate-sql="validateSqlQuery"
+          @submit:form="submitForm"
+          @cancel:form="openCancelDialog"
+          @delete:node="openDeleteDialog"
+          @update:fullscreen="updateFullscreenMode"
+          @update:stream_type="updateStreamType"
+          @expandLog="toggleExpandLog"
+          @update:delay="updateDelay"
+        />
+      </OForm>
     </div>
   </ODrawer>
   <confirm-dialog
@@ -122,19 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 </template>
 <script lang="ts" setup>
-import {
-  computed,
-  onMounted,
-  ref,
-  watch,
-  type Ref,
-  onActivated,
-  provide,
-} from "vue";
-import {
-  rangesFromServerError,
-  type SqlErrorRange,
-} from "@/utils/query/sqlDiagnostics";
+import { computed, onMounted, ref, watch, type Ref, onActivated, provide } from "vue";
+import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { useI18n } from "vue-i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -222,7 +224,6 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-
 const store = useStore();
 
 const { getStream } = useStreams();
@@ -232,7 +233,12 @@ const { buildQueryPayload } = useQuery();
 const emit = defineEmits(["update:node", "cancel:hideform", "delete:node"]);
 
 const internalOpen = ref(!!props.open);
-watch(() => props.open, (v) => { internalOpen.value = !!v; });
+watch(
+  () => props.open,
+  (v) => {
+    internalOpen.value = !!v;
+  },
+);
 
 function handleDrawerClose(v: boolean) {
   internalOpen.value = v;
@@ -361,18 +367,12 @@ const originalStreamRouting: Ref<StreamRoute> = ref(
 
 // Reactive view of the form-owned aggregation-enabled state derived from the
 // presence of an aggregation object (matches ScheduledPipeline's toggle).
-const isAggregationEnabled = computed(
-  () => !!streamRoute.value?.query_condition?.aggregation,
-);
+const isAggregationEnabled = computed(() => !!streamRoute.value?.query_condition?.aggregation);
 
 onMounted(() => {
   if (pipelineObj.isEditNode) {
     // Deep copy to avoid modifying the original node data, then seed the form.
-    form.reset(
-      JSON.parse(
-        JSON.stringify(pipelineObj.currentSelectedNodeData?.data),
-      ) as QueryForm,
-    );
+    form.reset(JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData?.data)) as QueryForm);
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
@@ -382,18 +382,13 @@ onMounted(() => {
 
 onActivated(() => {
   if (pipelineObj.isEditNode) {
-    form.reset(
-      JSON.parse(
-        JSON.stringify(pipelineObj.currentSelectedNodeData?.data),
-      ) as QueryForm,
-    );
+    form.reset(JSON.parse(JSON.stringify(pipelineObj.currentSelectedNodeData?.data)) as QueryForm);
   }
 
   originalStreamRouting.value = JSON.parse(JSON.stringify(streamRoute.value));
 });
 
 const streamTypes = ["logs", "metrics", "traces"];
-
 
 // Exposed computed for unit tests. The live drawer does not edit
 // streamRoute.name, so it is intentionally NOT a schema field (see Query.schema).
@@ -404,11 +399,7 @@ const isValidStreamName = computed(() => {
 
 const updateStreamFields = async () => {
   let streamCols: any = [];
-  const streams: any = await getStream(
-    props.streamName,
-    props.streamType,
-    true,
-  );
+  const streams: any = await getStream(props.streamName, props.streamType, true);
 
   if (streams && Array.isArray(streams.schema)) {
     streamCols = streams.schema.map((column: any) => ({
@@ -426,10 +417,7 @@ const closeDialog = () => {
 };
 
 const openCancelDialog = () => {
-  if (
-    JSON.stringify(originalStreamRouting.value) ===
-    JSON.stringify(streamRoute.value)
-  ) {
+  if (JSON.stringify(originalStreamRouting.value) === JSON.stringify(streamRoute.value)) {
     closeDialog();
     return;
   }
@@ -439,9 +427,7 @@ const openCancelDialog = () => {
   dialog.value.message = "Are you sure you want to cancel routing changes?";
   dialog.value.okCallback = () => {
     // Restore original data onto the form (single source of truth).
-    form.reset(
-      JSON.parse(JSON.stringify(originalStreamRouting.value)) as QueryForm,
-    );
+    form.reset(JSON.parse(JSON.stringify(originalStreamRouting.value)) as QueryForm);
     closeDialog();
   };
 };
@@ -506,8 +492,7 @@ const saveQueryData = async () => {
   };
 
   if (formData.trigger_condition.frequency_type === "cron") {
-    queryPayload.tz_offset =
-      getTimezoneOffset(formData.trigger_condition.timezone) || 0;
+    queryPayload.tz_offset = getTimezoneOffset(formData.trigger_condition.timezone) || 0;
   }
 
   if (formData.query_condition.type == "promql") {
@@ -574,7 +559,7 @@ const validateSqlQuery = async () => {
   //if no we can directly assign the sql to the query
   //we dont need to change the actual query instead of we need to change the query that we are sending for validation purpose
 
-  query.query.sql = normalizeLimit(streamRoute.value.query_condition.sql,100);
+  query.query.sql = normalizeLimit(streamRoute.value.query_condition.sql, 100);
 
   //encoding is not required for the pipeline queries
   if (store.state.zoConfig.sql_base64_enabled && query?.encoding) {
@@ -658,7 +643,7 @@ const normalizeLimit = (sql: string, maxLimit = 100): string => {
     if (sql.match(regex)) {
       return sql.replace(regex, (match, limit, offset) => {
         const num = parseInt(limit, 10);
-        return `LIMIT ${num > maxLimit ? maxLimit : num}${offset || ''}`;
+        return `LIMIT ${num > maxLimit ? maxLimit : num}${offset || ""}`;
       });
     }
 
@@ -706,5 +691,4 @@ defineExpose({
   saveQueryData,
   submitForm,
 });
-
 </script>

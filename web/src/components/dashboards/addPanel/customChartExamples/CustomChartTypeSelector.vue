@@ -19,14 +19,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        padding + borders) so the dialog body never overflows. That keeps the
        inner right-content area as the single scroller instead of stacking a
        second scrollbar on the dialog body. -->
-  <OCard class="p-0 w-full h-[calc(90vh_-_2rem)] overflow-hidden flex flex-col"
+  <OCard
+    class="p-0 w-full h-[calc(90vh_-_2rem)] overflow-hidden flex flex-col"
     data-test="custom-chart-type-selector-popup"
   >
     <!-- Header -->
     <OCardSection role="header">
       <div class="flex items-center gap-3 w-full">
         <OIcon name="bar-chart" size="sm" />
-        <span class="text-xl font-semibold whitespace-nowrap">{{ t('dashboard.customChartTypeSelector.exampleOfCustomCharts') }}</span>
+        <span class="text-xl font-semibold whitespace-nowrap">{{
+          t("dashboard.customChartTypeSelector.exampleOfCustomCharts")
+        }}</span>
         <OSearchInput
           v-model="searchQuery"
           :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
@@ -49,15 +52,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
 
     <!-- Main Content -->
-    <OCardSection
-      class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0"
-    >
+    <OCardSection class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0">
       <div class="flex flex-nowrap h-full w-full">
         <!-- Left Sidebar -->
-        <OCard
-          class="p-4 w-40 h-full shrink-0 overflow-y-auto"
-        >
-          <div class="text-sm font-medium mb-3 font-bold">{{ t('dashboard.customChartTypeSelector.chartTypes') }}</div>
+        <OCard class="p-4 w-40 h-full shrink-0 overflow-y-auto">
+          <div class="text-sm font-medium mb-3 font-bold">
+            {{ t("dashboard.customChartTypeSelector.chartTypes") }}
+          </div>
           <ul class="flex flex-col list-none p-0 m-0">
             <li
               v-for="(category, index) in chartCategories"
@@ -89,9 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <div class="text-center">
               <OIcon class="w-16 h-16" name="search-off" />
-              <div class="text-xl font-semibold text-text-muted mt-3">{{ t('dashboard.customChartTypeSelector.noResultsFound') }}</div>
+              <div class="text-xl font-semibold text-text-muted mt-3">
+                {{ t("dashboard.customChartTypeSelector.noResultsFound") }}
+              </div>
               <div class="text-sm text-text-muted mt-2">
-                {{ t('dashboard.customChartTypeSelector.trySearchingDifferentKeywords') }}
+                {{ t("dashboard.customChartTypeSelector.trySearchingDifferentKeywords") }}
               </div>
             </div>
           </div>
@@ -116,13 +119,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OCard
                   class="cursor-pointer transition-all duration-200 h-full hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)] hover:-translate-y-0.5"
                   :class="{
-                    'border-2 border-theme-accent shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]': selectedChart?.value === chart.value,
+                    'border-2 border-theme-accent shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]':
+                      selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
                   <OCardSection class="p-2">
-                    <div class="w-full h-37.5 flex items-center justify-center bg-surface-subtle rounded-default overflow-hidden">
+                    <div
+                      class="w-full h-37.5 flex items-center justify-center bg-surface-subtle rounded-default overflow-hidden"
+                    >
                       <img
                         :src="chart.asset"
                         :alt="chart.label"
@@ -157,14 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  nextTick,
-  computed,
-  inject,
-} from "vue";
+import { defineComponent, ref, onMounted, nextTick, computed, inject } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
@@ -173,7 +172,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
@@ -187,22 +186,15 @@ export default defineComponent({
     OCard,
     OCardSection,
     OIcon,
-},
+  },
   emits: ["close", "select"],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
-    const selectedCategory = ref<string>(
-      chartCategories.value[0]?.chartLabel || "",
-    );
+    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");
     const selectedChart = ref<ChartType | null>(null);
     const contentArea = ref<HTMLElement | null>(null);
     const confirmChartSelectionDialog = ref<boolean>(false);
@@ -212,9 +204,8 @@ export default defineComponent({
     // Get current query for the dialog
     const currentQuery = computed(
       () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex || 0
-        ]?.query || "",
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex || 0]?.query ||
+        "",
     );
 
     // Computed property to filter categories and charts based on search query
@@ -258,9 +249,7 @@ export default defineComponent({
       if (!contentArea.value) return;
 
       const scrollTop = contentArea.value.scrollTop;
-      const sections = contentArea.value.querySelectorAll(
-        ".chart-category-section",
-      );
+      const sections = contentArea.value.querySelectorAll(".chart-category-section");
 
       // Find which category is currently in view
       for (const section of Array.from(sections)) {

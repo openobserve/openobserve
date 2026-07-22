@@ -158,9 +158,7 @@ describe("StepPickerDialog", () => {
 
     it('falls back to the "help" icon when an item has no icon', () => {
       wrapper = mountPicker({ items: [{ key: "x", title: "X" }] });
-      const names = wrapper
-        .findAllComponents({ name: "OIcon" })
-        .map((i: any) => i.props("name"));
+      const names = wrapper.findAllComponents({ name: "OIcon" }).map((i: any) => i.props("name"));
       expect(names).toContain("help");
     });
 
@@ -258,9 +256,9 @@ describe("StepPickerDialog", () => {
 
     it("honours a custom searchPlaceholder", () => {
       wrapper = mountPicker({ searchPlaceholder: "Search Steps" });
-      expect(
-        wrapper.findComponent({ name: "OSearchInput" }).props("placeholder"),
-      ).toBe("Search Steps");
+      expect(wrapper.findComponent({ name: "OSearchInput" }).props("placeholder")).toBe(
+        "Search Steps",
+      );
     });
   });
 

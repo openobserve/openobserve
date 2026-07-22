@@ -258,9 +258,7 @@ describe("traceColors", () => {
       expect(traceUIColors.surface).toBe("var(--color-trace-surface)");
       expect(traceUIColors.border).toBe("var(--color-trace-border)");
       expect(traceUIColors.textPrimary).toBe("var(--color-trace-text-primary)");
-      expect(traceUIColors.textSecondary).toBe(
-        "var(--color-trace-text-secondary)",
-      );
+      expect(traceUIColors.textSecondary).toBe("var(--color-trace-text-secondary)");
       expect(traceUIColors.hover).toBe("var(--color-trace-hover)");
       expect(traceUIColors.selected).toBe("var(--color-trace-selected)");
     });

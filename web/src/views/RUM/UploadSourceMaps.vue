@@ -30,7 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-slot="{ isSubmitting }"
     >
       <!-- Form Content Area -->
-      <div class="flex-1 overflow-y-auto bg-card-glass-bg mb-[0.675rem] p-6 overflow-auto" style="height: calc(100vh - 172px)">
+      <div
+        class="flex-1 overflow-y-auto bg-card-glass-bg mb-[0.675rem] p-6 overflow-auto"
+        style="height: calc(100vh - 172px)"
+      >
         <div class="max-w-300 mx-auto">
           <!-- Input Fields -->
           <div class="grid grid-cols-1 gap-4 mb-6">
@@ -70,8 +73,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Bottom Action Bar -->
-      <div class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky"
-        style="z-index: 2">
+      <div
+        class="action-bar shrink-0 bg-card-glass-bg flex items-center justify-end gap-3 py-3 pr-3 border-t border-card-glass-border sticky"
+        style="z-index: 2"
+      >
         <OButton
           data-test="rum-upload-source-maps-cancel-btn"
           variant="outline"
@@ -79,14 +84,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="button"
           @click="navigateBack"
           :disabled="isSubmitting"
-        >Cancel</OButton>
+          >Cancel</OButton
+        >
         <OButton
           data-test="rum-upload-source-maps-upload-btn"
           variant="primary"
           size="sm-action"
           type="submit"
           :loading="isSubmitting"
-        >Upload</OButton>
+          >Upload</OButton
+        >
       </div>
     </OForm>
   </OPageLayout>
@@ -104,10 +111,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import SourceMapDropzone from "./SourceMapDropzone.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  makeUploadSourceMapsSchema,
-  type UploadSourceMapsForm,
-} from "./UploadSourceMaps.schema";
+import { makeUploadSourceMapsSchema, type UploadSourceMapsForm } from "./UploadSourceMaps.schema";
 
 const { t } = useI18n();
 const store = useStore();
@@ -119,13 +123,15 @@ const uploadSourceMapsSchema = makeUploadSourceMapsSchema(t);
 // Dynamic (query-param prefill) defaults → a typed component computed. The
 // service/version/environment are seeded from the route query; `file` always
 // starts empty.
-const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
-  service: (route.query.service as string) || "",
-  version: (route.query.version as string) || "",
-  environment: (route.query.environment as string) || "",
-  // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
-  file: null as unknown as File,
-}));
+const uploadSourceMapsDefaults = computed(
+  (): UploadSourceMapsForm => ({
+    service: (route.query.service as string) || "",
+    version: (route.query.version as string) || "",
+    environment: (route.query.environment as string) || "",
+    // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
+    file: null as unknown as File,
+  }),
+);
 
 // Navigate back to source maps list
 const navigateBack = () => {
@@ -150,7 +156,7 @@ const uploadSourceMaps = async (value: UploadSourceMapsForm) => {
 
     await sourcemapsService.uploadSourceMaps(
       store.state.selectedOrganization.identifier,
-      uploadData
+      uploadData,
     );
 
     toast({

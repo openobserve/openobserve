@@ -6,19 +6,13 @@
       'opacity-100': loading || isFadingOut,
     }"
   >
-    <div
-      class="w-full h-0.5 relative overflow-x-hidden bg-progress-bar-track"
-    >
+    <div class="w-full h-0.5 relative overflow-x-hidden bg-progress-bar-track">
       <div
         class="h-full relative overflow-hidden"
-        :class="
-          'bg-brand-indigo'
-        "
+        :class="'bg-brand-indigo'"
         :style="{
           width: `${displayPercentage}%`,
-          transition: shouldAnimate
-            ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            : 'none',
+          transition: shouldAnimate ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
           willChange: loading ? 'width' : 'auto',
           transform: 'translateZ(0)', // Force GPU acceleration
         }"
@@ -30,14 +24,10 @@
       <!-- Moving circle indicator -->
       <div
         class="absolute top-0 w-0.75 h-0.5 rounded-full shadow-[0_0_0.625rem_0.125rem_color-mix(in_srgb,var(--color-brand-indigo)_50%,transparent)] transform -translate-x-1/2"
-        :class="
-          'bg-brand-indigo'
-        "
+        :class="'bg-brand-indigo'"
         :style="{
           left: `${displayPercentage}%`,
-          transition: shouldAnimate
-            ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            : 'none',
+          transition: shouldAnimate ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         }"
       >
         <div
@@ -161,4 +151,3 @@ export default defineComponent({
   }
 }
 </style>
-

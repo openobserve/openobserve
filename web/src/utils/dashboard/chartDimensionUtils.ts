@@ -15,19 +15,13 @@ let measureTextCtx: CanvasRenderingContext2D | null | undefined;
  * @param {string} fontSize - The font size of the text.
  * @return {number} The width of the text in pixels.
  */
-export const calculateWidthText = (
-  text: string,
-  fontSize: string = "12px",
-): number => {
+export const calculateWidthText = (text: string, fontSize: string = "12px"): number => {
   if (!text) return 0;
 
   if (measureTextCtx === undefined) {
     try {
       const canvas = document.createElement("canvas");
-      measureTextCtx =
-        typeof canvas.getContext === "function"
-          ? canvas.getContext("2d")
-          : null;
+      measureTextCtx = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
     } catch {
       measureTextCtx = null;
     }
@@ -96,10 +90,7 @@ export const calculateOptimalFontSize = (
   let maxFontSize = 90; // Set a maximum possible font size
 
   if (canvasHeight !== undefined && canvasHeight > 0) {
-    maxFontSize = Math.max(
-      minFontSize,
-      Math.min(maxFontSize, Math.floor(canvasHeight / 1.2)),
-    );
+    maxFontSize = Math.max(minFontSize, Math.min(maxFontSize, Math.floor(canvasHeight / 1.2)));
   }
 
   let optimalFontSize = minFontSize;
@@ -149,8 +140,7 @@ export const calculateDynamicNameGap = (
   // When a label of width W is rotated by angle ╬╕:
   // - The vertical height = W * sin(╬╕) + fontSize * cos(╬╕)
   const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
+    labelWidth * Math.sin(rotationInRadians) + fontSize * Math.cos(rotationInRadians);
 
   // Calculate nameGap: vertical height + axis label margin + small buffer (8px)
   // The buffer ensures there's slight spacing between longest label tip and axis name
@@ -188,8 +178,7 @@ export const calculateRotatedLabelBottomSpace = (
 
   // Calculate the vertical height occupied by rotated label
   const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
+    labelWidth * Math.sin(rotationInRadians) + fontSize * Math.cos(rotationInRadians);
 
   if (hasAxisName) {
     // If there's an axis name, nameGap already covers the label height.

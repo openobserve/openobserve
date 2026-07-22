@@ -35,16 +35,8 @@ export const METRIC_MIN_FONT_PX = 12;
  * copy-button slot on both sides, capped by the cell height, and floored at
  * a readable minimum (never beyond what the height allows).
  */
-export const calculateMetricFontSize = (
-  text: string,
-  width: number,
-  height: number,
-): number => {
-  const fit = calculateOptimalFontSize(
-    text,
-    width - 2 * METRIC_COPY_BTN_SLOT_PX,
-    height,
-  );
+export const calculateMetricFontSize = (text: string, width: number, height: number): number => {
+  const fit = calculateOptimalFontSize(text, width - 2 * METRIC_COPY_BTN_SLOT_PX, height);
   const heightCap = Math.max(1, Math.floor(height / 1.2));
   const floorCap = Math.min(METRIC_MIN_FONT_PX, heightCap);
   // common case: the fit already clears the readability floor, so the
@@ -81,8 +73,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     panelSchema?.config?.decimals,
   );
   const metricText = formatUnitValue(unitValue);
-  options.backgroundColor =
-    panelSchema?.config?.background?.value?.color ?? "";
+  options.backgroundColor = panelSchema?.config?.background?.value?.color ?? "";
   options.dataset = { source: [[]] };
   options.tooltip = {
     show: false,
@@ -100,8 +91,7 @@ export function applyMetricChart(ctx: SQLContext): void {
     panelSchema?.config?.background?.value?.color,
     store?.state?.theme === "dark",
   );
-  const metricFieldLabel =
-    panelSchema?.queries?.[0]?.fields?.y?.[0]?.label || key1;
+  const metricFieldLabel = panelSchema?.queries?.[0]?.fields?.y?.[0]?.label || key1;
   options.series = [
     {
       ...defaultSeriesProps,
@@ -110,8 +100,7 @@ export function applyMetricChart(ctx: SQLContext): void {
       _metricLabel: metricFieldLabel,
       renderItem: function (params: any) {
         try {
-          const backgroundColor =
-            panelSchema?.config?.background?.value?.color;
+          const backgroundColor = panelSchema?.config?.background?.value?.color;
           const isDarkTheme = store?.state?.theme === "dark";
           return {
             type: "text",

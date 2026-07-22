@@ -43,12 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="{ height: barHeight(value) }"
         />
       </div>
-      <small
-        class="italic"
-        :class="annotationClass"
-        data-test="rum-error-trend-cell-annotation"
-        >{{ annotationLabel }}</small
-      >
+      <small class="italic" :class="annotationClass" data-test="rum-error-trend-cell-annotation">{{
+        annotationLabel
+      }}</small>
     </div>
 
     <!-- Pre-intersection and in-flight cells both show the skeleton — an
@@ -80,10 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import {
-  computeTrendAnnotation,
-  type IssueStatus,
-} from "@/utils/rum/errorIssueUtils";
+import { computeTrendAnnotation, type IssueStatus } from "@/utils/rum/errorIssueUtils";
 
 const props = defineProps<{
   /**
@@ -155,16 +149,12 @@ const displayBuckets = computed<number[]>(() => {
   const chunk = Math.ceil(buckets.length / MAX_BARS);
   const merged: number[] = [];
   for (let i = 0; i < buckets.length; i += chunk) {
-    merged.push(
-      buckets.slice(i, i + chunk).reduce((sum, value) => sum + value, 0),
-    );
+    merged.push(buckets.slice(i, i + chunk).reduce((sum, value) => sum + value, 0));
   }
   return merged;
 });
 
-const annotation = computed(() =>
-  computeTrendAnnotation(props.buckets, props.status),
-);
+const annotation = computed(() => computeTrendAnnotation(props.buckets, props.status));
 
 // Static per-kind utility strings (not built by interpolation) so Tailwind's
 // scanner sees every class it has to emit.
@@ -175,9 +165,7 @@ const ANNOTATION_CLASS: Record<string, string> = {
   flat: "text-text-secondary",
 };
 
-const annotationClass = computed(
-  () => ANNOTATION_CLASS[annotation.value.kind] ?? "",
-);
+const annotationClass = computed(() => ANNOTATION_CLASS[annotation.value.kind] ?? "");
 
 const annotationLabel = computed(() => {
   const { kind, factor } = annotation.value;
@@ -191,9 +179,7 @@ const maxValue = computed(() =>
   displayBuckets.value.reduce((max, value) => Math.max(max, value), 0),
 );
 
-const totalEvents = computed(() =>
-  displayBuckets.value.reduce((sum, value) => sum + value, 0),
-);
+const totalEvents = computed(() => displayBuckets.value.reduce((sum, value) => sum + value, 0));
 
 const barHeight = (value: number) => {
   if (value <= 0 || maxValue.value <= 0) return "0.125rem";
@@ -201,8 +187,5 @@ const barHeight = (value: number) => {
   return `${Math.max(15, (value / maxValue.value) * 100)}%`;
 };
 
-const ariaLabel = computed(() =>
-  t("rum.eventsCount", { count: totalEvents.value }),
-);
+const ariaLabel = computed(() => t("rum.eventsCount", { count: totalEvents.value }));
 </script>
-

@@ -32,16 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <span class="relative flex-1 min-w-0">
-      <span
-        :title="label"
-        class="block text-sm font-medium text-text-heading wrap-break-word"
-        >{{ label }}</span
-      >
-      <span
-        v-if="sublabel"
-        class="block text-xs text-text-secondary leading-snug"
-        >{{ sublabel }}</span
-      >
+      <span :title="label" class="block text-sm font-medium text-text-heading wrap-break-word">{{
+        label
+      }}</span>
+      <span v-if="sublabel" class="block text-xs text-text-secondary leading-snug">{{
+        sublabel
+      }}</span>
     </span>
 
     <OIcon

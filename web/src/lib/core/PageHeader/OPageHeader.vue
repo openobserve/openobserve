@@ -50,97 +50,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        61px on some pages and 60px on others. -->
   <header
     class="app-page-header shrink-0 px-page-edge border-b border-border-default"
-    :class="[
-      tabsBelow
-        ? 'flex flex-col'
-        : 'h-15 flex items-center justify-between gap-4',
-    ]"
+    :class="[tabsBelow ? 'flex flex-col' : 'h-15 flex items-center justify-between gap-4']"
   >
     <!-- Row 1. In two-row mode this is its own flex row; otherwise it collapses
          (display:contents) so the title block + actions stay direct children of
          the header — preserving the original single-row inline-tabs layout. -->
-    <div
-      :class="
-        tabsBelow
-          ? 'h-15 flex items-center justify-between gap-4'
-          : 'contents'
-      "
-    >
-    <div class="flex items-center gap-3.25 min-w-0 h-full flex-1">
-      <slot name="title-prefix" />
+    <div :class="tabsBelow ? 'h-15 flex items-center justify-between gap-4' : 'contents'">
+      <div class="flex items-center gap-3.25 min-w-0 h-full flex-1">
+        <slot name="title-prefix" />
 
-      <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
+        <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
            footprint, so the title's X never shifts between list and add/edit). -->
-      <template v-if="hasBack">
-        <slot name="back">
-          <button
-            type="button"
-            class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-default bg-surface-subtle text-text-body transition-colors hover:bg-button-ghost-hover-bg outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
-            :title="backLabel"
-            :aria-label="backLabel"
-            :data-test="props.back?.dataTest ?? 'app-page-header-back'"
-            @click="onBack"
-          >
-            <OIcon name="chevron-left" size="md" />
-          </button>
-        </slot>
-      </template>
+        <template v-if="hasBack">
+          <slot name="back">
+            <button
+              type="button"
+              class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-default bg-surface-subtle text-text-body transition-colors hover:bg-button-ghost-hover-bg outline-none focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+              :title="backLabel"
+              :aria-label="backLabel"
+              :data-test="props.back?.dataTest ?? 'app-page-header-back'"
+              @click="onBack"
+            >
+              <OIcon name="chevron-left" size="md" />
+            </button>
+          </slot>
+        </template>
 
-      <!-- Listing/index page: the module icon tile. -->
-      <span
-        v-else-if="icon"
-        class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-default bg-tabs-active-bg text-tabs-active-text"
-        aria-hidden="true"
-      >
-        <OIcon :name="icon" size="md" />
-      </span>
-
-      <div class="flex flex-col justify-center min-w-0 shrink-0">
-        <h1
-          class="text-base! font-semibold! leading-[1.45]! tracking-[-0.02em]! text-text-heading truncate min-h-6"
-          :title="title"
-          :data-test="titleDataTest"
+        <!-- Listing/index page: the module icon tile. -->
+        <span
+          v-else-if="icon"
+          class="inline-flex items-center justify-center shrink-0 w-9.5 h-9.5 rounded-default bg-tabs-active-bg text-tabs-active-text"
+          aria-hidden="true"
         >
-          <slot name="title">{{ title }}</slot>
-        </h1>
-        <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
+          <OIcon :name="icon" size="md" />
+        </span>
+
+        <div class="flex flex-col justify-center min-w-0 shrink-0">
+          <h1
+            class="text-base! font-semibold! leading-[1.45]! tracking-[-0.02em]! text-text-heading truncate min-h-6"
+            :title="title"
+            :data-test="titleDataTest"
+          >
+            <slot name="title">{{ title }}</slot>
+          </h1>
+          <!-- Fixed-height subtitle band: keeps the <h1> at an identical Y whether
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
-        <OText
-          v-if="hasSubtitle"
-          variant="meta"
-          as="div"
-          class="flex items-center h-5 min-w-0 -mt-0.5"
-        >
-          <slot name="subtitle">
-            <!-- leading-normal (not the meta variant's leading-none): truncate
+          <OText
+            v-if="hasSubtitle"
+            variant="meta"
+            as="div"
+            class="flex items-center h-5 min-w-0 -mt-0.5"
+          >
+            <slot name="subtitle">
+              <!-- leading-normal (not the meta variant's leading-none): truncate
                  sets overflow:hidden, and a 1em line box clips descenders
                  (g/y/p). The h-5 band + items-center leaves room for it. -->
-            <span class="truncate min-w-0 leading-normal">{{ subtitle }}</span>
-          </slot>
-        </OText>
-      </div>
+              <span class="truncate min-w-0 leading-normal">{{ subtitle }}</span>
+            </slot>
+          </OText>
+        </div>
 
-      <!-- Inline content placed immediately after the title block (e.g. a name
+        <!-- Inline content placed immediately after the title block (e.g. a name
            input on create pages). Renders between title text and tabs/actions. -->
-      <slot name="title-trail" />
+        <slot name="title-trail" />
 
-      <!-- Module tabs (Level-2 nav), inline to the right of the title.
+        <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
-      <div
-        v-if="hasTabs && !tabsBelow"
-        class="flex items-center min-w-0 flex-1 h-full"
-      >
-        <slot name="tabs" />
+        <div v-if="hasTabs && !tabsBelow" class="flex items-center min-w-0 flex-1 h-full">
+          <slot name="tabs" />
+        </div>
       </div>
-    </div>
 
-    <div
-      v-if="hasActions"
-      class="flex items-center gap-2 shrink-0"
-    >
-      <slot name="actions" />
-    </div>
+      <div v-if="hasActions" class="flex items-center gap-2 shrink-0">
+        <slot name="actions" />
+      </div>
     </div>
 
     <!-- Row 2: full-width section-tab strip (prototype's two-row header). The
@@ -202,21 +186,16 @@ const slotHasContent = (name: string): boolean => {
   if (!fn) return false;
   return fn().some((node) => {
     if (node.type === Comment) return false;
-    if (node.type === Text)
-      return typeof node.children === "string" && node.children.trim() !== "";
+    if (node.type === Text) return typeof node.children === "string" && node.children.trim() !== "";
     return true;
   });
 };
 
-const hasSubtitle = computed(
-  () => Boolean(props.subtitle) || slotHasContent("subtitle"),
-);
+const hasSubtitle = computed(() => Boolean(props.subtitle) || slotHasContent("subtitle"));
 const hasTabs = computed(() => slotHasContent("tabs"));
 const hasActions = computed(() => slotHasContent("actions"));
 const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
-const backLabel = computed(() =>
-  props.back?.label ? `Back to ${props.back.label}` : "Back",
-);
+const backLabel = computed(() => (props.back?.label ? `Back to ${props.back.label}` : "Back"));
 
 const onBack = () => {
   if (props.back?.onClick) props.back.onClick();

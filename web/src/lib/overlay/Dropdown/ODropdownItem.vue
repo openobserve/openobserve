@@ -1,9 +1,5 @@
 <script setup lang="ts">
-import type {
-  DropdownItemProps,
-  DropdownItemEmits,
-  DropdownItemSlots,
-} from "./ODropdown.types";
+import type { DropdownItemProps, DropdownItemEmits, DropdownItemSlots } from "./ODropdown.types";
 import { DropdownMenuItem } from "reka-ui";
 import OIcon from "../../core/Icon/OIcon.vue";
 import OShortcut from "../../core/Shortcut/OShortcut.vue";
@@ -17,12 +13,8 @@ const emit = defineEmits<DropdownItemEmits>();
 
 defineSlots<DropdownItemSlots>();
 
-const variantClasses: Record<
-  NonNullable<DropdownItemProps["variant"]>,
-  string
-> = {
-  default:
-    "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
+const variantClasses: Record<NonNullable<DropdownItemProps["variant"]>, string> = {
+  default: "text-dropdown-item-text data-[highlighted]:bg-dropdown-item-hover-bg",
   destructive:
     "text-dropdown-item-destructive-text data-[highlighted]:bg-dropdown-item-destructive-hover-bg",
 };

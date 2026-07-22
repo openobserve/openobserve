@@ -9,11 +9,11 @@ const props = withDefaults(defineProps<SpinnerProps>(), {
 
 // px dimensions per size token
 const sizeClasses: Record<NonNullable<SpinnerProps["size"]>, string> = {
-  xs: "size-4",   // 16px
-  sm: "size-5",   // 20px
-  md: "size-8",   // 32px
-  lg: "size-12",  // 48px
-  xl: "size-16",  // 64px
+  xs: "size-4", // 16px
+  sm: "size-5", // 20px
+  md: "size-8", // 32px
+  lg: "size-12", // 48px
+  xl: "size-16", // 64px
 };
 
 // Dot sizes are scaled-down from the ring size
@@ -48,14 +48,7 @@ const containerClasses = computed(() => [
       aria-hidden="true"
     >
       <!-- Track -->
-      <circle
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        stroke-width="3"
-        class="opacity-20"
-      />
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-20" />
       <!-- Spinning arc -->
       <path
         d="M12 2a10 10 0 0 1 10 10"
@@ -70,10 +63,7 @@ const containerClasses = computed(() => [
   <!-- Dots variant -->
   <span
     v-else
-    :class="[
-      'inline-flex items-center justify-center gap-1 shrink-0',
-      sizeClasses[size ?? 'md'],
-    ]"
+    :class="['inline-flex items-center justify-center gap-1 shrink-0', sizeClasses[size ?? 'md']]"
     role="status"
     aria-label="Loading"
     aria-live="polite"
@@ -81,10 +71,7 @@ const containerClasses = computed(() => [
     <span
       v-for="i in 3"
       :key="i"
-      :class="[
-        'rounded-full bg-spinner animate-bounce',
-        dotSizeClasses[size ?? 'md'],
-      ]"
+      :class="['rounded-full bg-spinner animate-bounce', dotSizeClasses[size ?? 'md']]"
       :style="{ animationDelay: `${(i - 1) * 0.15}s` }"
       aria-hidden="true"
     />

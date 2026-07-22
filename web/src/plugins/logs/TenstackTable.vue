@@ -28,10 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       (e.g. streaming_aggs replacing values). Same component dashboard panels
       use; driven by backend streaming progress. The full skeleton below is
       shown only on first load (no rows yet). -->
-    <LoadingProgress
-      :loading="loading"
-      :loadingProgressPercentage="loadingProgressPercentage"
-    />
+    <LoadingProgress :loading="loading" :loadingProgressPercentage="loadingProgressPercentage" />
     <table
       v-if="table"
       data-test="logs-search-result-logs-table"
@@ -86,8 +83,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="px-2 relative table-head text-ellipsis"
             :style="
               !defaultColumns && headerIndex === headerGroup.headers.length - 1
-                ? { flex: '1 1 auto', minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, width: 'auto', overflow: 'hidden' }
-                : { width: `calc(var(--header-${header?.id}-size) * 1px)`, minWidth: `calc(var(--header-${header?.id}-size) * 1px)`, flexShrink: '0' }
+                ? {
+                    flex: '1 1 auto',
+                    minWidth: `calc(var(--header-${header?.id}-size) * 1px)`,
+                    width: 'auto',
+                    overflow: 'hidden',
+                  }
+                : {
+                    width: `calc(var(--header-${header?.id}-size) * 1px)`,
+                    minWidth: `calc(var(--header-${header?.id}-size) * 1px)`,
+                    flexShrink: '0',
+                  }
             "
             :data-test="`log-search-result-table-th-${header.id}`"
           >
@@ -97,16 +103,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  The drag interactivity + hover accent only apply when the column
                  is resizable. Matches the OTable spec: short 1px --color-border. -->
             <div
-              @dblclick="
-                header.column.getCanResize() && header.column.resetSize()
-              "
+              @dblclick="header.column.getCanResize() && header.column.resetSize()"
               @mousedown.self.prevent.stop="
-                header.column.getCanResize() &&
-                  header.getResizeHandler()?.($event)
+                header.column.getCanResize() && header.getResizeHandler()?.($event)
               "
               @touchstart.self.prevent.stop="
-                header.column.getCanResize() &&
-                  header.getResizeHandler()?.($event)
+                header.column.getCanResize() && header.getResizeHandler()?.($event)
               "
               :class="[
                 'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
@@ -125,31 +127,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div
               v-if="!header.isPlaceholder"
-              :class="[
-                'text-left',
-                header.column.getCanSort() ? 'cursor-pointer select-none' : '',
-              ]"
-              @click="
-                getSortingHandler(
-                  $event,
-                  header.column.getToggleSortingHandler(),
-                )
-              "
+              :class="['text-left', header.column.getCanSort() ? 'cursor-pointer select-none' : '']"
+              @click="getSortingHandler($event, header.column.getToggleSortingHandler())"
               class="overflow-hidden text-ellipsis text-table-header-text text-xs font-medium"
             >
-              <FlexRender
-                :render="header.column.columnDef.header"
-                :props="header.getContext()"
-              />
+              <FlexRender :render="header.column.columnDef.header" :props="header.getContext()" />
             </div>
 
             <div
               v-if="
                 !header.isPlaceholder &&
-                (
-                  (header.column.columnDef.meta as any).closable ||
-                  (header.column.columnDef.meta as any).showWrap
-                )
+                ((header.column.columnDef.meta as any).closable ||
+                  (header.column.columnDef.meta as any).showWrap)
               "
               :data-test="`log-add-data-from-column-${header.column.columnDef.header}`"
               class="invisible flex items-center absolute right-2 top-0 h-full pl-3 bg-table-header-bg column-actions"
@@ -167,38 +156,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </th>
         </vue-draggable>
 
-
         <tr v-if="!loading && errMsg != ''" class="w-full">
-          <td
-            :colspan="columnOrder.length"
-            class="font-bold opacity-70"
-          >
+          <td :colspan="columnOrder.length" class="font-bold opacity-70">
             <div class="text-sm font-medium font-bold bg-warning">
-              <OIcon size="xs"
-name="warning"
-class="mr-1" />
+              <OIcon size="xs" name="warning" class="mr-1" />
               {{ errMsg }}
             </div>
           </td>
         </tr>
-        <tr
-          data-test="log-search-result-function-error"
-          v-if="functionErrorMsg != ''"
-        >
-          <td
-            :colspan="columnOrder.length"
-            class="font-bold opacity-60"
-          >
-            <div
-              class="text-sm font-medium font-bold pl-2 bg-status-warning-bg"
-            >
+        <tr data-test="log-search-result-function-error" v-if="functionErrorMsg != ''">
+          <td :colspan="columnOrder.length" class="font-bold opacity-60">
+            <div class="text-sm font-medium font-bold pl-2 bg-status-warning-bg">
               <OButton
                 variant="ghost"
                 size="icon-xs"
                 class="mr-1 log-row-expand-btn"
                 data-test="table-row-expand-menu"
                 @click.capture.stop="expandFunctionError"
-                ><OIcon :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'" size="sm" /></OButton
+                ><OIcon
+                  :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'"
+                  size="sm" /></OButton
               ><b>
                 <OIcon name="warning" size="sm" />
                 {{ t("search.functionErrorLabel") }}</b
@@ -207,10 +184,7 @@ class="mr-1" />
           </td>
         </tr>
         <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
-          <td
-            :colspan="columnOrder.length"
-            class="opacity-70 px-2 bg-status-warning-bg"
-          >
+          <td :colspan="columnOrder.length" class="opacity-70 px-2 bg-status-warning-bg">
             <pre>{{ functionErrorMsg }}</pre>
           </td>
         </tr>
@@ -251,7 +225,9 @@ class="mr-1" />
             >
               <span
                 class="logs-skel-pill inline-block h-3 rounded-default"
-                :style="{ width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%` }"
+                :style="{
+                  width: c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, c)}%`,
+                }"
                 aria-hidden="true"
               />
             </td>
@@ -271,10 +247,7 @@ class="mr-1" />
         class="relative"
         :style="{ height: totalSize + 'px' }"
       >
-        <template
-          v-for="virtualRow in virtualRows"
-          :key="formattedRows[virtualRow.index]?.id"
-        >
+        <template v-for="virtualRow in virtualRows" :key="formattedRows[virtualRow.index]?.id">
           <tr
             :data-test="`logs-search-result-detail-${
               (tableRows[virtualRow.index] as any)[
@@ -284,16 +257,16 @@ class="mr-1" />
             :style="{
               transform: `translateY(${virtualRow.start}px)`,
               minWidth: '100%',
-              width: (!defaultColumns && !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow) ? '100%' : undefined,
+              width:
+                !defaultColumns &&
+                !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                  ? '100%'
+                  : undefined,
             }"
             :data-index="virtualRow.index"
-            :data-expanded="
-              formattedRows?.[virtualRow.index]?.original?.isExpandedRow
-            "
+            :data-expanded="formattedRows?.[virtualRow.index]?.original?.isExpandedRow"
             :tabindex="
-              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
-                ? 0
-                : undefined
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow ? 0 : undefined
             "
             :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
             :class="[
@@ -306,9 +279,8 @@ class="mr-1" />
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'table-row'
                 : 'flex break-all',
-              (tableRows[virtualRow.index] as any)[
-                store.state.zoConfig.timestamp_column
-              ] === highlightTimestamp &&
+              (tableRows[virtualRow.index] as any)[store.state.zoConfig.timestamp_column] ===
+                highlightTimestamp &&
               !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                 ? 'bg-table-row-selected-bg'
                 : !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
@@ -319,22 +291,17 @@ class="mr-1" />
                 : '',
             ]"
             @click="
-              !(formattedRows[virtualRow.index]?.original as any)
-                ?.isExpandedRow &&
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow &&
               handleDataRowClick(tableRows[virtualRow.index], virtualRow.index)
             "
             @keydown="
-              !(formattedRows[virtualRow.index]?.original as any)
-                ?.isExpandedRow &&
+              !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow &&
               handleRowKeydown($event, tableRows[virtualRow.index], virtualRow.index)
             "
           >
             <!-- Status color line for entire row -->
             <div
-              v-if="
-                !(formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-              "
+              v-if="!(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
               class="absolute left-0 inset-y-0 w-1 z-10"
               data-test="log-table-row-status-color"
               :data-test-status-level="getRowStatusLevel(tableRows[virtualRow.index])"
@@ -343,10 +310,7 @@ class="mr-1" />
               }"
             />
             <td
-              v-if="
-                (formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-              "
+              v-if="(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow"
               :colspan="columnOrder.length"
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
               class="w-full relative"
@@ -363,32 +327,22 @@ class="mr-1" />
                 @copy="copyLogToClipboard"
                 @add-field-to-table="addFieldToTable"
                 @add-search-term="addSearchTerm"
-                @view-trace="
-                  viewTrace(formattedRows[virtualRow.index - 1]?.original)
-                "
-                @show-correlation="
-                  showCorrelation(formattedRows[virtualRow.index - 1]?.original)
-                "
+                @view-trace="viewTrace(formattedRows[virtualRow.index - 1]?.original)"
+                @show-correlation="showCorrelation(formattedRows[virtualRow.index - 1]?.original)"
                 :streamName="jsonpreviewStreamName"
                 @send-to-ai-chat="sendToAiChat"
               />
             </td>
             <template v-else>
               <td
-                v-for="(cell, cellIndex) in formattedRows[
-                  virtualRow.index
-                ].getVisibleCells()"
+                v-for="(cell, cellIndex) in formattedRows[virtualRow.index].getVisibleCells()"
                 :key="cell.id"
-                :data-test="
-                  'log-table-column-' +
-                  virtualRow.index +
-                  '-' +
-                  cell.column.columnDef.id
-                "
+                :data-test="'log-table-column-' + virtualRow.index + '-' + cell.column.columnDef.id"
                 class="py-none px-2 flex items-center justify-start relative table-cell"
                 :class="[...tableCellClass, { 'pl-4': cellIndex === 0 }]"
                 :style="
-                  !defaultColumns && cellIndex === formattedRows[virtualRow.index].getVisibleCells().length - 1
+                  !defaultColumns &&
+                  cellIndex === formattedRows[virtualRow.index].getVisibleCells().length - 1
                     ? {
                         flex: '1 1 auto',
                         minWidth: `calc(var(--col-${cell.column.columnDef.id}-size) * 1px)`,
@@ -425,16 +379,12 @@ class="mr-1" />
                   @click.capture.stop="handleExpandRow(virtualRow.index)"
                   ><OIcon
                     :name="
-                      expandedRowIndices.has(virtualRow.index)
-                        ? 'expand-more'
-                        : 'chevron-right'
+                      expandedRowIndices.has(virtualRow.index) ? 'expand-more' : 'chevron-right'
                     "
                     size="sm"
                 /></OButton>
 
-                <template
-                  v-if="activeCellActionId === `${cell.id}_${cell.column.id}`"
-                >
+                <template v-if="activeCellActionId === `${cell.id}_${cell.column.id}`">
                   <cell-actions
                     v-if="
                       (cell.column.columnDef.meta as any)?.closable &&
@@ -486,15 +436,7 @@ class="mr-1" />
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  computed,
-  watch,
-  nextTick,
-  onMounted,
-  onBeforeUnmount,
-  ComputedRef,
-} from "vue";
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, ComputedRef } from "vue";
 import type { PropType } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
@@ -631,9 +573,7 @@ useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
 
 // Typed view of the highlighter cache for indexed template lookups.
-const processedResultsMap = computed<Record<string, string>>(
-  () => processedResults.value,
-);
+const processedResultsMap = computed<Record<string, string>>(() => processedResults.value);
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -833,12 +773,8 @@ watch(
   () => [hasDefaultSourceColumn.value, props.wrap],
   () => {
     tableCellClass.value = [
-      hasDefaultSourceColumn.value && !props.wrap
-        ? "table-cell"
-        : "block",
-      !props.wrap
-        ? "overflow-hidden text-ellipsis whitespace-nowrap"
-        : "",
+      hasDefaultSourceColumn.value && !props.wrap ? "table-cell" : "block",
+      !props.wrap ? "overflow-hidden text-ellipsis whitespace-nowrap" : "",
       props.wrap ? "break-all" : "",
     ];
   },
@@ -879,12 +815,12 @@ const headers = computed<any[]>(() => headerGroups.value.headers);
 // Skeleton loading helpers — mirrors OTable shimmer pattern
 const SKEL_ROW_COUNT = 30;
 const SKEL_BASE_WIDTHS = [55, 70, 60, 45, 65, 50, 75, 40, 58, 68, 48, 62];
-const SKEL_JITTER     = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
+const SKEL_JITTER = [0, 6, -4, 3, -2, 5, -3, 2, -5, 4, -1, 6];
 // Timestamp column: pill sized to "2026-06-02 12:09:00.349" (23 chars × 7.2 px/char in monospace 12 px)
 const SKEL_TIMESTAMP_PX = Math.round("2026-06-02 12:09:00.349".length * 7.2);
 const skelCellWidth = (r: number, c: number): number => {
   const base = SKEL_BASE_WIDTHS[c % SKEL_BASE_WIDTHS.length] ?? 60;
-  const jit  = SKEL_JITTER[(r + c) % SKEL_JITTER.length] ?? 0;
+  const jit = SKEL_JITTER[(r + c) % SKEL_JITTER.length] ?? 0;
   return Math.max(25, Math.min(85, base + jit));
 };
 // Mirror the exact width/flex logic from real cells so the skeleton columns align perfectly.
@@ -892,21 +828,19 @@ const skelCellWidth = (r: number, c: number): number => {
 // All other columns: fixed width from the CSS variable (same as real rows).
 const skelTdStyle = (header: any, c: number): Record<string, string> => {
   const colId = header.column.id;
-  const isStretchSource = colId === 'source' && !header.column.getCanResize();
-  if (isStretchSource) return { flex: '1 1 0', minWidth: '0' };
+  const isStretchSource = colId === "source" && !header.column.getCanResize();
+  if (isStretchSource) return { flex: "1 1 0", minWidth: "0" };
   const w = `calc(var(--col-${colId}-size) * 1px)`;
   if (!props.defaultColumns && c === headers.value.length - 1) {
-    return { flex: '1 1 auto', minWidth: w, width: 'auto', overflow: 'hidden' };
+    return { flex: "1 1 auto", minWidth: w, width: "auto", overflow: "hidden" };
   }
-  return { width: w, minWidth: w, flexShrink: '0' };
+  return { width: w, minWidth: w, flexShrink: "0" };
 };
 
 watch(
   () => headers.value,
   (newVal) => {
-    isResizingHeader.value = newVal.some((header: any) =>
-      header.column.getIsResizing(),
-    );
+    isResizingHeader.value = newVal.some((header: any) => header.column.getIsResizing());
   },
   {
     deep: true,
@@ -916,9 +850,7 @@ watch(
 const parentRef = ref<HTMLElement | null>(null);
 
 const isFirefox = computed(() => {
-  return (
-    typeof document !== "undefined" && CSS.supports("-moz-appearance", "none")
-  );
+  return typeof document !== "undefined" && CSS.supports("-moz-appearance", "none");
 });
 
 // Cache for expanded row heights
@@ -927,8 +859,7 @@ const expandedRowHeights = ref<{ [key: number]: number }>({});
 const rowVirtualizerOptions = computed(() => {
   return {
     count: formattedRows.value.length,
-    getScrollElement: () =>
-      (props.scrollEl as HTMLElement | null) ?? parentRef.value,
+    getScrollElement: () => (props.scrollEl as HTMLElement | null) ?? parentRef.value,
     scrollMargin: props.scrollMargin,
     estimateSize: (index: number) => {
       // Check if this is an expanded row (odd indices after expansion)
@@ -943,8 +874,7 @@ const rowVirtualizerOptions = computed(() => {
         ? (element: any) => {
             const index = parseInt(element.dataset.index);
             // Only measure expanded rows (check if it's actually an expanded row)
-            const isExpandedRow =
-              formattedRows.value[index]?.original?.isExpandedRow;
+            const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
             if (isExpandedRow) {
               const height = element.getBoundingClientRect().height;
               expandedRowHeights.value[index] = height;
@@ -979,11 +909,7 @@ const setExpandedRows = () => {
 const copyLogToClipboard = (value: any, copyAsJson: boolean = true) => {
   emits("copy", value, copyAsJson);
 };
-const addSearchTerm = (
-  field: string,
-  field_value: string | number | boolean,
-  action: string,
-) => {
+const addSearchTerm = (field: string, field_value: string | number | boolean, action: string) => {
   emits("addSearchTerm", field, field_value, action);
 };
 const addFieldToTable = (value: string) => {
@@ -995,9 +921,7 @@ const closeColumn = (data: any) => {
 };
 
 const handleDragStart = (event: any) => {
-  if (
-    columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column
-  ) {
+  if (columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column) {
     isResizingHeader.value = true;
   } else {
     isResizingHeader.value = false;
@@ -1089,9 +1013,7 @@ const expandRow = async (index: number) => {
     // Force the virtualizer to recalculate all sizes
     if (rowVirtualizer.value) {
       // Find the actual expanded row element
-      const expandedElement = document.querySelector(
-        `[data-index="${index + 1}"]`,
-      );
+      const expandedElement = document.querySelector(`[data-index="${index + 1}"]`);
       if (expandedElement && rowVirtualizer.value.measureElement) {
         rowVirtualizer.value.measureElement(expandedElement);
       }
@@ -1166,9 +1088,7 @@ const handleRowKeydown = (event: KeyboardEvent, row: any, index: number) => {
         : (event.currentTarget as HTMLElement).previousElementSibling;
     while (sibling && !sibling.matches("tr[tabindex]")) {
       sibling =
-        event.key === "ArrowDown"
-          ? sibling.nextElementSibling
-          : sibling.previousElementSibling;
+        event.key === "ArrowDown" ? sibling.nextElementSibling : sibling.previousElementSibling;
     }
     if (sibling instanceof HTMLElement) sibling.focus();
   }
@@ -1206,11 +1126,7 @@ const showCorrelation = (row: any) => {
   emits("show-correlation", row);
 };
 
-const sendToAiChat = (
-  value: any,
-  isEntireRow: boolean = false,
-  append: boolean = true,
-) => {
+const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
   if (isEntireRow) {
     //here we will get the original value of the "row"
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -1242,9 +1158,7 @@ const checkIfSourceColumnPresent = (columns: any) => {
 const filterRowBasedOnColumns = (row: any, columns: any) => {
   //we need to filter the row based on the columns that user have applied
   //here we need to filter row not columns based on the columns that user have applied
-  const columnsToFilter = columns.filter(
-    (column: any) => column.id !== "source",
-  );
+  const columnsToFilter = columns.filter((column: any) => column.id !== "source");
   return columnsToFilter.reduce((acc: any, column: any) => {
     acc[column.id] = row[column.id];
     return acc;
@@ -1342,26 +1256,41 @@ defineExpose({
 .logs-skel-pill {
   background: linear-gradient(
     90deg,
-    var(--color-skeleton-base)      0%,
+    var(--color-skeleton-base) 0%,
     var(--color-skeleton-highlight) 50%,
-    var(--color-skeleton-base)      100%
+    var(--color-skeleton-base) 100%
   );
   background-size: 200% 100%;
   animation: logs-skel-shimmer 1.5s ease-in-out infinite;
 }
 
 @keyframes logs-skel-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 @keyframes logs-skel-row-in {
-  from { opacity: 0; transform: translateY(0.125rem); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(0.125rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .logs-skel-row  { opacity: 1; animation: none; }
-  .logs-skel-pill { animation: none; }
+  .logs-skel-row {
+    opacity: 1;
+    animation: none;
+  }
+  .logs-skel-pill {
+    animation: none;
+  }
 }
 </style>

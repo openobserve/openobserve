@@ -37,14 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="xs"
       class="shrink-0"
       @click="redirectBilling"
-    >{{ t("billing.upgradeNow") }}</OButton>
-    <OButton
-      v-else
-      variant="warning"
-      size="xs"
-      class="shrink-0"
-      @click="redirectContactSupport"
-    >{{ t("billing.contactSupport") }}</OButton>
+      >{{ t("billing.upgradeNow") }}</OButton
+    >
+    <OButton v-else variant="warning" size="xs" class="shrink-0" @click="redirectContactSupport">{{
+      t("billing.contactSupport")
+    }}</OButton>
   </div>
 </template>
 
@@ -67,10 +64,19 @@ export default defineComponent({
   props: ["currentPage"],
   methods: {
     getTrialPeriodMessage() {
-      if(Object.hasOwn(this.store.state.organizationData.organizationSettings, "free_trial_expiry") && this.store.state.organizationData.organizationSettings.free_trial_expiry != "" && this.store.state.organizationData.organizationSettings.free_trial_expiry != null) {
-        let dueDays = this.getDueDays(this.store.state.organizationData.organizationSettings.free_trial_expiry);
-        if(dueDays >= 0) {
-          if(dueDays > 1) {
+      if (
+        Object.hasOwn(
+          this.store.state.organizationData.organizationSettings,
+          "free_trial_expiry",
+        ) &&
+        this.store.state.organizationData.organizationSettings.free_trial_expiry != "" &&
+        this.store.state.organizationData.organizationSettings.free_trial_expiry != null
+      ) {
+        let dueDays = this.getDueDays(
+          this.store.state.organizationData.organizationSettings.free_trial_expiry,
+        );
+        if (dueDays >= 0) {
+          if (dueDays > 1) {
             return `${dueDays} Days remaining in your trial account`;
           } else {
             return `${dueDays} Day remaining in your trial account`;
@@ -87,9 +93,10 @@ export default defineComponent({
     const store = useStore();
     const router: any = useRouter();
 
-    const hasTrialExpiry = Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry")
-      && store.state.organizationData.organizationSettings.free_trial_expiry != ""
-      && store.state.organizationData.organizationSettings.free_trial_expiry != null;
+    const hasTrialExpiry =
+      Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry") &&
+      store.state.organizationData.organizationSettings.free_trial_expiry != "" &&
+      store.state.organizationData.organizationSettings.free_trial_expiry != null;
 
     const showTrialPeriodMsg = ref(hasTrialExpiry);
 
@@ -98,7 +105,7 @@ export default defineComponent({
       try {
         if (config.isCloud === "true") {
           const res = await BillingService.list_subscription(
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           );
           if (res.data?.provider === "aws") {
             // AWS billing - don't show trial period message
@@ -112,12 +119,12 @@ export default defineComponent({
     });
 
     const redirectBilling = () => {
-      router.push('/billings/plans/')
+      router.push("/billings/plans/");
     };
 
     const redirectContactSupport = () => {
       window.open(siteURL.contactSupport, "_blank");
-    }
+    };
 
     return {
       t,

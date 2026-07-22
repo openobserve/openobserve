@@ -37,10 +37,7 @@ describe("locale registry stays in sync", () => {
   //     UI quietly renders English
   //   - localeFileMap entry missing from APP_LOCALE_TO_BCP47 -> numbers format
   //     as en-US while the rest of the UI is translated
-  const languagesDir = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "languages",
-  );
+  const languagesDir = resolve(dirname(fileURLToPath(import.meta.url)), "languages");
 
   it("has exactly one localeFileMap entry per language file on disk", () => {
     const onDisk = readdirSync(languagesDir)
@@ -53,9 +50,7 @@ describe("locale registry stays in sync", () => {
   });
 
   it("formats numbers for every locale it can load", () => {
-    expect(Object.keys(APP_LOCALE_TO_BCP47).sort()).toEqual(
-      Object.keys(localeFileMap).sort(),
-    );
+    expect(Object.keys(APP_LOCALE_TO_BCP47).sort()).toEqual(Object.keys(localeFileMap).sort());
   });
 });
 

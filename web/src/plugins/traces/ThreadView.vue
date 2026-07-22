@@ -23,39 +23,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     - Empty + skeleton states
 -->
 <template>
-  <div
-    class="thread-view flex flex-col w-full h-full bg-surface-base"
-  >
+  <div class="thread-view flex flex-col w-full h-full bg-surface-base">
     <!-- Summary toolbar — sidebar-style badge chips. Hidden in the Session
          Detail Pretty view (those metrics already show in the KPI cards). -->
-    <div v-if="props.showSummary" class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-surface-base border-b border-border-default">
+    <div
+      v-if="props.showSummary"
+      class="thread-summary flex flex-wrap items-center gap-[0.4rem] py-2 px-4 bg-surface-base border-b border-border-default"
+    >
       <OTag
         type="metricChip"
         class="thread-chip thread-chip--steps h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-orange-700)_75%,var(--color-grey-300))]!"
-        :title="summary.turnCount === 1 ? t('traces.threadView.llmStep', { n: summary.turnCount }) : t('traces.threadView.llmSteps', { n: summary.turnCount })"
+        :title="
+          summary.turnCount === 1
+            ? t('traces.threadView.llmStep', { n: summary.turnCount })
+            : t('traces.threadView.llmSteps', { n: summary.turnCount })
+        "
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">{{ t('traces.threadView.steps') }}</span>
-        <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.turnCount }}</span>
+        <span
+          class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs"
+          >{{ t("traces.threadView.steps") }}</span
+        >
+        <span class="thread-chip__value text-text-body font-semibold text-xs">{{
+          summary.turnCount
+        }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--tools h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]!">
+      <OTag
+        type="metricChip"
+        class="thread-chip thread-chip--tools h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-cyan-500)_55%,var(--color-blue-500))]!"
+      >
         <template #icon><OIcon name="build" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">{{ t('traces.threadView.tools') }}</span>
-        <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.toolCallCount }}</span>
+        <span
+          class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs"
+          >{{ t("traces.threadView.tools") }}</span
+        >
+        <span class="thread-chip__value text-text-body font-semibold text-xs">{{
+          summary.toolCallCount
+        }}</span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--duration h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]!">
+      <OTag
+        type="metricChip"
+        class="thread-chip thread-chip--duration h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-[color-mix(in_srgb,var(--color-grey-500)_80%,var(--color-blue-800))]!"
+      >
         <template #icon><OIcon name="schedule" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">{{ t('traces.threadView.duration') }}</span>
+        <span
+          class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs"
+          >{{ t("traces.threadView.duration") }}</span
+        >
         <span class="thread-chip__value text-text-body font-semibold text-xs">
           {{ formatDuration(summary.totalDurationNs) }}
         </span>
       </OTag>
 
-      <OTag type="metricChip" class="thread-chip thread-chip--cost h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-success-600!">
+      <OTag
+        type="metricChip"
+        class="thread-chip thread-chip--cost h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-success-600!"
+      >
         <template #icon><OIcon name="payments" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">{{ t('traces.threadView.cost') }}</span>
+        <span
+          class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs"
+          >{{ t("traces.threadView.cost") }}</span
+        >
         <span class="thread-chip__value text-text-body font-semibold text-xs">
           {{ formatCost(summary.totalCost) }}
         </span>
@@ -68,8 +98,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">{{ t('traces.threadView.model') }}</span>
-        <span class="thread-chip__value text-text-body font-semibold text-xs">{{ summary.dominantModel }}</span>
+        <span
+          class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs"
+          >{{ t("traces.threadView.model") }}</span
+        >
+        <span class="thread-chip__value text-text-body font-semibold text-xs">{{
+          summary.dominantModel
+        }}</span>
       </OTag>
 
       <OTag
@@ -78,10 +113,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="thread-chip thread-chip--error h-6.5! px-2.5! py-0! bg-surface-base! border border-border-default rounded-default! text-xs! text-text-body! border-l-[3px]! border-l-error-600!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
-        <span class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs">{{ t('traces.threadView.errors') }}</span>
-        <span class="thread-chip__value thread-chip__value--error font-semibold text-xs text-error-600">{{ summary.errorCount }}</span>
+        <span
+          class="thread-chip__label text-text-secondary font-medium mr-[0.3125rem] tracking-normal text-2xs"
+          >{{ t("traces.threadView.errors") }}</span
+        >
+        <span
+          class="thread-chip__value thread-chip__value--error font-semibold text-xs text-error-600"
+          >{{ summary.errorCount }}</span
+        >
       </OTag>
-
     </div>
 
     <!-- Body -->
@@ -89,13 +129,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="!props.spans || props.spans.length === 0"
       class="flex-1 flex items-center justify-center text-text-muted text-sm"
     >
-      {{ t('traces.threadView.noSpansLoaded') }}
+      {{ t("traces.threadView.noSpansLoaded") }}
     </div>
     <div
       v-else-if="turns.length === 0"
       class="flex-1 flex items-center justify-center text-text-muted text-sm"
     >
-      {{ t('traces.threadView.noLlmTurns') }}
+      {{ t("traces.threadView.noLlmTurns") }}
       <code>gen_ai.operation.name = chat</code>.
     </div>
     <div v-else class="thread-scroll-body flex-1 overflow-auto px-4 py-3 bg-surface-base">
@@ -108,9 +148,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="thread-system__head flex items-center gap-2.5 py-2 px-3 cursor-pointer transition-all duration-120 hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_4%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-ai-accent)_8%,transparent)]"
           @click="showSystemFull = !showSystemFull"
         >
-          <span class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] text-ai-accent dark:text-(--color-purple-400) rounded-default text-2xs font-semibold tracking-[0.02rem] shrink-0">
+          <span
+            class="thread-system__badge inline-flex items-center py-[0.15rem] px-2 bg-[color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_18%,transparent)] text-ai-accent dark:text-(--color-purple-400) rounded-default text-2xs font-semibold tracking-[0.02rem] shrink-0"
+          >
             <OIcon name="settings" size="xs" class="mr-1" />
-            {{ t('traces.threadView.system') }}
+            {{ t("traces.threadView.system") }}
           </span>
           <span
             v-if="!showSystemFull"
@@ -119,11 +161,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ truncate(head.systemPrompt, 160) }}
           </span>
           <span v-else class="flex-1" />
-          <span class="thread-system__toggle inline-flex items-center gap-[0.15rem] text-theme-accent text-xs font-medium shrink-0">
-            <OIcon
-              :name="showSystemFull ? 'expand-less' : 'expand-more'"
-              size="sm"
-            />
+          <span
+            class="thread-system__toggle inline-flex items-center gap-[0.15rem] text-theme-accent text-xs font-medium shrink-0"
+          >
+            <OIcon :name="showSystemFull ? 'expand-less' : 'expand-more'" size="sm" />
           </span>
         </div>
         <div
@@ -143,9 +184,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <span>↶</span>
           <span>
-            {{ group.historicalUserCount === 1
-              ? t('traces.threadView.historicalMessage', { count: group.historicalUserCount })
-              : t('traces.threadView.historicalMessages', { count: group.historicalUserCount }) }}
+            {{
+              group.historicalUserCount === 1
+                ? t("traces.threadView.historicalMessage", { count: group.historicalUserCount })
+                : t("traces.threadView.historicalMessages", { count: group.historicalUserCount })
+            }}
           </span>
         </div>
 
@@ -177,77 +220,97 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="turn.span.span_id"
             class="thread-turn relative flex gap-3.5 pb-4 before:content-[''] before:absolute before:top-[1.875rem] before:bottom-0 before:left-3.5 before:w-0.5 before:rounded-full before:bg-border-default last:before:hidden"
           >
-          <div class="thread-turn__avatar shrink-0 relative z-1 w-7 h-7 rounded-full bg-(--color-purple-100) dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_16%,transparent)] text-ai-accent dark:text-(--color-purple-400) flex items-center justify-center border border-[color-mix(in_srgb,var(--color-ai-accent)_25%,transparent)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_40%,transparent)] shadow-[0_0_0_0.25rem_var(--color-surface-base)]">
-            <OIcon name="auto-awesome" size="xs" />
-          </div>
-          <div class="thread-turn__body flex-1 min-w-0 flex flex-col gap-2">
-          <!-- Genuine follow-up user message(s). -->
-          <div
-            v-for="(u, uIdx) in turn.followupUsers"
-            :key="`u-${uIdx}`"
-            class="thread-bubble thread-bubble--user thread-bubble--user-followup py-2.5 px-3.5 rounded-default text-sm leading-normal whitespace-pre-wrap break-words max-w-[min(40rem,75%)] bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
-          >
-            {{ u.content }}
-          </div>
+            <div
+              class="thread-turn__avatar shrink-0 relative z-1 w-7 h-7 rounded-full bg-(--color-purple-100) dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_16%,transparent)] text-ai-accent dark:text-(--color-purple-400) flex items-center justify-center border border-[color-mix(in_srgb,var(--color-ai-accent)_25%,transparent)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_40%,transparent)] shadow-[0_0_0_0.25rem_var(--color-surface-base)]"
+            >
+              <OIcon name="auto-awesome" size="xs" />
+            </div>
+            <div class="thread-turn__body flex-1 min-w-0 flex flex-col gap-2">
+              <!-- Genuine follow-up user message(s). -->
+              <div
+                v-for="(u, uIdx) in turn.followupUsers"
+                :key="`u-${uIdx}`"
+                class="thread-bubble thread-bubble--user thread-bubble--user-followup py-2.5 px-3.5 rounded-default text-sm leading-normal whitespace-pre-wrap break-words max-w-[min(40rem,75%)] bg-[image:var(--color-chat-bubble-user)] border border-(--color-indigo-100) dark:border-[color-mix(in_srgb,var(--color-indigo-900)_55%,var(--color-grey-700))] text-text-body shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)]"
+              >
+                {{ u.content }}
+              </div>
 
-          <!-- Tool calls — between the user input and the assistant output
+              <!-- Tool calls — between the user input and the assistant output
                (the model calls tools, then answers). Shared component, also
                used by the Session Detail collapsed turn body. -->
-          <ThreadToolCalls
-            :tool-calls="turn.toolCalls"
-            @span-selected="emit('span-selected', $event)"
-          />
+              <ThreadToolCalls
+                :tool-calls="turn.toolCalls"
+                @span-selected="emit('span-selected', $event)"
+              />
 
-          <!-- Assistant text (the final answer, after any tool calls). Rendered
+              <!-- Assistant text (the final answer, after any tool calls). Rendered
                as markdown — headings, tables, code, bold. v-html is sanitized in
                renderMarkdown(). -->
-          <div
-            v-for="(msg, mIdx) in turn.assistant"
-            :key="`a-${mIdx}`"
-            class="thread-bubble thread-bubble--assistant markdown-body self-start bg-surface-base border border-border-default text-text-body max-w-full shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)] py-2.5 px-3.5 rounded-default text-sm leading-normal break-words whitespace-normal"
-            v-html="renderMarkdown(msg.content)"
-          />
+              <div
+                v-for="(msg, mIdx) in turn.assistant"
+                :key="`a-${mIdx}`"
+                class="thread-bubble thread-bubble--assistant markdown-body self-start bg-surface-base border border-border-default text-text-body max-w-full shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-black)_6%,transparent)] dark:shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,var(--color-white)_8%,transparent)] py-2.5 px-3.5 rounded-default text-sm leading-normal break-words whitespace-normal"
+                v-html="renderMarkdown(msg.content)"
+              />
 
-
-          <!-- Footer. -->
-          <div class="thread-turn__footer flex items-center flex-wrap gap-[0.35rem] mt-2 pt-2 border-t border-dashed border-border-default text-xs text-text-secondary">
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" :title="t('traces.threadView.startedAt', { time: formatTime(turn.span.start_time) })">
-              <OIcon name="schedule" size="xs" />
-              {{ formatTime(turn.span.start_time) }}
-            </span>
-            <span class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default text-ai-accent dark:text-(--color-purple-400) bg-[color-mix(in_srgb,var(--color-ai-accent)_6%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)] font-medium max-w-50 overflow-hidden text-ellipsis text-2xs leading-none whitespace-nowrap shrink-0" :title="getModel(turn.span)">
-              <OIcon name="bolt" size="xs" />
-              {{ getModel(turn.span) || t('traces.threadView.unknown') }}
-            </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" :title="t('traces.threadView.duration')">
-              <OIcon name="timer" size="xs" />
-              {{ formatDuration(turn.span.duration) }}
-            </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" :title="t('traces.threadView.tokens')">
-              <OIcon name="data-usage" size="xs" />
-              {{ formatNumber(getTokens(turn.span)) }} {{ t('traces.threadView.tokensSuffix') }}
-            </span>
-            <span class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0" :title="t('traces.threadView.cost')">
-              <OIcon name="payments" size="xs" />
-              {{ formatCost(getCost(turn.span)) }}
-            </span>
-            <span
-              v-if="turn.span.span_status === 'ERROR'"
-              class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default text-error-600 dark:text-error-400 bg-[color-mix(in_srgb,var(--color-error-600)_8%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-error-400)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-error-600)_25%,transparent)] dark:border-[color-mix(in_srgb,var(--color-error-400)_30%,transparent)] font-medium text-2xs leading-none whitespace-nowrap shrink-0"
-            >
-              <OIcon name="error-outline" size="xs" />
-              {{ t('traces.threadView.error') }}
-            </span>
-            <button
-              class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-default text-theme-accent text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-120 shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
-              @click="emit('span-selected', turn.span.span_id)"
-            >
-              {{ t('traces.threadView.viewSpan') }}
-              <OIcon name="arrow-forward" size="xs" />
-            </button>
+              <!-- Footer. -->
+              <div
+                class="thread-turn__footer flex items-center flex-wrap gap-[0.35rem] mt-2 pt-2 border-t border-dashed border-border-default text-xs text-text-secondary"
+              >
+                <span
+                  class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0"
+                  :title="
+                    t('traces.threadView.startedAt', { time: formatTime(turn.span.start_time) })
+                  "
+                >
+                  <OIcon name="schedule" size="xs" />
+                  {{ formatTime(turn.span.start_time) }}
+                </span>
+                <span
+                  class="thread-metric thread-metric--model inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default text-ai-accent dark:text-(--color-purple-400) bg-[color-mix(in_srgb,var(--color-ai-accent)_6%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-ai-accent)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:border-[color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)] font-medium max-w-50 overflow-hidden text-ellipsis text-2xs leading-none whitespace-nowrap shrink-0"
+                  :title="getModel(turn.span)"
+                >
+                  <OIcon name="bolt" size="xs" />
+                  {{ getModel(turn.span) || t("traces.threadView.unknown") }}
+                </span>
+                <span
+                  class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0"
+                  :title="t('traces.threadView.duration')"
+                >
+                  <OIcon name="timer" size="xs" />
+                  {{ formatDuration(turn.span.duration) }}
+                </span>
+                <span
+                  class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0"
+                  :title="t('traces.threadView.tokens')"
+                >
+                  <OIcon name="data-usage" size="xs" />
+                  {{ formatNumber(getTokens(turn.span)) }} {{ t("traces.threadView.tokensSuffix") }}
+                </span>
+                <span
+                  class="thread-metric inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default bg-surface-subtle border border-border-default text-text-secondary text-2xs leading-none whitespace-nowrap shrink-0"
+                  :title="t('traces.threadView.cost')"
+                >
+                  <OIcon name="payments" size="xs" />
+                  {{ formatCost(getCost(turn.span)) }}
+                </span>
+                <span
+                  v-if="turn.span.span_status === 'ERROR'"
+                  class="thread-metric thread-metric--error inline-flex items-center gap-1 py-[0.18rem] px-2 rounded-default text-error-600 dark:text-error-400 bg-[color-mix(in_srgb,var(--color-error-600)_8%,transparent)] dark:bg-[color-mix(in_srgb,var(--color-error-400)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-error-600)_25%,transparent)] dark:border-[color-mix(in_srgb,var(--color-error-400)_30%,transparent)] font-medium text-2xs leading-none whitespace-nowrap shrink-0"
+                >
+                  <OIcon name="error-outline" size="xs" />
+                  {{ t("traces.threadView.error") }}
+                </span>
+                <button
+                  class="thread-turn__view-span ml-auto inline-flex items-center gap-[0.2rem] py-[0.2rem] px-[0.55rem] rounded-default text-theme-accent text-xs font-medium bg-transparent border border-transparent cursor-pointer transition-all duration-120 shrink-0 hover:bg-[color-mix(in_srgb,var(--color-blue-500)_8%,transparent)] hover:border-[color-mix(in_srgb,var(--color-blue-500)_25%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-blue-400)_12%,transparent)] dark:hover:border-[color-mix(in_srgb,var(--color-blue-400)_30%,transparent)]"
+                  @click="emit('span-selected', turn.span.span_id)"
+                >
+                  {{ t("traces.threadView.viewSpan") }}
+                  <OIcon name="arrow-forward" size="xs" />
+                </button>
+              </div>
+            </div>
           </div>
-          </div>
-        </div>
         </div>
       </template>
     </div>
@@ -303,7 +366,6 @@ import { renderMarkdown } from "./markdown";
 const store = useStore();
 const { t } = useI18n();
 
-
 interface ThreadHead {
   systemPrompt: string;
   userQuery: string;
@@ -345,9 +407,7 @@ const displayGroups = computed<TraceGroup[]>(() => {
 
     let assistant: Message[] = [];
     for (let i = g.turns.length - 1; i >= 0; i--) {
-      const msgs = g.turns[i].assistant.filter(
-        (m) => m.role === "assistant" && m.content,
-      );
+      const msgs = g.turns[i].assistant.filter((m) => m.role === "assistant" && m.content);
       if (msgs.length) {
         assistant = msgs;
         break;
@@ -377,9 +437,7 @@ const displayGroups = computed<TraceGroup[]>(() => {
 });
 
 /** Single-trace shortcuts for the existing template (back-compat). */
-const turns = computed<Turn[]>(() =>
-  traceGroups.value.length ? traceGroups.value[0].turns : [],
-);
+const turns = computed<Turn[]>(() => (traceGroups.value.length ? traceGroups.value[0].turns : []));
 const head = computed<ThreadHead>(() =>
   traceGroups.value.length
     ? {
@@ -395,9 +453,7 @@ const showSystemFull = ref(false);
 /* ─── summary aggregates ──────────────────────────────────────────────── */
 const summary = computed(() => {
   const all = props.spans || [];
-  const allTurnSpans = traceGroups.value.flatMap((g) =>
-    g.turns.map((t) => t.span),
-  );
+  const allTurnSpans = traceGroups.value.flatMap((g) => g.turns.map((t) => t.span));
   const toolCount = all.filter((s) => classify(s) === "tool_call").length;
 
   let totalCost = 0;
@@ -414,14 +470,12 @@ const summary = computed(() => {
     if (!m) continue;
     modelCount[m] = (modelCount[m] || 0) + 1;
   }
-  const dominantModel =
-    Object.entries(modelCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+  const dominantModel = Object.entries(modelCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
 
   const errorCount = all.filter((s) => s.span_status === "ERROR").length;
 
   const userTurnCount =
-    (head.value.userQuery ? 1 : 0) +
-    turns.value.reduce((n, t) => n + t.followupUsers.length, 0);
+    (head.value.userQuery ? 1 : 0) + turns.value.reduce((n, t) => n + t.followupUsers.length, 0);
 
   return {
     userTurnCount,

@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     data-test="override-config-popup-dialog"
     :open="open"
-    @update:open="(v: boolean) => { if (!v) closePopup() }"
+    @update:open="
+      (v: boolean) => {
+        if (!v) closePopup();
+      }
+    "
     :title="t('dashboard.columnFormattingTitle')"
     :sub-title="t('dashboard.columnFormattingSubtitle')"
     :width="80"
@@ -54,16 +58,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="addField(opt.value)"
             >
               <span class="flex items-center gap-2">
-                <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(opt.isNumeric)">
+                <span
+                  class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default"
+                  :class="badgeClass(opt.isNumeric)"
+                >
                   {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                 </span>
                 <span>{{ opt.label }}</span>
               </span>
             </ODropdownItem>
-            <div
-              v-if="!availableToAdd.length"
-              class="py-2 px-2.5 text-xs text-text-secondary"
-            >
+            <div v-if="!availableToAdd.length" class="py-2 px-2.5 text-xs text-text-secondary">
               {{ t("dashboard.columnFormattingAllAdded") }}
             </div>
           </div>
@@ -89,7 +93,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @keydown.enter.prevent="selectedIdx = idx"
             @keydown.space.prevent="selectedIdx = idx"
           >
-            <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(isNumericColumn(col))">
+            <span
+              class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default"
+              :class="badgeClass(isNumericColumn(col))"
+            >
               {{ isNumericColumn(col) ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
             </span>
             <span
@@ -112,11 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="flex-1 flex flex-col items-center justify-center gap-1.5 text-center p-4"
         >
-          <OIcon
-            name="format-color-text"
-            size="lg"
-            class="text-text-secondary"
-          />
+          <OIcon name="format-color-text" size="lg" class="text-text-secondary" />
           <div class="font-semibold text-sm">
             {{ t("dashboard.columnFormattingNoFields") }}
           </div>
@@ -129,10 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Detail: controls + live preview for the selected field -->
       <template v-if="selectedCol">
         <div class="min-w-0 overflow-y-auto">
-          <ColumnFormatControls
-            :col="selectedCol"
-            :is-numeric="isNumericColumn(selectedCol)"
-          />
+          <ColumnFormatControls :col="selectedCol" :is-numeric="isNumericColumn(selectedCol)" />
         </div>
         <div
           class="flex flex-col gap-2 min-w-0 overflow-y-auto p-3 border-l border-[color-mix(in_srgb,var(--color-grey-500)_18%,transparent)]"
@@ -200,16 +200,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @select="addField(opt.value)"
                 >
                   <span class="flex items-center gap-2">
-                    <span class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default" :class="badgeClass(opt.isNumeric)">
+                    <span
+                      class="shrink-0 text-3xs font-bold tracking-[0.05em] uppercase py-0.5 px-1.25 rounded-default"
+                      :class="badgeClass(opt.isNumeric)"
+                    >
                       {{ opt.isNumeric ? t("dashboard.typeNumeric") : t("dashboard.typeText") }}
                     </span>
                     <span>{{ opt.label }}</span>
                   </span>
                 </ODropdownItem>
-                <div
-                  v-if="!availableToAdd.length"
-                  class="py-2 px-2.5 text-xs text-text-secondary"
-                >
+                <div v-if="!availableToAdd.length" class="py-2 px-2.5 text-xs text-text-secondary">
                   {{ t("dashboard.columnFormattingAllAdded") }}
                 </div>
               </div>
@@ -223,18 +223,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center justify-between w-full">
         <span class="text-xs text-text-secondary">{{ footerSummary }}</span>
         <div class="flex gap-2">
-          <OButton
-            variant="outline"
-            data-test="override-config-popup-cancel"
-            @click="closePopup"
-          >
+          <OButton variant="outline" data-test="override-config-popup-cancel" @click="closePopup">
             {{ t("dashboard.cancel") }}
           </OButton>
-          <OButton
-            variant="primary"
-            data-test="override-config-popup-save"
-            @click="saveOverrides"
-          >
+          <OButton variant="primary" data-test="override-config-popup-save" @click="saveOverrides">
             {{ t("dashboard.overrideConfigSave") }}
           </OButton>
         </div>
@@ -274,16 +266,23 @@ const TableRenderer = defineAsyncComponent(
 
 export default defineComponent({
   name: "OverrideConfigPopup",
-  components: { OButton, OIcon, ODialog, ODropdown, ODropdownItem, OEmptyState, ColumnFormatControls, TableRenderer },
+  components: {
+    OButton,
+    OIcon,
+    ODialog,
+    ODropdown,
+    ODropdownItem,
+    OEmptyState,
+    ColumnFormatControls,
+    TableRenderer,
+  },
   props: {
     open: {
       type: Boolean,
       required: true,
     },
     columns: {
-      type: Array as PropType<
-        Array<{ label: string; alias: string; isNumeric?: boolean }>
-      >,
+      type: Array as PropType<Array<{ label: string; alias: string; isNumeric?: boolean }>>,
       required: true,
     },
     overrideConfig: {
@@ -326,9 +325,7 @@ export default defineComponent({
     const addOpenCenter = ref(false);
 
     const initFromProps = () => {
-      columnOverrides.value = loadAllFromRaw(
-        props.overrideConfig.overrideConfigs ?? [],
-      );
+      columnOverrides.value = loadAllFromRaw(props.overrideConfig.overrideConfigs ?? []);
       selectedIdx.value = columnOverrides.value.length ? 0 : -1;
     };
 
@@ -359,15 +356,11 @@ export default defineComponent({
     });
 
     const availableToAdd = computed(() => {
-      const used = new Set(
-        columnOverrides.value.map((c) => c.field).filter(Boolean),
-      );
+      const used = new Set(columnOverrides.value.map((c) => c.field).filter(Boolean));
       return allColumnOptions.value.filter((o: any) => !used.has(o.value));
     });
 
-    const selectedCol = computed(
-      () => columnOverrides.value[selectedIdx.value] ?? null,
-    );
+    const selectedCol = computed(() => columnOverrides.value[selectedIdx.value] ?? null);
 
     const footerSummary = computed(() => {
       const n = columnOverrides.value.length;
@@ -384,10 +377,7 @@ export default defineComponent({
 
     const getFieldLabel = (alias: string) => {
       if (!alias) return "";
-      return (
-        allColumnOptions.value.find((o: any) => o.value === alias)?.label ??
-        `${alias}`
-      );
+      return allColumnOptions.value.find((o: any) => o.value === alias)?.label ?? `${alias}`;
     };
 
     const detectedNumeric = (field: string): boolean => {
@@ -436,11 +426,9 @@ export default defineComponent({
       if (isNumeric) {
         const cache = buildValueMappingCache(props.valueMapping);
         const unit = maps.unitConfigMap[aliasLower]?.unit || props.panelUnit;
-        const customUnit =
-          maps.unitConfigMap[aliasLower]?.customUnit || props.panelUnitCustom;
+        const customUnit = maps.unitConfigMap[aliasLower]?.customUnit || props.panelUnitCustom;
         const decimals = props.panelDecimals ?? 2;
-        c.format = (val: any) =>
-          formatNumericValue(val, cache, unit, customUnit, decimals);
+        c.format = (val: any) => formatNumericValue(val, cache, unit, customUnit, decimals);
       }
       return c;
     };
@@ -469,12 +457,8 @@ export default defineComponent({
         name: label,
         label,
       };
-      const dataKey = String(
-        baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field,
-      );
-      const rows = base?.rows?.length
-        ? base.rows
-        : makeDummyRows(dataKey, isNumeric);
+      const dataKey = String(baseColumn.field ?? baseColumn.alias ?? baseColumn.name ?? col.field);
+      const rows = base?.rows?.length ? base.rows : makeDummyRows(dataKey, isNumeric);
       const previewCol = buildPreviewColumn(baseColumn, col, isNumeric);
       return { rows, columns: [previewCol] };
     };

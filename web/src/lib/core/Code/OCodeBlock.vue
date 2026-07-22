@@ -29,11 +29,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import type {
-  CodeBlockProps,
-  CodeBlockEmits,
-  CodeBlockSlots,
-} from "./OCodeBlock.types";
+import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBlock.types";
 
 const props = withDefaults(defineProps<CodeBlockProps>(), {
   copyable: true,
@@ -68,10 +64,7 @@ const highlightOne = (code: string, lang?: string): string => {
         ? hljs.highlight(code, { language: lang }).value
         : hljs.highlightAuto(code).value;
   } catch {
-    out = code
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+    out = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
   highlightCache.set(key, out);
   return out;

@@ -166,8 +166,7 @@ const triggerNode = (x = 100, y = 40) => ({
   data: { node_type: "workflow_trigger" },
 });
 
-const mountCanvas = () =>
-  mount(WorkflowCanvas as any, { global: { plugins: [i18n] } });
+const mountCanvas = () => mount(WorkflowCanvas as any, { global: { plugins: [i18n] } });
 
 const flow = (wrapper: any) => wrapper.findComponent({ name: "VueFlow" });
 
@@ -324,9 +323,7 @@ describe("WorkflowCanvas", () => {
       wfObj.currentSelectedWorkflow.nodes = [triggerNode()];
       wrapper = mountCanvas();
       await nextTick();
-      expect(
-        wrapper.find('[data-test="workflow-flow-empty-text"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="workflow-flow-empty-text"]').exists()).toBe(false);
     });
 
     it("re-shows the hint when the last node is removed", async () => {
@@ -335,9 +332,7 @@ describe("WorkflowCanvas", () => {
       await nextTick();
       wfObj.currentSelectedWorkflow.nodes = [];
       await nextTick();
-      expect(
-        wrapper.find('[data-test="workflow-flow-empty-text"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="workflow-flow-empty-text"]').exists()).toBe(true);
     });
   });
 

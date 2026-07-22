@@ -4,7 +4,9 @@
       <div
         data-test="promql-metric-selector-label"
         class="text-sm whitespace-nowrap flex items-center min-w-32.5"
-      >{{ t("panel.metric") }}</div>
+      >
+        {{ t("panel.metric") }}
+      </div>
       <span class="flex items-center ml-0.5 mr-0.5">:</span>
       <div class="m-1.25 flex-1">
         <OSelect
@@ -17,7 +19,11 @@
           data-test="metric-selector"
         >
           <template #empty>
-            {{ loading ? t('metrics.metricSelector.loadingMetrics') : t('metrics.metricSelector.noMetricsFound') }}
+            {{
+              loading
+                ? t("metrics.metricSelector.loadingMetrics")
+                : t("metrics.metricSelector.noMetricsFound")
+            }}
           </template>
         </OSelect>
       </div>
@@ -64,7 +70,7 @@ const loadMetrics = async () => {
       -1, // limit (get all)
       "", // keyword
       "", // sort
-      false // asc
+      false, // asc
     );
 
     if (response.data && response.data.list) {

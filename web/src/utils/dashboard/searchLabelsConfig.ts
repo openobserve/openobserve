@@ -34,11 +34,11 @@ const SECTION_DEFS = [
 
 export type SectionId = (typeof SECTION_DEFS)[number]["id"];
 
-export const ORDERED_SECTION_IDS: SectionId[] = SECTION_DEFS.map(
-  (s) => s.id as SectionId,
-);
+export const ORDERED_SECTION_IDS: SectionId[] = SECTION_DEFS.map((s) => s.id as SectionId);
 
-export const DEFAULT_EXPANDED_SECTIONS: Record<SectionId, boolean> =
-  Object.fromEntries(
-    SECTION_DEFS.map((s) => [s.id, (s as { id: string; defaultExpanded?: boolean }).defaultExpanded ?? true]),
-  ) as Record<SectionId, boolean>;
+export const DEFAULT_EXPANDED_SECTIONS: Record<SectionId, boolean> = Object.fromEntries(
+  SECTION_DEFS.map((s) => [
+    s.id,
+    (s as { id: string; defaultExpanded?: boolean }).defaultExpanded ?? true,
+  ]),
+) as Record<SectionId, boolean>;

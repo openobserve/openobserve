@@ -18,16 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="h-full">
     <div class="p-0 w-25">
       <ul class="flex flex-wrap list-none p-0 m-0">
-        <li class="w-12.5"
+        <li
+          class="w-12.5"
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
             'border-r border-b border-card-glass-border',
             'transition-colors duration-150 ease-in-out hover:bg-surface-subtle',
             selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
-            isChartDisabled(item)
-              ? 'opacity-50 cursor-not-allowed'
-              : 'cursor-pointer',
+            isChartDisabled(item) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
           data-test="dashboard-addpanel-chart-selection-item"
@@ -44,9 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="mx-auto my-2 w-6 h-6"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
-            <OTooltip class="text-center"
-              :content="item.title"
-            />
+            <OTooltip class="text-center" :content="item.title" />
           </div>
         </li>
       </ul>
@@ -98,8 +95,7 @@ export default defineComponent({
         id: "line",
       },
       {
-        image:
-          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
         title: t("dashboard.scatterLabel"),
         id: "scatter",
       },
@@ -175,13 +171,8 @@ export default defineComponent({
       },
     ]);
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { promqlMode, dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { promqlMode, dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const promqlAllowedCharts = new Set([
       "line",

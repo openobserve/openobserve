@@ -24,54 +24,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Filters live in the sub-nav band directly above the table. -->
     <template #subnav>
-          <div
-            data-test="running-queries-filter-container"
-            class="flex justify-start items-center gap-3 px-page-edge py-2"
+      <div
+        data-test="running-queries-filter-container"
+        class="flex justify-start items-center gap-3 px-page-edge py-2"
+      >
+        <OToggleGroup
+          :model-value="selectedQueryTypeTab"
+          @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
+          data-test="running-queries-query-type-tabs"
+        >
+          <OToggleGroupItem
+            v-for="visual in runningQueryTypes"
+            :key="visual.value"
+            :value="visual.value"
+            size="sm"
           >
-            <OToggleGroup
-              :model-value="selectedQueryTypeTab"
-              @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
-              data-test="running-queries-query-type-tabs"
-            >
-              <OToggleGroupItem
-                v-for="visual in runningQueryTypes"
-                :key="visual.value"
-                :value="visual.value"
-                size="sm"
-              >
-                {{ visual.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div class="o2-select-input o2-input">
-              <OSelect
-                v-model="selectedSearchField"
-                :options="searchFieldOptions"
-                labelKey="label"
-                valueKey="value"
-                class="p-0 w-35"
-                data-test="running-queries-search-fields-select"
-                @update:model-value="filterQuery = ''"
-              />
-            </div>
-            <OSearchInput
-              v-if="selectedSearchField == 'all'"
-              v-model="filterQuery"
-              class=" no-border o2-search-input"
-              :placeholder="t('queries.search')"
-              data-test="running-queries-search-input"
-            />
-            <div v-else class="o2-select-input o2-input w-62.5">
-              <OSelect
-                v-model="filterQuery"
-                placeholder="Select option"
-                :options="otherFieldOptions"
-                labelKey="label"
-                valueKey="value"
-                class="no-border search-input w-62.5"
-                data-test="running-queries-search-input"
-              />
-            </div>
-          </div>
+            {{ visual.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <div class="o2-select-input o2-input">
+          <OSelect
+            v-model="selectedSearchField"
+            :options="searchFieldOptions"
+            labelKey="label"
+            valueKey="value"
+            class="p-0 w-35"
+            data-test="running-queries-search-fields-select"
+            @update:model-value="filterQuery = ''"
+          />
+        </div>
+        <OSearchInput
+          v-if="selectedSearchField == 'all'"
+          v-model="filterQuery"
+          class="no-border o2-search-input"
+          :placeholder="t('queries.search')"
+          data-test="running-queries-search-input"
+        />
+        <div v-else class="o2-select-input o2-input w-62.5">
+          <OSelect
+            v-model="filterQuery"
+            placeholder="Select option"
+            :options="otherFieldOptions"
+            labelKey="label"
+            valueKey="value"
+            class="no-border search-input w-62.5"
+            data-test="running-queries-search-input"
+          />
+        </div>
+      </div>
     </template>
 
     <div class="flex-1 min-h-0">
@@ -142,23 +142,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
-import {
-  onBeforeMount,
-  ref,
-  defineComponent,
-  computed,
-  toRaw,
-  watch,
-} from "vue";
+import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue";
 
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
-import OSelect from '@/lib/forms/Select/OSelect.vue';
-import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
-import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
-import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { durationFormatter } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
@@ -170,8 +163,18 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { OPageLayout, QueryList, ConfirmDialog, RunningQueriesList, SummaryList, OToggleGroup, OToggleGroupItem, ODrawer, OSelect, OSearchInput,
-},
+  components: {
+    OPageLayout,
+    QueryList,
+    ConfirmDialog,
+    RunningQueriesList,
+    SummaryList,
+    OToggleGroup,
+    OToggleGroupItem,
+    ODrawer,
+    OSelect,
+    OSearchInput,
+  },
   setup() {
     const store = useStore();
     const schemaData = ref({});
@@ -218,63 +221,57 @@ export default defineComponent({
      */
     const getRunningQueriesSummary = () => {
       try {
-        const result = queries.value.reduce(
-          (acc: { [key: string]: any }, query: any) => {
-            const {
-              trace_id,
-              user_id,
+        const result = queries.value.reduce((acc: { [key: string]: any }, query: any) => {
+          const {
+            trace_id,
+            user_id,
+            search_type,
+            search_type_label,
+            created_at,
+            query: { start_time, end_time },
+          } = query;
+
+          const key = `${user_id}-${search_type_label}`;
+
+          if (!acc[key]) {
+            acc[key] = {
+              row_id: key,
+              user_id: user_id,
+              numOfQueries: 0,
+              duration: 0,
+              queryRange: 0,
               search_type,
-              search_type_label,
+              search_type_label: search_type_label,
+              trace_ids: [],
               created_at,
-              query: { start_time, end_time },
-            } = query;
+              query: { end_time, start_time },
+            };
+          }
 
-            const key = `${user_id}-${search_type_label}`;
+          if (acc[key].created_at > created_at) {
+            acc[key].created_at = created_at;
+          }
 
-            if (!acc[key]) {
-              acc[key] = {
-                row_id: key,
-                user_id: user_id,
-                numOfQueries: 0,
-                duration: 0,
-                queryRange: 0,
-                search_type,
-                search_type_label: search_type_label,
-                trace_ids: [],
-                created_at,
-                query: { end_time, start_time },
-              };
-            }
+          if (acc[key].query.start_time > start_time) {
+            acc[key].query.start_time = start_time;
+          }
 
-            if (acc[key].created_at > created_at) {
-              acc[key].created_at = created_at;
-            }
+          if (acc[key].query.end_time < end_time) {
+            acc[key].query.end_time = end_time;
+          }
 
-            if (acc[key].query.start_time > start_time) {
-              acc[key].query.start_time = start_time;
-            }
+          acc[key].trace_ids.push(trace_id);
 
-            if (acc[key].query.end_time < end_time) {
-              acc[key].query.end_time = end_time;
-            }
+          acc[key].numOfQueries += 1;
 
-            acc[key].trace_ids.push(trace_id);
+          if (created_at) {
+            acc[key].duration += getDuration(created_at).durationInSeconds;
+          }
 
-            acc[key].numOfQueries += 1;
+          acc[key].queryRange += queryRange(start_time, end_time).queryRangeInSeconds;
 
-            if (created_at) {
-              acc[key].duration += getDuration(created_at).durationInSeconds;
-            }
-
-            acc[key].queryRange += queryRange(
-              start_time,
-              end_time,
-            ).queryRangeInSeconds;
-
-            return acc;
-          },
-          {},
-        );
+          return acc;
+        }, {});
 
         return Object.values(result).map((user: any) => ({
           ...user,
@@ -312,7 +309,6 @@ export default defineComponent({
       data: null as any,
     });
 
-
     const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
@@ -340,7 +336,6 @@ export default defineComponent({
       pagination.value.rowsPerPage = val.value;
     };
     const filterQuery = ref("");
-
 
     const localTimeToMicroseconds = () => {
       // Create a Date object representing the current local time
@@ -377,13 +372,9 @@ export default defineComponent({
       return durationFormatter(averageDuration); // You can also return the total if needed
     };
 
-    const getGroupedQueryRange = (
-      queries: Array<{ startTime: number; endTime: number }>,
-    ) => {
+    const getGroupedQueryRange = (queries: Array<{ startTime: number; endTime: number }>) => {
       const totalQueryDuration = queries.reduce((acc, query) => {
-        const queryDuration = Math.floor(
-          (query.endTime - query.startTime) / 1000000,
-        );
+        const queryDuration = Math.floor((query.endTime - query.startTime) / 1000000);
         return acc + queryDuration;
       }, 0);
 
@@ -392,7 +383,9 @@ export default defineComponent({
       return durationFormatter(averageQueryDuration); // You can also return the total if needed
     };
 
-    const columns = ref<{ name: string; label: string; field: string; align?: string; sortable?: boolean }[]>([
+    const columns = ref<
+      { name: string; label: string; field: string; align?: string; sortable?: boolean }[]
+    >([
       {
         name: "user_id",
         field: "user_id",
@@ -461,16 +454,13 @@ export default defineComponent({
     const runningQueriesSummary = ref<any[]>([]);
 
     const baseFilteredQueries = computed(() =>
-      selectedQueryTypeTab.value === "all"
-        ? queries.value
-        : runningQueriesSummary.value,
+      selectedQueryTypeTab.value === "all" ? queries.value : runningQueriesSummary.value,
     );
 
     const searchTypeFiltered = computed(() =>
       baseFilteredQueries.value.filter(
         (query) =>
-          (selectedQueryTypeTab.value === "all" &&
-            filterQueryBySearchTypeTab(query)) ||
+          (selectedQueryTypeTab.value === "all" && filterQueryBySearchTypeTab(query)) ||
           selectedQueryTypeTab.value === "summary",
       ),
     );
@@ -478,9 +468,7 @@ export default defineComponent({
     const fieldFiltered = computed(() => {
       if (!filterQuery.value) return searchTypeFiltered.value;
       return searchTypeFiltered.value.filter((query) =>
-        Object.values(filterQueryCriteria).some((criteria) =>
-          criteria(query, filterQuery.value),
-        ),
+        Object.values(filterQueryCriteria).some((criteria) => criteria(query, filterQuery.value)),
       );
     });
 
@@ -527,12 +515,8 @@ export default defineComponent({
 
     const filterQueryBySearchTypeTab = (query: any) => {
       return (
-        query?.search_type
-          ?.toLowerCase()
-          .includes(selectedSearchType.value.toLowerCase()) ||
-        query?.search_type_label
-          ?.toLowerCase()
-          .includes(selectedSearchType.value.toLowerCase())
+        query?.search_type?.toLowerCase().includes(selectedSearchType.value.toLowerCase()) ||
+        query?.search_type_label?.toLowerCase().includes(selectedSearchType.value.toLowerCase())
       );
     };
 
@@ -598,8 +582,8 @@ export default defineComponent({
       const dismiss = toast({
         message: "Fetching running queries...",
         variant: "loading",
-              timeout: 0,
-});
+        timeout: 0,
+      });
       SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
           queries.value = response?.data?.status.map((query: any) => {
@@ -620,9 +604,7 @@ export default defineComponent({
         })
         .catch((error: any) => {
           toast({
-            message:
-              error.response?.data?.message ||
-              "Failed to fetch running queries",
+            message: error.response?.data?.message || "Failed to fetch running queries",
             variant: "error",
           });
         })
@@ -632,10 +614,7 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_queries(
-        store.state.zoConfig.meta_org,
-        deleteDialog.value.data,
-      )
+      SearchService.delete_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
           selectedRow.value[selectedQueryTypeTab.value] = [];
 
@@ -665,17 +644,18 @@ export default defineComponent({
 
     const handleMultiQueryCancel = (traceIds: string[] | null = null) => {
       if (!traceIds) {
-        deleteDialog.value.data = selectedRow.value[
-          selectedQueryTypeTab.value
-        ].reduce((acc: any, row: any) => {
-          if (row.trace_id) {
-            acc.push(row.trace_id);
-          } else {
-            // If query tab is "Summary", then add all trace_ids ( we store trace_id of all queries in trace_ids key )
-            acc.push(...row.trace_ids);
-          }
-          return acc;
-        }, []);
+        deleteDialog.value.data = selectedRow.value[selectedQueryTypeTab.value].reduce(
+          (acc: any, row: any) => {
+            if (row.trace_id) {
+              acc.push(row.trace_id);
+            } else {
+              // If query tab is "Summary", then add all trace_ids ( we store trace_id of all queries in trace_ids key )
+              acc.push(...row.trace_ids);
+            }
+            return acc;
+          },
+          [],
+        );
       } else {
         deleteDialog.value.data = traceIds;
       }
@@ -704,10 +684,17 @@ export default defineComponent({
         const search_type = row?.search_type;
         var query_source = "-unknown-";
 
-        if(search_type === "dashboards") {
-          query_source = row?.search_event_context?.folder_name + "/" + row?.search_event_context?.dashboard_name;
-        } else if(search_type == "alerts"){
-          query_source = row?.search_event_context?.alert_name + "(" + row?.search_event_context?.alert_key + ")";
+        if (search_type === "dashboards") {
+          query_source =
+            row?.search_event_context?.folder_name +
+            "/" +
+            row?.search_event_context?.dashboard_name;
+        } else if (search_type == "alerts") {
+          query_source =
+            row?.search_event_context?.alert_name +
+            "(" +
+            row?.search_event_context?.alert_key +
+            ")";
         }
 
         return {
@@ -755,7 +742,9 @@ export default defineComponent({
     useShortcuts([
       {
         id: "runningQueriesRefresh",
-        handler: () => { if (!isInputFocused()) refreshData(); },
+        handler: () => {
+          if (!isInputFocused()) refreshData();
+        },
       },
       {
         id: "runningQueriesFocusSearch",
@@ -779,7 +768,7 @@ export default defineComponent({
       showListSchemaDialog,
       filterQuery,
       changePagination,
-      "cancel": "cancel",
+      cancel: "cancel",
       schemaData,
       loadingState,
       refreshData,

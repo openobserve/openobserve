@@ -52,12 +52,9 @@ const props = defineProps<{
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
-const { generate, generating, error: genError, credential, canGenerate } =
-  useMcpCredential();
+const { generate, generating, error: genError, credential, canGenerate } = useMcpCredential();
 
-const endpoint = computed(
-  () => `${props.subs.url}/api/${props.subs.org}/mcp`,
-);
+const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
 // "oauth" (default, recommended) | "token".
 const authMode = ref<"oauth" | "token">("oauth");
@@ -69,22 +66,16 @@ const authMode = ref<"oauth" | "token">("oauth");
 // OAuth mode passes null so build() omits the header entirely.
 const tokenAuthValue = computed(() => {
   if (credential.value) {
-    return `Basic ${b64EncodeStandard(
-      `${credential.value.email}:${credential.value.token}`,
-    )}`;
+    return `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`;
   }
   return "Basic [BASIC_PASSCODE]";
 });
-const authValue = computed(() =>
-  authMode.value === "oauth" ? null : tokenAuthValue.value,
-);
+const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
 
 // The `Basic <base64>` line for the generated credential's reveal + download.
 const credentialHeader = computed(() =>
   credential.value
-    ? `Basic ${b64EncodeStandard(
-        `${credential.value.email}:${credential.value.token}`,
-      )}`
+    ? `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`
     : "",
 );
 
@@ -103,13 +94,13 @@ const mcpServersUrl = (ep: string, auth: string | null) => `{
   "mcpServers": {
     "openobserve": {
       "url": "${ep}"${
-  auth
-    ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-    : ``
-}
+          : ``
+      }
     }
   }
 }`;
@@ -161,13 +152,13 @@ http_headers = { "Authorization" = "${auth}" }`
     "openobserve": {
       "type": "http",
       "url": "${ep}"${
-      auth
-        ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-        : ``
-    }
+          : ``
+      }
     }
   }
 }`,
@@ -199,13 +190,13 @@ Authentication: OAuth (sign in when prompted)`,
   "mcpServers": {
     "openobserve": {
       "serverUrl": "${ep}"${
-      auth
-        ? `,
+        auth
+          ? `,
       "headers": {
         "Authorization": "${auth}"
       }`
-        : ``
-    }
+          : ``
+      }
     }
   }
 }`,
@@ -269,9 +260,7 @@ const selectedClient = ref("claudeCode");
 const activeClient = computed(
   () => CLIENTS.find((c) => c.id === selectedClient.value) ?? CLIENTS[0],
 );
-const activeConfig = computed(() =>
-  activeClient.value.build(endpoint.value, authValue.value),
-);
+const activeConfig = computed(() => activeClient.value.build(endpoint.value, authValue.value));
 const activeDeepLink = computed(
   () => activeClient.value.deepLink?.(endpoint.value, authValue.value) ?? null,
 );

@@ -37,13 +37,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="max-w-62.5"
       >
         <span class="font-mono text-xs truncate"
-          >{{ filter.label }} {{ filter.operator || "=" }}
-          {{ filter.value }}</span
+          >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</span
         >
         <template #trailing>
-          <span class="ml-1 inline-flex items-center"
-            ><OIcon name="close" size="xs"
-          /></span>
+          <span class="ml-1 inline-flex items-center"><OIcon name="close" size="xs" /></span>
         </template>
       </OTag>
     </div>
@@ -74,12 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <!-- The chip truncates its value; the tooltip is where the whole matcher
              stays readable. -->
-        <OTooltip
-          :content="`${filter.label} ${filter.operator || '='} ${filter.value}`"
-        />
+        <OTooltip :content="`${filter.label} ${filter.operator || '='} ${filter.value}`" />
         <span class="font-mono text-xs truncate"
-          >{{ filter.label }} {{ filter.operator || "=" }}
-          {{ filter.value }}</span
+          >{{ filter.label }} {{ filter.operator || "=" }} {{ filter.value }}</span
         >
         <template #trailing>
           <button
@@ -136,79 +130,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex items-center gap-2 shrink-0"
       data-test="metrics-explorer-label-actions"
     >
-    <OButton
-      v-if="expanded && filters.length > fitCount"
-      variant="ghost"
-      size="xs"
-      class="shrink-0"
-      data-test="metrics-explorer-label-show-less"
-      @click="expanded = false"
-    >
-      {{ t("metrics.explorer.labels.showLess") }}
-    </OButton>
+      <OButton
+        v-if="expanded && filters.length > fitCount"
+        variant="ghost"
+        size="xs"
+        class="shrink-0"
+        data-test="metrics-explorer-label-show-less"
+        @click="expanded = false"
+      >
+        {{ t("metrics.explorer.labels.showLess") }}
+      </OButton>
 
-    <!-- Membership resolution is deferred to the first filter interaction, so the
+      <!-- Membership resolution is deferred to the first filter interaction, so the
          bar itself reports that the grid is still narrowing. -->
-    <span
-      v-if="schemaLoading"
-      class="inline-flex items-center cursor-help"
-      role="status"
-      :aria-label="t('metrics.explorer.labels.schemaLoadingAria')"
-      data-test="metrics-explorer-label-schema-loading"
-    >
-      <OTooltip
-        :content="t('metrics.explorer.labels.schemaLoadingTooltip')"
-        :delay="200"
-      />
-      <OSpinner size="xs" />
-    </span>
+      <span
+        v-if="schemaLoading"
+        class="inline-flex items-center cursor-help"
+        role="status"
+        :aria-label="t('metrics.explorer.labels.schemaLoadingAria')"
+        data-test="metrics-explorer-label-schema-loading"
+      >
+        <OTooltip :content="t('metrics.explorer.labels.schemaLoadingTooltip')" :delay="200" />
+        <OSpinner size="xs" />
+      </span>
 
-    <!-- Two steps, no Add button: click Filter -> pick a label -> pick a value,
+      <!-- Two steps, no Add button: click Filter -> pick a label -> pick a value,
          and the chip commits on selection. Each dropdown is auto-opened as it
          appears, so picking a filter costs one click per decision the user
          actually makes, instead of one click per widget. -->
-    <div class="relative flex items-center gap-2">
-      <OButton
-        v-if="step === 'idle'"
-        variant="outline"
-        size="xs"
-        icon-left="add"
-        data-test="metrics-explorer-label-add"
-        @click="startPicking"
-      >
-        {{ t("metrics.explorer.labels.addFilter") }}
-      </OButton>
+      <div class="relative flex items-center gap-2">
+        <OButton
+          v-if="step === 'idle'"
+          variant="outline"
+          size="xs"
+          icon-left="add"
+          data-test="metrics-explorer-label-add"
+          @click="startPicking"
+        >
+          {{ t("metrics.explorer.labels.addFilter") }}
+        </OButton>
 
-      <div
-        v-else-if="step === 'label'"
-        ref="labelStepRef"
-        class="w-56"
-        data-test="metrics-explorer-label-picker-label"
-      >
-        <OSelect
-          v-model="draftLabel"
-          searchable
-          size="sm"
-          :placeholder="t('metrics.explorer.labels.selectLabel')"
-          :options="labelOptions"
-          :loading="labelNamesLoading"
-          :error="!!labelError"
-          :error-message="labelError"
-          @update:model-value="onLabelPicked"
-          @close="onDropdownClosed"
-        />
-      </div>
+        <div
+          v-else-if="step === 'label'"
+          ref="labelStepRef"
+          class="w-56"
+          data-test="metrics-explorer-label-picker-label"
+        >
+          <OSelect
+            v-model="draftLabel"
+            searchable
+            size="sm"
+            :placeholder="t('metrics.explorer.labels.selectLabel')"
+            :options="labelOptions"
+            :loading="labelNamesLoading"
+            :error="!!labelError"
+            :error-message="labelError"
+            @update:model-value="onLabelPicked"
+            @close="onDropdownClosed"
+          />
+        </div>
 
-      <div
-        v-else
-        ref="valueStepRef"
-        class="flex items-center gap-2"
-        data-test="metrics-explorer-label-picker-value"
-      >
-        <span class="text-xs font-mono text-text-secondary shrink-0">
-          {{ draftLabel }}
-        </span>
-        <!-- Defaulted to `=`, one click to change. All four PromQL matchers are
+        <div
+          v-else
+          ref="valueStepRef"
+          class="flex items-center gap-2"
+          data-test="metrics-explorer-label-picker-value"
+        >
+          <span class="text-xs font-mono text-text-secondary shrink-0">
+            {{ draftLabel }}
+          </span>
+          <!-- Defaulted to `=`, one click to change. All four PromQL matchers are
              supported by the selector builder, so regex filters cost nothing
              extra — but they never get in the way of the common case.
 
@@ -219,57 +210,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              way to say it — and a user has no reason to guess that. The labels
              stay the bare symbols: they are what PromQL calls these, and the
              trigger is `w-20`. -->
-        <div class="w-20">
-          <OTooltip
-            :content="t('metrics.explorer.labels.operatorHelp')"
-            content-class="whitespace-pre-line"
-            max-width="20rem"
-            :delay="200"
-          />
-          <OSelect
-            v-model="draftOperator"
-            size="sm"
-            :options="operatorOptions"
-            data-test="metrics-explorer-label-picker-operator"
-          />
-        </div>
-        <div ref="valueSelectRef" class="w-56">
-          <!-- `creatable` is what keeps the chip usable when suggestions fail:
+          <div class="w-20">
+            <OTooltip
+              :content="t('metrics.explorer.labels.operatorHelp')"
+              content-class="whitespace-pre-line"
+              max-width="20rem"
+              :delay="200"
+            />
+            <OSelect
+              v-model="draftOperator"
+              size="sm"
+              :options="operatorOptions"
+              data-test="metrics-explorer-label-picker-operator"
+            />
+          </div>
+          <div ref="valueSelectRef" class="w-56">
+            <!-- `creatable` is what keeps the chip usable when suggestions fail:
                the user can always type a value and commit it with Enter. -->
-          <OSelect
-            v-model="draftValue"
-            searchable
-            creatable
-            size="sm"
-            :placeholder="t('metrics.explorer.labels.selectOrTypeValue')"
-            :options="valueOptions"
-            :loading="valuesLoading"
-            @update:model-value="onValuePicked"
-            @create="onValueCreated"
-            @close="onDropdownClosed"
-          />
+            <OSelect
+              v-model="draftValue"
+              searchable
+              creatable
+              size="sm"
+              :placeholder="t('metrics.explorer.labels.selectOrTypeValue')"
+              :options="valueOptions"
+              :loading="valuesLoading"
+              @update:model-value="onValuePicked"
+              @create="onValueCreated"
+              @close="onDropdownClosed"
+            />
+          </div>
+          <span
+            v-if="suggestionsUnavailable"
+            class="text-xs text-text-secondary shrink-0"
+            data-test="metrics-explorer-label-picker-no-suggestions"
+          >
+            {{ t("metrics.explorer.labels.noSuggestions") }}
+          </span>
+          <OButton
+            variant="ghost"
+            size="xs"
+            icon-left="close"
+            :aria-label="t('metrics.explorer.labels.cancelDraftAria')"
+            data-test="metrics-explorer-label-picker-cancel"
+            @click="cancel"
+          >
+            <OTooltip :content="t('metrics.explorer.labels.cancelDraftAria')" />
+          </OButton>
         </div>
-        <span
-          v-if="suggestionsUnavailable"
-          class="text-xs text-text-secondary shrink-0"
-          data-test="metrics-explorer-label-picker-no-suggestions"
-        >
-          {{ t("metrics.explorer.labels.noSuggestions") }}
-        </span>
-        <OButton
-          variant="ghost"
-          size="xs"
-          icon-left="close"
-          :aria-label="t('metrics.explorer.labels.cancelDraftAria')"
-          data-test="metrics-explorer-label-picker-cancel"
-          @click="cancel"
-        >
-          <OTooltip :content="t('metrics.explorer.labels.cancelDraftAria')" />
-        </OButton>
       </div>
-    </div>
 
-    <!-- The empty-row hint, typed out.
+      <!-- The empty-row hint, typed out.
          A SIBLING of the picker block above, never a branch inside it: an extra
          `v-if` between that block's `v-if` and its `v-else-if` silently breaks
          the chain, and `+ Filter` then renders at the same time as the value
@@ -277,13 +268,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
          Idle + unfiltered only — it is a hint about the empty state, so it gets
          out of the way the moment there is a chip or an open picker. -->
-    <span
-      v-if="step === 'idle' && !filters.length"
-      class="query-editor-placeholder-overlay min-w-0 flex-1 overflow-hidden pointer-events-none select-none"
-      aria-hidden="true"
-      data-test="metrics-explorer-label-hint"
-    >
-      <!-- The SAME element the Logs placeholder types into (tailwind.css:75), so
+      <span
+        v-if="step === 'idle' && !filters.length"
+        class="query-editor-placeholder-overlay min-w-0 flex-1 overflow-hidden pointer-events-none select-none"
+        aria-hidden="true"
+        data-test="metrics-explorer-label-hint"
+      >
+        <!-- The SAME element the Logs placeholder types into (tailwind.css:75), so
            the font, size and colour are the one shared rule rather than a second
            opinion on it.
 
@@ -292,21 +283,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            BOUNDS the width. As a bare inline flex item it took its full intrinsic
            width instead and pushed `+ Filter` along the row — the hint is the one
            thing here that must yield, never the control. -->
-      <span class="query-editor-placeholder-typewriter block">{{
-        filterHint
-      }}</span>
-    </span>
+        <span class="query-editor-placeholder-typewriter block">{{ filterHint }}</span>
+      </span>
 
-    <OButton
-      v-if="filters.length > 1 && step === 'idle'"
-      variant="ghost"
-      size="xs"
-      class="shrink-0"
-      data-test="metrics-explorer-label-clear-all"
-      @click="$emit('clear-all')"
-    >
-      {{ t("metrics.explorer.labels.clearAll") }}
-    </OButton>
+      <OButton
+        v-if="filters.length > 1 && step === 'idle'"
+        variant="ghost"
+        size="xs"
+        class="shrink-0"
+        data-test="metrics-explorer-label-clear-all"
+        @click="$emit('clear-all')"
+      >
+        {{ t("metrics.explorer.labels.clearAll") }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -321,10 +310,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useFilterHint } from "@/composables/metrics/useFilterHint";
-import {
-  labelFilterKey,
-  type LabelFilter,
-} from "@/composables/metrics/useMetricsExplorerGrid";
+import { labelFilterKey, type LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
 /** The PromQL selector builder throws on anything else, so an invalid name is
  *  rejected here rather than being turned into a broken query. */
@@ -409,8 +395,7 @@ const measure = async () => {
   for (const w of chipWidths) {
     // Every chip but the first is preceded by `and` — the clone does not hold
     // those, so their width is added here.
-    const next =
-      used + (count ? CHIP_GAP + AND_SEPARATOR_WIDTH : 0) + w;
+    const next = used + (count ? CHIP_GAP + AND_SEPARATOR_WIDTH : 0) + w;
     if (next > avail) break;
     used = next;
     count++;
@@ -422,8 +407,7 @@ const measure = async () => {
       // Mirrors the addition above exactly — including the `and` this chip
       // brought with it. An asymmetric subtraction would leave `used` drifting
       // from the row's real width with every step.
-      used -=
-        chipWidths[count] + (count ? CHIP_GAP + AND_SEPARATOR_WIDTH : 0);
+      used -= chipWidths[count] + (count ? CHIP_GAP + AND_SEPARATOR_WIDTH : 0);
     }
   }
   fitCount.value = Math.max(1, count);
@@ -451,9 +435,7 @@ watch(() => props.filters, measure, { deep: true });
 const shownFilters = computed(() =>
   expanded.value ? props.filters : props.filters.slice(0, fitCount.value),
 );
-const hiddenFilters = computed(() =>
-  expanded.value ? [] : props.filters.slice(fitCount.value),
-);
+const hiddenFilters = computed(() => (expanded.value ? [] : props.filters.slice(fitCount.value)));
 
 type Step = "idle" | "label" | "value";
 const step = ref<Step>("idle");
@@ -475,9 +457,7 @@ const labelError = ref("");
  * screen. The loop is a chain of timers, so leaving it armed behind a committed
  * chip or an open picker would burn them for something nobody can see.
  */
-const hintEnabled = computed(
-  () => step.value === "idle" && !props.filters.length,
-);
+const hintEnabled = computed(() => step.value === "idle" && !props.filters.length);
 const { placeholder: filterHint } = useFilterHint(
   computed(() => props.labelNames ?? []),
   hintEnabled,
@@ -487,9 +467,7 @@ const valueOptions = ref<{ label: string; value: string }[]>([]);
 const valuesLoading = ref(false);
 const suggestionsUnavailable = ref(false);
 
-const labelOptions = computed(() =>
-  props.labelNames.map((name) => ({ label: name, value: name })),
-);
+const labelOptions = computed(() => props.labelNames.map((name) => ({ label: name, value: name })));
 
 /**
  * Opens a freshly-rendered OSelect.

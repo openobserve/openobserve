@@ -1,7 +1,9 @@
 <template>
   <div class="mb-4">
     <div class="flex flex-col gap-0.5 mb-2">
-      <span class="text-xs font-semibold text-text-heading">{{ t("onlineEvals.job.filter.title") }}</span>
+      <span class="text-xs font-semibold text-text-heading">{{
+        t("onlineEvals.job.filter.title")
+      }}</span>
       <span class="text-2xs text-text-secondary">{{ t("onlineEvals.job.filter.hint") }}</span>
     </div>
     <div class="job-filter__group min-w-0">

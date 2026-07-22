@@ -75,14 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  computed,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-} from "vue";
+import { defineComponent, computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -158,18 +151,14 @@ export default defineComponent({
     const spanMarkerRef = ref(null);
 
     const getLeftPosition = () => {
-      const left =
-        props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
+      const left = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
 
       return (left / props.baseTracePosition?.durationUs) * 100;
     };
 
     const getSpanWidth = () => {
       return Number(
-        (
-          (props.span?.durationUs / props.baseTracePosition?.durationUs) *
-          100
-        ).toFixed(2),
+        ((props.span?.durationUs / props.baseTracePosition?.durationUs) * 100).toFixed(2),
       );
     };
 
@@ -236,18 +225,13 @@ export default defineComponent({
 
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
-      if (
-        (leftPosition.value + spanWidth.value) * onePercent + labelWidth >
-        spanBlockWidth.value
-      ) {
+      if ((leftPosition.value + spanWidth.value) * onePercent + labelWidth > spanBlockWidth.value) {
         style.right = 0;
         style.top = "-0.3125rem";
       } else if (leftPosition.value > 50) {
         style.left = leftPosition.value * onePercent - labelWidth + "px";
       } else {
-        const left =
-          leftPosition.value +
-          (Math.floor(spanWidth.value) ? spanWidth.value : 1);
+        const left = leftPosition.value + (Math.floor(spanWidth.value) ? spanWidth.value : 1);
 
         style.left =
           (left * onePercent - leftPosition.value * onePercent < 19

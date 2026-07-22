@@ -5,47 +5,44 @@
     icon="smart-toy"
     bleed
   >
-      <template #title>
-        <span data-test="gen-ai-agent-mapping-page-title">{{
-          t("settings.genAiAgentMapping.title")
-        }}</span>
-      </template>
-      <!-- Content helpers (populate / clear the fields) live in the header,
+    <template #title>
+      <span data-test="gen-ai-agent-mapping-page-title">{{
+        t("settings.genAiAgentMapping.title")
+      }}</span>
+    </template>
+    <!-- Content helpers (populate / clear the fields) live in the header,
            separate from the primary Save action at the bottom. -->
-      <template #actions>
-        <OButton
-          data-test="gen-ai-agent-mapping-apply-defaults-btn"
-          variant="outline"
-          size="sm"
-          :loading="loadingDefaults"
-          @click="applyDefaults"
-        >
-          {{ t("settings.genAiAgentMapping.applyDefaults") }}
-        </OButton>
-        <OButton
-          data-test="gen-ai-agent-mapping-reset-empty-btn"
-          variant="outline"
-          size="sm"
-          @click="resetToEmpty"
-        >
-          {{ t("settings.genAiAgentMapping.resetToEmpty") }}
-        </OButton>
-        <OButton
-          data-test="gen-ai-agent-registry-clear-btn"
-          variant="outline-destructive"
-          size="sm"
-          :loading="clearingRegistry"
-          :disabled="loading || loadingDefaults || saving"
-          @click="openClearRegistryDialog"
-        >
-          {{ t("settings.genAiAgentMapping.clearRegistry") }}
-        </OButton>
-      </template>
+    <template #actions>
+      <OButton
+        data-test="gen-ai-agent-mapping-apply-defaults-btn"
+        variant="outline"
+        size="sm"
+        :loading="loadingDefaults"
+        @click="applyDefaults"
+      >
+        {{ t("settings.genAiAgentMapping.applyDefaults") }}
+      </OButton>
+      <OButton
+        data-test="gen-ai-agent-mapping-reset-empty-btn"
+        variant="outline"
+        size="sm"
+        @click="resetToEmpty"
+      >
+        {{ t("settings.genAiAgentMapping.resetToEmpty") }}
+      </OButton>
+      <OButton
+        data-test="gen-ai-agent-registry-clear-btn"
+        variant="outline-destructive"
+        size="sm"
+        :loading="clearingRegistry"
+        :disabled="loading || loadingDefaults || saving"
+        @click="openClearRegistryDialog"
+      >
+        {{ t("settings.genAiAgentMapping.clearRegistry") }}
+      </OButton>
+    </template>
 
-    <div
-      v-if="loading"
-      class="flex flex-1 items-center justify-center"
-    >
+    <div v-if="loading" class="flex flex-1 items-center justify-center">
       <OSpinner size="md" />
     </div>
 
@@ -63,9 +60,7 @@
             data-test="gen-ai-agent-name-fields-input"
           >
             <template #tooltip>
-              <OTooltip
-                :content="t('settings.genAiAgentMapping.agentNameInfo')"
-              />
+              <OTooltip :content="t('settings.genAiAgentMapping.agentNameInfo')" />
             </template>
           </OTextarea>
           <OTextarea
@@ -78,9 +73,7 @@
             data-test="gen-ai-agent-id-fields-input"
           >
             <template #tooltip>
-              <OTooltip
-                :content="t('settings.genAiAgentMapping.agentIdInfo')"
-              />
+              <OTooltip :content="t('settings.genAiAgentMapping.agentIdInfo')" />
             </template>
           </OTextarea>
         </div>
@@ -109,9 +102,7 @@
       size="sm"
       :title="t('settings.genAiAgentMapping.clearRegistryTitle')"
       :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="
-        t('settings.genAiAgentMapping.clearRegistryConfirm')
-      "
+      :primary-button-label="t('settings.genAiAgentMapping.clearRegistryConfirm')"
       primary-button-variant="destructive"
       :primary-button-loading="clearingRegistry"
       @click:secondary="clearRegistryDialogOpen = false"

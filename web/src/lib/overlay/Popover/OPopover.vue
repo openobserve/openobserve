@@ -20,18 +20,25 @@ let lastWasPointer = false;
 const _oPopKey = "__oPopoverListenersRegistered__";
 if (typeof document !== "undefined" && !(globalThis as any)[_oPopKey]) {
   (globalThis as any)[_oPopKey] = true;
-  document.addEventListener("pointerdown", () => { lastWasPointer = true; }, true);
-  document.addEventListener("keydown", () => { lastWasPointer = false; }, true);
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      lastWasPointer = true;
+    },
+    true,
+  );
+  document.addEventListener(
+    "keydown",
+    () => {
+      lastWasPointer = false;
+    },
+    true,
+  );
 }
 </script>
 
 <script setup lang="ts">
-import {
-  PopoverRoot,
-  PopoverTrigger,
-  PopoverPortal,
-  PopoverContent,
-} from "reka-ui";
+import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -90,17 +97,20 @@ function handleOpenChange(v: boolean) {
     const el = document.activeElement;
     if (el instanceof HTMLElement) {
       el.dataset.noFocusVisible = "true";
-      el.addEventListener("blur", () => { delete el.dataset.noFocusVisible; }, { once: true });
+      el.addEventListener(
+        "blur",
+        () => {
+          delete el.dataset.noFocusVisible;
+        },
+        { once: true },
+      );
     }
   }
 }
 
 // ── Nested-overlay coordination (shared with ODropdown) ─────────────────────
 // Register with an ancestor overlay so it ignores our portal's pointer events.
-const parentRegistry = inject<DropdownNestedRegistry | null>(
-  O_DROPDOWN_NESTED_KEY,
-  null,
-);
+const parentRegistry = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
 let closeNestedRegistration: (() => void) | null = null;
 watch(internalOpen, (open) => {
   if (!parentRegistry) return;

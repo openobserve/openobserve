@@ -18,56 +18,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="qp-2"
     :title="sessionDetails.id || t('rum.sessionReplay')"
-    :back="{ label: t('rum.sessionReplay'), onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
+    :back="{
+      label: t('rum.sessionReplay'),
+      onClick: () => router.back(),
+      dataTest: 'session-viewer-back-btn',
+    }"
     bleed
   >
-      <template #subtitle>
-        <div class="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="language" size="sm" />
-            {{ sessionDetails.ip }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="calendar-month" size="sm" />
-            {{ sessionDetails.date }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="person" size="sm" />
-            {{ sessionDetails.user_email || "Unknown User" }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="location-on" size="sm" />
-            {{ sessionDetails.city }}, {{ sessionDetails.country }}
-          </div>
-          <div class="text-xs truncate flex items-center gap-1.5">
-            <OIcon name="settings" size="sm" />
-            {{ sessionDetails.browser }}, {{ sessionDetails.os }}
-          </div>
-          <div
-            v-if="frustrationCount > 0"
-            class="text-xs truncate flex items-center"
-            :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
-            data-test="session-viewer-frustration-summary"
-          >
-            <OIcon
-              name="sentiment-very-dissatisfied"
-              size="sm"
-              class="pr-1 text-severity-warning-color"
-              data-test="frustration-summary-icon"
-            />
-            <span
-              class="font-semibold text-severity-warning-color"
-              data-test="frustration-summary-text"
-              >{{ frustrationCount }} Frustration{{
-                frustrationCount > 1 ? "s" : ""
-              }}</span
-            >
-          </div>
+    <template #subtitle>
+      <div class="flex items-center flex-wrap gap-x-3 gap-y-1 min-w-0">
+        <div class="text-xs truncate flex items-center gap-1.5">
+          <OIcon name="language" size="sm" />
+          {{ sessionDetails.ip }}
         </div>
-      </template>
-    <div
-      class="w-full flex bg-card-glass-bg overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0"
-    >
+        <div class="text-xs truncate flex items-center gap-1.5">
+          <OIcon name="calendar-month" size="sm" />
+          {{ sessionDetails.date }}
+        </div>
+        <div class="text-xs truncate flex items-center gap-1.5">
+          <OIcon name="person" size="sm" />
+          {{ sessionDetails.user_email || "Unknown User" }}
+        </div>
+        <div class="text-xs truncate flex items-center gap-1.5">
+          <OIcon name="location-on" size="sm" />
+          {{ sessionDetails.city }}, {{ sessionDetails.country }}
+        </div>
+        <div class="text-xs truncate flex items-center gap-1.5">
+          <OIcon name="settings" size="sm" />
+          {{ sessionDetails.browser }}, {{ sessionDetails.os }}
+        </div>
+        <div
+          v-if="frustrationCount > 0"
+          class="text-xs truncate flex items-center"
+          :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
+          data-test="session-viewer-frustration-summary"
+        >
+          <OIcon
+            name="sentiment-very-dissatisfied"
+            size="sm"
+            class="pr-1 text-severity-warning-color"
+            data-test="frustration-summary-icon"
+          />
+          <span
+            class="font-semibold text-severity-warning-color"
+            data-test="frustration-summary-text"
+            >{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? "s" : "" }}</span
+          >
+        </div>
+      </div>
+    </template>
+    <div class="w-full flex bg-card-glass-bg overflow-hidden h-[calc(100%-3.125)]! flex-1 min-h-0">
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
@@ -196,8 +196,7 @@ const sessionDetails = ref({
 
 const frustrationCount = computed(() => {
   return segmentEvents.value.filter(
-    (event: any) =>
-      event.frustration_types && event.frustration_types.length > 0,
+    (event: any) => event.frustration_types && event.frustration_types.length > 0,
   ).length;
 });
 
@@ -238,12 +237,11 @@ watch(
     ) {
       // Clear any existing timer
       if (seekTimer !== null) {
-         
         clearTimeout(seekTimer);
       }
 
       // Use setTimeout to give video player time to fully initialize
-       
+
       seekTimer = setTimeout(() => {
         if (videoPlayerRef.value) {
           try {
@@ -279,27 +277,19 @@ const getSession = () => {
   return new Promise((resolve) => {
     let geoFields = "";
 
-    if (
-      performanceState.data.streams["_sessionreplay"]["schema"][
-        "geo_info_country"
-      ]
-    ) {
+    if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_country"]) {
       geoFields += "min(geo_info_city) as city,";
     }
 
-    if (
-      performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]
-    ) {
+    if (performanceState.data.streams["_sessionreplay"]["schema"]["geo_info_city"]) {
       geoFields += "min(geo_info_country) as country,";
     }
 
     const req = {
       query: {
         sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where session_id='${getSessionId.value}' order by zo_sql_timestamp`,
-        start_time:
-          Number(router.currentRoute.value.query.start_time) - 86400000000,
-        end_time:
-          Number(router.currentRoute.value.query.end_time) + 86400000000,
+        start_time: Number(router.currentRoute.value.query.start_time) - 86400000000,
+        end_time: Number(router.currentRoute.value.query.end_time) + 86400000000,
         from: 0,
         size: 10,
       },
@@ -348,10 +338,8 @@ const getSessionSegments = () => {
     size: 1000,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
-      startTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
-      endTime:
-        Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000000,
+      startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 300000,
+      endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 300000000,
     },
     sqlMode: false,
     currentPage: 0,
@@ -405,8 +393,7 @@ const getSessionEvents = () => {
     size: 150,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
-      startTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
+      startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
       endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 1,
     },
     sqlMode: false,
@@ -430,10 +417,7 @@ const getSessionEvents = () => {
     .then((res) => {
       const events = ["action", "view", "error"];
 
-      if (
-        !sessionDetails.value.user_email ||
-        sessionDetails.value.user_email === "Unknown User"
-      )
+      if (!sessionDetails.value.user_email || sessionDetails.value.user_email === "Unknown User")
         sessionDetails.value.user_email = res.data.hits[0]?.usr_email;
 
       segmentEvents.value = res.data.hits.filter((hit: any) => {
@@ -464,8 +448,7 @@ const getSessionErrorLogs = () => {
     size: 150,
     timestamp_column: store.state.zoConfig.timestamp_column,
     timestamps: {
-      startTime:
-        Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
+      startTime: Number(sessionState.data.selectedSession?.start_time) * 1000 - 1,
       endTime: Number(sessionState.data.selectedSession?.end_time) * 1000 + 1,
     },
     sqlMode: false,
@@ -536,8 +519,7 @@ const handleErrorEvent = (event: any) => {
 
 const handleActionEvent = (event: any) => {
   const _event = getDefaultEvent(event);
-  _event.name =
-    event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
+  _event.name = event?.action_type + ' on "' + event?.action_target_name + '"' || "--";
 
   // Add frustration information if present
   if (event?.action_frustration_type) {
@@ -593,12 +575,8 @@ function formatTimeDifference(start_time: number, end_time: number) {
   const milliSeconds = Math.abs(start_time - end_time);
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
-  let minutes: string | number = Math.floor(
-    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60),
-  );
-  let seconds: string | number = Math.floor(
-    (milliSeconds % (1000 * 60)) / 1000,
-  );
+  let minutes: string | number = Math.floor((milliSeconds % (1000 * 60 * 60)) / (1000 * 60));
+  let seconds: string | number = Math.floor((milliSeconds % (1000 * 60)) / 1000);
 
   // Add leading zeros if needed
   hours = hours < 10 ? "0" + hours : hours;
@@ -628,10 +606,6 @@ const handleSidebarEvent = (event: string, payload: any) => {
   }
 
   // Always seek to the event time in the video player
-  videoPlayerRef.value.goto(
-    payload.relativeTime,
-    !!videoPlayerRef.value.playerState?.isPlaying,
-  );
+  videoPlayerRef.value.goto(payload.relativeTime, !!videoPlayerRef.value.playerState?.isPlaying);
 };
 </script>
-

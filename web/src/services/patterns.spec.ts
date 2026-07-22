@@ -56,7 +56,7 @@ describe("patterns service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${params.org_identifier}/streams/${params.stream_name}/patterns/extract`,
-        params.query
+        params.query,
       );
     });
 
@@ -73,7 +73,7 @@ describe("patterns service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/production-org/streams/application-logs/patterns/extract`,
-        params.query
+        params.query,
       );
     });
 
@@ -112,7 +112,7 @@ describe("patterns service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/staging/streams/k8s-events/patterns/extract`,
-        params.query
+        params.query,
       );
     });
 
@@ -129,7 +129,7 @@ describe("patterns service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/org123/streams/default/patterns/extract`,
-        {}
+        {},
       );
     });
   });
@@ -144,7 +144,7 @@ describe("patterns service", () => {
           org_identifier: "org123",
           stream_name: "my-logs",
           query: {},
-        })
+        }),
       ).rejects.toThrow("Network error");
     });
 
@@ -157,7 +157,7 @@ describe("patterns service", () => {
           org_identifier: "org123",
           stream_name: "my-logs",
           query: { invalid: "query" },
-        })
+        }),
       ).rejects.toThrow("Validation error");
     });
 
@@ -170,7 +170,7 @@ describe("patterns service", () => {
           org_identifier: "org123",
           stream_name: "nonexistent-stream",
           query: {},
-        })
+        }),
       ).rejects.toThrow("Stream not found");
     });
   });

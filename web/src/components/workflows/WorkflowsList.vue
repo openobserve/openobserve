@@ -183,10 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="hero"
                 preset="no-workflows"
                 :filtered="!!filterQuery"
-                @action="
-                  (id) =>
-                    id === 'clear-filters' ? (filterQuery = '') : openCreateEditor()
-                "
+                @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : openCreateEditor())"
               />
             </template>
 
@@ -252,9 +249,7 @@ const router = useRouter();
 const store = useStore();
 
 const currentRouteName = computed(() => router.currentRoute.value.name);
-const orgId = computed(
-  () => store.state.selectedOrganization.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
 const loading = ref(true);
 const filterQuery = ref("");
@@ -264,9 +259,7 @@ const filteredWorkflows = computed(() => {
   const q = filterQuery.value.trim().toLowerCase();
   if (!q) return workflows.value;
   return workflows.value.filter(
-    (w) =>
-      w.name?.toLowerCase().includes(q) ||
-      w.description?.toLowerCase().includes(q),
+    (w) => w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q),
   );
 });
 
@@ -279,9 +272,7 @@ const resultTotal = computed(() => filteredWorkflows.value.length);
 // v1 has one kind (alert-fired); once B1 adds WorkflowTriggerParams.kind we can
 // map data.kind -> a per-kind label here.
 const triggerLabel = (wf: any): string => {
-  const triggerNode = (wf.nodes || []).find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
+  const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!triggerNode) return "—";
   return t("workflow.triggerAlertFired");
 };
@@ -356,9 +347,7 @@ const getWorkflows = async () => {
   try {
     const response = await workflowService.listWorkflows(orgId.value);
     // list handler returns a bare array of Workflow.
-    const list = Array.isArray(response.data)
-      ? response.data
-      : (response.data?.list ?? []);
+    const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     workflows.value = list.map((wf: any, index: number) => ({
       ...wf,
       "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
@@ -382,7 +371,6 @@ const openCreateEditor = (trigger = "alert_fired") => {
     query: { org_identifier: orgId.value, trigger },
   });
 };
-
 
 // Hydrate the shared editor state from the row synchronously (pipeline pattern)
 // so the editor has the name + full graph immediately — no async re-fetch.

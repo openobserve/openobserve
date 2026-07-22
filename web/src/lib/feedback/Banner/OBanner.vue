@@ -20,7 +20,7 @@ const props = withDefaults(defineProps<Props>(), {
 const slots = useSlots();
 
 const ariaRole = computed(() =>
-  props.variant === "error" || props.variant === "warning" ? "alert" : "status"
+  props.variant === "error" || props.variant === "warning" ? "alert" : "status",
 );
 
 const hasDefaultSlot = computed(() => !!slots.default);
@@ -59,12 +59,7 @@ const variantClass = computed(() => {
       variantClass,
     ]"
   >
-    <div
-      :class="[
-        'flex flex-row items-start gap-3',
-        inlineActions ? 'flex-1' : '',
-      ]"
-    >
+    <div :class="['flex flex-row items-start gap-3', inlineActions ? 'flex-1' : '']">
       <div v-if="showIconArea" class="shrink-0 flex items-start">
         <slot name="icon">
           <OIcon :name="icon" size="sm" />

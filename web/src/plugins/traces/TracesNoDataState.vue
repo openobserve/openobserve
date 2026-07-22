@@ -54,21 +54,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+          <img
+            :src="getImageURL('images/common/kubernetes.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("traces.noData.kubernetes") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          data-test="traces-no-data-python-btn"
-          @click="go('python')"
-        >
-          <img :src="getImageURL('images/ingestion/python.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+        <EmptyStateIngestionChip data-test="traces-no-data-python-btn" @click="go('python')">
+          <img
+            :src="getImageURL('images/ingestion/python.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("traces.noData.python") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          data-test="traces-no-data-nodejs-btn"
-          @click="go('nodejs')"
-        >
-          <img :src="getImageURL('images/ingestion/nodejs.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+        <EmptyStateIngestionChip data-test="traces-no-data-nodejs-btn" @click="go('nodejs')">
+          <img
+            :src="getImageURL('images/ingestion/nodejs.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("traces.noData.nodejs") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip

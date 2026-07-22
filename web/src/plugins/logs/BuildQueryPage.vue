@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full w-full relative border-t border-border-default" data-test="logs-build-query-page">
+  <div
+    class="h-full w-full relative border-t border-border-default"
+    data-test="logs-build-query-page"
+  >
     <!-- PanelEditor with BUILD_PRESET -->
     <PanelEditor
       ref="panelEditorRef"
@@ -40,12 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import {
-  ref,
-  onMounted,
-  defineAsyncComponent,
-  provide,
-} from "vue";
+import { ref, onMounted, defineAsyncComponent, provide } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -66,9 +64,7 @@ import useNotifications from "@/composables/useNotifications";
 import PanelEditor from "@/components/dashboards/PanelEditor/PanelEditor.vue";
 
 // These can remain async as they're not needed immediately
-const AddToDashboard = defineAsyncComponent(
-  () => import("@/plugins/metrics/AddToDashboard.vue"),
-);
+const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
 
 // ============================================================================
 // Default Builder Fields
@@ -190,9 +186,7 @@ const restoreConfigFromUrl = (): {
   customQuery?: boolean;
   query?: string;
 } => {
-  const buildData = router.currentRoute.value?.query?.build_data as
-    | string
-    | undefined;
+  const buildData = router.currentRoute.value?.query?.build_data as string | undefined;
   if (!buildData) {
     return {};
   }
@@ -256,24 +250,19 @@ const initializeFromQuery = async () => {
   if (
     props.isFirstToggle &&
     urlConfig.fields &&
-    (urlConfig.fields.x?.length ||
-      urlConfig.fields.y?.length ||
-      urlConfig.customQuery)
+    (urlConfig.fields.x?.length || urlConfig.fields.y?.length || urlConfig.customQuery)
   ) {
     const savedFields = urlConfig.fields;
     dashboardPanelData.data.queries[0].fields.stream =
       savedFields.stream || props.selectedStream || "";
-    dashboardPanelData.data.queries[0].fields.stream_type =
-      savedFields.stream_type || "logs";
+    dashboardPanelData.data.queries[0].fields.stream_type = savedFields.stream_type || "logs";
     dashboardPanelData.data.queries[0].fields.x = savedFields.x || [];
     dashboardPanelData.data.queries[0].fields.y = savedFields.y || [];
-    dashboardPanelData.data.queries[0].fields.breakdown =
-      savedFields.breakdown || [];
+    dashboardPanelData.data.queries[0].fields.breakdown = savedFields.breakdown || [];
     if (savedFields.filter) {
       dashboardPanelData.data.queries[0].fields.filter = savedFields.filter;
     }
-    dashboardPanelData.data.queries[0].customQuery =
-      urlConfig.customQuery || false;
+    dashboardPanelData.data.queries[0].customQuery = urlConfig.customQuery || false;
     if (urlConfig.joins) {
       dashboardPanelData.data.queries[0].joins = urlConfig.joins;
     }
@@ -339,8 +328,7 @@ const initializeFromQuery = async () => {
   // Queries with WHERE clause should be parsed so the filter is preserved.
   const trimmedQuery = props.searchQuery?.trim() || "";
   const isEmptyOrSelectAll =
-    !trimmedQuery ||
-    /^\s*select\s+\*\s+from\s+["'`]?[\w.:-]+["'`]?\s*$/i.test(trimmedQuery);
+    !trimmedQuery || /^\s*select\s+\*\s+from\s+["'`]?[\w.:-]+["'`]?\s*$/i.test(trimmedQuery);
   if (isEmptyOrSelectAll) {
     if (props.selectedStream) {
       dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
@@ -381,8 +369,7 @@ const initializeFromQuery = async () => {
       if (parsed.customQuery) {
         // Parsing failed or complex query detected
         if (props.selectedStream) {
-          dashboardPanelData.data.queries[0].fields.stream =
-            props.selectedStream;
+          dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
           dashboardPanelData.data.queries[0].fields.stream_type = "logs";
         }
         dashboardPanelData.data.queries[0].query = props.searchQuery;
@@ -399,14 +386,12 @@ const initializeFromQuery = async () => {
         // Set stream from parsed query or fallback to selected stream
         const streamName = panelFields.stream || props.selectedStream;
         dashboardPanelData.data.queries[0].fields.stream = streamName;
-        dashboardPanelData.data.queries[0].fields.stream_type =
-          panelFields.stream_type || "logs";
+        dashboardPanelData.data.queries[0].fields.stream_type = panelFields.stream_type || "logs";
 
         // Apply parsed fields to builder
         dashboardPanelData.data.queries[0].fields.x = panelFields.x;
         dashboardPanelData.data.queries[0].fields.y = panelFields.y;
-        dashboardPanelData.data.queries[0].fields.breakdown =
-          panelFields.breakdown;
+        dashboardPanelData.data.queries[0].fields.breakdown = panelFields.breakdown;
         dashboardPanelData.data.queries[0].fields.filter = panelFields.filter;
         dashboardPanelData.data.queries[0].customQuery = false;
 
@@ -474,9 +459,7 @@ const onAddToDashboard = () => {
   const errors: string[] = [];
   validatePanel(errors, true);
   if (errors.length) {
-    showErrorNotification(
-      t("logs.buildQueryPage.validationErrors"),
-    );
+    showErrorNotification(t("logs.buildQueryPage.validationErrors"));
     return;
   }
   showAddToDashboardDialog.value = true;
@@ -561,4 +544,3 @@ defineExpose({
   dashboardPanelData,
 });
 </script>
-

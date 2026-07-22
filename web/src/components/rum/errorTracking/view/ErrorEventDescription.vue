@@ -16,11 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="wrap-break-word overflow-hidden whitespace-break-spaces">
-    <template
-      v-if="
-        column.type === 'view' && column.view_loading_type === 'route_change'
-      "
-    >
+    <template v-if="column.type === 'view' && column.view_loading_type === 'route_change'">
       <pre
         data-test="error-event-description-navigation"
         class="bg-surface-subtle rounded-default p-2"
@@ -30,12 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <span class="text-primary">to</span> : {{ column.view_url }}
 }</pre>
     </template>
-    <template
-      v-else-if="column.type === 'resource' && column.resource_type === 'xhr'"
-    >
-      <span class="font-bold pr-2 text-xs">{{
-        column.resource_method
-      }}</span>
+    <template v-else-if="column.type === 'resource' && column.resource_type === 'xhr'">
+      <span class="font-bold pr-2 text-xs">{{ column.resource_method }}</span>
       <a
         :href="column.resource_url"
         target="_blank"
@@ -46,10 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="pl-2">[ {{ column.resource_status_code }} ]</span>
     </template>
     <template v-else>
-      <span
-        data-test="error-event-description-default"
-        class="text-sm"
-      >{{ getDescription }}</span>
+      <span data-test="error-event-description-default" class="text-sm">{{ getDescription }}</span>
     </template>
   </div>
 </template>
@@ -80,12 +69,9 @@ const getDescription = computed(() => {
     return props.column["view_url"];
   } else if (props.column["type"] === "action") {
     return (
-      props.column["_oo_action_target_text"] +
-      " : " +
-      props.column["_oo_action_target_selector"]
+      props.column["_oo_action_target_text"] + " : " + props.column["_oo_action_target_selector"]
     );
   }
   return "";
 });
 </script>
-

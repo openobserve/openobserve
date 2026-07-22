@@ -25,34 +25,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
     data-test="monitor-status-timeline"
   >
-    <div
-      class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
-    >
-      <span class="font-bold text-xs text-text-heading"> {{ t('synthetics.timeline.title') }} </span>
+    <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
+      <span class="font-bold text-xs text-text-heading">
+        {{ t("synthetics.timeline.title") }}
+      </span>
       <span class="flex-1" />
-      <span
-        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
-      >
+      <span class="inline-flex items-center gap-1.5 text-xs text-text-secondary">
         <span
           class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-error-solid-bg)]"
         />
-        {{ failCount }} {{ t('synthetics.timeline.failed') }}
+        {{ failCount }} {{ t("synthetics.timeline.failed") }}
       </span>
-      <span
-        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
-      >
+      <span class="inline-flex items-center gap-1.5 text-xs text-text-secondary">
         <span
           class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-orange-solid-bg)]"
         />
-        {{ mixedCount }} {{ t('synthetics.timeline.warning') }}
+        {{ mixedCount }} {{ t("synthetics.timeline.warning") }}
       </span>
-      <span
-        class="inline-flex items-center gap-1.5 text-xs text-text-secondary"
-      >
+      <span class="inline-flex items-center gap-1.5 text-xs text-text-secondary">
         <span
           class="w-[0.4375rem] h-[0.4375rem] rounded-full bg-[var(--color-badge-success-solid-bg)]"
         />
-        {{ passCount }} {{ t('synthetics.timeline.passed') }}
+        {{ passCount }} {{ t("synthetics.timeline.passed") }}
       </span>
     </div>
     <div class="border-t border-border-default" />
@@ -89,32 +83,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-success-solid-bg)]"
                     />
-                    <span class="text-text-secondary"
-                      >{{ t('synthetics.timeline.tooltipPassed', { count: passCountLocal(seg.executions) }) }}</span
-                    >
+                    <span class="text-text-secondary">{{
+                      t("synthetics.timeline.tooltipPassed", {
+                        count: passCountLocal(seg.executions),
+                      })
+                    }}</span>
                     <span
                       class="w-2 h-2 rounded-full shrink-0 bg-[var(--color-badge-error-solid-bg)]"
                     />
-                    <span class="text-text-secondary"
-                      >{{ t('synthetics.timeline.tooltipFailed', { count: failCountLocal(seg.executions) }) }}</span
-                    >
+                    <span class="text-text-secondary">{{
+                      t("synthetics.timeline.tooltipFailed", {
+                        count: failCountLocal(seg.executions),
+                      })
+                    }}</span>
                   </div>
-                  <template
-                    v-for="(group, gIdx) in groupedByLocation(seg.executions)"
-                    :key="gIdx"
-                  >
-                    <div
-                      class="px-1 flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0"
-                    >
+                  <template v-for="(group, gIdx) in groupedByLocation(seg.executions)" :key="gIdx">
+                    <div class="px-1 flex items-center gap-1.5 mb-0.5 mt-1 first:mt-0">
                       <span
                         class="w-2 h-2 rounded-full shrink-0"
                         :class="{
-                          'bg-badge-success-solid-bg':
-                            group.status === 'all-pass',
-                          'bg-color-badge-orange-solid-bg':
-                            group.status === 'mixed',
-                          'bg-color-badge-error-solid-bg':
-                            group.status === 'all-fail',
+                          'bg-badge-success-solid-bg': group.status === 'all-pass',
+                          'bg-color-badge-orange-solid-bg': group.status === 'mixed',
+                          'bg-color-badge-error-solid-bg': group.status === 'all-fail',
                         }"
                       />
                       <span class="text-text-secondary text-xs font-semibold">
@@ -140,9 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="w-3.5 h-3.5"
                         alt=""
                       />
-                      <span class="text-text-secondary text-xs">{{
-                        exec.device
-                      }}</span>
+                      <span class="text-text-secondary text-xs">{{ exec.device }}</span>
                     </div>
                   </template>
                 </div>
@@ -161,9 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="chevron-right" size="xs" />
         </OButton>
       </div>
-      <div
-        class="flex justify-between text-3xs font-mono tabular-nums text-text-secondary"
-      >
+      <div class="flex justify-between text-3xs font-mono tabular-nums text-text-secondary">
         <span>{{ endLabel }}</span>
         <span>{{ rangeLabel }}</span>
         <span>{{ startLabel }}</span>
@@ -277,12 +263,10 @@ const canScrollRight = computed(() => {
 
 const rangeLabel = computed(() => {
   const total = props.segments.length;
-  const page = Math.round(
-    scrollLeft.value / (scrollRef.value?.clientWidth ?? 1),
-  );
+  const page = Math.round(scrollLeft.value / (scrollRef.value?.clientWidth ?? 1));
   const start = page * MAX_VISIBLE + 1;
   const end = Math.min((page + 1) * MAX_VISIBLE, total);
-  return t('synthetics.timeline.rangeLabel', { start, end, total });
+  return t("synthetics.timeline.rangeLabel", { start, end, total });
 });
 
 function scrollTimeline(direction: "left" | "right") {

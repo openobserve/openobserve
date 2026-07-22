@@ -16,28 +16,20 @@
       bleed
       :scroll="false"
     >
-        <template #title>
-          <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
-        </template>
-        <template #actions>
-          <OButton
-            data-test="llm-providers-add-btn"
-            variant="primary"
-            size="sm"
-            @click="openCreate"
-          >
-            {{ t("llmProviders.newButton") }}
-          </OButton>
-        </template>
+      <template #title>
+        <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
+      </template>
+      <template #actions>
+        <OButton data-test="llm-providers-add-btn" variant="primary" size="sm" @click="openCreate">
+          {{ t("llmProviders.newButton") }}
+        </OButton>
+      </template>
 
       <div v-if="isLoading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
       </div>
 
-      <div
-        v-else-if="!providers.length"
-        class="flex flex-1 items-center justify-center"
-      >
+      <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
         <!-- First-run state — uses the same `no-llm-providers` preset the
              OTable's #empty slot uses for the filtered case, so the empty
              surface in this page reads consistently with the rest of the
@@ -79,7 +71,7 @@
               class="flex-1"
               :placeholder="t('llmProviders.searchPlaceholder')"
               data-test="llm-providers-search-input"
-              />
+            />
           </template>
           <template #toolbar-trailing>
             <OButton
@@ -90,7 +82,11 @@
               data-test="llm-providers-list-refresh-btn"
               @click="loadProviders"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="llmProvidersRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="llmProvidersRefresh"
+              />
             </OButton>
           </template>
           <template #empty>
@@ -171,9 +167,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
-  type Provider,
-} from "@/services/online-evals.service";
+import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
   booleanOf,
   defaultModelOf,
@@ -383,13 +377,21 @@ async function performDelete() {
     });
     await loadProviders();
   } catch (err: any) {
-    showError(err, t("onlineEvals.deleteError", { label: t("onlineEvals.singular.providers").toLowerCase() }));
+    showError(
+      err,
+      t("onlineEvals.deleteError", { label: t("onlineEvals.singular.providers").toLowerCase() }),
+    );
   } finally {
     pendingDeleteRow.value = null;
   }
 }
 
 useShortcuts([
-  { id: "llmProvidersRefresh", handler: () => { if (!isInputFocused()) loadProviders(); } },
+  {
+    id: "llmProvidersRefresh",
+    handler: () => {
+      if (!isInputFocused()) loadProviders();
+    },
+  },
 ]);
 </script>

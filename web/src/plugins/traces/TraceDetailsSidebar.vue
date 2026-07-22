@@ -31,11 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-flex items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
-          <OIcon
-            name="error"
-            size="sm"
-            class="mr-1 text-status-error-text!"
-          />
+          <OIcon name="error" size="sm" class="mr-1 text-status-error-text!" />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
         <OTag
@@ -44,7 +40,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :value="span.gen_ai_operation_name"
           class="mr-1 normal-case!"
           data-test="trace-details-sidebar-observation-badge"
-        >{{ span.gen_ai_operation_name?.charAt(0) + span.gen_ai_operation_name?.slice(1).toLowerCase() }}</OTag>
+          >{{
+            span.gen_ai_operation_name?.charAt(0) +
+            span.gen_ai_operation_name?.slice(1).toLowerCase()
+          }}</OTag
+        >
 
         <span class="truncate">{{ span.operation_name }}</span>
       </div>
@@ -73,14 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-service"
           >
             <template #icon>
-              <img
-                :src="serviceIconUrl"
-                class="w-3.5 h-3.5 shrink-0"
-                aria-hidden="true"
-                alt=""
-              />
+              <img :src="serviceIconUrl" class="w-3.5 h-3.5 shrink-0" aria-hidden="true" alt="" />
             </template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.service') }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{
+              t("traces.traceDetailsSidebar.service")
+            }}</span>
             <span
               class="text-3xs font-semibold text-text-body"
               data-test="trace-details-sidebar-header-toolbar-service-name"
@@ -97,7 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.duration') }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{
+              t("traces.traceDetailsSidebar.duration")
+            }}</span>
             <span class="text-3xs font-semibold text-text-body">{{ getDuration }}</span>
           </OTag>
 
@@ -122,7 +121,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.start') }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{
+              t("traces.traceDetailsSidebar.start")
+            }}</span>
             <span class="text-3xs font-semibold text-text-body">{{ getStartTime }}</span>
           </OTag>
 
@@ -135,7 +136,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
-            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{ t('traces.traceDetailsSidebar.resends') }}</span>
+            <span class="text-3xs font-medium mr-0.75 text-text-secondary">{{
+              t("traces.traceDetailsSidebar.resends")
+            }}</span>
             <span class="text-3xs font-semibold text-text-body">{{ spanHttpResendCount }}</span>
           </OTag>
         </div>
@@ -163,10 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Logs Button -->
           <span v-if="parentMode === 'standalone'" class="shrink-0">
             <!-- Single button with wrapper for tooltip functionality -->
-            <span
-              class="inline-block"
-              tabindex="0"
-            >
+            <span class="inline-block" tabindex="0">
               <OButton
                 variant="outline"
                 size="xs"
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click.stop="viewSpanLogs"
                 data-test="trace-details-sidebar-header-toolbar-view-logs-btn"
               >
-                {{ t('traces.viewLogs') }}
+                {{ t("traces.viewLogs") }}
               </OButton>
               <OTooltip :content="viewLogsTooltipContent" />
             </span>
@@ -197,7 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="text-3xs h-5 px-1.5 bg-surface-base border border-solid border-border-default border-l-[0.1875rem] border-l-badge-purple-ol-border shrink-0 transition-all duration-200 hover:-translate-y-px"
             :title="span.gen_ai_response_model"
           >
-            <span class="text-3xs font-semibold text-badge-purple-ol-text">{{ span.gen_ai_response_model }}</span>
+            <span class="text-3xs font-semibold text-badge-purple-ol-text">{{
+              span.gen_ai_response_model
+            }}</span>
           </OTag>
 
           <!-- Token Usage Group -->
@@ -209,7 +211,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('traces.traceDetailsSidebar.inputTokens')"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
-              <span class="text-3xs font-medium mr-0.5">{{ t('traces.traceDetailsSidebar.in') }}</span>
+              <span class="text-3xs font-medium mr-0.5">{{
+                t("traces.traceDetailsSidebar.in")
+              }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.input }}</span>
             </OTag>
 
@@ -220,7 +224,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('traces.traceDetailsSidebar.outputTokens')"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
-              <span class="text-3xs font-medium mr-0.5">{{ t('traces.traceDetailsSidebar.out') }}</span>
+              <span class="text-3xs font-medium mr-0.5">{{
+                t("traces.traceDetailsSidebar.out")
+              }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.output }}</span>
             </OTag>
           </div>
@@ -244,7 +250,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="span.gen_ai_provider_name"
             type="metricChip"
             class="text-3xs font-semibold px-2 py-0.75 bg-badge-blue-solid-bg text-badge-blue-solid-text rounded-full uppercase tracking-wide shrink-0"
-          >{{ span.gen_ai_provider_name }}</OTag>
+            >{{ span.gen_ai_provider_name }}</OTag
+          >
         </div>
       </div>
     </div>
@@ -263,8 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="preview"
           :label="t('traces.traceDetailsSidebar.preview')"
           data-test="trace-details-sidebar-tabs-preview"
-                    class="font-normal! capitalize"
-
+          class="font-normal! capitalize"
         />
 
         <OTab
@@ -278,14 +284,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="trace-details-sidebar-tabs-error"
           class="font-normal! gap-1! capitalize"
         >
-          {{ t('common.error') }}
+          {{ t("common.error") }}
           <OTag
             v-if="hasExceptionEvents.length"
             type="countChip"
             value="error"
             class="ml-0"
             data-test="trace-details-sidebar-tabs-error-count"
-          >{{ hasExceptionEvents.length }}</OTag>
+            >{{ hasExceptionEvents.length }}</OTag
+          >
         </OTab>
         <OTab
           v-if="hasDbSpan"
@@ -298,15 +305,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           name="events"
           :label="t('common.events')"
           data-test="trace-details-sidebar-tabs-events"
-                    class="font-normal! capitalize"
-
+          class="font-normal! capitalize"
         />
         <OTab
           name="links"
           :label="t('common.links')"
           data-test="trace-details-sidebar-tabs-links"
           class="font-normal! capitalize"
-
         />
         <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
         <OTab
@@ -315,7 +320,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('correlation.correlatedLogs')"
           data-test="trace-details-sidebar-tabs-correlated-logs"
           class="font-normal! capitalize"
-
         />
         <OTab
           v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
@@ -335,41 +339,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'px-page-edge py-2'
       "
     >
-      <OTabPanels :model-value="activeTab"
-@update:model-value="$emit('update:activeTab', $event)"
-grow
-class="h-full overflow-y-auto">
+      <OTabPanels
+        :model-value="activeTab"
+        @update:model-value="$emit('update:activeTab', $event)"
+        grow
+        class="h-full overflow-y-auto"
+      >
         <!-- LLM Preview Tab Panel -->
-        <OTabPanel
-          v-if="isLLMSpan"
-          name="preview"
-          class="llm-preview-panel p-3"
-        >
+        <OTabPanel v-if="isLLMSpan" name="preview" class="llm-preview-panel p-3">
           <div class="llm-preview-container overflow-hidden overflow-x-auto w-full h-full!">
             <!-- Input and Output Side by Side -->
-            <div
-              class="flex io-container w-full! h-full!"
-              ref="ioContainerRef"
-            >
+            <div class="flex io-container w-full! h-full!" ref="ioContainerRef">
               <!-- Input Section -->
-              <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full pr-2">
+              <div
+                class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full pr-2"
+              >
                 <div
                   class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
-                  <div>{{ t('traces.traceDetailsSidebar.input') }}</div>
+                  <div>{{ t("traces.traceDetailsSidebar.input") }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
                       :title="
-                        isFullscreen ? t('traces.traceDetailsSidebar.exitFullscreen') : t('traces.traceDetailsSidebar.enterFullscreen')
+                        isFullscreen
+                          ? t('traces.traceDetailsSidebar.exitFullscreen')
+                          : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
                       @click="toggleFullscreen"
                     >
-                      <OIcon
-                        :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="xs"
-                      />
+                      <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
                     </OButton>
                     <OButton
                       variant="outline"
@@ -382,7 +382,9 @@ class="h-full overflow-y-auto">
                     </OButton>
                   </div>
                 </div>
-                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
+                <div
+                  class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg"
+                >
                   <!-- System Instructions (when available) -->
                   <div v-if="parsedSystemInstructions" class="mb-3">
                     <OCollapsible
@@ -392,7 +394,9 @@ class="h-full overflow-y-auto">
                     >
                       <div class="p-2 bg-code-bg">
                         <LLMContentRenderer
-                          :content="JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])"
+                          :content="
+                            JSON.stringify([{ role: 'system', content: parsedSystemInstructions }])
+                          "
                           :observation-type="span.gen_ai_operation_name"
                           content-type="input"
                           view-mode="formatted"
@@ -404,8 +408,8 @@ class="h-full overflow-y-auto">
                     v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
-                    {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
-</div>
+                    {{ t("traces.traceDetailsSidebar.noDataAvailable") }}
+                  </div>
                   <LLMContentRenderer
                     v-if="hasContent(span.gen_ai_input_messages)"
                     :content="span.gen_ai_input_messages"
@@ -419,24 +423,25 @@ class="h-full overflow-y-auto">
               </div>
 
               <!-- Output Section -->
-              <div class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full">
+              <div
+                class="w-1/2 io-section basis-[calc(50%-0.4rem)] grow-0 shrink-0 flex flex-col h-full"
+              >
                 <div
                   class="section-label font-bold mb-2 flex items-center justify-between text-text-heading text-sm"
                 >
-                  <div>{{ t('traces.traceDetailsSidebar.output') }}</div>
+                  <div>{{ t("traces.traceDetailsSidebar.output") }}</div>
                   <div class="flex items-center gap-1">
                     <OButton
                       variant="outline"
                       size="icon"
                       :title="
-                        isFullscreen ? t('traces.traceDetailsSidebar.exitFullscreen') : t('traces.traceDetailsSidebar.enterFullscreen')
+                        isFullscreen
+                          ? t('traces.traceDetailsSidebar.exitFullscreen')
+                          : t('traces.traceDetailsSidebar.enterFullscreen')
                       "
                       @click="toggleFullscreen"
                     >
-                      <OIcon
-                        :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                        size="xs"
-                      />
+                      <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
                     </OButton>
                     <OButton
                       variant="outline"
@@ -449,13 +454,15 @@ class="h-full overflow-y-auto">
                     </OButton>
                   </div>
                 </div>
-                <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
+                <div
+                  class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg"
+                >
                   <div
                     v-if="!hasContent(span.gen_ai_output_messages)"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
-                    {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
-</div>
+                    {{ t("traces.traceDetailsSidebar.noDataAvailable") }}
+                  </div>
                   <LLMContentRenderer
                     v-else
                     :content="span.gen_ai_output_messages"
@@ -483,36 +490,26 @@ class="h-full overflow-y-auto">
           </div>
         </OTabPanel>
 
-        <OTabPanel
-          name="attributes"
-          class="p-0 flex flex-col overflow-hidden"
-        >
+        <OTabPanel name="attributes" class="p-0 flex flex-col overflow-hidden">
           <!-- View mode toggle toolbar -->
           <div class="flex items-center justify-start pb-1.5! h-fit!">
             <OToggleGroup v-model="attributesViewMode" class="rounded-default!">
-              <OToggleGroupItem value="json"
-size="xs"
-class="h-5! text-xs!">
+              <OToggleGroupItem value="json" size="xs" class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
                 JSON
               </OToggleGroupItem>
-              <OToggleGroupItem value="table"
-size="xs"
-class="h-5! text-xs!">
+              <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
                 <template #icon-left
                   ><OIcon name="table-chart" size="xs" class="shrink-0"
                 /></template>
-                {{ t('traces.traceDetailsSidebar.table') }}
+                {{ t("traces.traceDetailsSidebar.table") }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
           <!-- JSON View -->
-          <div
-            v-if="attributesViewMode === 'json'"
-            class="grow overflow-auto"
-          >
+          <div v-if="attributesViewMode === 'json'" class="grow overflow-auto">
             <json-preview
               :value="attributesForDisplay"
               :highlight-query="searchQuery"
@@ -535,17 +532,12 @@ class="h-5! text-xs!">
                   >
                     <span class="mr-1 inline-flex shrink-0">
                       <OButton variant="ghost" size="icon-xs-circle">
-                        <OIcon
-                          color="currentColor"
-                          class="w-[0.7rem]! h-[0.7rem]! pb-[0.185rem]!"
-                        >
+                        <OIcon color="currentColor" class="w-[0.7rem]! h-[0.7rem]! pb-[0.185rem]!">
                           <component :is="action.iconComponent" />
                         </OIcon>
                       </OButton>
                     </span>
-                    <span class="text-sm!">{{
-                      $t("traces.applyAndSearch")
-                    }}</span>
+                    <span class="text-sm!">{{ $t("traces.applyAndSearch") }}</span>
                   </li>
                 </ul>
               </template>
@@ -600,9 +592,7 @@ class="h-5! text-xs!">
                             </OIcon>
                           </OButton>
                         </span>
-                        <span class="text-sm!">{{
-                          $t("traces.applyAndSearch")
-                        }}</span>
+                        <span class="text-sm!">{{ $t("traces.applyAndSearch") }}</span>
                       </li>
                     </ul>
                   </template>
@@ -611,19 +601,11 @@ class="h-5! text-xs!">
             </TenstackTable>
           </div>
         </OTabPanel>
-        <OTabPanel
-          name="events"
-          class="p-0 flex flex-col h-[30.6rem]!"
-        >
+        <OTabPanel name="events" class="p-0 flex flex-col h-[30.6rem]!">
           <template v-if="spanDetails.events.length">
             <!-- Wrap toggle toolbar -->
             <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
-              <OSwitch
-                v-model="eventsWrap"
-                :label="t('common.wrap')"
-                size="md"
-                class="gap-1!"
-              />
+              <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
             </div>
             <!-- TenstackTable for events -->
             <div
@@ -675,9 +657,7 @@ class="h-5! text-xs!">
           <TraceErrorTab
             :span="span"
             :search-query="searchQuery"
-            :show-llm-metrics="
-              !!(isLLMSpan && llmMetrics && span.gen_ai_response_model)
-            "
+            :show-llm-metrics="!!(isLLMSpan && llmMetrics && span.gen_ai_response_model)"
             data-test="trace-details-sidebar-no-exceptions"
           />
         </OTabPanel>
@@ -692,9 +672,7 @@ class="h-5! text-xs!">
               class="trace-detail-tab-table border border-solid border-card-glass-border w-full"
               data-test="trace-details-sidebar-links-table"
             >
-              <thead
-                class="thead-sticky text-left bg-surface-accent"
-              >
+              <thead class="thead-sticky text-left bg-surface-accent">
                 <tr>
                   <th
                     v-for="(col, index) in linkColumns"
@@ -763,20 +741,10 @@ class="h-5! text-xs!">
             :hide-reset-filters-button="true"
           />
           <!-- Loading/Empty state when no data -->
-          <div
-            v-else
-            class="flex items-center justify-center py-20 h-full"
-          >
+          <div v-else class="flex items-center justify-center py-20 h-full">
             <div class="text-center">
-              <OSpinner
-                v-if="correlationLoading"
-                size="lg"
-                class="mb-4"
-              />
-              <div
-                v-else-if="correlationError"
-                class="text-sm font-bold"
-              >
+              <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
+              <div v-else-if="correlationError" class="text-sm font-bold">
                 {{ correlationError }}
               </div>
               <div v-else class="text-base text-text-muted">
@@ -816,20 +784,10 @@ class="h-5! text-xs!">
             @close="$emit('update:activeTab', 'attributes')"
           />
           <!-- Loading/Empty state when no data -->
-          <div
-            v-else
-            class="flex items-center justify-center py-20 h-full"
-          >
+          <div v-else class="flex items-center justify-center py-20 h-full">
             <div class="text-center">
-              <OSpinner
-                v-if="correlationLoading"
-                size="lg"
-                class="mb-4"
-              />
-              <div
-                v-else-if="correlationError"
-                class="text-sm font-bold"
-              >
+              <OSpinner v-if="correlationLoading" size="lg" class="mb-4" />
+              <div v-else-if="correlationError" class="text-sm font-bold">
                 {{ correlationError }}
               </div>
               <div v-else class="text-base text-text-muted">
@@ -864,11 +822,7 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
 import { computed } from "vue";
-import {
-  formatTimeWithSuffix,
-  convertTimeFromNsToUs,
-  getImageURL,
-} from "@/utils/zincutils";
+import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
 import { onMounted, onUnmounted, defineAsyncComponent, nextTick } from "vue";
@@ -907,7 +861,7 @@ import TraceErrorTab from "./components/TraceErrorTab.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
   TRACE_SERVICE_DETECTION_KEY,
@@ -1013,9 +967,7 @@ export default defineComponent({
       events: [],
     });
 
-    const { hasSpanError, hasExceptionEvents } = useTraceDetails(
-      computed(() => props.span),
-    );
+    const { hasSpanError, hasExceptionEvents } = useTraceDetails(computed(() => props.span));
 
     const spanHttpResendCount = computed(() => {
       const attrs = props.span;
@@ -1097,13 +1049,8 @@ export default defineComponent({
       entries.forEach(([key, value], index) => {
         const keyHtml = `<span class="trace-json-key">"${escapeHtml(key)}"</span>`;
         const valueHtml = formatValue(value);
-        const comma =
-          index < entries.length - 1
-            ? '<span class="trace-json-punct">,</span>'
-            : "";
-        lines.push(
-          `  ${keyHtml}<span class="trace-json-punct">:</span> ${valueHtml}${comma}`,
-        );
+        const comma = index < entries.length - 1 ? '<span class="trace-json-punct">,</span>' : "";
+        lines.push(`  ${keyHtml}<span class="trace-json-punct">:</span> ${valueHtml}${comma}`);
       });
 
       lines.push('<span class="trace-json-punct">}</span>');
@@ -1129,8 +1076,7 @@ export default defineComponent({
       if (field === "end_time") {
         return span._end_time_ns ?? span.end_time ?? displayValue;
       }
-      const timestampField =
-        store.state?.zoConfig?.timestamp_column || "_timestamp";
+      const timestampField = store.state?.zoConfig?.timestamp_column || "_timestamp";
       if (field === timestampField) {
         return span[timestampField] ?? displayValue;
       }
@@ -1155,10 +1101,8 @@ export default defineComponent({
         header: t("traces.traceDetailsSidebar.field"),
         size: 200,
         meta: {
-          headerClass:
-            "border-b border-r border-b-card-glass-border",
-          cellClass:
-            "border-r border-b-card-glass-border text-json-key",
+          headerClass: "border-b border-r border-b-card-glass-border",
+          cellClass: "border-r border-b-card-glass-border text-json-key",
         },
       },
       {
@@ -1216,9 +1160,7 @@ export default defineComponent({
       }));
     });
 
-    const getDuration = computed(() =>
-      formatTimeWithSuffix(props.span.duration),
-    );
+    const getDuration = computed(() => formatTimeWithSuffix(props.span.duration));
 
     const getTTFT = computed(() => {
       // Only calculate for LLM spans with completion_start_time
@@ -1243,7 +1185,7 @@ export default defineComponent({
     // Check if View Logs button should be disabled
     const isViewLogsDisabled = computed(() => {
       // Enterprise loading state
-      if (config.isEnterprise === 'true' && correlationLoading.value) {
+      if (config.isEnterprise === "true" && correlationLoading.value) {
         return true;
       }
 
@@ -1258,8 +1200,8 @@ export default defineComponent({
     // Get tooltip content based on disabled state
     const viewLogsTooltipContent = computed(() => {
       // Enterprise loading state
-      if (config.isEnterprise === 'true' && correlationLoading.value) {
-        return t('correlation.loadingCorrelation');
+      if (config.isEnterprise === "true" && correlationLoading.value) {
+        return t("correlation.loadingCorrelation");
       }
 
       // Non-enterprise mode with no log streams selected
@@ -1268,11 +1210,11 @@ export default defineComponent({
         props.showLogStreamSelector &&
         props.selectedLogStreams.length === 0
       ) {
-        return t('search.selectLogsStreamFirst');
+        return t("search.selectLogsStreamFirst");
       }
 
       // Default enabled state
-      return t('traces.viewLogs');
+      return t("traces.viewLogs");
     });
 
     const eventColumns = ref([
@@ -1343,14 +1285,9 @@ export default defineComponent({
           header: t("traces.traceDetailsSidebar.timestamp"),
           size: eventsColSizes.value[tsCol] ?? 220,
           accessorFn: (row: any) =>
-            timestampToTimezoneDate(
-              row[tsCol] / 1000000,
-              store.state.timezone,
-              HUMAN_TZ_FORMAT,
-            ),
+            timestampToTimezoneDate(row[tsCol] / 1000000, store.state.timezone, HUMAN_TZ_FORMAT),
           meta: {
-            headerClass:
-              "border-b border-r border-b-card-glass-border",
+            headerClass: "border-b border-r border-b-card-glass-border",
             cellClass: "border-r border-b-card-glass-border",
           },
         });
@@ -1377,8 +1314,7 @@ export default defineComponent({
             return typeof val === "object" ? JSON.stringify(val) : String(val);
           },
           meta: {
-            headerClass:
-              "border-b border-r border-b-card-glass-border",
+            headerClass: "border-b border-r border-b-card-glass-border",
             cellClass: "border-r border-b-card-glass-border",
           },
         });
@@ -1392,9 +1328,7 @@ export default defineComponent({
           .map((id) => colMap.get(id)!);
         // Append any new columns not present in the saved order
         const orderedIds = new Set(eventsColOrder.value);
-        cols
-          .filter((c) => !orderedIds.has(c.id))
-          .forEach((c) => ordered.push(c));
+        cols.filter((c) => !orderedIds.has(c.id)).forEach((c) => ordered.push(c));
         return ordered;
       }
 
@@ -1438,12 +1372,11 @@ export default defineComponent({
       delete spanDetails.attrs._end_time_ns;
 
       spanDetails.attrs.duration = spanDetails.attrs.duration + "us";
-      spanDetails.attrs[store.state.zoConfig.timestamp_column] =
-        timestampToTimezoneDate(
-          spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
-          store.state.timezone,
-          HUMAN_TZ_FORMAT,
-        );
+      spanDetails.attrs[store.state.zoConfig.timestamp_column] = timestampToTimezoneDate(
+        spanDetails.attrs[store.state.zoConfig.timestamp_column] / 1000,
+        store.state.timezone,
+        HUMAN_TZ_FORMAT,
+      );
 
       spanDetails.attrs["start_time"] = timestampToTimezoneDate(
         spanDetails.attrs["start_time"] / 1000000,
@@ -1460,9 +1393,9 @@ export default defineComponent({
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
-        spanDetails.events = JSON.parse(
-          (props.span.events as unknown as string) || "[]",
-        ).map((event: any) => event);
+        spanDetails.events = JSON.parse((props.span.events as unknown as string) || "[]").map(
+          (event: any) => event,
+        );
       } catch (_e: any) {
         console.log(_e);
         spanDetails.events = [];
@@ -1492,10 +1425,7 @@ export default defineComponent({
         tags.value = {};
         Object.keys(props.span).forEach((key: string) => {
           if (!span_details.has(key)) {
-            tags.value[key] =
-              key === "span_kind"
-                ? getSpanKind(props.span[key])
-                : props.span[key];
+            tags.value[key] = key === "span_kind" ? getSpanKind(props.span[key]) : props.span[key];
           }
         });
       },
@@ -1506,7 +1436,7 @@ export default defineComponent({
     );
 
     const viewSpanLogs = () => {
-      if (config.isEnterprise === 'true' && correlationProps.value) {
+      if (config.isEnterprise === "true" && correlationProps.value) {
         navigateToCorrelatedLogs(correlationProps.value);
       } else {
         const queryDetails = buildQueryDetails(props.span);
@@ -1514,11 +1444,9 @@ export default defineComponent({
       }
     };
 
-
     const getStartTime = computed(() => {
       return formatTimeWithSuffix(
-        convertTimeFromNsToUs(props.span.start_time) -
-          (props.baseTracePosition?.startTimeUs || 0),
+        convertTimeFromNsToUs(props.span.start_time) - (props.baseTracePosition?.startTimeUs || 0),
       );
     });
 
@@ -1583,9 +1511,7 @@ export default defineComponent({
     const spanLinks = computed(() => {
       try {
         const parsedLinks =
-          typeof props.span.links === "string"
-            ? JSON.parse(props.span.links)
-            : props.span.links;
+          typeof props.span.links === "string" ? JSON.parse(props.span.links) : props.span.links;
 
         return parsedLinks || [];
       } catch (e) {
@@ -1599,20 +1525,14 @@ export default defineComponent({
     // appear in the metrics dashboard. Uses K8S_METRIC_GROUP_DEFINITIONS for OTel
     // semantic defaults; overrides the pods icon with the project-specific component.
     const metricGroupResources = ref<MetricGroupDefinition[]>(
-      K8S_METRIC_GROUP_DEFINITIONS.map((g) =>
-        g.id === "pods" ? { ...g, icon: DeployedCode } : g,
-      ),
+      K8S_METRIC_GROUP_DEFINITIONS.map((g) => (g.id === "pods" ? { ...g, icon: DeployedCode } : g)),
     );
 
     // Correlation state
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
     const correlationProps = ref<any>(null);
-    const {
-      findRelatedTelemetry,
-      loadSemanticGroups,
-      semanticGroups,
-    } = useServiceCorrelation();
+    const { findRelatedTelemetry, loadSemanticGroups, semanticGroups } = useServiceCorrelation();
 
     // Write correlation data to shared searchObj for TraceDetails to use
     watch(correlationProps, (newVal) => {
@@ -1687,12 +1607,10 @@ export default defineComponent({
     // text field on the span. Returns null when nothing classifiable is set.
     const deriveSpanSeverity = (span: any): string | null => {
       if (!span) return null;
-      const spanStatus = typeof span.span_status === "string"
-        ? span.span_status.toUpperCase()
-        : null;
+      const spanStatus =
+        typeof span.span_status === "string" ? span.span_status.toUpperCase() : null;
       if (spanStatus === "ERROR") return "ERROR";
-      const otelStatusCode =
-        span.status?.code ?? span.statusCode ?? span.status_code;
+      const otelStatusCode = span.status?.code ?? span.statusCode ?? span.status_code;
       if (otelStatusCode === 2 || otelStatusCode === "ERROR") return "ERROR";
       return normalizeSeverity(span.severity_text ?? span.severity);
     };
@@ -1708,15 +1626,12 @@ export default defineComponent({
 
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
-        correlationError.value =
-          t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
+        correlationError.value = t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
         return;
       }
 
       if (!props.span || !props.streamName) {
-        console.warn(
-          "[TraceDetailsSidebar] Cannot load correlation: missing span or stream name",
-        );
+        console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
         correlationError.value = t("traces.traceDetailsSidebar.missingSpanOrStream");
         return;
       }
@@ -1794,12 +1709,9 @@ export default defineComponent({
           // the correct field names for the log stream (e.g., k8s_namespace_name)
           // instead of semantic IDs (k8s-namespace) or trace field names
           // (service_k8s_namespace_name).
-          const logFilters =
-            correlationData.related_streams.logs?.[0]?.filters || {};
+          const logFilters = correlationData.related_streams.logs?.[0]?.filters || {};
           const actualMatchedDimensions =
-            Object.keys(logFilters).length > 0
-              ? logFilters
-              : correlationData.matched_dimensions;
+            Object.keys(logFilters).length > 0 ? logFilters : correlationData.matched_dimensions;
 
           correlationProps.value = {
             serviceName: correlationData.service_name,
@@ -1808,7 +1720,11 @@ export default defineComponent({
             matchedSetId: correlationData.matched_set_id,
             chipDimensions: {
               ...buildChipDimensionsFromFilters(correlationData, semanticGroups.value),
-              ...buildWorkloadChipDimensions(correlationData.matched_set_id, semanticGroups.value, props.span as Record<string, any>),
+              ...buildWorkloadChipDimensions(
+                correlationData.matched_set_id,
+                semanticGroups.value,
+                props.span as Record<string, any>,
+              ),
             },
             sourceEvent: {
               timestamp: props.span?.start_time,
@@ -1886,7 +1802,9 @@ export default defineComponent({
 
         // Copy to clipboard
         copyToClipboard(textToCopy, {
-          successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", { type: type.charAt(0).toUpperCase() + type.slice(1) }),
+          successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", {
+            type: type.charAt(0).toUpperCase() + type.slice(1),
+          }),
           errorMessage: t("traces.traceDetailsSidebar.failedToCopyClipboard"),
         });
       } catch (error) {
@@ -1922,12 +1840,7 @@ export default defineComponent({
       // Check if JSON stringified content is null/empty
       try {
         const stringified = JSON.stringify(content);
-        if (
-          stringified === "null" ||
-          stringified === "{}" ||
-          stringified === "[]"
-        )
-          return false;
+        if (stringified === "null" || stringified === "{}" || stringified === "[]") return false;
       } catch (e) {
         // If stringify fails, continue with other checks
       }
@@ -1946,10 +1859,12 @@ export default defineComponent({
           parsed = raw;
         }
         if (Array.isArray(parsed)) {
-          return parsed
-            .filter((p: any) => p.type === "text" && p.content)
-            .map((p: any) => p.content)
-            .join("\n") || null;
+          return (
+            parsed
+              .filter((p: any) => p.type === "text" && p.content)
+              .map((p: any) => p.content)
+              .join("\n") || null
+          );
         }
         return null;
       } catch {
@@ -1964,8 +1879,7 @@ export default defineComponent({
           .then(() => {
             // Check if this specific element is now fullscreen
             nextTick(() => {
-              isFullscreen.value =
-                document.fullscreenElement === ioContainerRef.value;
+              isFullscreen.value = document.fullscreenElement === ioContainerRef.value;
             });
           })
           .catch((err: any) => {
@@ -1978,37 +1892,21 @@ export default defineComponent({
     onMounted(() => {
       const handleFullscreenChange = () => {
         // Check if the IO container is in fullscreen
-        isFullscreen.value =
-          document.fullscreenElement === ioContainerRef.value;
+        isFullscreen.value = document.fullscreenElement === ioContainerRef.value;
       };
 
       // Listen to fullscreen change events
       document.addEventListener("fullscreenchange", handleFullscreenChange);
-      document.addEventListener(
-        "webkitfullscreenchange",
-        handleFullscreenChange,
-      );
+      document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
       document.addEventListener("mozfullscreenchange", handleFullscreenChange);
       document.addEventListener("MSFullscreenChange", handleFullscreenChange);
 
       // Cleanup listeners on unmount
       onUnmounted(() => {
-        document.removeEventListener(
-          "fullscreenchange",
-          handleFullscreenChange,
-        );
-        document.removeEventListener(
-          "webkitfullscreenchange",
-          handleFullscreenChange,
-        );
-        document.removeEventListener(
-          "mozfullscreenchange",
-          handleFullscreenChange,
-        );
-        document.removeEventListener(
-          "MSFullscreenChange",
-          handleFullscreenChange,
-        );
+        document.removeEventListener("fullscreenchange", handleFullscreenChange);
+        document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+        document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+        document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
       });
     });
 
@@ -2021,9 +1919,7 @@ export default defineComponent({
       getServiceIconDataUrl(
         props.span?.service_name ?? "",
         isDarkMode.value,
-        props.span
-          ? getOrSetServiceColor(resolveSpanIdentity(props.span))
-          : "#9e9e9e",
+        props.span ? getOrSetServiceColor(resolveSpanIdentity(props.span)) : "#9e9e9e",
       ),
     );
 

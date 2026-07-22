@@ -10,7 +10,12 @@
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
              opened on an empty list) instead of showing an empty dropdown. -->
-        <OSkeleton type="text" v-if="agentsLoading" data-test="quality-agent-filter-skeleton" class="w-full h-8.5" />
+        <OSkeleton
+          type="text"
+          v-if="agentsLoading"
+          data-test="quality-agent-filter-skeleton"
+          class="w-full h-8.5"
+        />
         <OSelect
           v-else
           v-model="agentModel"
@@ -26,11 +31,7 @@
       </div>
     </div>
 
-    <QualityKpiSkeleton
-      v-if="showKpiSkeleton"
-      :count="visibleKpis.length"
-      class="px-page-edge"
-    />
+    <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
     <KpiCardRow v-else class="quality-page__kpis px-page-edge" aria-label="Tier 1 KPIs">
       <QualityKpiCard
         v-for="kpi in visibleKpis"
@@ -43,7 +44,8 @@
     <!-- Tier 2: the configs table is the persistent view; selecting a
          row opens the detail in a right-side ODrawer (70% width). The user
          keeps full context of the list behind the drawer. -->
-    <div class="quality-page__tier2 grid gap-3 min-h-0 flex-1"
+    <div
+      class="quality-page__tier2 grid gap-3 min-h-0 flex-1"
       style="grid-template-columns: minmax(0, 1fr)"
     >
       <QualityScoreConfigsTable
@@ -67,7 +69,11 @@
            the inner panel no longer renders its own title row. -->
       <template #header-right>
         <OTag
-          v-if="detailDataType === 'numeric' || detailDataType === 'categorical' || detailDataType === 'boolean'"
+          v-if="
+            detailDataType === 'numeric' ||
+            detailDataType === 'categorical' ||
+            detailDataType === 'boolean'
+          "
           type="evalDataType"
           :value="detailDataType"
           data-test="quality-detail-type-badge"
@@ -107,10 +113,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
-import {
-  useQualityScoreConfigs,
-  type ScoreConfigRow,
-} from "./composables/useQualityScoreConfigs";
+import { useQualityScoreConfigs, type ScoreConfigRow } from "./composables/useQualityScoreConfigs";
 import { useQualityConfigDetail } from "./composables/useQualityConfigDetail";
 import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
@@ -168,17 +171,12 @@ const router = useRouter();
 const dateWindowRef = toRef(props, "dateWindow");
 const agentFilterRef = toRef(props, "agentFilter");
 
-const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(
-  dateWindowRef,
-  agentFilterRef,
-);
+const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef, agentFilterRef);
 
 // Placeholder KPIs can be hidden here without touching the render loop — add
 // their ids to this set to filter them out of the v-for.
 const HIDDEN_KPI_IDS = new Set<string>();
-const visibleKpis = computed(() =>
-  kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)),
-);
+const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
 
 const scoreConfigsRef = toRef(props, "scoreConfigs");
 const {
@@ -217,8 +215,7 @@ const {
 const numericThreshold = computed(() => {
   const cfg = selectedConfig.value;
   if (!cfg) return null;
-  const ht: any =
-    (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
+  const ht: any = (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
   if (!ht || ht.value == null || !ht.direction) return null;
   return {
     value: Number(ht.value),
@@ -235,20 +232,11 @@ const numericRange = computed(() => {
 });
 
 async function refreshAll() {
-  await Promise.all([
-    refresh(),
-    refreshConfigs(),
-    refreshDetail(),
-    refreshCharts(),
-  ]);
+  await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts()]);
 }
 
 const isAnyLoading = computed(
-  () =>
-    isLoading.value ||
-    isConfigsLoading.value ||
-    isDetailLoading.value ||
-    isChartsLoading.value,
+  () => isLoading.value || isConfigsLoading.value || isDetailLoading.value || isChartsLoading.value,
 );
 
 // Surface refresh + an aggregated loading flag so OnlineEvals can drive the

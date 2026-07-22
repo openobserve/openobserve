@@ -22,306 +22,300 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
-      <OTable
-        :frame="false"
-        :key="activeTab"
-        data-test="pipeline-list-table"
-        :data="filteredPipelines"
-        :columns="otableColumns"
-        row-key="pipeline_id"
-        :loading="loading"
-        :global-filter="filterQuery"
-        :show-global-filter="false"
-        :page-size="20"
-        :page-size-options="[20, 50, 100, 250, 500]"
-        selection="multiple"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        :default-columns="false"
-        show-index
-        table-id="pipelines-pipeline-list"
-        v-model:selected-ids="selectedPipelineIds"
-        :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
-        :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
-        :row-class="(row: any) => row.source?.source_type === 'scheduled' ? 'cursor-pointer' : ''"
-        v-model:expanded-ids="expandedId"
-        width="100%"
-        class="w-full h-full"
-      >
-        <template #toolbar>
-          <div class="flex items-center gap-2 w-full">
-            <OToggleGroup
-              :model-value="activeTab"
-              @update:model-value="(v) => { activeTab = v as string; updateActiveTab(); }"
-              data-test="pipeline-list-tabs"
-            >
-              <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                {{ t("pipeline_list.tab_all") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                {{ t("pipeline_list.tab_scheduled") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
-                <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                {{ t("pipeline_list.tab_realtime") }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-            <div class="flex-1 min-w-0">
-              <OInput
-                data-test="pipeline-list-search-input"
-                v-model="filterQuery"
-                class="w-full"
-                :placeholder="t('pipeline.search')"
+        <OTable
+          :frame="false"
+          :key="activeTab"
+          data-test="pipeline-list-table"
+          :data="filteredPipelines"
+          :columns="otableColumns"
+          row-key="pipeline_id"
+          :loading="loading"
+          :global-filter="filterQuery"
+          :show-global-filter="false"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          selection="multiple"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          :default-columns="false"
+          show-index
+          table-id="pipelines-pipeline-list"
+          v-model:selected-ids="selectedPipelineIds"
+          :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
+          :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
+          :row-class="
+            (row: any) => (row.source?.source_type === 'scheduled' ? 'cursor-pointer' : '')
+          "
+          v-model:expanded-ids="expandedId"
+          width="100%"
+          class="w-full h-full"
+        >
+          <template #toolbar>
+            <div class="flex items-center gap-2 w-full">
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="
+                  (v) => {
+                    activeTab = v as string;
+                    updateActiveTab();
+                  }
+                "
+                data-test="pipeline-list-tabs"
               >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
+                <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("pipeline_list.tab_all") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+                  <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                  {{ t("pipeline_list.tab_scheduled") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="realtime" size="sm" data-test="tab-realtime">
+                  <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                  {{ t("pipeline_list.tab_realtime") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <div class="flex-1 min-w-0">
+                <OInput
+                  data-test="pipeline-list-search-input"
+                  v-model="filterQuery"
+                  class="w-full"
+                  :placeholder="t('pipeline.search')"
+                >
+                  <template #icon-left>
+                    <OIcon name="search" size="sm" />
+                  </template>
+                </OInput>
+              </div>
             </div>
-          </div>
-        </template>
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="pipeline-list-refresh-btn"
-            @click="getPipelines"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="pipelinesRefresh" />
-          </OButton>
-        </template>
-
-        <template #cell-type="{ row }">
-          <OTag type="pipelineType" :value="row.type" />
-        </template>
-
-        <template #cell-actions="{ row }">
-          <div class="flex items-center actions-container">
+          </template>
+          <template #toolbar-trailing>
             <OButton
-              :data-test="`pipeline-list-${row.name}-pause-start-action`"
-              :data-row-action="row.enabled ? 'pause' : 'resume'"
-              :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+              variant="outline"
               size="icon-sm"
-              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-              @click.stop="togglePipeline(row)"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="pipeline-list-refresh-btn"
+              @click="getPipelines"
             >
               <OTooltip
                 side="bottom"
-                :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
+                :content="t('common.refresh')"
+                shortcut-id="pipelinesRefresh"
               />
             </OButton>
-            <OButton
-              :data-test="`pipeline-list-${row.name}-view-pipeline`"
-              variant="ghost"
-              size="icon-sm"
-              :title="t('pipeline.view')"
-              icon-left="visibility"
-            >
-              <OTooltip max-width="none" side="left">
-                <template #content
-                  ><PipelineView :pipeline="row"
-                /></template>
-              </OTooltip>
-            </OButton>
-            <OButton
-              :data-test="`pipeline-list-${row.name}-update-pipeline`"
-              data-row-action="edit"
-              variant="ghost"
-              size="icon-sm"
-              @click.stop="editPipeline(row)"
-              icon-left="edit"
-            >
-              <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="pipelinesRowEdit" />
-            </OButton>
-            <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
-                 actions (teleported out of the row): x = export, Del = delete. -->
-            <button
-              type="button"
-              data-row-action="export"
-              class="hidden"
-              tabindex="-1"
-              aria-hidden="true"
-              @click.stop="exportPipeline(row)"
-            />
-            <button
-              type="button"
-              data-row-action="delete"
-              class="hidden"
-              tabindex="-1"
-              aria-hidden="true"
-              @click.stop="openDeleteDialog(row)"
-            />
-            <ODropdown align="end">
-              <template #trigger>
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  @click.stop
-                  :data-test="`pipeline-list-${row.name}-more-options`"
-                  icon-left="more-vert"
-                />
-              </template>
-              <ODropdownItem
-                :data-test="`pipeline-list-${row.name}-export-action`"
-                shortcut-id="pipelinesRowExport"
-                @select="exportPipeline(row)"
-              >
-                <template #icon-left>
-                  <OIcon size="sm" name="download" />
-                </template>
-                {{ t("pipeline.export") }}
-              </ODropdownItem>
-              <ODropdownSeparator />
-              <ODropdownItem
-                :data-test="`pipeline-list-${row.name}-delete-pipeline`"
-                shortcut-id="pipelinesRowDelete"
-                @select="openDeleteDialog(row)"
-                variant="destructive"
-              >
-                <template #icon-left>
-                  <OIcon size="sm" name="delete" />
-                </template>
-                {{ t("pipeline.delete") }}
-              </ODropdownItem>
-              <ODropdownSeparator
-                v-if="
-                  row.source.source_type === 'scheduled' &&
-                  config.isEnterprise == 'true'
-                "
-              />
-              <ODropdownItem
-                v-if="
-                  row.source.source_type === 'scheduled' &&
-                  config.isEnterprise == 'true'
-                "
-                :data-test="`pipeline-list-${row.name}-backfill-action`"
-                @select="openBackfillDialog(row)"
-              >
-                <template #icon-left>
-                  <OIcon size="sm" name="refresh" />
-                </template>
-                Create Backfill
-              </ODropdownItem>
-              <ODropdownSeparator v-if="row.last_error" />
-              <ODropdownItem
-                v-if="row.last_error"
-                :data-test="`pipeline-list-${row.name}-view-error-action`"
-                @select="showErrorDialog(row)"
-              >
-                <template #icon-left>
-                  <OIcon size="sm" name="error" />
-                </template>
-                <div class="flex flex-col">
-                  <div>View Error</div>
-                  <div class="text-xs text-text-secondary">
-                    {{
-                      new Date(
-                        row.last_error.last_error_timestamp / 1000,
-                      ).toLocaleString()
-                    }}
-                  </div>
-                </div>
-              </ODropdownItem>
-            </ODropdown>
-          </div>
-        </template>
+          </template>
 
-        <template #expansion="{ row }: { row: PipelineRow }">
-          <div
-            v-if="row?.sql_query"
-            data-test="scheduled-pipeline-expanded-content"
-            class="text-left px-12 py-0 mb-2 max-h-screen overflow-hidden"
-          >
-            <div class="flex items-center py-2">
-              <strong
-                >{{ t("pipeline_list.sql_query") }} : <span></span
-              ></strong>
-            </div>
-            <div class="flex items-start justify-center">
-              <div
-                data-test="scheduled-pipeline-expanded-sql"
-                class="w-full overflow-y-auto p-2.5 border border-border-default border-l-[3px] border-l-accent h-full max-h-50 whitespace-normal bg-surface-subtle text-text-body"
+          <template #cell-type="{ row }">
+            <OTag type="pipelineType" :value="row.type" />
+          </template>
+
+          <template #cell-actions="{ row }">
+            <div class="flex items-center actions-container">
+              <OButton
+                :data-test="`pipeline-list-${row.name}-pause-start-action`"
+                :data-row-action="row.enabled ? 'pause' : 'resume'"
+                :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                size="icon-sm"
+                :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                @click.stop="togglePipeline(row)"
               >
-                <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
+                <OTooltip
+                  side="bottom"
+                  :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
+                />
+              </OButton>
+              <OButton
+                :data-test="`pipeline-list-${row.name}-view-pipeline`"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('pipeline.view')"
+                icon-left="visibility"
+              >
+                <OTooltip max-width="none" side="left">
+                  <template #content><PipelineView :pipeline="row" /></template>
+                </OTooltip>
+              </OButton>
+              <OButton
+                :data-test="`pipeline-list-${row.name}-update-pipeline`"
+                data-row-action="edit"
+                variant="ghost"
+                size="icon-sm"
+                @click.stop="editPipeline(row)"
+                icon-left="edit"
+              >
+                <OTooltip
+                  side="bottom"
+                  :content="t('alerts.edit')"
+                  shortcut-id="pipelinesRowEdit"
+                />
+              </OButton>
+              <!-- Hidden proxies so the row-hover shortcuts reach the more-menu
+                 actions (teleported out of the row): x = export, Del = delete. -->
+              <button
+                type="button"
+                data-row-action="export"
+                class="hidden"
+                tabindex="-1"
+                aria-hidden="true"
+                @click.stop="exportPipeline(row)"
+              />
+              <button
+                type="button"
+                data-row-action="delete"
+                class="hidden"
+                tabindex="-1"
+                aria-hidden="true"
+                @click.stop="openDeleteDialog(row)"
+              />
+              <ODropdown align="end">
+                <template #trigger>
+                  <OButton
+                    variant="ghost"
+                    size="icon-sm"
+                    @click.stop
+                    :data-test="`pipeline-list-${row.name}-more-options`"
+                    icon-left="more-vert"
+                  />
+                </template>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-export-action`"
+                  shortcut-id="pipelinesRowExport"
+                  @select="exportPipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="download" />
+                  </template>
+                  {{ t("pipeline.export") }}
+                </ODropdownItem>
+                <ODropdownSeparator />
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-delete-pipeline`"
+                  shortcut-id="pipelinesRowDelete"
+                  @select="openDeleteDialog(row)"
+                  variant="destructive"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="delete" />
+                  </template>
+                  {{ t("pipeline.delete") }}
+                </ODropdownItem>
+                <ODropdownSeparator
+                  v-if="row.source.source_type === 'scheduled' && config.isEnterprise == 'true'"
+                />
+                <ODropdownItem
+                  v-if="row.source.source_type === 'scheduled' && config.isEnterprise == 'true'"
+                  :data-test="`pipeline-list-${row.name}-backfill-action`"
+                  @select="openBackfillDialog(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="refresh" />
+                  </template>
+                  Create Backfill
+                </ODropdownItem>
+                <ODropdownSeparator v-if="row.last_error" />
+                <ODropdownItem
+                  v-if="row.last_error"
+                  :data-test="`pipeline-list-${row.name}-view-error-action`"
+                  @select="showErrorDialog(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="error" />
+                  </template>
+                  <div class="flex flex-col">
+                    <div>View Error</div>
+                    <div class="text-xs text-text-secondary">
+                      {{ new Date(row.last_error.last_error_timestamp / 1000).toLocaleString() }}
+                    </div>
+                  </div>
+                </ODropdownItem>
+              </ODropdown>
+            </div>
+          </template>
+
+          <template #expansion="{ row }: { row: PipelineRow }">
+            <div
+              v-if="row?.sql_query"
+              data-test="scheduled-pipeline-expanded-content"
+              class="text-left px-12 py-0 mb-2 max-h-screen overflow-hidden"
+            >
+              <div class="flex items-center py-2">
+                <strong>{{ t("pipeline_list.sql_query") }} : <span></span></strong>
+              </div>
+              <div class="flex items-start justify-center">
+                <div
+                  data-test="scheduled-pipeline-expanded-sql"
+                  class="w-full overflow-y-auto p-2.5 border border-border-default border-l-[3px] border-l-accent h-full max-h-50 whitespace-normal bg-surface-subtle text-text-body"
+                >
+                  <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
+                </div>
               </div>
             </div>
-          </div>
-        </template>
+          </template>
 
-        <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-pipelines"
-            :filtered="!!filterQuery"
-            @action="
-              (id) =>
-                id === 'clear-filters'
-                  ? (filterQuery = '')
-                  : id === 'import'
-                    ? goToImportPipeline()
-                    : goToCreatePipeline()
-            "
-          />
-        </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-pipelines"
+              :filtered="!!filterQuery"
+              @action="
+                (id) =>
+                  id === 'clear-filters'
+                    ? (filterQuery = '')
+                    : id === 'import'
+                      ? goToImportPipeline()
+                      : goToCreatePipeline()
+              "
+            />
+          </template>
 
-        <template #bottom="bottomProps">
-          <div
-            class="flex items-center justify-between w-full py-1"
-          >
-            <div
-              class="flex items-center text-xs font-normal mr-4"
-            >
-              {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
+          <template #bottom="bottomProps">
+            <div class="flex items-center justify-between w-full py-1">
+              <div class="flex items-center text-xs font-normal mr-4">
+                {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
+              </div>
+              <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
+                <OButton
+                  data-test="pipeline-list-export-pipelines-btn"
+                  variant="outline"
+                  size="sm"
+                  @click="exportBulkPipelines"
+                  icon-left="download"
+                >
+                  {{ t("pipeline_list.export") }}
+                </OButton>
+                <OButton
+                  data-test="pipeline-list-pause-pipelines-btn"
+                  variant="outline"
+                  size="sm"
+                  @click="bulkTogglePipelines('pause')"
+                  icon-left="pause"
+                >
+                  {{ t("pipeline_list.pause") }}
+                </OButton>
+                <OButton
+                  data-test="pipeline-list-resume-pipelines-btn"
+                  variant="outline"
+                  size="sm"
+                  @click="bulkTogglePipelines('resume')"
+                  icon-left="play-arrow"
+                >
+                  {{ t("pipeline_list.resume") }}
+                </OButton>
+                <OButton
+                  data-test="pipeline-list-delete-pipelines-btn"
+                  variant="outline-destructive"
+                  size="sm"
+                  @click="openBulkDeleteDialog"
+                  icon-left="delete"
+                >
+                  Delete
+                </OButton>
+              </div>
             </div>
-            <div
-              v-if="selectedPipelineIds.length > 0"
-              class="flex items-center gap-2"
-            >
-              <OButton
-                data-test="pipeline-list-export-pipelines-btn"
-                variant="outline"
-                size="sm"
-                @click="exportBulkPipelines"
-                icon-left="download"
-              >
-                {{ t("pipeline_list.export") }}
-              </OButton>
-              <OButton
-                data-test="pipeline-list-pause-pipelines-btn"
-                variant="outline"
-                size="sm"
-                @click="bulkTogglePipelines('pause')"
-                icon-left="pause"
-              >
-                {{ t("pipeline_list.pause") }}
-              </OButton>
-              <OButton
-                data-test="pipeline-list-resume-pipelines-btn"
-                variant="outline"
-                size="sm"
-                @click="bulkTogglePipelines('resume')"
-                icon-left="play-arrow"
-              >
-                {{ t("pipeline_list.resume") }}
-              </OButton>
-              <OButton
-                data-test="pipeline-list-delete-pipelines-btn"
-                variant="outline-destructive"
-                size="sm"
-                @click="openBulkDeleteDialog"
-                icon-left="delete"
-              >
-                Delete
-              </OButton>
-            </div>
-          </div>
-        </template>
-      </OTable>
+          </template>
+        </OTable>
       </div>
     </div>
   </div>
@@ -380,13 +374,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="error" size="md" class="text-status-error-text" />
     </template>
 
-    <div v-if="errorDialog.data" class="pipeline-error-content px-6 py-5 max-h-[60vh] overflow-y-auto">
+    <div
+      v-if="errorDialog.data"
+      class="pipeline-error-content px-6 py-5 max-h-[60vh] overflow-y-auto"
+    >
       <!-- Error Summary -->
       <div v-if="errorDialog.data.last_error.error_summary" class="mb-4">
         <div class="section-label mb-2 text-compact font-semibold tracking-[0.02em] opacity-80">
           {{ t("pipeline_list.error_summary") }}
         </div>
-        <div class="error-summary-box p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text">
+        <div
+          class="error-summary-box p-4 rounded-default font-mono text-compact leading-[1.6] whitespace-pre-wrap wrap-break-word bg-banner-error-soft-bg border border-banner-error-soft-border text-banner-error-soft-text"
+        >
           {{ errorDialog.data.last_error.error_summary }}
         </div>
       </div>
@@ -403,14 +402,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="node-errors-container flex flex-col gap-3">
           <div
-            v-for="(nodeError, nodeId) in errorDialog.data.last_error
-              .node_errors"
+            v-for="(nodeError, nodeId) in errorDialog.data.last_error.node_errors"
             :key="nodeId"
             class="node-error-item p-4 rounded-default bg-surface-subtle border border-border-default transition-all hover:bg-interactive-hover-bg"
           >
             <div class="node-error-header flex items-center justify-between mb-2.5">
-              <span class="node-name font-semibold text-sm">{{ nodeError.node_name || nodeId }}</span>
-              <span class="node-type text-xs px-2.5 py-1 rounded-default bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium">{{ nodeError.node_type }}</span>
+              <span class="node-name font-semibold text-sm">{{
+                nodeError.node_name || nodeId
+              }}</span>
+              <span
+                class="node-type text-xs px-2.5 py-1 rounded-default bg-badge-indigo-soft-bg text-badge-indigo-soft-text font-medium"
+                >{{ nodeError.node_type }}</span
+              >
             </div>
             <!-- The API field is `errors`, not `error_messages` — this block
                  read a key the response never carries, so the dialog listed
@@ -522,9 +525,7 @@ const columns: any = ref([]);
 
 const selectedPipelineIds = ref<string[]>([]);
 const selectedPipelines = computed(() =>
-  filteredPipelines.value.filter((p: any) =>
-    selectedPipelineIds.value.includes(p.pipeline_id),
-  ),
+  filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id)),
 );
 const expandedId = ref<string[]>([]);
 
@@ -552,7 +553,6 @@ const currentRouteName = computed(() => {
 
 const otableColumns = computed(() => columns.value);
 
-
 const updateActiveTab = () => {
   expandedId.value = [];
   if (activeTab.value === "all") {
@@ -561,8 +561,9 @@ const updateActiveTab = () => {
     return;
   }
 
-  filteredPipelines.value = pipelines.value
-    .filter((pipeline: any) => pipeline.source.source_type === activeTab.value);
+  filteredPipelines.value = pipelines.value.filter(
+    (pipeline: any) => pipeline.source.source_type === activeTab.value,
+  );
 
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
@@ -584,12 +585,7 @@ const togglePipeline = (row: any) => {
 const togglePipelineState = (row: any, from_now: boolean) => {
   const newState = !row.enabled;
   pipelineService
-    .toggleState(
-      store.state.selectedOrganization.identifier,
-      row.pipeline_id,
-      newState,
-      from_now,
-    )
+    .toggleState(store.state.selectedOrganization.identifier, row.pipeline_id, newState, from_now)
     .then(async () => {
       row.enabled = newState;
       const message = row.enabled
@@ -604,15 +600,12 @@ const togglePipelineState = (row: any, from_now: boolean) => {
     .catch((error) => {
       if (error.response.status != 403) {
         toast({
-          message:
-            error.response?.data?.message ||
-            "Error while updating pipeline state",
+          message: error.response?.data?.message || "Error while updating pipeline state",
           variant: "error",
         });
       }
     });
 };
-
 
 const getColumnsForActiveTab = (tab: any) => {
   const nameColumn = {
@@ -717,12 +710,7 @@ const getColumnsForActiveTab = (tab: any) => {
     ];
   }
   if (tab === "realtime") {
-    return [
-      nameColumn,
-      streamNameColumn,
-      streamTypeColumn,
-      actionsColumn,
-    ];
+    return [nameColumn, streamNameColumn, streamTypeColumn, actionsColumn];
   }
   return [
     nameColumn,
@@ -799,9 +787,7 @@ const getPipelines = async () => {
             : pipeline.source.trigger_condition.cron;
         pipeline.period = pipeline.source.trigger_condition.period + " Mins";
         pipeline.cron =
-          pipeline.source.trigger_condition.frequency_type == "minutes"
-            ? "False"
-            : "True";
+          pipeline.source.trigger_condition.frequency_type == "minutes" ? "False" : "True";
         pipeline.sql_query = pipeline.source.query_condition.sql;
       }
 
@@ -836,8 +822,7 @@ const editPipeline = (pipeline: any) => {
 const openDeleteDialog = (pipeline: any) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("pipeline.deletePipeline");
-  confirmDialogMeta.value.message =
-    "Are you sure you want to delete this pipeline?";
+  confirmDialogMeta.value.message = "Are you sure you want to delete this pipeline?";
   confirmDialogMeta.value.onConfirm = deletePipeline;
   confirmDialogMeta.value.data = pipeline;
 };
@@ -846,8 +831,8 @@ const savePipeline = (data: any) => {
   const dismiss = toast({
     message: "saving pipeline...",
     variant: "loading",
-      timeout: 0,
-});
+    timeout: 0,
+  });
 
   pipelineService
     .createPipeline({
@@ -867,8 +852,7 @@ const savePipeline = (data: any) => {
       dismiss();
       if (error.response.status != 403) {
         toast({
-          message:
-            error.response?.data?.message || "Error while saving pipeline",
+          message: error.response?.data?.message || "Error while saving pipeline",
           variant: "error",
         });
       }
@@ -879,8 +863,8 @@ const deletePipeline = async () => {
   const dismiss = toast({
     message: "deleting pipeline...",
     variant: "loading",
-      timeout: 0,
-});
+    timeout: 0,
+  });
   const { pipeline_id } = confirmDialogMeta.value.data;
   const org_id = store.state.selectedOrganization.identifier;
   pipelineService
@@ -897,8 +881,7 @@ const deletePipeline = async () => {
     .catch((error) => {
       if (error.response.status != 403) {
         toast({
-          message:
-            error.response?.data?.message || "Error while deleting pipeline",
+          message: error.response?.data?.message || "Error while deleting pipeline",
           variant: "error",
         });
       }
@@ -971,10 +954,7 @@ const exportBulkPipelines = () => {
 //if user clicks on run pipeline button then we need toggle the pipeline state and resume the pipeline from where it paused / start from now as per the user choice
 const handleResumePipeline = () => {
   resumePipelineDialogMeta.value.show = false;
-  togglePipelineState(
-    resumePipelineDialogMeta.value.data,
-    shouldStartfromNow.value,
-  );
+  togglePipelineState(resumePipelineDialogMeta.value.data, shouldStartfromNow.value);
 };
 //if user clicks on cancel button then we need to just close the dialog and do not toggle the pipeline state
 const handleCancelResumePipeline = () => {
@@ -1170,15 +1150,21 @@ const onBackfillSuccess = () => {
 useShortcuts([
   {
     id: "pipelinesAdd",
-    handler: () => { if (!isInputFocused()) goToCreatePipeline(); },
+    handler: () => {
+      if (!isInputFocused()) goToCreatePipeline();
+    },
   },
   {
     id: "pipelinesImport",
-    handler: () => { if (!isInputFocused()) goToImportPipeline(); },
+    handler: () => {
+      if (!isInputFocused()) goToImportPipeline();
+    },
   },
   {
     id: "pipelinesRefresh",
-    handler: () => { if (!isInputFocused()) getPipelines(); },
+    handler: () => {
+      if (!isInputFocused()) getPipelines();
+    },
   },
   {
     id: "pipelinesFocusSearch",

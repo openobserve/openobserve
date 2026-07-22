@@ -31,16 +31,14 @@ export function normalizeJobFilterCondition(value: any): V2Group {
   if (conditionValue?.op && Array.isArray(conditionValue.conditions)) {
     return ensureIds({
       filterType: "group",
-      logicalOperator:
-        String(conditionValue.op).toUpperCase() === "OR" ? "OR" : "AND",
+      logicalOperator: String(conditionValue.op).toUpperCase() === "OR" ? "OR" : "AND",
       conditions: conditionValue.conditions.map((condition: any) => ({
         filterType: "condition",
         column: condition.column || "",
         operator: condition.operator || "=",
         value: condition.value || "",
         values: condition.values || [],
-        logicalOperator:
-          String(conditionValue.op).toUpperCase() === "OR" ? "OR" : "AND",
+        logicalOperator: String(conditionValue.op).toUpperCase() === "OR" ? "OR" : "AND",
       })),
     }) as V2Group;
   }
@@ -69,8 +67,7 @@ export function cleanFilterGroup(group: any): V2Group {
           : null;
       }
 
-      const hasValue =
-        item?.value !== undefined && item?.value !== null && item?.value !== "";
+      const hasValue = item?.value !== undefined && item?.value !== null && item?.value !== "";
       if (item?.filterType !== "condition" || !item.column || !item.operator || !hasValue)
         return null;
 
@@ -104,9 +101,7 @@ export function isJobFilterComplete(group: any): boolean {
       if (!isJobFilterComplete(item)) return false;
     } else if (item?.filterType === "condition") {
       const hasValue =
-        (item.value !== undefined &&
-          item.value !== null &&
-          item.value !== "") ||
+        (item.value !== undefined && item.value !== null && item.value !== "") ||
         (Array.isArray(item.values) && item.values.length > 0);
       if (!item.column || !item.operator || !hasValue) return false;
     }

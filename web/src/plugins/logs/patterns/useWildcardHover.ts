@@ -35,11 +35,7 @@ function normalizeSampleValues(raw: any[]): WildcardDisplayValue[] {
 }
 
 export default function useWildcardHover() {
-  function onMouseEnter(
-    token: string,
-    sampleValues: any[],
-    event: MouseEvent,
-  ) {
+  function onMouseEnter(token: string, sampleValues: any[], event: MouseEvent) {
     // Cancel any pending hide
     if (hideTimeout) {
       clearTimeout(hideTimeout);

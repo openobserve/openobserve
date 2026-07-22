@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-default w-full h-full dark:bg-surface-base dark:border-border-default">
+  <OCard
+    class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-default w-full h-full dark:bg-surface-base dark:border-border-default"
+  >
     <div class="flex items-center justify-between px-3 py-2">
       <div>
         <h3 class="pt-2 text-base font-semibold leading-6 text-text-heading m-0">
@@ -25,17 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("billing.enterpriseSubtitle") }}
         </p>
       </div>
-      <OTag
-        type="billingTag"
-        value="discount"
-        class="mt-2"
-      />
+      <OTag type="billingTag" value="discount" class="mt-2" />
     </div>
 
     <OSeparator class="my-2" />
 
     <div class="px-3 pt-2 h-137.5">
-      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">{{ t("billing.features") }}</h4>
+      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">
+        {{ t("billing.features") }}
+      </h4>
       <p class="mb-3 mt-1 text-compact font-normal leading-[1.125rem] text-text-secondary m-0">
         {{ t("billing.included") }}
       </p>
@@ -61,7 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
             class="mr-2 text-status-positive check-icon"
           />
-          <div class="text-base leading-[1.375rem] text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div
+            class="text-base leading-[1.375rem] text-text-body"
+            :class="{ 'ml-6': !feature.is_parent }"
+          >
+            {{ feature.name }}
+          </div>
         </div>
         <div class="text-base leading-[1.375rem] text-text-body font-bold">{{ feature.price }}</div>
       </div>

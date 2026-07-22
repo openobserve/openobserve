@@ -49,7 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-2xs text-text-secondary tabular-nums leading-none shrink-0"
         :title="peakTitle"
         data-test="pattern-volume-peak"
-      >{{ peakLabel }}</span>
+        >{{ peakLabel }}</span
+      >
     </template>
     <div
       v-else-if="loading"
@@ -108,9 +109,7 @@ let observer: IntersectionObserver | null = null;
 // would sit on its skeleton forever.
 const hasBeenVisible = ref(false);
 
-const entry = computed<PatternVolumeEntry | undefined>(() =>
-  cache?.get(props.pattern),
-);
+const entry = computed<PatternVolumeEntry | undefined>(() => cache?.get(props.pattern));
 
 // Report the volume upward as it lands, and clear it when the cache is dropped
 // so the row never shows figures from a window that's no longer displayed.
@@ -173,17 +172,7 @@ onBeforeUnmount(() => {
  */
 const MAX_BARS = 27;
 
-const HEIGHT_CLASSES = [
-  "h-0.5",
-  "h-1",
-  "h-1.5",
-  "h-2",
-  "h-2.5",
-  "h-3",
-  "h-4",
-  "h-5",
-  "h-6",
-];
+const HEIGHT_CLASSES = ["h-0.5", "h-1", "h-1.5", "h-2", "h-2.5", "h-3", "h-4", "h-5", "h-6"];
 
 const loading = computed(() => !entry.value || entry.value.loading);
 
@@ -199,9 +188,7 @@ const displayBuckets = computed<number[]>(() => {
   return merged;
 });
 
-const maxValue = computed(() =>
-  displayBuckets.value.reduce((max, v) => Math.max(max, v), 0),
-);
+const maxValue = computed(() => displayBuckets.value.reduce((max, v) => Math.max(max, v), 0));
 
 /**
  * Time one drawn bar covers. When more buckets arrive than the cell can draw
@@ -216,9 +203,7 @@ const barSeconds = computed<number | null>(() => {
   return secs * chunk;
 });
 
-const totalEvents = computed(() =>
-  displayBuckets.value.reduce((sum, v) => sum + v, 0),
-);
+const totalEvents = computed(() => displayBuckets.value.reduce((sum, v) => sum + v, 0));
 
 const barHeightClass = (value: number): string => {
   if (maxValue.value <= 0 || value <= 0) return HEIGHT_CLASSES[0];
@@ -233,9 +218,7 @@ const barHeightClass = (value: number): string => {
 const skeletonHeight = (i: number): string =>
   HEIGHT_CLASSES[1 + ((i * 3) % (HEIGHT_CLASSES.length - 1))];
 
-const ariaLabel = computed(() =>
-  t("logs.patternList.volumeEvents", { count: totalEvents.value }),
-);
+const ariaLabel = computed(() => t("logs.patternList.volumeEvents", { count: totalEvents.value }));
 
 // The busiest bucket, labelling the dashed rule. Compact so it stays legible at
 // text-2xs; the exact figure is on hover.

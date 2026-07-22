@@ -101,34 +101,21 @@ vi.mock("@/composables/contextProviders", () => ({
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
 
-
 // ── Stub definitions ─────────────────────────────────────────────────────────
 
 const stubs = {
   RichTextInput: {
-    template: "<div data-test=\"rich-text-input\" />",
-    props: [
-      "modelValue",
-      "placeholder",
-      "disabled",
-      "theme",
-      "references",
-      "borderless",
-    ],
-    emits: [
-      "update:modelValue",
-      "keydown",
-      "submit",
-      "update:references",
-    ],
+    template: '<div data-test="rich-text-input" />',
+    props: ["modelValue", "placeholder", "disabled", "theme", "references", "borderless"],
+    emits: ["update:modelValue", "keydown", "submit", "update:references"],
   },
   ConfirmDialog: {
-    template: "<div data-test=\"confirm-dialog\" />",
+    template: '<div data-test="confirm-dialog" />',
     props: ["modelValue", "title", "message"],
     emits: ["update:ok", "update:cancel", "update:modelValue"],
   },
   O2AIConfirmDialog: {
-    template: "<div data-test=\"o2-ai-confirm-dialog\" />",
+    template: '<div data-test="o2-ai-confirm-dialog" />',
     props: ["visible", "confirmation"],
     emits: ["confirm", "cancel", "always-confirm"],
   },
@@ -138,12 +125,12 @@ const stubs = {
   ODialog: {
     name: "ODialog",
     template:
-      "<div data-test=\"o-dialog\" v-if=\"open\">" +
-      "<div data-test=\"o-dialog-title\">{{ title }}</div>" +
-      "<div data-test=\"o-dialog-body\"><slot /></div>" +
-      "<button data-test=\"o-dialog-primary\" @click=\"$emit('click:primary')\">{{ primaryButtonLabel }}</button>" +
-      "<button data-test=\"o-dialog-secondary\" @click=\"$emit('click:secondary')\">{{ secondaryButtonLabel }}</button>" +
-      "<button data-test=\"o-dialog-close\" @click=\"$emit('update:open', false)\">x</button>" +
+      '<div data-test="o-dialog" v-if="open">' +
+      '<div data-test="o-dialog-title">{{ title }}</div>' +
+      '<div data-test="o-dialog-body"><slot /></div>' +
+      '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button>' +
+      '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondaryButtonLabel }}</button>' +
+      '<button data-test="o-dialog-close" @click="$emit(\'update:open\', false)">x</button>' +
       "</div>",
     props: [
       "open",
@@ -166,22 +153,17 @@ const stubs = {
       "secondaryButtonLoading",
       "neutralButtonLoading",
     ],
-    emits: [
-      "update:open",
-      "click:primary",
-      "click:secondary",
-      "click:neutral",
-    ],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   },
   // Stub ODrawer with the same surface (default slot, v-model:open) so the
   // History drawer can be asserted without pulling in the real component.
   ODrawer: {
     name: "ODrawer",
     template:
-      "<div data-test=\"o-drawer\" v-if=\"open\">" +
-      "<div data-test=\"o-drawer-title\">{{ title }}</div>" +
-      "<div data-test=\"o-drawer-body\"><slot /></div>" +
-      "<button data-test=\"o-drawer-close\" @click=\"$emit('update:open', false)\">x</button>" +
+      '<div data-test="o-drawer" v-if="open">' +
+      '<div data-test="o-drawer-title">{{ title }}</div>' +
+      '<div data-test="o-drawer-body"><slot /></div>' +
+      '<button data-test="o-drawer-close" @click="$emit(\'update:open\', false)">x</button>' +
       "</div>",
     props: [
       "open",
@@ -195,12 +177,7 @@ const stubs = {
       "secondaryButtonLabel",
       "neutralButtonLabel",
     ],
-    emits: [
-      "update:open",
-      "click:primary",
-      "click:secondary",
-      "click:neutral",
-    ],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   },
 };
 
@@ -520,9 +497,7 @@ describe("O2AIChat", () => {
       expect(drawer.props("open")).toBe(true);
       expect(drawer.props("title")).toBe("Chat History");
       expect(drawer.props("size")).toBe("sm");
-      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe(
-        "Chat History",
-      );
+      expect(wrapper.find('[data-test="o-drawer-title"]').text()).toBe("Chat History");
     });
 
     it("should close the drawer when update:open is emitted with false", async () => {
@@ -637,11 +612,7 @@ describe("O2AIChat", () => {
       // The image preview dialog has no primary/secondary labels.
       return wrapper
         .findAllComponents({ name: "ODialog" })
-        .find(
-          (d) =>
-            d.props("size") === "lg" &&
-            d.props("primaryButtonLabel") === undefined,
-        );
+        .find((d) => d.props("size") === "lg" && d.props("primaryButtonLabel") === undefined);
     }
 
     it("should not render the image preview dialog when showImagePreview is false", async () => {

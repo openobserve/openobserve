@@ -52,9 +52,7 @@ export function thresholdForConfig(config: ScoreConfig): ThresholdSql {
     if (!Array.isArray(list) || list.length === 0) {
       return { unhealthyExpr: null, label: "" };
     }
-    const inList = list
-      .map((c) => `'${escapeSqlString(String(c))}'`)
-      .join(", ");
+    const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
     return {
       unhealthyExpr: `value_categorical NOT IN (${inList})`,
       label: list.join(" · "),

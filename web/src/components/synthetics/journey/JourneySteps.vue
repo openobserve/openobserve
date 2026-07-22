@@ -68,9 +68,9 @@ const props = withDefaults(
     /** Expanded row ids (v-model). */
     expandedIds?: string[];
     /** Per-step replay results for error cards. */
-    getReplayResult?: (row: TData) =>
-      | { passed: boolean; durationMs: number; error?: string; structuredError?: any }
-      | undefined;
+    getReplayResult?: (
+      row: TData,
+    ) => { passed: boolean; durationMs: number; error?: string; structuredError?: any } | undefined;
     /** Returns a CSS color for the 4px left status bar per row (e.g. validation errors). */
     getRowStatusColor?: (row: TData) => string | undefined;
   }>(),
@@ -93,9 +93,9 @@ const emit = defineEmits<{
   "update:expanded-ids": [ids: string[]];
   "row-click": [row: TData, event: MouseEvent];
   // Row actions emitted for parent handling
-  "expand": [row: TData];
-  "delete": [row: TData];
-  "duplicate": [row: TData];
+  expand: [row: TData];
+  delete: [row: TData];
+  duplicate: [row: TData];
   "insert-below": [row: TData];
   "retry-replay": [];
 }>();
@@ -160,7 +160,12 @@ const isEditor = computed(() => props.mode === "editor");
 const columns = computed<OTableColumnDef<TData>[]>(() => {
   if (isEditor.value) {
     return [
-      { id: "details", header: t('synthetics.journey.stepHeader'), size: 200, meta: { autoWidth: true } },
+      {
+        id: "details",
+        header: t("synthetics.journey.stepHeader"),
+        size: 200,
+        meta: { autoWidth: true },
+      },
       { id: "actions", header: "", size: 128, isAction: true },
     ];
   }
@@ -168,9 +173,14 @@ const columns = computed<OTableColumnDef<TData>[]>(() => {
   return [
     { id: "step", header: "", size: 44 },
     { id: "screenshot", header: "", size: 90 },
-    { id: "details", header: t('synthetics.journey.stepHeader'), size: 200, meta: { autoWidth: true } },
+    {
+      id: "details",
+      header: t("synthetics.journey.stepHeader"),
+      size: 200,
+      meta: { autoWidth: true },
+    },
     { id: "progress", header: "", size: 100 },
-    { id: "duration", header: t('synthetics.journey.durationHeader'), size: 80 },
+    { id: "duration", header: t("synthetics.journey.durationHeader"), size: 80 },
   ];
 });
 
@@ -264,20 +274,13 @@ function handleUpdateExpanded(ids: string[]) {
         <!-- Selection is handled by OTable's built-in checkbox column when selection="multiple" -->
 
         <!-- Action icon chip -->
-        <span
-          class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center"
-        >
-          <OIcon
-            :name="actionIcon(row)"
-            size="sm"
-            class="text-primary-500"
-            aria-hidden="true"
-          />
+        <span class="bg-primary-50 rounded-default p-1 shrink-0 flex items-center">
+          <OIcon :name="actionIcon(row)" size="sm" class="text-primary-500" aria-hidden="true" />
         </span>
 
         <!-- Action label badge -->
         <div class="w-24!">
-            <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
+          <OBadge variant="default" size="sm">{{ actionLabel(row) }}</OBadge>
         </div>
 
         <!-- Step display name -->
@@ -314,10 +317,7 @@ function handleUpdateExpanded(ids: string[]) {
 
     <!-- ── cell-actions: Row action buttons (editor mode) ──────── -->
     <template v-if="mode === 'editor'" #cell-actions="{ row }">
-      <div
-        class="flex items-center gap-0.5 shrink-0"
-        :class="{ invisible: isLocked }"
-      >
+      <div class="flex items-center gap-0.5 shrink-0" :class="{ invisible: isLocked }">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
 
         <OButton

@@ -16,55 +16,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div
-    :class="position === 'bottom' ? 'py-2' : 'pt-2'"
-    class="w-full flex justify-between"
-  >
+  <div :class="position === 'bottom' ? 'py-2' : 'pt-2'" class="w-full flex justify-between">
     <div
       v-if="position === 'bottom' && maxRecords"
       class="flex items-center whitespace-nowrap w-50 justify-center justify-start"
     >
       <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
-      <OInput
-        v-model="maxRecords"
-        @blur="changeMaxRecordToReturn"
-      />
+      <OInput v-model="maxRecords" @blur="changeMaxRecordToReturn" />
     </div>
-    <div
-      v-if="position === 'top' && pageTitle"
-      class="font-bold flex items-center"
-    >
+    <div v-if="position === 'top' && pageTitle" class="font-bold flex items-center">
       <OButton
-        v-if="
-          collapsibleIcon === 'show' &&
-          searchCollapseImage == 'collapse_sidebar_icon'
-        "
+        v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
         variant="ghost"
         size="icon"
         class="mr-2"
         @click="toggleSidePanel"
       >
-        <img
-          :src="getImageURL('images/common/collapse_sidebar_icon.svg')"
-          width="16"
-          height="16"
-        />
+        <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
       </OButton>
       <OButton
-        v-if="
-          collapsibleIcon === 'show' &&
-          searchCollapseImage == 'expand_sidebar_icon'
-        "
+        v-if="collapsibleIcon === 'show' && searchCollapseImage == 'expand_sidebar_icon'"
         variant="ghost"
         size="icon"
         class="mr-2"
         @click="toggleSidePanel"
       >
-        <img
-          :src="getImageURL('images/common/expand_sidebar_icon.svg')"
-          width="16"
-          height="16"
-        />
+        <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
       </OButton>
       <div class="ml-1">
         {{ resultTotal }}
@@ -74,11 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="ml-auto">
       <span class="mr-4 text-xs font-semibold">
         {{ t("search.showing") }}
-        {{
-          resultTotal > 0
-            ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1
-            : 0
-        }}
+        {{ resultTotal > 0 ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }}
         -
         {{
           scope.pagination.page * scope.pagination.rowsPerPage >= resultTotal
@@ -171,10 +144,7 @@ export default defineComponent({
     };
 
     const toggleSidePanel = () => {
-      store.dispatch(
-        "setSearchCollapseToggle",
-        store.state.searchCollapsibleSection == 0 ? 20 : 0,
-      );
+      store.dispatch("setSearchCollapseToggle", store.state.searchCollapsibleSection == 0 ? 20 : 0);
     };
 
     return {
@@ -207,4 +177,3 @@ export default defineComponent({
   },
 });
 </script>
-

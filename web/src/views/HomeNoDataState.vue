@@ -68,31 +68,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="hub"
           data-test="home-no-data-otel-btn"
           @click="go('ingestLogsFromOtel')"
-        >{{ t("home.noDataState.otel") }}</EmptyStateIngestionChip>
+          >{{ t("home.noDataState.otel") }}</EmptyStateIngestionChip
+        >
         <EmptyStateIngestionChip
           data-test="home-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+          <img
+            :src="getImageURL('images/common/kubernetes.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("home.noDataState.kubernetes") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          data-test="home-no-data-aws-btn"
-          @click="go('AWSConfig')"
-        >
-          <img :src="getImageURL('images/ingestion/aws.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+        <EmptyStateIngestionChip data-test="home-no-data-aws-btn" @click="go('AWSConfig')">
+          <img
+            :src="getImageURL('images/ingestion/aws.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("home.noDataState.aws") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           icon="insights"
           data-test="home-no-data-ai-btn"
           @click="go('ai-integrations')"
-        >{{ t("home.noDataState.aiIntegrations") }}</EmptyStateIngestionChip>
+          >{{ t("home.noDataState.aiIntegrations") }}</EmptyStateIngestionChip
+        >
         <EmptyStateIngestionChip
           icon="alt-route"
           data-test="home-no-data-shippers-btn"
           @click="go('ingestLogs')"
-        >{{ t("home.noDataState.shippers") }}</EmptyStateIngestionChip>
+          >{{ t("home.noDataState.shippers") }}</EmptyStateIngestionChip
+        >
       </div>
     </template>
   </OEmptyState>

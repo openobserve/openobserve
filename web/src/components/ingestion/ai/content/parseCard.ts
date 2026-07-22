@@ -141,9 +141,7 @@ function extractWarnings(preamble: string[]): string[] {
 export function parseCard(md: string): ParsedCard {
   const { preamble, sections } = splitSections(md);
 
-  const metaSection = sections.find(
-    (s) => s.title.toLowerCase() === "card metadata",
-  );
+  const metaSection = sections.find((s) => s.title.toLowerCase() === "card metadata");
   const table = metaSection ? parseMetadataTable(metaSection.lines) : {};
 
   // Fall back to the H1 ("# Name — Data Sources UI panel content") for the name.
@@ -159,9 +157,7 @@ export function parseCard(md: string): ParsedCard {
     displayName: cleanValue(table["display name"]) || h1Name,
     category: cleanValue(table["category"]),
     tagline: cleanValue(table["tagline"]),
-    runtime:
-      cleanValue(table["supported runtime"]) ||
-      cleanValue(table["prerequisites"]),
+    runtime: cleanValue(table["supported runtime"]) || cleanValue(table["prerequisites"]),
   };
 
   const displaySections: CardSection[] = sections

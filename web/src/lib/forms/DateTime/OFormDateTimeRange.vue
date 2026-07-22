@@ -20,10 +20,7 @@
 import { inject, ref, watch } from "vue";
 import DateTime from "@/components/DateTime.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import type {
-  FormDateTimeRangeProps,
-  DateTimeRangeValue,
-} from "./OFormDateTimeRange.types";
+import type { FormDateTimeRangeProps, DateTimeRangeValue } from "./OFormDateTimeRange.types";
 
 defineOptions({ inheritAttrs: false });
 
@@ -32,9 +29,7 @@ const props = defineProps<FormDateTimeRangeProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormDateTimeRange] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormDateTimeRange] must be rendered inside <OForm>. No form context found.");
 }
 
 // Resolve a possibly-nested/indexed field name (e.g. `dashboards[0].timerange`)
@@ -46,10 +41,7 @@ const valueAtName = (values: any, name: string): unknown => {
     .replace(/\[(\w+)\]/g, ".$1")
     .split(".")
     .filter(Boolean);
-  return parts.reduce(
-    (acc: any, key) => (acc == null ? undefined : acc[key]),
-    values,
-  );
+  return parts.reduce((acc: any, key) => (acc == null ? undefined : acc[key]), values);
 };
 
 // Remount key — bumped only when the field value changes from outside this
@@ -94,8 +86,7 @@ const onDateChange = (field: any, dt: any) => {
     <template #default="{ field }">
       <div v-if="props.label || props.description" class="mb-2">
         <div v-if="props.label" class="text-sm font-bold text-input-label-text">
-          {{ props.label
-          }}<span v-if="props.required" class="text-input-error-text"> *</span>
+          {{ props.label }}<span v-if="props.required" class="text-input-error-text"> *</span>
         </div>
         <div v-if="props.description" class="text-xs">
           {{ props.description }}

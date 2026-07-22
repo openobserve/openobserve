@@ -25,7 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="toc-header"
         class="px-3 py-2 flex items-center gap-2 border-b flex-shrink-0 border-border-default !bg-[var(--color-theme-table-header-bg)]"
       >
-        <OIcon data-test="toc-header-icon" name="format-list-bulleted" size="sm" class="opacity-80" />
+        <OIcon
+          data-test="toc-header-icon"
+          name="format-list-bulleted"
+          size="sm"
+          class="opacity-80"
+        />
         <span data-test="toc-header-title" class="text-xs font-semibold text-text-body">
           Table of Contents
         </span>
@@ -34,7 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Content -->
       <div data-test="toc-content" class="p-3 flex-1 overflow-auto">
         <!-- Table of Contents -->
-        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" class="text-xs italic text-text-secondary">
+        <div
+          v-if="tableOfContents.length === 0"
+          data-test="toc-empty-state"
+          class="text-xs italic text-text-secondary"
+        >
           No sections available
         </div>
         <div v-else class="space-y-1">
@@ -58,7 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`toc-level1-text-${item.id}`"
                   @click="$emit('scroll-to-section', item.id)"
                   class="text-xs font-medium truncate flex-1 cursor-pointer hover:text-text-link-hover"
-                >{{ item.text }}</span>
+                  >{{ item.text }}</span
+                >
                 <!-- Expand button on the right (only for items with children) -->
                 <OButton
                   v-if="item.children.length > 0"
@@ -68,13 +78,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="$emit('toggle-section', item, $event)"
                   class="flex-shrink-0"
                 >
-                  <OIcon :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'" size="sm" />
-                  <OTooltip :content="expandedSections[item.id] ? 'Collapse' : 'Expand'" side="top" />
+                  <OIcon
+                    :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'"
+                    size="sm"
+                  />
+                  <OTooltip
+                    :content="expandedSections[item.id] ? 'Collapse' : 'Expand'"
+                    side="top"
+                  />
                 </OButton>
               </div>
 
               <!-- Level 2 Children -->
-              <div v-if="expandedSections[item.id] && item.children.length > 0" :data-test="`toc-level2-container-${item.id}`" class="ml-4 space-y-1 mt-1">
+              <div
+                v-if="expandedSections[item.id] && item.children.length > 0"
+                :data-test="`toc-level2-container-${item.id}`"
+                class="ml-4 space-y-1 mt-1"
+              >
                 <template v-for="child in item.children" :key="child.id">
                   <div :data-test="`toc-level2-item-${child.id}`">
                     <!-- Level 2 Item -->
@@ -94,7 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`toc-level2-text-${child.id}`"
                         @click="$emit('scroll-to-section', child.id)"
                         class="text-xs truncate flex-1 cursor-pointer hover:text-text-link-hover"
-                      >{{ child.text }}</span>
+                        >{{ child.text }}</span
+                      >
                       <!-- Expand button on the right (only for items with children) -->
                       <OButton
                         v-if="child.children.length > 0"
@@ -104,13 +125,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="$emit('toggle-section', child, $event)"
                         class="flex-shrink-0"
                       >
-                        <OIcon :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'" size="sm" />
-                        <OTooltip :content="expandedSections[child.id] ? 'Collapse' : 'Expand'" side="top" />
+                        <OIcon
+                          :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'"
+                          size="sm"
+                        />
+                        <OTooltip
+                          :content="expandedSections[child.id] ? 'Collapse' : 'Expand'"
+                          side="top"
+                        />
                       </OButton>
                     </div>
 
                     <!-- Level 3 Children -->
-                    <div v-if="expandedSections[child.id] && child.children.length > 0" :data-test="`toc-level3-container-${child.id}`" class="ml-4 space-y-1 mt-1">
+                    <div
+                      v-if="expandedSections[child.id] && child.children.length > 0"
+                      :data-test="`toc-level3-container-${child.id}`"
+                      class="ml-4 space-y-1 mt-1"
+                    >
                       <div
                         v-for="grandchild in child.children"
                         :key="grandchild.id"
@@ -118,8 +149,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="$emit('scroll-to-section', grandchild.id)"
                         class="flex items-center gap-2 px-2 py-1 rounded-default cursor-pointer transition-colors text-text-secondary hover:bg-surface-subtle-hover"
                       >
-                        <OIcon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber-manual-record" size="xs" class="opacity-60" />
-                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="text-2xs truncate">{{ grandchild.text }}</span>
+                        <OIcon
+                          :data-test="`toc-level3-icon-${grandchild.id}`"
+                          name="fiber-manual-record"
+                          size="xs"
+                          class="opacity-60"
+                        />
+                        <span
+                          :data-test="`toc-level3-text-${grandchild.id}`"
+                          class="text-2xs truncate"
+                          >{{ grandchild.text }}</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -148,9 +188,7 @@ interface TocItem {
 
 export default defineComponent({
   name: "IncidentTableOfContents",
-  components: { OButton,
-    OIcon,
-},
+  components: { OButton, OIcon },
   props: {
     tableOfContents: {
       type: Array as PropType<TocItem[]>,
@@ -165,6 +203,6 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['scroll-to-section', 'toggle-section'],
+  emits: ["scroll-to-section", "toggle-section"],
 });
 </script>

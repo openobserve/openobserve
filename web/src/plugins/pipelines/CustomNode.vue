@@ -88,12 +88,8 @@ const props = defineProps({
 });
 
 defineEmits(["delete:node"]);
-const {
-  pipelineObj,
-  deletePipelineNode,
-  checkIfDefaultDestinationNode,
-  openStepPicker,
-} = useDragAndDrop();
+const { pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode, openStepPicker } =
+  useDragAndDrop();
 const showButtons = ref(false);
 const showDeleteTooltip = ref(false);
 let hideButtonsTimeout: number | null = null;
@@ -104,12 +100,10 @@ const getLastError = (): {
   node_errors?: Record<string, NodeErrorInfo>;
 } | null => {
   const pipeline: unknown = pipelineObj.currentSelectedPipeline;
-  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline))
-    return null;
+  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline)) return null;
   const lastError: unknown = pipeline.last_error;
   if (!lastError || typeof lastError !== "object") return null;
-  const nodeErrors =
-    "node_errors" in lastError ? lastError.node_errors : undefined;
+  const nodeErrors = "node_errors" in lastError ? lastError.node_errors : undefined;
   return { node_errors: nodeErrors as Record<string, NodeErrorInfo> };
 };
 
@@ -126,8 +120,7 @@ const hasNodeError = computed(() => {
 // Get error info for current node
 const getNodeErrorInfo = computed(() => {
   const lastError = getLastError();
-  if (!lastError || !lastError.node_errors || props.id === undefined)
-    return null;
+  if (!lastError || !lastError.node_errors || props.id === undefined) return null;
 
   const nodeError = lastError.node_errors[props.id];
   if (!nodeError) return null;
@@ -139,9 +132,7 @@ const getNodeErrorInfo = computed(() => {
   // and the backend read path is untyped passthrough, so neither is converted
   // server-side. formatNodeErrorText owns that reconciliation; a bare join()
   // here rendered the tuple shape as "msg,[object Object]".
-  return formatNodeErrorText(nodeError, (count) =>
-    t("pipeline.moreErrors", { count }),
-  );
+  return formatNodeErrorText(nodeError, (count) => t("pipeline.moreErrors", { count }));
 });
 
 // Edge color mapping for different node types.
@@ -164,11 +155,7 @@ const getNodeColor = (ioType: string | undefined) => {
 };
 
 // Function to update edge colors on node hover
-const updateEdgeColors = (
-  nodeId: string | undefined,
-  color: string | null,
-  reset = false,
-) => {
+const updateEdgeColors = (nodeId: string | undefined, color: string | null, reset = false) => {
   if (pipelineObj.currentSelectedPipeline?.edges) {
     pipelineObj.currentSelectedPipeline.edges.forEach((edge: PipelineEdge) => {
       if (edge.source === nodeId) {
@@ -201,10 +188,7 @@ const updateEdgeColors = (
 };
 
 // Node hover handlers
-const handleNodeHover = (
-  nodeId: string | undefined,
-  ioType: string | undefined,
-) => {
+const handleNodeHover = (nodeId: string | undefined, ioType: string | undefined) => {
   const color = getNodeColor(ioType);
   updateEdgeColors(nodeId, color, false);
 
@@ -324,8 +308,7 @@ const openCancelDialog = (id: string) => {
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
-    confirmDialogMeta.value.warningMessage =
-      defaultDestinationNodeWarningMessage;
+    confirmDialogMeta.value.warningMessage = defaultDestinationNodeWarningMessage;
   } else {
     confirmDialogMeta.value.warningMessage = "";
   }
@@ -362,8 +345,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
   // narrow through unknown to its runtime element shape.
   const nodeTypes = pipelineObj.nodeTypes as unknown as NodeType[];
   const node = nodeTypes.find(
-    (node: NodeType) =>
-      node.subtype === searchTerm && node.io_type === ioType,
+    (node: NodeType) => node.subtype === searchTerm && node.io_type === ioType,
   );
   return node ? node.icon : undefined;
 }
@@ -431,7 +413,6 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         >
           {{ getTruncatedConditions(data.condition || data.conditions) }}
         </div>
-
       </template>
 
       <!-- Error badge (function nodes) + delete button, shared across types -->
@@ -483,7 +464,9 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
             class="fixed bg-status-negative text-white py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap left-3.75"
           >
             Delete Node
-            <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
+            <div
+              class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"
+            ></div>
           </div>
         </div>
       </template>

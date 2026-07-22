@@ -45,22 +45,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
 
       <div class="flex gap-3 mb-8">
-        <OButton
-          data-test="error-404-go-home-btn"
-          variant="primary"
-          size="sm-action"
-          to="/"
-        >{{ t('common.goHome') }}</OButton>
+        <OButton data-test="error-404-go-home-btn" variant="primary" size="sm-action" to="/">{{
+          t("common.goHome")
+        }}</OButton>
         <OButton
           data-test="error-404-go-back-btn"
           variant="outline"
           size="sm-action"
           @click="goBack"
-        >{{ t('common.goBack') }}</OButton>
+          >{{ t("common.goBack") }}</OButton
+        >
       </div>
 
       <p class="text-compact text-text-secondary opacity-70 m-0">
-        {{ t('common.redirectingHome', { countdown }) }}
+        {{ t("common.redirectingHome", { countdown }) }}
       </p>
     </div>
   </div>

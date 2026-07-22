@@ -23,9 +23,7 @@
           class="h-full w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 -ml-page-edge px-page-edge flex justify-between items-center font-semibold text-xs cursor-pointer bg-surface-subtle text-field-list-group-text"
           @click="toggleGroup(row.group)"
         >
-          <div class="flex-1 min-w-0">
-            {{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})
-          </div>
+          <div class="flex-1 min-w-0">{{ groupName }} ({{ groupFieldCount[row.group] ?? 0 }})</div>
           <OButton
             v-if="(groupFieldCount[row.group] ?? 0) > 0"
             variant="ghost"
@@ -175,7 +173,9 @@ const searchMatchedGroups = computed<Set<string> | null>(() => {
     if (
       !row.isGroup &&
       row.group &&
-      String(row.name ?? "").toLowerCase().includes(term)
+      String(row.name ?? "")
+        .toLowerCase()
+        .includes(term)
     ) {
       matched.add(row.group);
     }
@@ -221,4 +221,3 @@ function scrollToTop() {
 
 defineExpose({ scrollToTop });
 </script>
-

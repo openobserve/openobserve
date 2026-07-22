@@ -27,9 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="dataTest ? `${dataTest}-none` : undefined"
       @click.stop="select(null)"
     >
-      <span
-        class="absolute inset-x-px top-1/2 h-px origin-center -rotate-45 bg-status-negative"
-      />
+      <span class="absolute inset-x-px top-1/2 h-px origin-center -rotate-45 bg-status-negative" />
     </button>
 
     <!-- Curated swatches -->
@@ -60,12 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="customStyle"
       :title="t('dashboard.customColor')"
     >
-      <OIcon
-        v-if="!isCustomActive"
-        name="colorize"
-        size="xs"
-        class="opacity-70"
-      />
+      <OIcon v-if="!isCustomActive" name="colorize" size="xs" class="opacity-70" />
       <OIcon
         v-else
         name="check"
@@ -110,17 +103,13 @@ export default defineComponent({
     const isActive = (c: string) => normalized.value === c.toLowerCase();
 
     const isCustomActive = computed(
-      () =>
-        !!props.modelValue &&
-        !props.swatches.some((s) => s.toLowerCase() === normalized.value),
+      () => !!props.modelValue && !props.swatches.some((s) => s.toLowerCase() === normalized.value),
     );
 
     const select = (c: string | null) => emit("update:modelValue", c);
 
     const customStyle = computed<CSSProperties>(() =>
-      isCustomActive.value && props.modelValue
-        ? { background: props.modelValue }
-        : {},
+      isCustomActive.value && props.modelValue ? { background: props.modelValue } : {},
     );
 
     return {
@@ -135,4 +124,3 @@ export default defineComponent({
   },
 });
 </script>
-

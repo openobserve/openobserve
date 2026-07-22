@@ -25,15 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <div
-      class="bg-card-glass-bg py-2 flex-1 overflow-y-auto overflow-x-hidden"
-    >
+    <div class="bg-card-glass-bg py-2 flex-1 overflow-y-auto overflow-x-hidden">
       <div>
-        <OForm
-          :form="form"
-          id="add-destination-form"
-          class="flex flex-col gap-2 px-3 mt-2 mb-1"
-        >
+        <OForm :form="form" id="add-destination-form" class="flex flex-col gap-2 px-3 mt-2 mb-1">
           <!-- Destination Type Selection for Alerts (only show in create mode, not edit) -->
           <div v-if="isAlerts && !destination" class="w-full pb-3">
             <div class="text-sm font-medium mb-2">
@@ -50,10 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Destination Type and Name Display for Edit Mode -->
-          <div
-            v-if="isAlerts && destination && dtVal"
-            class="w-full pb-3"
-          >
+          <div v-if="isAlerts && destination && dtVal" class="w-full pb-3">
             <div class="flex gap-3">
               <!-- Destination Type (Read-only) -->
               <div class="w-1/2">
@@ -64,20 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex items-center p-2 border border-card-glass-border rounded-default"
                   data-test="destination-type-readonly"
                 >
-                  <OIcon
-                    :name="getDestinationTypeIcon(dtVal)"
-                    size="md"
-                    class="mr-2"
-                  />
-                  <span class="text-sm">{{
-                    getDestinationTypeName(dtVal)
-                  }}</span>
-                  <OTag
-                    type="readonlyFlag"
-                    value="readonly"
-                    class="ml-2"
-                    >{{ t("alert_destinations.readonly") }}</OTag
-                  >
+                  <OIcon :name="getDestinationTypeIcon(dtVal)" size="md" class="mr-2" />
+                  <span class="text-sm">{{ getDestinationTypeName(dtVal) }}</span>
+                  <OTag type="readonlyFlag" value="readonly" class="ml-2">{{
+                    t("alert_destinations.readonly")
+                  }}</OTag>
                 </div>
               </div>
               <!-- Destination Name (Read-only) -->
@@ -99,10 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Show for: create mode with destination_type selected OR edit mode for prebuilt destinations -->
           <div
             v-if="
-              isAlerts &&
-              (isPrebuiltDestination ||
-                (isUpdatingDestination &&
-                  dtVal !== 'custom'))
+              isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
             "
             class="w-full"
           >
@@ -129,10 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Template selector for prebuilt destinations -->
-            <div
-              v-if="dtVal && dtVal !== 'custom'"
-              class="w-1/2 py-1"
-            >
+            <div v-if="dtVal && dtVal !== 'custom'" class="w-1/2 py-1">
               <OFormSelect
                 data-test="add-destination-prebuilt-template-select"
                 name="template"
@@ -143,10 +119,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 tabindex="0"
               />
               <div class="text-xs text-text-secondary mt-1">
-                {{ t('alert_destinations.templateHelp', {
-                  type: getDestinationTypeName(dtVal),
-                  name: defaultPrebuiltTemplateName,
-                }) }}
+                {{
+                  t("alert_destinations.templateHelp", {
+                    type: getDestinationTypeName(dtVal),
+                    name: defaultPrebuiltTemplateName,
+                  })
+                }}
               </div>
             </div>
 
@@ -161,11 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="text-sm font-medium pb-1">
                   {{ t("alert_destinations.custom_headers") }}
                 </div>
-                <div
-                  v-for="(header, index) in apiHeaders"
-                  :key="index"
-                  class="flex gap-2 pb-2"
-                >
+                <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
                   <div class="w-5/12 ml-0">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-key-input`"
@@ -229,12 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Tabs for non-alert destinations OR custom alert destinations -->
-          <div
-            v-if="
-              !isAlerts || (isAlerts && dtVal === 'custom')
-            "
-            class="w-full pb-3"
-          >
+          <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
             <div class="app-tabs-container h-9 mr-2 w-fit">
               <app-tabs
                 data-test="add-destination-tabs"
@@ -252,15 +221,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-sm font-medium mr-2">
               {{ t("alert_destinations.noEmailTemplates") }}
             </div>
-            <OButton variant="outline" size="sm" @click="createEmailTemplate"
-              >{{ t("alert_destinations.createEmailTemplate") }}</OButton
-            >
+            <OButton variant="outline" size="sm" @click="createEmailTemplate">{{
+              t("alert_destinations.createEmailTemplate")
+            }}</OButton>
           </div>
           <!-- Name + Template row for custom alert destinations -->
-          <div
-            v-if="isAlerts && dtVal === 'custom'"
-            class="flex gap-3 w-full"
-          >
+          <div v-if="isAlerts && dtVal === 'custom'" class="flex gap-3 w-full">
             <div class="w-1/2 py-1">
               <OFormInput
                 data-test="add-destination-name-input"
@@ -282,10 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <!-- Name field for non-alert destinations (pipelines) -->
-          <div
-            v-if="!isAlerts"
-            class="py-1 w-full"
-          >
+          <div v-if="!isAlerts" class="py-1 w-full">
             <OFormInput
               data-test="add-destination-name-input"
               name="name"
@@ -297,9 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template
             v-if="
-              (isAlerts &&
-                dtVal === 'custom' &&
-                typeVal === 'http') ||
+              (isAlerts && dtVal === 'custom' && typeVal === 'http') ||
               (!isAlerts && typeVal === 'http')
             "
           >
@@ -313,10 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div
-                class="py-1"
-                :class="{ 'w-1/4': !isAlerts, 'w-1/2': isAlerts }"
-              >
+              <div class="py-1" :class="{ 'w-1/4': !isAlerts, 'w-1/2': isAlerts }">
                 <OFormSelect
                   data-test="add-destination-method-select"
                   name="method"
@@ -326,10 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   tabindex="0"
                 />
               </div>
-              <div
-                v-if="!isAlerts"
-                class="w-1/4 py-1"
-              >
+              <div v-if="!isAlerts" class="w-1/4 py-1">
                 <OFormSelect
                   data-test="add-destination-output-format-select"
                   name="output_format"
@@ -342,11 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="w-full py-2">
               <div class="font-bold py-1">{{ t("alert_destinations.headers") }}</div>
-              <div
-                v-for="(header, index) in apiHeaders"
-                :key="index"
-                class="flex gap-2 pb-2"
-              >
+              <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
                 <div class="w-5/12 ml-0">
                   <OFormInput
                     :data-test="`add-destination-header-${header['key']}-key-input`"
@@ -396,12 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </template>
-          <template
-            v-if="
-              typeVal === 'email' &&
-              (!isAlerts || dtVal === 'custom')
-            "
-          >
+          <template v-if="typeVal === 'email' && (!isAlerts || dtVal === 'custom')">
             <OFormInput
               name="emails"
               :label="t('reports.recipients')"
@@ -411,12 +357,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template
-            v-if="
-              typeVal === 'action' &&
-              (!isAlerts || dtVal === 'custom')
-            "
-          >
+          <template v-if="typeVal === 'action' && (!isAlerts || dtVal === 'custom')">
             <div class="w-1/2 py-1 action-select">
               <OFormSelect
                 data-test="add-destination-action-select"
@@ -438,9 +379,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
         <div
           v-if="
-            isAlerts &&
-            (isPrebuiltDestination ||
-              (isUpdatingDestination && dtVal !== 'custom'))
+            isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
           "
           class="flex items-center gap-2"
         >
@@ -499,13 +438,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
 </template>
 <script lang="ts" setup>
-import {
-  ref,
-  computed,
-  onBeforeMount,
-  onActivated,
-  watch,
-} from "vue";
+import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import type { PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import destinationService from "@/services/alert_destination";
@@ -518,11 +451,7 @@ import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import type {
-  Template,
-  Headers,
-  DestinationPayload,
-} from "@/ts/interfaces";
+import type { Template, Headers, DestinationPayload } from "@/ts/interfaces";
 import { useRouter } from "vue-router";
 import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
@@ -576,12 +505,8 @@ const form = useOForm({
 // Single submit entry-point: prebuilt types save via handlePrebuiltSave, custom/
 // pipeline via saveCustomDestination. Returned so OForm awaits the real save (the
 // footer Save spinner spans it).
-function saveDestination(
-  value: AddDestinationForm,
-): Promise<void> | undefined {
-  return isPrebuiltDestination.value
-    ? handlePrebuiltSave(value)
-    : saveCustomDestination(value);
+function saveDestination(value: AddDestinationForm): Promise<void> | undefined {
+  return isPrebuiltDestination.value ? handlePrebuiltSave(value) : saveCustomDestination(value);
 }
 
 // Reactive reads of the discriminators + the api-headers array.
@@ -634,16 +559,12 @@ const onSaveClick = () => {
 };
 
 // Bridge helpers for the non-<input> discriminators.
-const setDestinationType = (v: string) =>
-  form.setFieldValue("destination_type", v ?? "");
+const setDestinationType = (v: string) => form.setFieldValue("destination_type", v ?? "");
 const setType = (v: string) => form.setFieldValue("type", v);
 
 const tabs = computed(() => {
   // In edit mode for custom destinations, only show the tab for the current type
-  if (
-    isUpdatingDestination.value &&
-    dtVal.value === "custom"
-  ) {
+  if (isUpdatingDestination.value && dtVal.value === "custom") {
     const currentType = typeVal.value;
 
     // Only return the tab matching the current destination type
@@ -742,19 +663,13 @@ const setupDestinationData = () => {
     }
 
     // Priority 1: Check metadata.prebuilt_type (most reliable for prebuilt destinations)
-    if (
-      parsedMetadata?.prebuilt_type &&
-      isPrebuiltType(parsedMetadata.prebuilt_type)
-    ) {
+    if (parsedMetadata?.prebuilt_type && isPrebuiltType(parsedMetadata.prebuilt_type)) {
       setDestType(parsedMetadata.prebuilt_type);
     }
     // Priority 2: Check if template starts with 'system-prebuilt-' AND destination structure matches
     // (Must have emails array for email, or specific prebuilt URL patterns for HTTP)
     else if (props.destination.template?.startsWith("system-prebuilt-")) {
-      const templateType = props.destination.template.replace(
-        "system-prebuilt-",
-        "",
-      );
+      const templateType = props.destination.template.replace("system-prebuilt-", "");
       // Only treat as prebuilt if structure matches the type
       if (
         templateType === "email" &&
@@ -878,8 +793,7 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   const rawMetadata = props.destination.metadata;
   if (rawMetadata) {
     try {
-      const metadata =
-        typeof rawMetadata === "string" ? JSON.parse(rawMetadata) : rawMetadata;
+      const metadata = typeof rawMetadata === "string" ? JSON.parse(rawMetadata) : rawMetadata;
       Object.entries(metadata).forEach(([key, value]) => {
         if (key.startsWith("credential_")) {
           credentials[key.replace("credential_", "")] = value;
@@ -950,8 +864,7 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
 const getFormattedTemplates = computed(() =>
   props.templates
     .filter((template) => {
-      if (typeVal.value === "email" && template.type === "email")
-        return true;
+      if (typeVal.value === "email" && template.type === "email") return true;
       else if (typeVal.value !== "email") return true;
       return false;
     })
@@ -964,9 +877,7 @@ const getFormattedTemplates = computed(() =>
 const templateNameFor = (type: string): string => {
   if (!type || type === "custom") return "";
   const expectedName = `prebuilt_${type}`;
-  const fromApi = props.templates.find(
-    (tpl) => tpl.isPrebuilt && tpl.name === expectedName,
-  );
+  const fromApi = props.templates.find((tpl) => tpl.isPrebuilt && tpl.name === expectedName);
   return fromApi?.name ?? expectedName;
 };
 
@@ -987,7 +898,7 @@ const prebuiltTemplateOptions = computed(() => {
   const options: { label: string; value: string }[] = [];
 
   if (defaultPrebuiltTemplateName.value) {
-    const defaultLabel = t('alert_destinations.templateDefaultOption', {
+    const defaultLabel = t("alert_destinations.templateDefaultOption", {
       name: defaultPrebuiltTemplateName.value,
     });
     options.push({ label: defaultLabel, value: defaultPrebuiltTemplateName.value });
@@ -1164,9 +1075,7 @@ function saveCustomDestination(value: AddDestinationForm) {
 
   if (value.type === "email") {
     payload["type"] = "email";
-    payload["emails"] = (value.emails || "")
-      .split(/[;,]/)
-      .map((email: string) => email.trim());
+    payload["emails"] = (value.emails || "").split(/[;,]/).map((email: string) => email.trim());
   }
 
   if (value.type === "action") {
@@ -1191,7 +1100,7 @@ function saveCustomDestination(value: AddDestinationForm) {
         emit("cancel:hideform");
         toast({
           variant: "success",
-          message: t('alert_destinations.saved'),
+          message: t("alert_destinations.saved"),
         });
       })
       .catch((err: any) => {
@@ -1221,7 +1130,7 @@ function saveCustomDestination(value: AddDestinationForm) {
         emit("cancel:hideform");
         toast({
           variant: "success",
-          message: t('alert_destinations.saved'),
+          message: t("alert_destinations.saved"),
         });
       })
       .catch((err: any) => {

@@ -28,26 +28,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:active-tab="handleTabChange"
   >
     <template #output-content>
-      <div class="w-full h-full flex flex-col border-l border-border-default" style="min-width: 400px;">
+      <div
+        class="w-full h-full flex flex-col border-l border-border-default"
+        style="min-width: 400px"
+      >
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
           class="text-center text-sm font-semibold text-text-heading py-3 shrink-0"
         >
-          {{ t('modelPricing.errorValidations') }}
+          {{ t("modelPricing.errorValidations") }}
         </div>
-        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">{{ t('modelPricing.outputMessages') }}</div>
+        <div v-else class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">
+          {{ t("modelPricing.outputMessages") }}
+        </div>
         <OSeparator class="mt-1 shrink-0" />
         <div class="flex-1 min-h-0 overflow-auto resize-none">
           <!-- Model Pricing Errors Section -->
-          <div
-            class="p-2.5 mb-2.5"
-            v-if="modelPricingErrorsToDisplay.length > 0"
-          >
+          <div class="p-2.5 mb-2.5" v-if="modelPricingErrorsToDisplay.length > 0">
             <div>
-              <div
-                v-for="(errorGroup, index) in modelPricingErrorsToDisplay"
-                :key="index"
-              >
+              <div v-for="(errorGroup, index) in modelPricingErrorsToDisplay" :key="index">
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
@@ -58,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="model-pricing-import-name-error"
                     class="text-status-negative"
                     v-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'model_pricing_name'
+                      typeof errorMessage === 'object' && errorMessage.field == 'model_pricing_name'
                     "
                   >
                     {{ errorMessage.message }}
@@ -68,7 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="model-pricing-import-name-input"
                         v-model="userSelectedModelPricingName[index]"
                         :label="t('modelPricing.modelNameLabel')"
-                        @update:model-value="updateModelPricingName(userSelectedModelPricingName[index], index)"
+                        @update:model-value="
+                          updateModelPricingName(userSelectedModelPricingName[index], index)
+                        "
                       />
                     </div>
                   </span>
@@ -86,7 +86,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="model-pricing-import-pattern-input"
                         v-model="userSelectedModelPricingPattern[index]"
                         :label="t('modelPricing.matchPatternLabel')"
-                        @update:model-value="updateModelPricingPattern(userSelectedModelPricingPattern[index], index)"
+                        @update:model-value="
+                          updateModelPricingPattern(userSelectedModelPricingPattern[index], index)
+                        "
                       />
                     </div>
                   </span>
@@ -101,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-base mb-2.5 uppercase text-primary"
               data-test="model-pricing-import-creation-title"
             >
-              {{ t('modelPricing.modelPricingCreation') }}
+              {{ t("modelPricing.modelPricingCreation") }}
             </div>
             <div
               class=""
@@ -117,7 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
-                <pre class="creators-message whitespace-pre-wrap max-w-full" style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word;">{{ val.message }}</pre>
+                <pre
+                  class="creators-message whitespace-pre-wrap max-w-full"
+                  style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word"
+                  >{{ val.message }}</pre
+                >
               </div>
             </div>
           </div>
@@ -135,7 +141,7 @@ import { useRouter } from "vue-router";
 
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 import modelPricingService from "@/services/model_pricing";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -187,22 +193,14 @@ const allTabs = computed(() => [
 function updateModelPricingName(name: string, index: number) {
   if (baseImportRef.value?.jsonArrayOfObj[index]) {
     baseImportRef.value.jsonArrayOfObj[index].name = name;
-    baseImportRef.value.jsonStr = JSON.stringify(
-      baseImportRef.value.jsonArrayOfObj,
-      null,
-      2
-    );
+    baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
   }
 }
 
 function updateModelPricingPattern(pattern: string, index: number) {
   if (baseImportRef.value?.jsonArrayOfObj[index]) {
     baseImportRef.value.jsonArrayOfObj[index].match_pattern = pattern;
-    baseImportRef.value.jsonStr = JSON.stringify(
-      baseImportRef.value.jsonArrayOfObj,
-      null,
-      2
-    );
+    baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
   }
 }
 
@@ -220,9 +218,7 @@ async function importJson({ jsonStr: jsonString }: any) {
     }
 
     const parsedJson = JSON.parse(jsonString);
-    jsonArrayOfObj.value = Array.isArray(parsedJson)
-      ? parsedJson
-      : [parsedJson];
+    jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
   } catch (e: any) {
     toast({
       message: e.message || t("settings.importModelPricing.invalidJsonFormat"),
@@ -407,8 +403,7 @@ async function createModelPricing(jsonObj: any, index: number) {
     return true;
   } catch (error: any) {
     const errorMessage =
-      error?.response?.data?.message ||
-      t("settings.importModelPricing.unknownError");
+      error?.response?.data?.message || t("settings.importModelPricing.unknownError");
 
     // Skip bottom snackbar for 403 — global interceptor already shows persistent top banner.
     if (error?.response?.status !== 403) {

@@ -17,7 +17,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import i18n from "@/locales";
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -73,7 +72,6 @@ describe("ConfigPanelSearch", () => {
       expect((input.element as HTMLInputElement).value).toBe("hello");
       w.unmount();
     });
-
   });
 
   // -------------------------------------------------------------------------
@@ -88,6 +86,5 @@ describe("ConfigPanelSearch", () => {
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1]).toContain("axis");
     });
-
   });
 });

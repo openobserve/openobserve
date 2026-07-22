@@ -32,20 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :size="drawerSize"
     :show-close="true"
     :primary-button-label="
-      hideFooter || readonlyBody || bodyCreatingNew
-        ? undefined
-        : t('common.save')
+      hideFooter || readonlyBody || bodyCreatingNew ? undefined : t('common.save')
     "
     :secondary-button-label="
-      hideFooter || readonlyBody || bodyCreatingNew
-        ? undefined
-        : t('common.cancel')
+      hideFooter || readonlyBody || bodyCreatingNew ? undefined : t('common.cancel')
     "
     :neutral-button-label="
-      !hideFooter &&
-      !bodyCreatingNew &&
-      workflowObj.isEditNode &&
-      meta?.category !== 'trigger'
+      !hideFooter && !bodyCreatingNew && workflowObj.isEditNode && meta?.category !== 'trigger'
         ? t('workflow.deleteNode')
         : undefined
     "
@@ -54,17 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:neutral="onDelete"
     data-test="workflow-node-drawer"
   >
-    <div
-      :class="workflowObj.dialog.expand ? 'h-full min-h-0' : 'p-4'"
-    >
+    <div :class="workflowObj.dialog.expand ? 'h-full min-h-0' : 'p-4'">
       <!-- Per-node-type body. Each exposes submit() returning the data payload
            (or null to block Save). Types without a form yet fall back to the
            placeholder below. -->
-      <component
-        v-if="bodyComponent"
-        :is="bodyComponent"
-        ref="bodyRef"
-      />
+      <component v-if="bodyComponent" :is="bodyComponent" ref="bodyRef" />
       <div
         v-else
         class="flex flex-col items-center justify-center text-center gap-2 py-10 text-text-secondary"
@@ -87,18 +74,13 @@ import WorkflowAlertTrigger from "@/plugins/workflows/nodes/WorkflowAlertTrigger
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
 import WorkflowFunction from "@/plugins/workflows/nodes/WorkflowFunction.vue";
 import WorkflowDestination from "@/plugins/workflows/nodes/WorkflowDestination.vue";
-import useWorkflowCanvas, {
-  workflowObj,
-  nodeMeta,
-} from "@/plugins/workflows/useWorkflowCanvas";
+import useWorkflowCanvas, { workflowObj, nodeMeta } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18n();
 const { commitNode, cancelNodeDrawer, requestDeleteNode } = useWorkflowCanvas();
 
 const meta = computed(() => nodeMeta(workflowObj.dialog.name));
-const title = computed(() =>
-  meta.value ? t(meta.value.titleKey) : workflowObj.dialog.name,
-);
+const title = computed(() => (meta.value ? t(meta.value.titleKey) : workflowObj.dialog.name));
 
 // Node types that have a real config form. The rest still show the placeholder.
 const BODY_COMPONENTS: Record<string, any> = {
@@ -118,9 +100,7 @@ const drawerWidth = computed(() => {
   if (workflowObj.dialog.name === "function") return 30;
   return undefined; // destination + trigger fall back to `size`
 });
-const drawerSize = computed(() =>
-  workflowObj.dialog.name === "destination" ? "lg" : "md",
-);
+const drawerSize = computed(() => (workflowObj.dialog.name === "destination" ? "lg" : "md"));
 
 // Ref to the active body so Save can pull its payload / let it veto.
 const bodyRef = ref<any>(null);

@@ -94,35 +94,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="flex flex-col">
                 <OButtonGroup class="float-right">
-                  <OButton
-                    variant="ghost-primary"
-                    size="xs"
-                    @click="selectAllAdditions"
+                  <OButton variant="ghost-primary" size="xs" @click="selectAllAdditions"
                     >Select All New</OButton
                   >
-                  <OButton
-                    variant="ghost-warning"
-                    size="xs"
-                    @click="selectAllModifications"
+                  <OButton variant="ghost-warning" size="xs" @click="selectAllModifications"
                     >Select All Modified</OButton
                   >
-                  <OButton variant="ghost-muted" size="xs" @click="deselectAll"
-                    >Clear All</OButton
-                  >
+                  <OButton variant="ghost-muted" size="xs" @click="deselectAll">Clear All</OButton>
                 </OButtonGroup>
               </div>
             </div>
           </div>
 
           <!-- Scrollable Groups Container -->
-          <div class="bg-card-glass-bg groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2">
+          <div
+            class="bg-card-glass-bg groups-scroll-container flex-1 overflow-y-auto overflow-x-hidden p-2"
+          >
             <!-- Additions -->
             <div v-if="diffData.additions.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-separator mb-1 text-status-positive p-1">
+              <div
+                class="text-sm font-semibold border-b border-separator mb-1 text-status-positive p-1"
+              >
                 <OIcon name="add-circle" size="sm" />
-                New ({{ selectedAdditions.length }}/{{
-                  diffData.additions.length
-                }})
+                New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
               </div>
               <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
                 <li
@@ -142,15 +136,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span class="text-compact font-medium">{{ group.display }}</span>
                     <span class="block text-2xs text-muted-foreground truncate">
                       {{ group.id }} • {{ group.fields.length }} fields
-                      <OTag v-if="group.normalize" type="normalizeState" value="true" class="ml-1" />
+                      <OTag
+                        v-if="group.normalize"
+                        type="normalizeState"
+                        value="true"
+                        class="ml-1"
+                      />
                     </span>
                   </div>
                   <div class="flex items-center shrink-0 ms-auto">
-                    <OButton
-                      variant="ghost"
-                      size="icon-circle-sm"
-                      @click.stop="viewGroup(group)"
-                    >
+                    <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
                       <OIcon name="visibility" size="sm" />
                     </OButton>
                   </div>
@@ -160,11 +155,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Modifications -->
             <div v-if="diffData.modifications.length > 0" class="mb-2">
-              <div class="text-sm font-semibold border-b border-separator mb-1 text-status-warning-text p-1">
+              <div
+                class="text-sm font-semibold border-b border-separator mb-1 text-status-warning-text p-1"
+              >
                 <OIcon name="edit" size="sm" />
-                Modified ({{ selectedModifications.length }}/{{
-                  diffData.modifications.length
-                }})
+                Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
               </div>
               <ul class="flex flex-col divide-y divide-border border rounded-default mb-0">
                 <li
@@ -176,16 +171,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex items-start shrink-0 pt-1">
                     <OCheckbox
-                      :model-value="
-                        selectedModifications.includes(mod.proposed.id)
-                      "
+                      :model-value="selectedModifications.includes(mod.proposed.id)"
                       @update:model-value="toggleModification(mod.proposed.id)"
                     />
                   </div>
                   <div class="flex flex-col flex-1 min-w-0 px-2">
                     <span class="text-compact font-medium">{{ mod.proposed.display }}</span>
                     <span class="block text-2xs text-muted-foreground truncate">
-                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
+                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
+                      {{ mod.proposed.fields.length }} fields
                     </span>
                   </div>
                   <div class="flex items-center shrink-0 ms-auto">
@@ -216,7 +210,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <div class="flex flex-col flex-1 min-w-0 px-2">
                       <span class="text-compact">{{ group.display }}</span>
-                      <span class="block text-2xs text-muted-foreground">{{ group.id }} • {{ group.fields.length }} fields</span>
+                      <span class="block text-2xs text-muted-foreground"
+                        >{{ group.id }} • {{ group.fields.length }} fields</span
+                      >
                     </div>
                   </li>
                 </ul>
@@ -226,10 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- No Diff State -->
-        <div
-          v-else-if="!isImporting && !diffData"
-          class="bg-card-glass-bg p-4 text-center"
-        >
+        <div v-else-if="!isImporting && !diffData" class="bg-card-glass-bg p-4 text-center">
           <OIcon name="cloud-upload" class="mb-3 size-16!" />
           <div class="text-xl font-semibold text-text-muted mb-2">
             Upload a JSON file to get started
@@ -253,9 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="text-sm font-medium mb-2">
-        Fields ({{ selectedGroup?.fields.length }})
-      </div>
+      <div class="text-sm font-medium mb-2">Fields ({{ selectedGroup?.fields.length }})</div>
       <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
@@ -284,10 +275,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex gap-3">
       <div class="w-1/2">
         <div class="text-sm font-medium text-status-error-text mb-2">Current</div>
-        <div class="text-xs mb-1">
-          {{ selectedModification?.current.fields.length }} fields
-        </div>
-        <div class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default">
+        <div class="text-xs mb-1">{{ selectedModification?.current.fields.length }} fields</div>
+        <div
+          class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default"
+        >
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
@@ -301,10 +292,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="w-1/2">
         <div class="text-sm font-medium text-status-positive mb-2">Proposed</div>
-        <div class="text-xs mb-1">
-          {{ selectedModification?.proposed.fields.length }} fields
-        </div>
-        <div class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default">
+        <div class="text-xs mb-1">{{ selectedModification?.proposed.fields.length }} fields</div>
+        <div
+          class="field-chips-container max-h-62.5 overflow-y-auto p-2 bg-surface-base rounded-default"
+        >
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
@@ -314,12 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ field }}
             <template #trailing>
-              <OIcon
-                v-if="isNewField(field)"
-                name="add"
-                size="xs"
-                class="ml-1"
-              />
+              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ml-1" />
             </template>
           </OTag>
         </div>
@@ -380,9 +366,7 @@ const selectedGroup = ref<SemanticGroup | null>(null);
 const selectedModification = ref<SemanticGroupModification | null>(null);
 
 const hasSelectedChanges = computed(() => {
-  return (
-    selectedAdditions.value.length > 0 || selectedModifications.value.length > 0
-  );
+  return selectedAdditions.value.length > 0 || selectedModifications.value.length > 0;
 });
 
 const loadFile = async (value: FileValue) => {
@@ -431,9 +415,7 @@ const previewDiff = async (groups: SemanticGroup[]) => {
     diffData.value = response.data;
 
     // Auto-select all additions and modifications
-    selectedAdditions.value = response.data.additions.map(
-      (g: SemanticGroup) => g.id,
-    );
+    selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
     selectedModifications.value = response.data.modifications.map(
       (m: SemanticGroupModification) => m.proposed.id,
     );
@@ -452,9 +434,7 @@ const selectAllAdditions = () => {
 
 const selectAllModifications = () => {
   if (!diffData.value) return;
-  selectedModifications.value = diffData.value.modifications.map(
-    (m) => m.proposed.id,
-  );
+  selectedModifications.value = diffData.value.modifications.map((m) => m.proposed.id);
 };
 
 const deselectAll = () => {

@@ -46,9 +46,7 @@ const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 const textInputRef = ref<HTMLInputElement | null>(null);
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 const heightClasses: Record<NonNullable<ColorProps["size"]>, string> = {
@@ -128,9 +126,7 @@ const wrapperClasses = computed(() => [
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
   "focus-within:ring-2 focus-within:ring-datepicker-focus-ring",
-  props.disabled
-    ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60"
-    : "",
+  props.disabled ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
 </script>
@@ -142,14 +138,16 @@ const wrapperClasses = computed(() => [
       :for="inputId"
       class="text-xs font-medium text-datepicker-label leading-none flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help text-datepicker-label"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <div :class="wrapperClasses">
@@ -163,63 +161,60 @@ const wrapperClasses = computed(() => [
           :class="disabled || readonly ? 'cursor-not-allowed' : 'cursor-pointer'"
         >
           <span
-            :class="[
-              'rounded-default border border-datepicker-border',
-              swatchSize[size ?? 'md'],
-            ]"
+            :class="['rounded-default border border-datepicker-border', swatchSize[size ?? 'md']]"
             :style="{ background: swatchHex }"
             aria-hidden="true"
           />
         </PopoverTrigger>
 
         <PopoverPortal>
-        <PopoverContent
-          :side-offset="6"
-          align="start"
-          class="z-[10001] rounded-default border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border w-55"
-        >
-          <!-- Saturation / Brightness area -->
-          <!-- ColorAreaRoot passes gradient styles via scoped slot -->
-          <ColorAreaRoot
-            :model-value="pickerColor"
-            color-space="hsb"
-            x-channel="saturation"
-            y-channel="brightness"
-            class="w-full rounded-default overflow-hidden relative h-35"
-            @update:model-value="handlePickerChange"
-            v-slot="{ style: areaStyle }"
+          <PopoverContent
+            :side-offset="6"
+            align="start"
+            class="z-[10001] rounded-default border shadow-md p-3 flex flex-col gap-3 bg-colorpicker-popup-bg border-colorpicker-popup-border w-55"
           >
-            <ColorAreaArea class="w-full h-full" :style="areaStyle" />
-            <ColorAreaThumb
-              class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
-            />
-          </ColorAreaRoot>
+            <!-- Saturation / Brightness area -->
+            <!-- ColorAreaRoot passes gradient styles via scoped slot -->
+            <ColorAreaRoot
+              :model-value="pickerColor"
+              color-space="hsb"
+              x-channel="saturation"
+              y-channel="brightness"
+              class="w-full rounded-default overflow-hidden relative h-35"
+              @update:model-value="handlePickerChange"
+              v-slot="{ style: areaStyle }"
+            >
+              <ColorAreaArea class="w-full h-full" :style="areaStyle" />
+              <ColorAreaThumb
+                class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
+              />
+            </ColorAreaRoot>
 
-          <!-- Hue slider — ColorSliderTrack applies its own gradient internally -->
-          <ColorSliderRoot
-            :model-value="pickerColor"
-            color-space="hsb"
-            channel="hue"
-            class="relative flex items-center w-full h-4 rounded-default"
-            @update:model-value="handlePickerChange"
-          >
-            <ColorSliderTrack class="w-full h-3 rounded-default overflow-hidden" />
-            <ColorSliderThumb
-              class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
-            />
-          </ColorSliderRoot>
+            <!-- Hue slider — ColorSliderTrack applies its own gradient internally -->
+            <ColorSliderRoot
+              :model-value="pickerColor"
+              color-space="hsb"
+              channel="hue"
+              class="relative flex items-center w-full h-4 rounded-default"
+              @update:model-value="handlePickerChange"
+            >
+              <ColorSliderTrack class="w-full h-3 rounded-default overflow-hidden" />
+              <ColorSliderThumb
+                class="size-4 rounded-full border-2 border-colorpicker-thumb shadow outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
+              />
+            </ColorSliderRoot>
 
-          <!-- Hex input inside popup -->
-          <input
-            type="text"
-            :value="swatchHex"
-            maxlength="7"
-            placeholder="#000000"
-            :disabled="disabled"
-            class="w-full rounded-default border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
-            @input="handleText"
-          />
-        </PopoverContent>
+            <!-- Hex input inside popup -->
+            <input
+              type="text"
+              :value="swatchHex"
+              maxlength="7"
+              placeholder="#000000"
+              :disabled="disabled"
+              class="w-full rounded-default border px-2 py-1 text-xs font-mono outline-none text-datepicker-text placeholder:text-datepicker-placeholder bg-datepicker-bg border-datepicker-border focus:border-datepicker-focus-border"
+              @input="handleText"
+            />
+          </PopoverContent>
         </PopoverPortal>
       </PopoverRoot>
 
@@ -278,10 +273,7 @@ const wrapperClasses = computed(() => [
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-datepicker-label leading-none"
-      >
+      <span v-else-if="helpText" class="text-xs text-datepicker-label leading-none">
         {{ helpText }}
       </span>
     </div>

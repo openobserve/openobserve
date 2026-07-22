@@ -51,9 +51,7 @@ defineSlots<DateSlots>();
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 // ── Popup open state (needed to close it from Apply button) ───
@@ -73,9 +71,7 @@ const rekaValue = computed(() => tryParse(props.modelValue));
 
 // Staged selection for autoApply=false mode
 // Cast: ref() deep-unwraps DateValue's class type structurally, breaking DateValue bindings
-const stagedDate = ref<DateValue | undefined>(rekaValue.value) as Ref<
-  DateValue | undefined
->;
+const stagedDate = ref<DateValue | undefined>(rekaValue.value) as Ref<DateValue | undefined>;
 
 const rekaMin = computed(() => tryParse(props.min));
 const rekaMax = computed(() => tryParse(props.max));
@@ -130,9 +126,7 @@ const wrapperClasses = computed(() => [
     : "border-datepicker-border hover:border-datepicker-hover-border",
   "focus-within:border-datepicker-focus-border",
   "focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
-  props.disabled
-    ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60"
-    : "",
+  props.disabled ? "bg-datepicker-disabled-bg border-datepicker-disabled-border opacity-60" : "",
   heightClasses[props.size ?? "md"],
 ]);
 </script>
@@ -144,14 +138,16 @@ const wrapperClasses = computed(() => [
       :for="inputId"
       class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help text-datepicker-label"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <DatePickerRoot
@@ -200,7 +196,8 @@ const wrapperClasses = computed(() => [
                     ? 'rounded-default px-px outline-none tabular-nums data-placeholder:text-datepicker-placeholder focus:bg-datepicker-segment-focus-bg focus:text-datepicker-segment-focus-text focus:data-placeholder:text-datepicker-segment-focus-text'
                     : 'select-none text-datepicker-placeholder',
                 ]"
-              >{{ seg.value }}</DatePickerInput>
+                >{{ seg.value }}</DatePickerInput
+              >
             </template>
           </template>
         </DatePickerField>
@@ -235,9 +232,7 @@ const wrapperClasses = computed(() => [
         class="z-50 rounded-default border shadow-md p-3 bg-datepicker-popup-bg border-datepicker-popup-border"
       >
         <DatePickerCalendar v-slot="{ weekDays, grid }">
-          <DatePickerHeader
-            class="flex items-center justify-between mb-3"
-          >
+          <DatePickerHeader class="flex items-center justify-between mb-3">
             <DatePickerPrev
               class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
             >
@@ -256,9 +251,7 @@ const wrapperClasses = computed(() => [
               </svg>
             </DatePickerPrev>
 
-            <DatePickerHeading
-              class="text-sm font-medium text-datepicker-heading-text"
-            />
+            <DatePickerHeading class="text-sm font-medium text-datepicker-heading-text" />
 
             <DatePickerNext
               class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
@@ -279,10 +272,7 @@ const wrapperClasses = computed(() => [
             </DatePickerNext>
           </DatePickerHeader>
 
-          <DatePickerGrid
-            v-for="month in grid"
-            :key="month.value.toString()"
-          >
+          <DatePickerGrid v-for="month in grid" :key="month.value.toString()">
             <DatePickerGridHead>
               <DatePickerGridRow class="flex gap-1 mb-1">
                 <DatePickerHeadCell
@@ -301,11 +291,7 @@ const wrapperClasses = computed(() => [
                 :key="idx"
                 class="flex gap-1 mb-1"
               >
-                <DatePickerCell
-                  v-for="date in weekDates"
-                  :key="date.toString()"
-                  :date="date"
-                >
+                <DatePickerCell v-for="date in weekDates" :key="date.toString()" :date="date">
                   <DatePickerCellTrigger
                     :day="date"
                     :month="month.value"
@@ -320,13 +306,18 @@ const wrapperClasses = computed(() => [
         </DatePickerCalendar>
 
         <!-- Apply button (only when autoApply=false) -->
-        <div v-if="autoApply === false" class="flex justify-end mt-2 pt-2 border-t border-datepicker-popup-border">
+        <div
+          v-if="autoApply === false"
+          class="flex justify-end mt-2 pt-2 border-t border-datepicker-popup-border"
+        >
           <button
             type="button"
             :disabled="disabled"
             class="px-4 py-1.5 rounded-default text-xs font-medium bg-datepicker-day-selected-bg text-datepicker-day-selected-text outline-none ring-offset-1 ring-offset-surface-base hover:opacity-90 transition-[box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
             @click="handleApply"
-          >Apply</button>
+          >
+            Apply
+          </button>
         </div>
       </DatePickerContent>
     </DatePickerRoot>
@@ -339,10 +330,7 @@ const wrapperClasses = computed(() => [
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-datepicker-label leading-none"
-      >
+      <span v-else-if="helpText" class="text-xs text-datepicker-label leading-none">
         {{ helpText }}
       </span>
     </div>

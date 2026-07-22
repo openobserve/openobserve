@@ -16,131 +16,131 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-    <OPageLayout bleed
+    <OPageLayout
+      bleed
       v-if="!showDestinationEditor"
       :title="t('pipeline_destinations.header')"
       icon="person-pin-circle"
       :subtitle="'External targets for pipeline output'"
     >
-        <template #actions>
-          <OButton
-            data-test="pipeline-destination-list-add-btn"
-            variant="primary"
-            size="sm"
-            @click="editDestination(null)"
-            >{{ t(`alert_destinations.add`) }}</OButton
-          >
-        </template>
-      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
-      <OTable
-        :frame="false"
-        data-test="alert-destinations-list-table"
-        :data="visibleRows"
-        :columns="columns"
-        row-key="name"
-        :loading="loading"
-        :selected-ids="selectedDestinationIds"
-        selection="multiple"
-        pagination="client"
-        :page-size="20"
-        :page-size-options="[5, 10, 20, 50, 100]"
-        :footer-title="t('pipeline_destinations.header')"
-        sorting="client"
-        :default-columns="false"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="settings-pipeline-destinations"
-        show-index
-        :show-global-filter="false"
-        @update:selected-ids="handleSelectedIdsUpdate"
-      >
-        <template #toolbar>
-          <OSearchInput
-            v-model="filterQuery"
-            class="flex-1"
-            :placeholder="t('pipeline_destinations.search')"
-          />
-        </template>
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="pipeline-destination-list-refresh-btn"
-            @click="getDestinations"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="pipelineDestinationsRefresh" />
-          </OButton>
-        </template>
-        <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-pipeline-destinations"
-            :filtered="!!filterQuery"
-            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : editDestination(null)"
-          />
-        </template>
-
-        <template #cell-destination_type="{ row }">
-          <OTag
-            v-if="row.destination_type_name"
-            type="fieldTag"
-            value="soft"
-          >{{ row.destination_type_name }}</OTag>
-          <span v-else class="text-text-body">—</span>
-        </template>
-
-        <template #cell-output_format="{ row }">
-          <OTag
-            v-if="row.output_format"
-            type="fieldTag"
-            value="soft"
-          >{{ formatOutputFormat(row.output_format) }}</OTag>
-          <span v-else class="text-text-body">—</span>
-        </template>
-
-        <template #cell-actions="{ row }">
-          <OButton
-            :data-test="`alert-destination-list-${row.name}-update-destination`"
-            data-row-action="edit"
-            variant="ghost"
-            size="icon-sm"
-            :title="t('alert_destinations.edit')"
-            @click="editDestination(row)"
-          >
-            <OIcon name="edit" size="sm" />
-          </OButton>
-          <OButton
-            :data-test="`alert-destination-list-${row.name}-delete-destination`"
-            data-row-action="delete"
-            variant="ghost"
-            size="icon-sm"
-            :title="t('alert_destinations.delete')"
-            @click="conformDeleteDestination(row)"
-          >
-            <OIcon name="delete" size="sm" />
-          </OButton>
-        </template>
-
-        <template
-          v-if="selectedDestinations.length > 0"
-          #bottom
+      <template #actions>
+        <OButton
+          data-test="pipeline-destination-list-add-btn"
+          variant="primary"
+          size="sm"
+          @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton
         >
-          <span class="text-xs text-text-secondary font-medium">
-            {{ selectedDestinations.length }} selected
-          </span>
-          <OButton
-            data-test="pipeline-destination-list-delete-destinations-btn"
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            @click="openBulkDeleteDialog"
-          >
-            Delete
-          </OButton>
-        </template>
-      </OTable>
+      </template>
+      <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+        <OTable
+          :frame="false"
+          data-test="alert-destinations-list-table"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="name"
+          :loading="loading"
+          :selected-ids="selectedDestinationIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[5, 10, 20, 50, 100]"
+          :footer-title="t('pipeline_destinations.header')"
+          sorting="client"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-pipeline-destinations"
+          show-index
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              class="flex-1"
+              :placeholder="t('pipeline_destinations.search')"
+            />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="pipeline-destination-list-refresh-btn"
+              @click="getDestinations"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="pipelineDestinationsRefresh"
+              />
+            </OButton>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-pipeline-destinations"
+              :filtered="!!filterQuery"
+              @action="
+                (id) => (id === 'clear-filters' ? (filterQuery = '') : editDestination(null))
+              "
+            />
+          </template>
+
+          <template #cell-destination_type="{ row }">
+            <OTag v-if="row.destination_type_name" type="fieldTag" value="soft">{{
+              row.destination_type_name
+            }}</OTag>
+            <span v-else class="text-text-body">—</span>
+          </template>
+
+          <template #cell-output_format="{ row }">
+            <OTag v-if="row.output_format" type="fieldTag" value="soft">{{
+              formatOutputFormat(row.output_format)
+            }}</OTag>
+            <span v-else class="text-text-body">—</span>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`alert-destination-list-${row.name}-update-destination`"
+              data-row-action="edit"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alert_destinations.edit')"
+              @click="editDestination(row)"
+            >
+              <OIcon name="edit" size="sm" />
+            </OButton>
+            <OButton
+              :data-test="`alert-destination-list-${row.name}-delete-destination`"
+              data-row-action="delete"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alert_destinations.delete')"
+              @click="conformDeleteDestination(row)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+          </template>
+
+          <template v-if="selectedDestinations.length > 0" #bottom>
+            <span class="text-xs text-text-secondary font-medium">
+              {{ selectedDestinations.length }} selected
+            </span>
+            <OButton
+              data-test="pipeline-destination-list-delete-destinations-btn"
+              variant="outline-destructive"
+              size="sm"
+              icon-left="delete"
+              @click="openBulkDeleteDialog"
+            >
+              Delete
+            </OButton>
+          </template>
+        </OTable>
       </div>
     </OPageLayout>
     <div v-else>
@@ -170,15 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
-import {
-  ref,
-  onBeforeMount,
-  onActivated,
-  watch,
-  defineComponent,
-  onMounted,
-  computed,
-} from "vue";
+import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { getImageURL } from "@/utils/zincutils";
@@ -298,9 +290,7 @@ export default defineComponent({
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
-    const templates: Ref<Template[]> = ref([
-      { name: "test", body: "", type: "http" },
-    ]);
+    const templates: Ref<Template[]> = ref([{ name: "test", body: "", type: "http" }]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
       data: null,
@@ -318,9 +308,7 @@ export default defineComponent({
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const map = new Map(destinations.value.map((r: any) => [r.name, r]));
-      selectedDestinations.value = ids
-        .map((id: any) => map.get(id))
-        .filter(Boolean);
+      selectedDestinations.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
     onActivated(() => {
@@ -348,8 +336,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading destinations...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
       loading.value = true;
       destinationService
         .list({
@@ -387,17 +375,12 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add")
-        editDestination(null);
+      if (router.currentRoute.value.query.action === "add") editDestination(null);
       if (router.currentRoute.value.query.action === "update")
-        editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string),
-        );
+        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
     };
     const getDestinationByName = (name: string) => {
-      return destinations.value.find(
-        (destination) => destination.name === name,
-      );
+      return destinations.value.find((destination) => destination.name === name);
     };
     const editDestination = (destination: any) => {
       if (!destination) {
@@ -633,7 +616,12 @@ export default defineComponent({
     };
 
     useShortcuts([
-      { id: "pipelineDestinationsRefresh", handler: () => { if (!isInputFocused()) getDestinations(); } },
+      {
+        id: "pipelineDestinationsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getDestinations();
+        },
+      },
     ]);
 
     return {

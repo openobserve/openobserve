@@ -6,10 +6,7 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <div
-    class="flex flex-col h-full p-4 min-h-0"
-    data-test="score-config-library"
-  >
+  <div class="flex flex-col h-full p-4 min-h-0" data-test="score-config-library">
     <div
       v-if="isLoadingCatalog"
       class="flex flex-col items-center justify-center flex-1 p-8"
@@ -25,9 +22,7 @@ the Free Software Foundation, either version 3 of the License, or
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
       <div class="text-status-error-text">{{ loadError }}</div>
-      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
-        Retry
-      </OButton>
+      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog"> Retry </OButton>
     </div>
 
     <div v-else class="flex flex-col min-h-0 flex-1">
@@ -45,11 +40,10 @@ the Free Software Foundation, either version 3 of the License, or
           class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-text-secondary select-none"
           data-test="score-config-library-select-all"
         >
-          <OCheckbox
-            :model-value="allVisibleSelected"
-            @update:model-value="toggleSelectAll"
-          />
-          <span class="cursor-pointer" @click="toggleSelectAll">{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
+          <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
+          <span class="cursor-pointer" @click="toggleSelectAll">{{
+            allVisibleSelected ? "Clear all" : "Select all"
+          }}</span>
         </div>
         <span class="text-xs text-text-secondary">
           {{ filteredEntries.length }} score config(s)
@@ -69,17 +63,13 @@ the Free Software Foundation, either version 3 of the License, or
             <span class="text-text-heading">{{ group.label }}</span>
             <span class="font-medium text-text-secondary">({{ group.entries.length }})</span>
           </div>
-          <ul
-            class="flex flex-col rounded-default border border-border-default"
-          >
+          <ul class="flex flex-col rounded-default border border-border-default">
             <li
               v-for="entry in group.entries"
               :key="entry.name"
               class="flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors duration-200 border-l-4"
               :class="[
-                isSelected(entry.name)
-                  ? 'bg-primary/5 border-primary'
-                  : 'border-transparent',
+                isSelected(entry.name) ? 'bg-primary/5 border-primary' : 'border-transparent',
               ]"
               :data-test="`score-config-library-item-${entry.name}`"
               @click="toggle(entry)"
@@ -93,10 +83,7 @@ the Free Software Foundation, either version 3 of the License, or
               </div>
               <div class="flex flex-col flex-1 min-w-0">
                 <span class="text-sm font-medium">{{ entry.displayName }}</span>
-                <span
-                  v-if="entry.description"
-                  class="block text-xs text-text-secondary"
-                >
+                <span v-if="entry.description" class="block text-xs text-text-secondary">
                   {{ entry.description }}
                 </span>
               </div>
@@ -218,11 +205,10 @@ function toggle(entry: CatalogScoreConfig) {
   selectedNames.value = next;
 }
 
-watch(
-  selectedNames,
-  (val) => emit("update:selected-count", val.size),
-  { deep: true, immediate: true },
-);
+watch(selectedNames, (val) => emit("update:selected-count", val.size), {
+  deep: true,
+  immediate: true,
+});
 
 async function importSelected() {
   if (isImporting.value || selectedNames.value.size === 0) return;
@@ -279,4 +265,3 @@ function payloadFor(entry: CatalogScoreConfig) {
 
 defineExpose({ importSelected });
 </script>
-

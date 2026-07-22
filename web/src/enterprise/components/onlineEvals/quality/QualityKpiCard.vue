@@ -7,7 +7,9 @@
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
       <div class="flex items-center justify-between gap-2 mb-1">
-        <div class="kpi-label text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate">
+        <div
+          class="kpi-label text-2xs font-semibold leading-normal text-text-secondary min-w-0 truncate"
+        >
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
         </div>
         <span
@@ -21,17 +23,11 @@
           <span class="text-2xl font-bold leading-none text-text-secondary">
             {{ bigNumber }}
           </span>
-          <span
-            v-if="unitLabel"
-            class="text-compact font-semibold text-text-secondary "
-          >
+          <span v-if="unitLabel" class="text-compact font-semibold text-text-secondary">
             {{ unitLabel }}
           </span>
         </template>
-        <span
-          v-else
-          class="text-base font-medium leading-none text-text-muted"
-        >
+        <span v-else class="text-base font-medium leading-none text-text-muted">
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
       </div>
@@ -149,4 +145,3 @@ const sparkColor = computed(() => {
   return "#3b82f6";
 });
 </script>
-

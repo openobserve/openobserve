@@ -7,10 +7,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
 import { chartColor } from "@/utils/chartTheme";
-import type {
-  BooleanTrendPoint,
-  BooleanTrendSeries,
-} from "../composables/useQualityDetailCharts";
+import type { BooleanTrendPoint, BooleanTrendSeries } from "../composables/useQualityDetailCharts";
 import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
@@ -48,7 +45,8 @@ function buildOption(): echarts.EChartsOption {
   const text = chartColor("--color-text-secondary");
   const grid = chartColor("--color-border-subtle");
   const seriesList = effectiveSeries();
-  const isSplit = seriesList.length > 1 || seriesList.some((s) => s.id !== "__default__" && s.id !== "default");
+  const isSplit =
+    seriesList.length > 1 || seriesList.some((s) => s.id !== "__default__" && s.id !== "default");
 
   const echSeries: echarts.SeriesOption[] = seriesList.map((s, idx) => {
     const color = PALETTE[idx % PALETTE.length];

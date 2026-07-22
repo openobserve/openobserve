@@ -23,35 +23,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     :scroll="false"
   >
-      <template #actions>
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="dateState.valueType"
-          :default-absolute-time="{
-            startTime: dateState.startTime ?? 0,
-            endTime: dateState.endTime ?? 0,
-          }"
-          :default-relative-time="dateState.relativeTimePeriod ?? ''"
-          data-test="ai-sessions-date-time"
-          class="h-8"
-          @on:date-change="onDateChange"
-        />
-        <!-- Last-refresh + refresh control (logs-style), consistent with the
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="dateState.valueType"
+        :default-absolute-time="{
+          startTime: dateState.startTime ?? 0,
+          endTime: dateState.endTime ?? 0,
+        }"
+        :default-relative-time="dateState.relativeTimePeriod ?? ''"
+        data-test="ai-sessions-date-time"
+        class="h-8"
+        @on:date-change="onDateChange"
+      />
+      <!-- Last-refresh + refresh control (logs-style), consistent with the
              LLM Insights page header. -->
-        <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
-        >
-          <ORefreshButton
-            :last-run-at="sessionsLastRunAt"
-            :loading="isLoading"
-            :disabled="isLoading"
-            data-test="ai-sessions-refresh-btn"
-            @click="refresh"
-          />
-        </div>
-      </template>
+      <div
+        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+      >
+        <ORefreshButton
+          :last-run-at="sessionsLastRunAt"
+          :loading="isLoading"
+          :disabled="isLoading"
+          data-test="ai-sessions-refresh-btn"
+          @click="refresh"
+        />
+      </div>
+    </template>
 
     <SessionsList
       ref="sessionsRef"
@@ -73,10 +73,7 @@ import SessionsList from "@/plugins/traces/SessionsList.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import {
-  useAiDateRange,
-  resolveAiDateWindow,
-} from "@/enterprise/composables/useAiDateRange";
+import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 
 defineOptions({ name: "AISessionsPage" });
 
@@ -99,12 +96,8 @@ const isRefreshing = ref(false);
 // stamps `lastRunAt` when its fetch settles and exposes its own `loading`; OR in
 // the page-level `isRefreshing` so the icon spins from the moment of click
 // (covering the relative-window re-anchor before the list load starts).
-const sessionsLastRunAt = computed<number | null>(
-  () => sessionsRef.value?.lastRunAt ?? null,
-);
-const isLoading = computed(
-  () => isRefreshing.value || sessionsRef.value?.loading || false,
-);
+const sessionsLastRunAt = computed<number | null>(() => sessionsRef.value?.lastRunAt ?? null);
+const isLoading = computed(() => isRefreshing.value || sessionsRef.value?.loading || false);
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);
@@ -198,10 +191,7 @@ async function refresh() {
       writeToUrl();
     }
     await nextTick();
-    await sessionsRef.value?.refresh?.(
-      timeRange.value.startTime,
-      timeRange.value.endTime,
-    );
+    await sessionsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   } finally {
     isRefreshing.value = false;
   }

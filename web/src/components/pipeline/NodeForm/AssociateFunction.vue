@@ -37,9 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown.stop
     :primaryButtonLabel="!creating ? t('alerts.save') : undefined"
     :secondaryButtonLabel="!creating ? t('alerts.cancel') : undefined"
-    :neutralButtonLabel="
-      !creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined
-    "
+    :neutralButtonLabel="!creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
     @click:primary="saveFunction"
     @click:secondary="openCancelDialog"
@@ -50,10 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          same contract WorkflowNodeDrawer follows. That is now expressed with
          ODrawer's `bleed` prop above rather than a manual px-3 here: the drawer
          pads its own body (bodyPaddingClass), so padding here would double up. -->
-    <div
-      data-test="add-function-node-routing-section"
-      class="flex flex-col h-full bg-surface-base"
-    >
+    <div data-test="add-function-node-routing-section" class="flex flex-col h-full bg-surface-base">
       <!-- NOTE: `is-updating` is deliberately NOT bound to pipelineObj.isEditNode.
            That flag means "editing the NODE"; the picker's isUpdating means
            "editing an existing FUNCTION" (it locks the select). Editing a node
@@ -101,12 +96,7 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits([
-  "update:node",
-  "cancel:hideform",
-  "delete:node",
-  "add:function",
-]);
+const emit = defineEmits(["update:node", "cancel:hideform", "delete:node", "add:function"]);
 
 const { t } = useI18n();
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
@@ -132,11 +122,9 @@ const picker = ref<any>(null);
 const creating = ref(false);
 
 // Edit prefill.
-const initialName =
-  (pipelineObj.currentSelectedNodeData?.data as { name?: string })?.name || "";
+const initialName = (pipelineObj.currentSelectedNodeData?.data as { name?: string })?.name || "";
 const initialAfterFlatten =
-  (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })
-    ?.after_flatten ?? true;
+  (pipelineObj.currentSelectedNodeData?.data as { after_flatten?: boolean })?.after_flatten ?? true;
 
 const dialog = ref({
   show: false,
@@ -173,8 +161,7 @@ const openCancelDialog = () => {
 const openDeleteDialog = () => {
   dialog.value.show = true;
   dialog.value.title = "Delete Node";
-  dialog.value.message =
-    "Are you sure you want to delete function association?";
+  dialog.value.message = "Are you sure you want to delete function association?";
   dialog.value.okCallback = deleteFunction;
 };
 

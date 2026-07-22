@@ -16,20 +16,14 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  selectDimensionsFromData,
-  selectTraceDimensions,
-} from "./useDimensionSelector";
+import { selectDimensionsFromData, selectTraceDimensions } from "./useDimensionSelector";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /** Build N identical log samples each containing the given fields. */
-function buildSamples(
-  count: number,
-  fields: Record<string, string>
-): Record<string, string>[] {
+function buildSamples(count: number, fields: Record<string, string>): Record<string, string>[] {
   return Array.from({ length: count }, () => ({ ...fields }));
 }
 
@@ -37,7 +31,7 @@ function buildSamples(
 function buildSamplesWithCardinality(
   total: number,
   fieldName: string,
-  uniqueCount: number
+  uniqueCount: number,
 ): Record<string, string>[] {
   return Array.from({ length: total }, (_, i) => ({
     [fieldName]: `val-${i % uniqueCount}`,
@@ -221,11 +215,7 @@ describe("useDimensionSelector", () => {
     });
 
     it("respects the prioritised order: service_name before span_kind before span_status", () => {
-      const schema = [
-        { name: "span_status" },
-        { name: "service_name" },
-        { name: "span_kind" },
-      ];
+      const schema = [{ name: "span_status" }, { name: "service_name" }, { name: "span_kind" }];
       const result = selectTraceDimensions(schema);
       const svcIdx = result.indexOf("service_name");
       const kindIdx = result.indexOf("span_kind");
@@ -261,11 +251,7 @@ describe("useDimensionSelector", () => {
     });
 
     it("includes database-related trace fields when present", () => {
-      const schema = [
-        { name: "service_name" },
-        { name: "db_system" },
-        { name: "db_operation" },
-      ];
+      const schema = [{ name: "service_name" }, { name: "db_system" }, { name: "db_operation" }];
       const result = selectTraceDimensions(schema, 8);
       expect(result).toContain("db_system");
     });
@@ -281,24 +267,36 @@ describe("useDimensionSelector", () => {
     });
 
     it("does not include schema fields that are not in the OTel priority list", () => {
-      const schema = [
-        { name: "service_name" },
-        { name: "my_custom_dimension" },
-      ];
+      const schema = [{ name: "service_name" }, { name: "my_custom_dimension" }];
       const result = selectTraceDimensions(schema, 8);
       expect(result).not.toContain("my_custom_dimension");
     });
 
     it("uses default maxDimensions of 8 when not specified", () => {
       const schema = Array.from({ length: 25 }, (_, i) => ({
-        name: [
-          "service_name", "span_kind", "span_status", "operation_name",
-          "http_method", "http_status_code", "http_route", "http_target",
-          "db_system", "db_operation", "db_name",
-          "messaging_system", "messaging_operation",
-          "rpc_system", "rpc_service", "rpc_method",
-          "host_name", "container_name", "k8s_pod_name", "k8s_namespace_name",
-        ][i] || `extra_${i}`,
+        name:
+          [
+            "service_name",
+            "span_kind",
+            "span_status",
+            "operation_name",
+            "http_method",
+            "http_status_code",
+            "http_route",
+            "http_target",
+            "db_system",
+            "db_operation",
+            "db_name",
+            "messaging_system",
+            "messaging_operation",
+            "rpc_system",
+            "rpc_service",
+            "rpc_method",
+            "host_name",
+            "container_name",
+            "k8s_pod_name",
+            "k8s_namespace_name",
+          ][i] || `extra_${i}`,
       }));
       const result = selectTraceDimensions(schema);
       expect(result.length).toBeLessThanOrEqual(8);

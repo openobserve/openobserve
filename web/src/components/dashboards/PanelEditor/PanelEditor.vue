@@ -32,11 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Query-related chart content (not html/markdown/custom_chart) -->
       <div
-        v-if="
-          !['html', 'markdown', 'custom_chart'].includes(
-            dashboardPanelData.data.type,
-          )
-        "
+        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
         :class="mainContentContainerClass"
         :style="mainContentContainerStyle"
       >
@@ -90,20 +86,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :style="afterSlotInnerStyle"
                 @scroll.passive="onBuilderScroll"
               >
-                <div
-                  class="flex flex-col w-full h-full"
-                  :style="layoutPanelContainerStyle"
-                >
+                <div class="flex flex-col w-full h-full" :style="layoutPanelContainerStyle">
                   <!-- Mode selection + Add To Dashboard row. Skip when empty (e.g.
                        dashboard mode) so its `my-2` margin isn't dead space. -->
                   <div
                     v-if="pageType === 'build' || resolvedConfig.showAddToDashboardButton"
                     class="flex justify-between items-center my-2 mx-2"
                   >
-                    <QueryTypeSelector
-                      v-if="pageType === 'build'"
-                      :showQueryType="false"
-                    />
+                    <QueryTypeSelector v-if="pageType === 'build'" :showQueryType="false" />
                     <div v-else />
                     <div class="flex items-center gap-2">
                       <OButton
@@ -123,9 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <DashboardQueryBuilder
                     v-if="resolvedConfig.showQueryBuilder"
                     :dashboardData="dashboardData"
-                    @custom-chart-template-selected="
-                      handleCustomChartTemplateSelected
-                    "
+                    @custom-chart-template-selected="handleCustomChartTemplateSelected"
                   />
                   <OSeparator v-if="resolvedConfig.showQueryBuilder" />
 
@@ -140,12 +128,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     class="pl-3"
                     :variablesConfig="dashboardData?.variables"
-                    :showDynamicFilters="
-                      dashboardData?.variables?.showDynamicFilters
-                    "
-                    :selectedTimeDate="
-                      dateTimeForVariables || dashboardPanelData.meta.dateTime
-                    "
+                    :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
+                    :selectedTimeDate="dateTimeForVariables || dashboardPanelData.meta.dateTime"
                     @variablesData="handleVariablesDataUpdated"
                     @openAddVariable="emit('openAddVariable')"
                     :initialVariableValues="initialVariableValues"
@@ -156,37 +140,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
 
                   <!-- Outdated Warning -->
-                  <div
-                    v-if="resolvedConfig.showOutdatedWarning && isOutDated"
-                    class="p-2"
-                  >
+                  <div v-if="resolvedConfig.showOutdatedWarning && isOutDated" class="p-2">
                     <div
                       class="border border-banner-warning-border bg-banner-warning-bg p-[1%] rounded-default"
-                     
                     >
-                      <div class="font-bold">
-                        Your chart is not up to date
-                      </div>
+                      <div class="font-bold">Your chart is not up to date</div>
                       <div>
-                        Chart Configuration / Variables has been updated, but
-                        the chart was not updated automatically. Click on the
-                        "Apply" button to run the query again
+                        Chart Configuration / Variables has been updated, but the chart was not
+                        updated automatically. Click on the "Apply" button to run the query again
                       </div>
                     </div>
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div
-                    class="flex justify-end mr-2 items-center gap-2"
-                  >
+                  <div class="flex justify-end mr-2 items-center gap-2">
                     <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
                         !panelSchemaRendererRef?.noData &&
-                        ![
-                          'table', 'heatmap', 'metric', 'gauge',
-                          'geomap', 'maps',
-                        ].includes(dashboardPanelData.data.type)
+                        !['table', 'heatmap', 'metric', 'gauge', 'geomap', 'maps'].includes(
+                          dashboardPanelData.data.type,
+                        )
                       "
                       variant="ghost"
                       size="icon"
@@ -203,8 +177,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         editMode &&
                         pageType === 'dashboard' &&
                         [
-                          'area', 'area-stacked', 'bar', 'h-bar',
-                          'line', 'scatter', 'stacked', 'h-stacked',
+                          'area',
+                          'area-stacked',
+                          'bar',
+                          'h-bar',
+                          'line',
+                          'scatter',
+                          'stacked',
+                          'h-stacked',
                         ].includes(dashboardPanelData.data.type) &&
                         panelSchemaRendererRef?.checkIfPanelIsTimeSeries === true
                       "
@@ -214,11 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="panel-editor-annotation-btn"
                     >
                       <OIcon
-                        :name="
-                          panelSchemaRendererRef?.isAddAnnotationMode
-                            ? 'cancel'
-                            : 'edit'
-                        "
+                        :name="panelSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'edit'"
                         size="sm"
                       />
                       <OTooltip
@@ -235,18 +211,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <PanelErrorButtons
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
-                      :limitNumberOfSeriesWarningMessage="
-                        limitNumberOfSeriesWarningMessage
-                      "
+                      :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
                       :isCachedDataDifferWithCurrentTimeRange="
                         isCachedDataDifferWithCurrentTimeRange
                       "
                       :isPartialData="isPartialData"
                       :isPanelLoading="isPanelLoading"
                       :lastTriggeredAt="
-                        resolvedConfig.showLastRefreshedTime
-                          ? (lastTriggeredAt as any)
-                          : null
+                        resolvedConfig.showLastRefreshedTime ? (lastTriggeredAt as any) : null
                       "
                       :viewOnly="false"
                       :xAliasInconsistencyWarning="hasInconsistentXAlias"
@@ -268,9 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :folder-id="folderId"
                         :selectedTimeObj="dashboardPanelData.meta.dateTime"
                         :variablesData="resolvedVariablesData"
-                        :allowAnnotationsAdd="
-                          editMode && pageType === 'dashboard'
-                        "
+                        :allowAnnotationsAdd="editMode && pageType === 'dashboard'"
                         :allowAlertCreation="pageType === 'metrics'"
                         :width="6"
                         :shouldRefreshWithoutCache="shouldRefreshWithoutCache"
@@ -286,9 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         "
                         @error="handleChartApiError"
                         @updated:data-zoom="handleDataZoom"
-                        @updated:vrl-function-field-list="
-                          updateVrlFunctionFieldList
-                        "
+                        @updated:vrl-function-field-list="updateVrlFunctionFieldList"
                         @last-triggered-at-update="handleLastTriggeredAtUpdate"
                         @series-data-update="seriesDataUpdate"
                         @show-legends="showLegendsDialog = true"
@@ -297,18 +265,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @is-cached-data-differ-with-current-time-range-update="
                           handleIsCachedDataDifferWithCurrentTimeRangeUpdate
                         "
-                        @update:initial-variable-values="
-                          handleInitialVariableValuesUpdate
-                        "
+                        @update:initial-variable-values="handleInitialVariableValuesUpdate"
                       />
                     </div>
                   </div>
 
                   <!-- Errors Component -->
-                  <DashboardErrorsComponent
-                    :errors="errorData"
-                    class="col-auto shrink-0"
-                  />
+                  <DashboardErrorsComponent :errors="errorData" class="col-auto shrink-0" />
                 </div>
 
                 <!-- Query Editor -->
@@ -328,11 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Config Panel Sidebar -->
               <div
                 class="col-auto"
-                :style="
-                  pageType === 'logs' || pageType === 'build'
-                    ? { height: '100%' }
-                    : {}
-                "
+                :style="pageType === 'logs' || pageType === 'build' ? { height: '100%' } : {}"
               >
                 <PanelSidebar
                   :title="t('dashboard.configLabel')"
@@ -371,16 +330,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabId="tabId"
             :panelId="panelId"
           />
-          <CustomHTMLEditor class="flex-1 min-h-0"
+          <CustomHTMLEditor
+            class="flex-1 min-h-0"
             v-model="dashboardPanelData.data.htmlContent"
             :initialVariableValues="liveVariablesData"
             :tabId="tabId"
             :panelId="panelId"
           />
-          <DashboardErrorsComponent
-            :errors="errorData"
-            class="shrink-0"
-          />
+          <DashboardErrorsComponent :errors="errorData" class="shrink-0" />
         </div>
       </div>
 
@@ -405,16 +362,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :tabId="tabId"
             :panelId="panelId"
           />
-          <CustomMarkdownEditor class="flex-1 min-h-0"
+          <CustomMarkdownEditor
+            class="flex-1 min-h-0"
             v-model="dashboardPanelData.data.markdownContent"
             :initialVariableValues="liveVariablesData"
             :tabId="tabId"
             :panelId="panelId"
           />
-          <DashboardErrorsComponent
-            :errors="errorData"
-            class="shrink-0"
-          />
+          <DashboardErrorsComponent :errors="errorData" class="shrink-0" />
         </div>
       </div>
 
@@ -448,9 +403,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[0, 20]"
           :disable="!dashboardPanelData.layout.showFieldList"
           :style="{
-            width: dashboardPanelData.layout.showFieldList
-              ? '100%'
-              : 'calc(100% - 50px)',
+            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
             height: '100%',
           }"
           separatorClass="field-list-separator"
@@ -483,9 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex bg-card-glass-bg"
               :style="{ height: contentHeight, overflow: 'hidden' }"
             >
-              <div
-                class="flex flex-col scroll flex-1 min-w-0 h-full"
-              >
+              <div class="flex flex-col scroll flex-1 min-w-0 h-full">
                 <!-- Editor/Preview splitter -->
                 <div class="h-125 shrink-0 overflow-hidden">
                   <OSplitter
@@ -496,7 +447,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Custom Chart Editor -->
                     <template #before>
                       <div class="relative w-full h-full">
-                        <CustomChartEditor class="w-full h-full"
+                        <CustomChartEditor
+                          class="w-full h-full"
                           v-model="dashboardPanelData.data.customChartContent"
                         />
                         <!-- Example Charts button (dashboard mode only) -->
@@ -510,8 +462,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             @click="showCustomChartTypeSelector = true"
                             data-test="custom-chart-type-selector-btn"
                           >
-                            <template #icon-left><OIcon name="bar-chart" size="sm"
-                            /></template>
+                            <template #icon-left><OIcon name="bar-chart" size="sm" /></template>
                             Example Charts
                           </OButton>
                           <ODialog
@@ -531,7 +482,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Splitter separator -->
                     <template #separator>
-                      <div class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-table-resize-handle"></div>
+                      <div
+                        class="w-1 h-full bg-transparent transition-colors duration-300 hover:bg-table-resize-handle"
+                      ></div>
                     </template>
 
                     <!-- Chart Preview -->
@@ -542,7 +495,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"
                             :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                            :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
+                            :isCachedDataDifferWithCurrentTimeRange="
+                              isCachedDataDifferWithCurrentTimeRange
+                            "
                             :isPartialData="isPartialData"
                             :isPanelLoading="isPanelLoading"
                             :lastTriggeredAt="null"
@@ -573,9 +528,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           "
                           @error="handleChartApiError"
                           @updated:data-zoom="handleDataZoom"
-                          @updated:vrl-function-field-list="
-                            updateVrlFunctionFieldList
-                          "
+                          @updated:vrl-function-field-list="updateVrlFunctionFieldList"
                           @last-triggered-at-update="handleLastTriggeredAtUpdate"
                           @series-data-update="seriesDataUpdate"
                           @show-legends="showLegendsDialog = true"
@@ -584,9 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @is-cached-data-differ-with-current-time-range-update="
                             handleIsCachedDataDifferWithCurrentTimeRangeUpdate
                           "
-                          @update:initial-variable-values="
-                            handleInitialVariableValuesUpdate
-                          "
+                          @update:initial-variable-values="handleInitialVariableValuesUpdate"
                         />
                       </div>
                     </template>
@@ -595,10 +546,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- Errors Component -->
                 <div class="col-auto shrink-0">
-                  <DashboardErrorsComponent
-                    :errors="errorData"
-                    class="col-auto shrink-0"
-                  />
+                  <DashboardErrorsComponent :errors="errorData" class="col-auto shrink-0" />
                 </div>
 
                 <!-- Query Editor for custom chart -->
@@ -707,8 +655,7 @@ const CustomChartEditor = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/CustomChartEditor.vue"),
 );
 const CustomChartTypeSelector = defineAsyncComponent(
-  () =>
-    import("@/components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue"),
+  () => import("@/components/dashboards/addPanel/customChartExamples/CustomChartTypeSelector.vue"),
 );
 const QueryTypeSelector = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/QueryTypeSelector.vue"),
@@ -751,12 +698,8 @@ const resolvedConfig = computed<PanelEditorConfig>(() => resolveConfig(props));
 
 // Get dashboard panel data composable
 const pageKey = computed(() => props.pageType);
-const {
-  dashboardPanelData,
-  resetAggregationFunction,
-  makeAutoSQLQuery,
-  validatePanel,
-} = useDashboardPanelData(pageKey.value);
+const { dashboardPanelData, resetAggregationFunction, makeAutoSQLQuery, validatePanel } =
+  useDashboardPanelData(pageKey.value);
 
 // Provide page key for child components
 provide("dashboardPanelDataPageKey", pageKey.value);
@@ -847,8 +790,14 @@ const showCustomChartTypeSelector = ref(false);
 // X-axis alias consistency warning for multi-SQL panels
 // Only applicable for chart types that render an x-axis
 const xAxisChartTypes = new Set([
-  "line", "area", "area-stacked", "stacked", "h-stacked",
-  "bar", "h-bar", "scatter",
+  "line",
+  "area",
+  "area-stacked",
+  "stacked",
+  "h-stacked",
+  "bar",
+  "h-bar",
+  "scatter",
 ]);
 const hasInconsistentXAlias = computed(() => {
   if (!xAxisChartTypes.has(dashboardPanelData.data.type)) return false;
@@ -857,8 +806,7 @@ const hasInconsistentXAlias = computed(() => {
   // functionName metadata, so including them causes false positives
   // when the user writes SQL with the same timestamp field.
   const activeQueries = dashboardPanelData.data.queries.filter(
-    (_: any, idx: number) =>
-      !(dashboardPanelData.layout.hiddenQueries || []).includes(idx),
+    (_: any, idx: number) => !(dashboardPanelData.layout.hiddenQueries || []).includes(idx),
   );
   const builderQueries = activeQueries.filter(
     (q: any) => !q.customQuery && q.fields.x && q.fields.x.length > 0,
@@ -921,7 +869,7 @@ const rowStyle = computed<CSSProperties>(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return { height: "100%", width: "100%" };
   }
-  return { overflowY: "auto", width: '100%' };
+  return { overflowY: "auto", width: "100%" };
 });
 
 // Main content container class - logs/build uses vertical flex, others use horizontal
@@ -960,9 +908,7 @@ const splitterLimits = computed<[number, number]>(() => {
 // Splitter style
 const splitterStyle = computed(() => {
   return {
-    width: dashboardPanelData.layout.showFieldList
-      ? "100%"
-      : "calc(100% - 50px)",
+    width: dashboardPanelData.layout.showFieldList ? "100%" : "calc(100% - 50px)",
     height: "100%",
   };
 });
@@ -972,7 +918,7 @@ const afterSlotStyle = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
     return {
       height: "100%",
-      width: "100%"
+      width: "100%",
     };
   }
   return {};
@@ -1113,17 +1059,13 @@ const handleChartTypeSelection = async (selection: any) => {
 // Define your ECharts 'option' here.
 // 'data' variable is available for use and contains the response data from the search result and it is an array.
 `;
-        dashboardPanelData.data.customChartContent =
-          defaultComments + template.code;
+        dashboardPanelData.data.customChartContent = defaultComments + template.code;
 
-        const currentQueryIndex =
-          dashboardPanelData.layout.currentQueryIndex || 0;
+        const currentQueryIndex = dashboardPanelData.layout.currentQueryIndex || 0;
         if (dashboardPanelData.data.queries[currentQueryIndex]) {
           if (replaceQuery && template.query && template.query.trim()) {
-            dashboardPanelData.data.queries[currentQueryIndex].query =
-              template.query.trim();
-            dashboardPanelData.data.queries[currentQueryIndex].customQuery =
-              true;
+            dashboardPanelData.data.queries[currentQueryIndex].query = template.query.trim();
+            dashboardPanelData.data.queries[currentQueryIndex].customQuery = true;
           }
         }
       }
@@ -1143,51 +1085,33 @@ const handleChartTypeSelection = async (selection: any) => {
 // This is the centralized watcher that replaces duplicate watchers in AddPanel, Metrics, and BuildQueryPage
 watch(
   () => [
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.stream,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.stream,
     // Rebuild the auto query once the stream schema loads (makeAutoSQLQuery bails
     // out while groupedFields is empty).
     dashboardPanelData.meta?.streamFields?.groupedFields?.length,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.x,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.y,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.breakdown,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.z,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.filter,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.customQuery,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.latitude,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.longitude,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.weight,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.source,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.target,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.value,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.name,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.fields?.value_for_maps,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.config?.limit,
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.joins,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.x,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.y,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.breakdown,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.z,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.filter,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.latitude,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.longitude,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.weight,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.source,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.target,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.value,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields?.name,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.fields
+      ?.value_for_maps,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.config?.limit,
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins,
     dashboardPanelData.data.type,
   ],
   async () => {
     // Only auto-generate SQL if in builder mode (customQuery = false)
     if (
-      !dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.customQuery
+      !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery
     ) {
       const result = await makeAutoSQLQuery();
 
@@ -1204,9 +1128,7 @@ watch(
 
 // Watch for customQuery mode changes to notify parent
 watch(
-  () =>
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.customQuery,
+  () => dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.customQuery,
   (isCustomMode) => {
     emit("customQueryModeChanged", isCustomMode ?? false);
   },

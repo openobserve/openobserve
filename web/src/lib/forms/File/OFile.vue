@@ -1,12 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  FileProps,
-  FileEmits,
-  FileSlots,
-  FileValue,
-} from "./OFile.types";
+import type { FileProps, FileEmits, FileSlots, FileValue } from "./OFile.types";
 import { computed, ref, useAttrs, useId } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -44,9 +39,7 @@ const files = computed<File[]>(() => {
   return Array.isArray(v) ? v : [v];
 });
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 const heightClasses: Record<NonNullable<FileProps["size"]>, string> = {
@@ -206,14 +199,16 @@ const wrapperClasses = computed(() => [
       :for="inputId"
       class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help text-file-label"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <div
@@ -249,14 +244,13 @@ const wrapperClasses = computed(() => [
         <path
           d="M7.293 1.5a1 1 0 0 1 1.414 0l3.5 3.5a1 1 0 0 1-1.414 1.414L9 4.621V10a1 1 0 1 1-2 0V4.621L4.207 6.414A1 1 0 0 1 2.793 5L7.293 1.5Z"
         />
-        <path d="M2 12a1 1 0 0 1 2 0v1.5h8V12a1 1 0 0 1 2 0v2a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 2 14v-2Z" />
+        <path
+          d="M2 12a1 1 0 0 1 2 0v1.5h8V12a1 1 0 0 1 2 0v2a.5.5 0 0 1-.5.5h-11A.5.5 0 0 1 2 14v-2Z"
+        />
       </svg>
 
       <!-- Selected files / placeholder -->
-      <div
-        v-if="files.length === 0"
-        class="flex-1 min-w-0 text-file-placeholder truncate"
-      >
+      <div v-if="files.length === 0" class="flex-1 min-w-0 text-file-placeholder truncate">
         {{
           placeholder ||
           (dropZone
@@ -329,10 +323,7 @@ const wrapperClasses = computed(() => [
       </button>
     </div>
 
-    <div
-      v-if="effectiveError || helpText"
-      class="flex items-center justify-between gap-2"
-    >
+    <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
         :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
@@ -341,10 +332,7 @@ const wrapperClasses = computed(() => [
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-file-label leading-none"
-      >
+      <span v-else-if="helpText" class="text-xs text-file-label leading-none">
         {{ helpText }}
       </span>
     </div>

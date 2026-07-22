@@ -105,26 +105,16 @@ import "@vue-flow/core/dist/theme-default.css";
 import "@vue-flow/controls/dist/style.css";
 
 const { t } = useI18n();
-const {
-  workflowObj,
-  onNodeChange,
-  onNodesChange,
-  onEdgesChange,
-  onConnect,
-  onDrop,
-  onDragOver,
-} = useWorkflowCanvas();
+const { workflowObj, onNodeChange, onNodesChange, onEdgesChange, onConnect, onDrop, onDragOver } =
+  useWorkflowCanvas();
 
-const { onNodesInitialized, setViewport, viewport, dimensions, findNode } =
-  useVueFlow();
+const { onNodesInitialized, setViewport, viewport, dimensions, findNode } = useVueFlow();
 
 const vueFlowRef = ref<any>(null);
 // Read-only inspection canvas (the Runs view) — disables node drag/connect and,
 // via WorkflowNode, the hover add/delete + click-to-edit. Run overlays stay.
 const readOnly = computed(() => workflowObj.readOnly);
-const isCanvasEmpty = computed(
-  () => workflowObj.currentSelectedWorkflow.nodes.length === 0,
-);
+const isCanvasEmpty = computed(() => workflowObj.currentSelectedWorkflow.nodes.length === 0);
 
 // Center the trigger horizontally once nodes have measured dimensions — keep
 // its Y (near the top) so the steps flow down. Runs once per editor mount.
@@ -132,9 +122,7 @@ let centered = false;
 onNodesInitialized(() => {
   if (centered) return;
   const nodes = workflowObj.currentSelectedWorkflow.nodes;
-  const trigger = nodes.find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
+  const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) return;
   const nodeW = findNode(trigger.id)?.dimensions?.width;
   const paneW = dimensions.value?.width;

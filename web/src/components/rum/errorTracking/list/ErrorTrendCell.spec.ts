@@ -96,9 +96,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: null });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(true);
     });
 
     it("does not render bars container when buckets is null", () => {
@@ -106,9 +104,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: null });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(false);
     });
 
     it("does not render em-dash when buckets is null", () => {
@@ -116,9 +112,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: null });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists()).toBe(false);
     });
 
     it("skeleton has aria-label for screen readers", () => {
@@ -135,20 +129,14 @@ describe("ErrorTrendCell", () => {
     it("transitions from skeleton to bars after buckets become populated", async () => {
       // Arrange
       wrapper = mountCell({ buckets: null });
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(true);
 
       // Act
       await wrapper.setProps({ buckets: flatBuckets });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(true);
     });
   });
 
@@ -162,9 +150,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: [] });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists()).toBe(true);
     });
 
     it("empty span contains the em-dash character", () => {
@@ -172,9 +158,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: [] });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').text(),
-      ).toBe("—");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-empty"]').text()).toBe("—");
     });
 
     it("empty span has title tooltip 'No occurrences in the selected time range'", () => {
@@ -182,11 +166,9 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: [] });
 
       // Assert
-      expect(
-        wrapper
-          .find('[data-test="rum-error-trend-cell-empty"]')
-          .attributes("title"),
-      ).toBe("No occurrences in the selected time range");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-empty"]').attributes("title")).toBe(
+        "No occurrences in the selected time range",
+      );
     });
 
     it("does not render skeleton when buckets is empty array", () => {
@@ -194,9 +176,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: [] });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(false);
     });
 
     it("does not render bars container when buckets is empty array", () => {
@@ -204,9 +184,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: [] });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(false);
     });
   });
 
@@ -220,21 +198,15 @@ describe("ErrorTrendCell", () => {
     });
 
     it("renders the trend cell container", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(true);
     });
 
     it("does not render the empty state", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists()).toBe(false);
     });
 
     it("does not render skeleton when buckets are populated", () => {
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(false);
     });
 
     it("renders exactly 12 bar spans for a 12-bucket input", () => {
@@ -305,9 +277,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: spikeBuckets, status: "ongoing" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("▲ 4.0×");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("▲ 4.0×");
     });
 
     it("shows '▼ 0.0×' annotation for dropping ongoing buckets", () => {
@@ -315,9 +285,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: dropBuckets, status: "ongoing" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("▼ 0.0×");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("▼ 0.0×");
     });
 
     it("shows 'new' annotation when status is 'new' even with spiking buckets", () => {
@@ -325,9 +293,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: spikeBuckets, status: "new" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("new");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("new");
     });
 
     it("shows 'flat' annotation for flat ongoing buckets", () => {
@@ -335,9 +301,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: flatBuckets, status: "ongoing" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("flat");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("flat");
     });
 
     it("shows 'new' annotation when status is 'new' and buckets are flat", () => {
@@ -345,9 +309,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: flatBuckets, status: "new" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("new");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("new");
     });
 
     it("shows 'flat' for ongoing when buckets array is too short to compute trend (≤4)", () => {
@@ -355,9 +317,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: [1, 2, 3, 4], status: "ongoing" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("flat");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("flat");
     });
 
     it("annotation is not shown when buckets is null (skeleton shown instead)", () => {
@@ -365,12 +325,8 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: null, status: "new" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(true);
     });
   });
 
@@ -408,55 +364,39 @@ describe("ErrorTrendCell", () => {
     it("transitions from skeleton to bars after buckets become populated", async () => {
       // Arrange
       wrapper = mountCell({ buckets: null });
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(true);
 
       // Act
       await wrapper.setProps({ buckets: flatBuckets });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(true);
     });
 
     it("transitions from skeleton to em-dash after buckets become empty array", async () => {
       // Arrange
       wrapper = mountCell({ buckets: null });
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(true);
 
       // Act
       await wrapper.setProps({ buckets: [] });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-error-trend-cell-empty"]').exists()).toBe(true);
     });
 
     it("updates annotation when status changes from ongoing to new", async () => {
       // Arrange
       wrapper = mountCell({ buckets: spikeBuckets, status: "ongoing" });
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("▲ 4.0×");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("▲ 4.0×");
 
       // Act
       await wrapper.setProps({ status: "new" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text(),
-      ).toBe("new");
+      expect(wrapper.find('[data-test="rum-error-trend-cell-annotation"]').text()).toBe("new");
     });
 
     it("updates bar count when buckets prop changes from 12 to 48", async () => {
@@ -497,7 +437,10 @@ describe("ErrorTrendCell", () => {
       expect(capturedCallback).not.toBeNull();
 
       // Act — simulate a visible intersection
-      capturedCallback!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+      capturedCallback!(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
 
       // Assert
       expect(wrapper.emitted("visible")).toHaveLength(1);
@@ -521,7 +464,10 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: null });
 
       // Act — not intersecting
-      capturedCallback!([{ isIntersecting: false } as IntersectionObserverEntry], {} as IntersectionObserver);
+      capturedCallback!(
+        [{ isIntersecting: false } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
 
       // Assert
       expect(wrapper.emitted("visible")).toBeFalsy();
@@ -573,7 +519,10 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: null });
 
       // Act
-      capturedCallback!([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+      capturedCallback!(
+        [{ isIntersecting: true } as IntersectionObserverEntry],
+        {} as IntersectionObserver,
+      );
 
       // Assert
       expect(disconnectSpy).toHaveBeenCalledTimes(1);
@@ -662,9 +611,7 @@ describe("ErrorTrendCell", () => {
       wrapper = mountCell({ buckets: [5], status: "ongoing" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(true);
       expect(wrapper.findAll(".trend-bar")).toHaveLength(1);
     });
 
@@ -676,9 +623,7 @@ describe("ErrorTrendCell", () => {
       });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(true);
     });
 
     it("renders single-bucket array with aria-label showing correct total", () => {
@@ -705,15 +650,11 @@ describe("ErrorTrendCell", () => {
 
     it("handles large bucket values without crashing", () => {
       // Arrange
-      const largeBuckets = Array.from({ length: 12 }, (_, i) =>
-        i >= 8 ? 1_000_000 : 1,
-      );
+      const largeBuckets = Array.from({ length: 12 }, (_, i) => (i >= 8 ? 1_000_000 : 1));
       wrapper = mountCell({ buckets: largeBuckets, status: "ongoing" });
 
       // Assert
-      expect(
-        wrapper.find('[data-test="rum-error-trend-cell"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="rum-error-trend-cell"]').exists()).toBe(true);
     });
   });
 });

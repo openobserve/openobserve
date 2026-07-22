@@ -1,6 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 import { describe, it, expect, beforeEach } from "vitest";
-import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "./useMetricsCorrelationDashboard";
+import {
+  useMetricsCorrelationDashboard,
+  type MetricsCorrelationConfig,
+} from "./useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
 
 describe("useMetricsCorrelationDashboard", () => {
@@ -70,7 +73,7 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panel.queries).toHaveLength(1);
       expect(panel.queries[0].query).toContain('FROM "cpu_usage"');
       expect(panel.queries[0].query).toContain("service = 'api'");
-      expect(panel.queries[0].query).toContain('"k8s-cluster" = \'prod\'');
+      expect(panel.queries[0].query).toContain("\"k8s-cluster\" = 'prod'");
     });
 
     it("should handle special characters in filter values", () => {
@@ -154,13 +157,13 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panels[0].layout.h).toBe(14);
 
       // x is col * 64 (default panelWidth)
-      expect(panels[0].layout.x).toBe(0);   // col 0
-      expect(panels[1].layout.x).toBe(64);  // col 1
+      expect(panels[0].layout.x).toBe(0); // col 0
+      expect(panels[1].layout.x).toBe(64); // col 1
       expect(panels[2].layout.x).toBe(128); // col 2
 
       // y is row * 16 (default panelHeight)
-      expect(panels[0].layout.y).toBe(0);   // row 0
-      expect(panels[3].layout.y).toBe(14);  // row 1
+      expect(panels[0].layout.y).toBe(0); // row 0
+      expect(panels[3].layout.y).toBe(14); // row 1
     });
 
     it("should use custom panelWidth and panelHeight in createMetricPanel when provided", () => {
@@ -201,8 +204,8 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panels[2].layout.x).toBe(0);
 
       // y is row * customHeight; with 1 column each panel is its own row
-      expect(panels[0].layout.y).toBe(0);                // row 0 * 20
-      expect(panels[1].layout.y).toBe(customHeight);     // row 1 * 20
+      expect(panels[0].layout.y).toBe(0); // row 0 * 20
+      expect(panels[1].layout.y).toBe(customHeight); // row 1 * 20
       expect(panels[3].layout.y).toBe(customHeight * 3); // row 3 * 20
     });
   });
@@ -298,7 +301,7 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(dashboard).toBeDefined();
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       expect(query).toContain('FROM "correlated_logs"');
-      expect(query).toContain('"k8s-pod" = \'api-xyz\'');
+      expect(query).toContain("\"k8s-pod\" = 'api-xyz'");
     });
 
     it("should return null when no log streams available", () => {
@@ -382,16 +385,14 @@ describe("useMetricsCorrelationDashboard", () => {
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
 
       // Fields with hyphens should be quoted
-      expect(query).toContain('"k8s-cluster" = \'prod\'');
-      expect(query).toContain('"k8s-namespace" = \'default\'');
+      expect(query).toContain("\"k8s-cluster\" = 'prod'");
+      expect(query).toContain("\"k8s-namespace\" = 'default'");
       // Regular field names should not be quoted
       expect(query).toContain("service = 'api'");
     });
 
     it("should set table_dynamic_columns for logs panel", () => {
-      const logStreams: StreamInfo[] = [
-        { stream_name: "app_logs", filters: {} },
-      ];
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "api-server",
@@ -411,9 +412,7 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should use default panelWidth=192 and panelHeight=44 in createCorrelationDashboard when not provided", () => {
-      const logStreams: StreamInfo[] = [
-        { stream_name: "app_logs", filters: {} },
-      ];
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "api-server",
@@ -435,9 +434,7 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should use custom panelWidth and panelHeight in createCorrelationDashboard when provided", () => {
-      const logStreams: StreamInfo[] = [
-        { stream_name: "app_logs", filters: {} },
-      ];
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "api-server",
@@ -490,9 +487,7 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should handle streams with empty filters", () => {
-      const logStreams: StreamInfo[] = [
-        { stream_name: "app_logs", filters: {} },
-      ];
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "test",
@@ -513,9 +508,7 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should use time range from config", () => {
-      const metricStreams: StreamInfo[] = [
-        { stream_name: "cpu", filters: {} },
-      ];
+      const metricStreams: StreamInfo[] = [{ stream_name: "cpu", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "test",

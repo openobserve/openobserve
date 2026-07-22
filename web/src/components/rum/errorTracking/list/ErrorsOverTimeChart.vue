@@ -107,9 +107,7 @@ const resolveToken = (token: string, fallback: string): string => {
 
 const deployIndex = computed(() => {
   if (!props.deploy) return -1;
-  return props.buckets.findIndex(
-    (bucket) => bucket.ts >= props.deploy!.firstSeen,
-  );
+  return props.buckets.findIndex((bucket) => bucket.ts >= props.deploy!.firstSeen);
 });
 
 const chartOptions = computed(() => {

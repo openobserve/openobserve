@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       }"
       data-test="trace-header-operation-name"
     >
-      {{ t('traces.traceHeader.operationName') }}
+      {{ t("traces.traceHeader.operationName") }}
       <div
         class="bg-accent inline-flex items-center justify-center w-5 h-5 rounded-full absolute -right-2.5 -top-0.5 z-10 cursor-col-resize"
         @mousedown="handleMouseDown"
@@ -46,26 +46,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         width: `calc(100% - ${splitterWidth}px)`,
       }"
       data-test="trace-header-tics"
-      v-if="
-        !isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length
-      "
+      v-if="!isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length"
     >
-      <div
-        class="w-1/4 text-xs pl-3"
-        data-test="trace-header-tic-label-0"
-      >
+      <div class="w-1/4 text-xs pl-3" data-test="trace-header-tic-label-0">
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
-      <div
-        class="w-1/4 text-xs pl-1"
-        data-test="trace-header-tic-label-1"
-      >
+      <div class="w-1/4 text-xs pl-1" data-test="trace-header-tic-label-1">
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
-      <div
-        class="w-1/4 text-xs pl-1"
-        data-test="trace-header-tic-label-2"
-      >
+      <div class="w-1/4 text-xs pl-1" data-test="trace-header-tic-label-2">
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div

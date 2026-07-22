@@ -94,9 +94,7 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
   });
 
   it("blocks an empty stream_type and stream_name", () => {
-    const m = issuesByPath(
-      validScheduled({ stream_type: "", stream_name: "" }),
-    );
+    const m = issuesByPath(validScheduled({ stream_type: "", stream_name: "" }));
     expect(m["stream_type"]).toContain(STREAM_TYPE_REQUIRED_MESSAGE);
     expect(m["stream_name"]).toContain(STREAM_NAME_REQUIRED_MESSAGE);
   });
@@ -139,12 +137,8 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
     base.query_condition.type = "promql";
     base.query_condition.promql_condition = { operator: "", value: "" };
     const m = issuesByPath(base);
-    expect(
-      m["query_condition.promql_condition.operator"]?.length,
-    ).toBeGreaterThan(0);
-    expect(
-      m["query_condition.promql_condition.value"]?.length,
-    ).toBeGreaterThan(0);
+    expect(m["query_condition.promql_condition.operator"]?.length).toBeGreaterThan(0);
+    expect(m["query_condition.promql_condition.value"]?.length).toBeGreaterThan(0);
   });
 
   it("promql value is zero-safe (0 passes)", () => {
@@ -174,9 +168,7 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
       ],
     };
     const m = issuesByPath(base);
-    expect(
-      m["query_condition.conditions.conditions.0.column"]?.length,
-    ).toBeGreaterThan(0);
+    expect(m["query_condition.conditions.conditions.0.column"]?.length).toBeGreaterThan(0);
   });
 
   // ── Anomaly branch: near-pass-through — `name` ONLY ─────────────────────────

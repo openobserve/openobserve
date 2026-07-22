@@ -1,7 +1,5 @@
 <template>
-  <div
-    class="py-0.5 bg-section-header-bg"
-  >
+  <div class="py-0.5 bg-section-header-bg">
     <div
       class="flex justify-between"
       :class="{ 'items-center': minHeaderHeight }"
@@ -17,7 +15,7 @@
           size="md"
         />
         <div
-          @click="showExpandIcon ? expanded = !expanded : null"
+          @click="showExpandIcon ? (expanded = !expanded) : null"
           class="text-sm font-bold text-text-secondary"
           :class="labelClass"
         >
@@ -82,4 +80,3 @@ const expanded = computed({
   set: (value) => emits("update:isExpanded", value),
 });
 </script>
-

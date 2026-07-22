@@ -18,10 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="w-[calc(100%-1px)] overflow-hidden relative-position h-full flex flex-col">
     <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="px-2 py-1 mt-2! mx-2!" />
     <template v-if="activeTab === 'tags'">
-      <div
-        data-test="event-metadata"
-        class="flex p-2 sticky top-0 px-3"
-      >
+      <div data-test="event-metadata" class="flex p-2 sticky top-0 px-3">
         <div class="w-full flex flex-col">
           <div class="w-full pb-2 text-xs">
             <OIcon name="mail" size="sm" class="pr-1" />
@@ -56,9 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
     <template v-else>
-      <div
-        class="flex items-center justify-between w-full pt-2 px-1.5"
-      >
+      <div class="flex items-center justify-between w-full pt-2 px-1.5">
         <div class="pr-1 w-[60%]">
           <OInput
             v-model="searchEvent"
@@ -101,21 +96,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="event-type-badge"
               />
               <template
-                v-if="
-                  filteredEvent.frustration_types &&
-                  filteredEvent.frustration_types.length > 0
-                "
+                v-if="filteredEvent.frustration_types && filteredEvent.frustration_types.length > 0"
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
                   class="mr-1 inline"
                 />
               </template>
-              <div
-                class="inline"
-                :title="filteredEvent.name"
-                data-test="event-name"
-              >
+              <div class="inline" :title="filteredEvent.name" data-test="event-name">
                 {{ filteredEvent.name }}
               </div>
             </div>
@@ -135,7 +123,7 @@ import AppTabs from "../common/AppTabs.vue";
 import { useI18n } from "vue-i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
 
@@ -211,12 +199,7 @@ watch(
   { immediate: true, deep: true },
 );
 
-const selectedEventTypes = ref<string[]>([
-  "error",
-  "action",
-  "view",
-  "frustration",
-]);
+const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustration"]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
@@ -238,16 +221,12 @@ const searchEvents = (value: string | number | null) => {
         ? true
         : (() => {
             // Check if event type is selected
-            const isTypeSelected = selectedEventTypes.value.includes(
-              event.type,
-            );
+            const isTypeSelected = selectedEventTypes.value.includes(event.type);
 
             // Check if frustration filter is active and event has frustrations
-            const hasFrustration =
-              event.frustration_types && event.frustration_types.length > 0;
+            const hasFrustration = event.frustration_types && event.frustration_types.length > 0;
             const showFrustration =
-              selectedEventTypes.value.includes("frustration") &&
-              hasFrustration;
+              selectedEventTypes.value.includes("frustration") && hasFrustration;
 
             // Show event if its type is selected OR if frustration filter is active and event has frustrations
             return isTypeSelected || showFrustration;

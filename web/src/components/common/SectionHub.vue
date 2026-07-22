@@ -32,16 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ConstrainedPage size="lg" class="o2-section-hub" data-test="section-hub">
     <div>
       <header v-if="title || description" class="mb-6">
-        <h1
-          v-if="title"
-          class="text-xl! font-semibold! text-text-heading"
-        >
+        <h1 v-if="title" class="text-xl! font-semibold! text-text-heading">
           {{ title }}
         </h1>
-        <p
-          v-if="description"
-          class="text-sm text-text-secondary mt-1"
-        >
+        <p v-if="description" class="text-sm text-text-secondary mt-1">
           {{ description }}
         </p>
       </header>
@@ -52,15 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mb-8"
         :data-test="`section-hub-group-${group.label}`"
       >
-        <h2
-          v-if="group.label"
-          class="text-sm! font-semibold! text-text-heading mb-3"
-        >
+        <h2 v-if="group.label" class="text-sm! font-semibold! text-text-heading mb-3">
           {{ group.label }}
         </h2>
-        <div
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
             v-for="item in group.items"
             :key="item.key"

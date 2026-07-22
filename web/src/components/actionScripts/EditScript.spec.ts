@@ -39,12 +39,8 @@ document.body.appendChild(node);
 // Mock services
 vi.mock("@/services/action_scripts", () => ({
   default: {
-    create: vi
-      .fn()
-      .mockResolvedValue({ data: { code: 200, message: "Success" } }),
-    update: vi
-      .fn()
-      .mockResolvedValue({ data: { code: 200, message: "Success" } }),
+    create: vi.fn().mockResolvedValue({ data: { code: 200, message: "Success" } }),
+    update: vi.fn().mockResolvedValue({ data: { code: 200, message: "Success" } }),
     get_by_id: vi.fn().mockResolvedValue({
       data: {
         id: "test-id",
@@ -65,10 +61,7 @@ vi.mock("@/services/service_accounts", () => ({
   default: {
     list: vi.fn().mockResolvedValue({
       data: {
-        data: [
-          { email: "service1@example.com" },
-          { email: "service2@example.com" },
-        ],
+        data: [{ email: "service1@example.com" }, { email: "service2@example.com" }],
       },
     }),
   },
@@ -78,8 +71,7 @@ vi.mock("@/services/service_accounts", () => ({
 // with a spy that returns a dismiss fn — so we can assert the error toast on a
 // failed save without rendering into the DOM.
 vi.mock("@/lib/feedback/Toast/useToast", async (importActual) => {
-  const actual =
-    await importActual<typeof import("@/lib/feedback/Toast/useToast")>();
+  const actual = await importActual<typeof import("@/lib/feedback/Toast/useToast")>();
   return { ...actual, toast: vi.fn(() => () => {}) };
 });
 
@@ -87,8 +79,7 @@ describe("EditScript", () => {
   let wrapper: any;
 
   // Set a form-owned field on the REAL OForm (the single source of truth).
-  const setField = (w: any, name: string, value: unknown) =>
-    w.vm.form.setFieldValue(name, value);
+  const setField = (w: any, name: string, value: unknown) => w.vm.form.setFieldValue(name, value);
 
   // Drive the form's own submit so the schema runs + the handler is awaited
   // deterministically (a fire-and-forget native submit would not be).
@@ -143,23 +134,17 @@ describe("EditScript", () => {
 
   it("should mount EditScript component", () => {
     expect(wrapper.exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="add-action-script-section"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-action-script-section"]').exists()).toBe(true);
   });
 
   describe("Header section", () => {
     it("should display back button", () => {
-      expect(
-        wrapper.find('[data-test="add-action-script-back-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-back-btn"]').exists()).toBe(true);
     });
 
     it("should navigate back when back button is clicked", async () => {
       const routerBackSpy = vi.spyOn(router, "back");
-      await wrapper
-        .find('[data-test="add-action-script-back-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-action-script-back-btn"]').trigger("click");
       expect(routerBackSpy).toHaveBeenCalled();
     });
 
@@ -179,23 +164,15 @@ describe("EditScript", () => {
 
   describe("Form fields (OForm* wiring + data-tests preserved)", () => {
     it("renders the name OForm input", () => {
-      expect(
-        wrapper.find('[data-test="add-action-script-name-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-name-input"]').exists()).toBe(true);
     });
 
     it("renders the description OForm input", () => {
-      expect(
-        wrapper
-          .find('[data-test="add-action-script-description-input"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-description-input"]').exists()).toBe(true);
     });
 
     it("renders the type OForm select", () => {
-      expect(
-        wrapper.find('[data-test="add-action-script-type-select"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-type-select"]').exists()).toBe(true);
     });
 
     it("seeds the form from default values (blank create form)", () => {
@@ -207,11 +184,7 @@ describe("EditScript", () => {
     });
 
     it("does not show field errors before the first submit (R3)", () => {
-      expect(
-        wrapper
-          .find('[data-test="add-action-script-name-input-error"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-action-script-name-input-error"]').exists()).toBe(false);
     });
   });
 
@@ -429,15 +402,11 @@ describe("EditScript", () => {
 
   describe("Step navigation", () => {
     it("displays the first step", () => {
-      expect(
-        wrapper.find('[data-test="add-action-script-step-1"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-step-1"]').exists()).toBe(true);
     });
 
     it("displays the file input in step 1", () => {
-      expect(
-        wrapper.find('[data-test="add-action-script-file-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-file-input"]').exists()).toBe(true);
     });
 
     it("advances to the next step on Continue", async () => {
@@ -445,9 +414,7 @@ describe("EditScript", () => {
       // on create, so a valid file must be present before the stepper advances.
       setField(wrapper, "codeZip", new File(["code"], "script.zip"));
       await nextTick();
-      await wrapper
-        .find('[data-test="add-action-script-step1-continue-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-action-script-step1-continue-btn"]').trigger("click");
       // goToStep() awaits the form's async validator (TanStack onDynamicAsync),
       // which settles on a macrotask. A single flushPromises() can resolve before
       // that timer fires under a loaded event loop, so poll until it advances.
@@ -456,26 +423,20 @@ describe("EditScript", () => {
 
     it("reactively hides the Schedule step when type switches to 'service' (Rule ③)", async () => {
       // Create-mode default is 'scheduled' → the Schedule step (step 2) shows.
-      expect(
-        wrapper.find('[data-test="add-action-script-step-2"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-step-2"]').exists()).toBe(true);
 
       // Switch the form-owned `type` to a real-time action. formType is read via
       // form.useStore (owner pattern), so the OStep v-if must update reactively.
       wrapper.vm.form.setFieldValue("type", "service");
       await nextTick();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-action-script-step-2"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="add-action-script-step-2"]').exists()).toBe(false);
 
       // Back to scheduled re-reveals it.
       wrapper.vm.form.setFieldValue("type", "scheduled");
       await nextTick();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-action-script-step-2"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-step-2"]').exists()).toBe(true);
     });
   });
 
@@ -486,14 +447,10 @@ describe("EditScript", () => {
     });
 
     it("displays step 3 + the service account OForm select", () => {
-      expect(
-        wrapper.find('[data-test="add-action-script-step-3"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="add-action-script-service-account-select"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-step-3"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-service-account-select"]').exists()).toBe(
+        true,
+      );
     });
 
     it("advances to step 4 on Continue", async () => {
@@ -501,9 +458,7 @@ describe("EditScript", () => {
       // goToStep() is async (awaits schema validation), so flush after the click.
       setField(wrapper, "service_account", "service1@example.com");
       await nextTick();
-      await wrapper
-        .find('[data-test="add-action-script-step3-continue-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="add-action-script-step3-continue-btn"]').trigger("click");
       // goToStep() awaits the form's async validator (TanStack onDynamicAsync),
       // which settles on a macrotask. A single flushPromises() can resolve before
       // that timer fires under a loaded event loop, so poll until it advances.
@@ -518,9 +473,7 @@ describe("EditScript", () => {
     });
 
     it("displays step 4 + at least one env-variable row", () => {
-      expect(
-        wrapper.find('[data-test="add-action-script-step-4"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-step-4"]').exists()).toBe(true);
       expect(
         wrapper.findAll('[data-test="add-action-script-env-variable"]').length,
       ).toBeGreaterThan(0);
@@ -529,10 +482,7 @@ describe("EditScript", () => {
     it("adds a new env variable via addApiHeader", () => {
       const before = wrapper.vm.environmentalVariables.length;
       wrapper.vm.addApiHeader("MY_KEY", "my_value");
-      const last =
-        wrapper.vm.environmentalVariables[
-          wrapper.vm.environmentalVariables.length - 1
-        ];
+      const last = wrapper.vm.environmentalVariables[wrapper.vm.environmentalVariables.length - 1];
       expect(wrapper.vm.environmentalVariables.length).toBe(before + 1);
       expect(last.key).toBe("MY_KEY");
       expect(last.value).toBe("my_value");
@@ -551,9 +501,7 @@ describe("EditScript", () => {
     });
 
     it("re-adds an empty row when the last env variable is deleted", () => {
-      wrapper.vm.environmentalVariables = [
-        { key: "ONLY", value: "v", uuid: "only" },
-      ];
+      wrapper.vm.environmentalVariables = [{ key: "ONLY", value: "v", uuid: "only" }];
       wrapper.vm.deleteApiHeader({ key: "ONLY", value: "v", uuid: "only" });
       expect(wrapper.vm.environmentalVariables.length).toBe(1);
       expect(wrapper.vm.environmentalVariables[0].key).toBe("");
@@ -580,9 +528,7 @@ describe("EditScript", () => {
       wrapper.vm.isEditingActionScript = true;
       wrapper.vm.formData.fileNameToShow = "existing.zip";
       await nextTick();
-      expect(
-        wrapper.find('[data-test="add-action-script-edit-file-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-action-script-edit-file-btn"]').exists()).toBe(true);
     });
   });
 
@@ -592,9 +538,7 @@ describe("EditScript", () => {
     });
 
     it("returns an error for an invalid cron expression", () => {
-      expect(wrapper.vm.getCronError("not a cron")).toContain(
-        "Invalid cron expression",
-      );
+      expect(wrapper.vm.getCronError("not a cron")).toContain("Invalid cron expression");
     });
 
     it("returns an error for an empty cron string", () => {
@@ -608,9 +552,7 @@ describe("EditScript", () => {
       const original = store.state.zoConfig.min_auto_refresh_interval;
       store.state.zoConfig.min_auto_refresh_interval = 3600;
       try {
-        expect(wrapper.vm.getCronError("* * * * *")).toContain(
-          "Frequency should be greater than",
-        );
+        expect(wrapper.vm.getCronError("* * * * *")).toContain("Frequency should be greater than");
       } finally {
         store.state.zoConfig.min_auto_refresh_interval = original;
       }
@@ -619,9 +561,7 @@ describe("EditScript", () => {
 
   describe("openCancelDialog", () => {
     it("navigates directly when nothing changed", () => {
-      const routerReplaceSpy = vi
-        .spyOn(router, "replace")
-        .mockResolvedValue(undefined as any);
+      const routerReplaceSpy = vi.spyOn(router, "replace").mockResolvedValue(undefined as any);
       wrapper.vm.originalActionScriptData = JSON.stringify(wrapper.vm.formData);
       wrapper.vm.openCancelDialog();
       expect(wrapper.vm.dialog.show).toBe(false);

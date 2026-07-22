@@ -19,11 +19,7 @@ defineSlots<{
 <template>
   <div data-test="o2-table-error" class="py-4 px-2">
     <slot :message="message ?? ''">
-      <OBanner
-        variant="error"
-        :content="message ?? ''"
-        inline-actions
-      >
+      <OBanner variant="error" :content="message ?? ''" inline-actions>
         <template v-if="message" #actions>
           <button
             data-test="o2-table-error-retry-btn"

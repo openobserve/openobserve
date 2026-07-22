@@ -1,20 +1,8 @@
 <script setup lang="ts">
-import type {
-  ToggleGroupProps,
-  ToggleGroupEmits,
-  ToggleGroupSlots,
-} from "./OToggleGroup.types";
+import type { ToggleGroupProps, ToggleGroupEmits, ToggleGroupSlots } from "./OToggleGroup.types";
 import { ToggleGroupAnimatedKey } from "./OToggleGroup.types";
 import { ToggleGroupRoot, type AcceptableValue } from "reka-ui";
-import {
-  computed,
-  provide,
-  ref,
-  watch,
-  nextTick,
-  onMounted,
-  onBeforeUnmount,
-} from "vue";
+import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 
 const props = withDefaults(defineProps<ToggleGroupProps>(), {
   type: "single",
@@ -30,13 +18,9 @@ const slots = defineSlots<ToggleGroupSlots>();
 
 // reka-ui's ToggleGroupRoot omits `boolean` from its model type; our public API
 // allows it (boolean-valued groups round-trip fine), so narrow at the boundary.
-const rekaModelValue = computed(
-  () => props.modelValue as AcceptableValue | AcceptableValue[],
-);
+const rekaModelValue = computed(() => props.modelValue as AcceptableValue | AcceptableValue[]);
 
-const hasLabel = computed(
-  () => Boolean(slots.label) || props.label !== undefined,
-);
+const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
 
 // Sliding-selection indicator ------------------------------------------------
 // On by default for every single-select group (one active item to track). A
@@ -163,7 +147,9 @@ const wrapperClasses = computed(() => {
     <span
       :class="[
         'o-input-label text-compact select-none leading-tight',
-        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        disabled
+          ? 'font-normal text-input-label-text-disabled'
+          : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ label }}</slot>

@@ -173,13 +173,13 @@ const jumpTarget = computed<{ from: number; to: number } | null>(() => {
 const jumpTargetSublabel = computed(() => {
   if (!jumpTarget.value) return "";
   const tz = props.timezone || "UTC";
-  const zone = tz.toLowerCase() === "local" || tz.toLowerCase() === "browser"
-    ? Intl.DateTimeFormat().resolvedOptions().timeZone
-    : tz;
+  const zone =
+    tz.toLowerCase() === "local" || tz.toLowerCase() === "browser"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : tz;
   // Show doc_time_max (before nudge) as the "last data" label
   const lastDataUs = props.streamDocTimeRange!.max;
-  const formatted = DateTime
-    .fromMillis(lastDataUs / 1000)
+  const formatted = DateTime.fromMillis(lastDataUs / 1000)
     .setZone(zone)
     .toFormat("MMM d, yyyy HH:mm:ss");
   return t("logs.logsNoEventsState.lastData", { formatted, zone });
@@ -193,5 +193,4 @@ const isRelative = computed(() => props.dateType === "relative" && !!props.relat
 const currentPeriodLabel = computed(() =>
   isRelative.value ? periodToLabel(props.relativeTimePeriod) : t("logs.noEvents.selectedRange"),
 );
-
 </script>

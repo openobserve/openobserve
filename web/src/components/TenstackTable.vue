@@ -66,10 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
       >
         <!-- ── Pivot multi-level headers (dashboard only) ───────────────────── -->
-        <thead
-          v-if="pivotHeaderLevels.length > 0"
-          class="pivot-thead sticky top-0 z-10"
-        >
+        <thead v-if="pivotHeaderLevels.length > 0" class="pivot-thead sticky top-0 z-10">
           <tr
             v-for="(level, levelIdx) in pivotHeaderLevels as any[]"
             :key="'hl_' + levelIdx"
@@ -77,26 +74,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Row-field headers: first <tr> only, rowspan all levels -->
             <template v-if="levelIdx === 0">
-            <th
-              v-for="col in pivotRowColumns"
-              :key="'rh_' + col.name"
-              :rowspan="pivotHeaderLevels.length"
-              class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg"
-              :style="getStickyColumnStyle(col) as any"
-              @click="handlePivotSort(col.name)"
-            >
-              {{ col.label }}
-              <OIcon
-                :name="
-                  pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
-                "
-                size="xs"
-                class="ml-1 pivot-sort-icon"
-                :class="{
-                  'pivot-sort-active text-accent': pivotSortState.sortBy === col.name,
-                }"
-              />
-            </th>
+              <th
+                v-for="col in pivotRowColumns"
+                :key="'rh_' + col.name"
+                :rowspan="pivotHeaderLevels.length"
+                class="cursor-pointer px-2 text-center font-semibold align-middle whitespace-nowrap py-[0.3125rem] [border-right:1px_solid_var(--color-pivot-header-border)] [border-bottom:1px_solid_var(--color-pivot-header-border)] bg-sticky-col-header-bg"
+                :style="getStickyColumnStyle(col) as any"
+                @click="handlePivotSort(col.name)"
+              >
+                {{ col.label }}
+                <OIcon
+                  :name="pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'"
+                  size="xs"
+                  class="ml-1 pivot-sort-icon"
+                  :class="{
+                    'pivot-sort-active text-accent': pivotSortState.sortBy === col.name,
+                  }"
+                />
+              </th>
             </template>
             <!-- Pivot group / value headers -->
             <th
@@ -128,14 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ cell.label }}
               <OIcon
                 v-if="level.isLeaf && cell._sortColumn"
-                :name="
-                  pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'
-                "
+                :name="pivotSortState.descending ? 'arrow-downward' : 'arrow-upward'"
                 size="xs"
                 class="ml-1 pivot-sort-icon"
                 :class="{
-                  'pivot-sort-active text-accent':
-                    pivotSortState.sortBy === cell._sortColumn,
+                  'pivot-sort-active text-accent': pivotSortState.sortBy === cell._sortColumn,
                 }"
               />
             </th>
@@ -153,17 +145,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-model="columnOrder"
             :element="'table'"
             :animation="200"
-            :sort="
-              enableColumnReorder && (!isResizingHeader || !defaultColumns)
-            "
+            :sort="enableColumnReorder && (!isResizingHeader || !defaultColumns)"
             handle=".table-head"
             :class="[
               // Flex only for virtual-scroll mode (logs/traces) for drag-reorder + alignment
               // Non-virtual (dashboard) uses table-layout:auto — no flex so browser auto-sizes columns
               useVirtualScroll ? 'flex items-center' : '',
-              enableColumnReorder && table.getState().columnOrder.length
-                ? 'cursor-move!'
-                : '',
+              enableColumnReorder && table.getState().columnOrder.length ? 'cursor-move!' : '',
               // Header-row chrome via centralized token utilities (same tokens
               // OTable uses): background band + full-width underline on the row
               // so it spans past the last column.
@@ -188,17 +176,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :id="header.id"
               class="px-2 relative table-head text-ellipsis! group"
               :class="[
-                (header.column.columnDef.meta as any)?.align === 'center'
-                  ? 'text-center!'
-                  : '',
-                (header.column.columnDef.meta as any)?.align === 'right'
-                  ? 'text-right!'
-                  : '',
+                (header.column.columnDef.meta as any)?.align === 'center' ? 'text-center!' : '',
+                (header.column.columnDef.meta as any)?.align === 'right' ? 'text-right!' : '',
                 (header.column.columnDef.meta as any)?.headerClass ?? '',
                 {
                   'pivot-total-col font-semibold':
-                    stickyColTotals &&
-                    (header.column.columnDef.meta as any)?._isTotalColumn,
+                    stickyColTotals && (header.column.columnDef.meta as any)?._isTotalColumn,
                 },
               ]"
               :style="{
@@ -222,16 +205,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      EVERY column (even non-resizable) for continuous dividers;
                      drag + hover accent only when resizable. -->
                 <div
-                  @dblclick="
-                    header.column.getCanResize() && header.column.resetSize()
-                  "
+                  @dblclick="header.column.getCanResize() && header.column.resetSize()"
                   @mousedown.self.prevent.stop="
-                    header.column.getCanResize() &&
-                      header.getResizeHandler()?.($event)
+                    header.column.getCanResize() && header.getResizeHandler()?.($event)
                   "
                   @touchstart.self.prevent.stop="
-                    header.column.getCanResize() &&
-                      header.getResizeHandler()?.($event)
+                    header.column.getCanResize() && header.getResizeHandler()?.($event)
                   "
                   :class="[
                     'absolute right-0 top-0 h-full flex items-center justify-end select-none touch-none z-10 group/resizer',
@@ -266,19 +245,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                   <!-- Server-side sort icons (shown when sortBy prop is provided) -->
                   <template
-                    v-if="
-                      sortBy !== undefined &&
-                      (header.column.columnDef.meta as any)?.sortable
-                    "
+                    v-if="sortBy !== undefined && (header.column.columnDef.meta as any)?.sortable"
                   >
                     <OIcon
-                      v-if="
-                        (sortFieldMap?.[header.column.id] ??
-                          header.column.id) === sortBy
-                      "
-                      :name="
-                        sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'
-                      "
+                      v-if="(sortFieldMap?.[header.column.id] ?? header.column.id) === sortBy"
+                      :name="sortOrder === 'asc' ? 'arrow-upward' : 'arrow-downward'"
                       :data-test="`o2-table-sort-icon-${header.id}`"
                       data-test-sort-state="active"
                       :data-test-sort-direction="sortOrder"
@@ -305,7 +276,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     side="bottom"
                     align="start"
                     :side-offset="4"
-                    @update:open="(v: boolean) => { if (v) colFilterSearch[header.column.id] = '' }"
+                    @update:open="
+                      (v: boolean) => {
+                        if (v) colFilterSearch[header.column.id] = '';
+                      }
+                    "
                   >
                     <template #trigger>
                       <OButton
@@ -319,7 +294,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           name="filter-list"
                           size="sm"
                           :data-test="`o2-table-column-filter-icon-${header.column.id}-${isColFiltered(header.column.id) ? 'active' : 'inactive'}`"
-                          :class="isColFiltered(header.column.id) ? 'text-primary-600' : 'opacity-50'"
+                          :class="
+                            isColFiltered(header.column.id) ? 'text-primary-600' : 'opacity-50'
+                          "
                         />
                       </OButton>
                     </template>
@@ -331,9 +308,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @click.stop
                     >
                       <!-- Search box — always visible at top -->
-                      <div
-                        class="px-2 pb-1 border-b border-table-row-divider"
-                      >
+                      <div class="px-2 pb-1 border-b border-table-row-divider">
                         <OInput
                           v-model="colFilterSearch[header.column.id]"
                           size="sm"
@@ -406,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('common.close')"
                     size="sm"
                     @click.stop="closeColumn(header.column.columnDef)"
-                   />
+                  />
                 </div>
               </div>
             </th>
@@ -415,14 +390,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Loading row: only rendered when the parent supplies a custom
             #loading slot. With no slot, the shimmer skeleton <tbody> below
             takes over (initial fetch). -->
-          <tr
-            v-if="loading && tableRows.length === 0 && $slots.loading"
-            class="w-full"
-          >
-            <td
-              :colspan="columnOrder.length"
-              class="font-bold bg-table-header-bg opacity-70"
-            >
+          <tr v-if="loading && tableRows.length === 0 && $slots.loading" class="w-full">
+            <td :colspan="columnOrder.length" class="font-bold bg-table-header-bg opacity-70">
               <slot name="loading" />
             </td>
           </tr>
@@ -433,10 +402,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </td>
           </tr>
           <tr v-if="!loading && errMsg != ''" class="w-full">
-            <td
-              :colspan="columnOrder.length"
-              class="font-bold opacity-70"
-            >
+            <td :colspan="columnOrder.length" class="font-bold opacity-70">
               <div class="text-sm font-medium font-bold bg-warning">
                 <OIcon size="sm" name="warning" class="mr-1" />
                 {{ errMsg }}
@@ -444,13 +410,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </td>
           </tr>
           <tr data-test="o2-table-function-error" v-if="functionErrorMsg != ''">
-            <td
-              :colspan="columnOrder.length"
-              class="font-bold opacity-60"
-            >
-              <div
-                class="text-sm font-medium font-bold pl-2 bg-warning"
-              >
+            <td :colspan="columnOrder.length" class="font-bold opacity-60">
+              <div class="text-sm font-medium font-bold pl-2 bg-warning">
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
@@ -459,9 +420,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click.capture.stop="expandFunctionError"
                 >
                   <OIcon
-                    :name="
-                      isFunctionErrorOpen ? 'expand-more' : 'chevron-right'
-                    "
+                    :name="isFunctionErrorOpen ? 'expand-more' : 'chevron-right'"
                     size="sm"
                   /> </OButton
                 ><b>
@@ -472,10 +431,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </td>
           </tr>
           <tr v-if="functionErrorMsg != '' && isFunctionErrorOpen">
-            <td
-              :colspan="columnOrder.length"
-              class="opacity-70 px-2 bg-warning"
-            >
+            <td :colspan="columnOrder.length" class="opacity-70 px-2 bg-warning">
               <pre>{{ functionErrorMsg }}</pre>
             </td>
           </tr>
@@ -498,10 +454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{ animationDelay: `${(r - 1) * 40}ms` }"
           >
             <!-- No columns yet (first paint) — full-width shimmer bar -->
-            <td
-              v-if="!headers?.length"
-              class="w-full px-4 overflow-hidden"
-            >
+            <td v-if="!headers?.length" class="w-full px-4 overflow-hidden">
               <span
                 class="o2-skel-pill inline-block h-3 rounded-default"
                 :style="{ width: `${skelCellWidth(r - 1, 0)}%` }"
@@ -521,9 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="o2-skel-pill inline-block h-3 rounded-default"
                   :style="{
                     width:
-                      c === 0
-                        ? `${SKEL_TIMESTAMP_PX}px`
-                        : `${skelCellWidth(r - 1, Number(c))}%`,
+                      c === 0 ? `${SKEL_TIMESTAMP_PX}px` : `${skelCellWidth(r - 1, Number(c))}%`,
                   }"
                   aria-hidden="true"
                 />
@@ -538,17 +489,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <tbody
           data-test="o2-table-body"
           ref="tableBodyRef"
-          :class="{ 'relative': useVirtualScroll && !showPagination }"
+          :class="{ relative: useVirtualScroll && !showPagination }"
         >
           <!-- ── Dashboard: regular DOM rows (no virtual scroll) ──────────────── -->
           <!-- Used when `data` prop is present (dashboard mode) OR pagination is
             enabled. Virtual scroll (below) is only for logs/traces. -->
           <template v-if="showPagination || !useVirtualScroll">
             <!-- Top spacer for dashboard virtual scroll -->
-            <tr
-              v-if="dashVirtualEnabled && dashVirtualPaddingTop > 0"
-              aria-hidden="true"
-            >
+            <tr v-if="dashVirtualEnabled && dashVirtualPaddingTop > 0" aria-hidden="true">
               <td
                 :colspan="columnOrder.length"
                 :style="{
@@ -576,29 +524,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-data-row-cell"
                 class="py-1 px-2 overflow-hidden relative table-cell group/copy"
                 :class="[
-                  (cell.column.columnDef.meta as any)?.align === 'center'
-                    ? 'text-center!'
-                    : '',
-                  (cell.column.columnDef.meta as any)?.align === 'right'
-                    ? 'text-right!'
-                    : '',
+                  (cell.column.columnDef.meta as any)?.align === 'center' ? 'text-center!' : '',
+                  (cell.column.columnDef.meta as any)?.align === 'right' ? 'text-right!' : '',
                   (cell.column.columnDef.meta as any)?.cellClass ?? '',
                   {
-                    'sticky-column bg-inherit': (cell.column.columnDef.meta as any)
-                      ?.sticky,
+                    'sticky-column bg-inherit': (cell.column.columnDef.meta as any)?.sticky,
                   },
                   {
                     'pivot-total-col font-semibold':
-                      stickyColTotals &&
-                      (cell.column.columnDef.meta as any)?._isTotalColumn,
+                      stickyColTotals && (cell.column.columnDef.meta as any)?._isTotalColumn,
                   },
                   // In separate-border mode (pivot or sticky columns),
                   // <tr> borders don't render — apply the row border on <td>.
                   { 'border-b': usesSeparateBorders },
-                  isPivotMergeNoBorder(
-                    row.original,
-                    (cell.column.columnDef.meta as any)?._col,
-                  )
+                  isPivotMergeNoBorder(row.original, (cell.column.columnDef.meta as any)?._col)
                     ? 'pivot-no-border border-b-0!'
                     : '',
                 ]"
@@ -608,20 +547,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: rowHeight ? rowHeight + 'px' : undefined,
                   },
                   props.getCellStyle?.(cell),
-                  getStickyColumnStyle(
-                    (cell.column.columnDef.meta as any)?._col,
-                  ) as any,
-                  getStickyTotalColumnStyle(
-                    (cell.column.columnDef.meta as any)?._col,
-                  ) as any,
+                  getStickyColumnStyle((cell.column.columnDef.meta as any)?._col) as any,
+                  getStickyTotalColumnStyle((cell.column.columnDef.meta as any)?._col) as any,
                 ]"
               >
                 <template
                   v-if="
-                    !isPivotMergeHidden(
-                      row.original,
-                      (cell.column.columnDef.meta as any)?._col,
-                    )
+                    !isPivotMergeHidden(row.original, (cell.column.columnDef.meta as any)?._col)
                   "
                 >
                   <div
@@ -630,40 +562,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       (cell.column.columnDef.meta as any)?.align === 'center'
                         ? 'justify-center!'
                         : '',
-                      (cell.column.columnDef.meta as any)?.align === 'right'
-                        ? 'justify-end!'
-                        : '',
+                      (cell.column.columnDef.meta as any)?.align === 'right' ? 'justify-end!' : '',
                     ]"
                   >
                     <!-- Copy button LEFT (right-aligned) -->
                     <span
                       v-if="
                         enableCellCopy &&
-                        (cell.column.columnDef.meta as any)?.align ===
-                          'right' &&
+                        (cell.column.columnDef.meta as any)?.align === 'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
                       class="mr-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
-                      :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
+                      :data-copied="
+                        isCellCopied(idx as number, cell.column.id) ? 'true' : undefined
+                      "
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
                         class="h-4! w-4! min-h-0!"
                         @click.stop="
-                          copyCellContent(
-                            getCellDisplayValue(cell),
-                            idx as number,
-                            cell.column.id,
-                          )
+                          copyCellContent(getCellDisplayValue(cell), idx as number, cell.column.id)
                         "
                       >
                         <OIcon
                           :name="
-                            isCellCopied(idx as number, cell.column.id)
-                              ? 'check'
-                              : 'content-copy'
+                            isCellCopied(idx as number, cell.column.id) ? 'check' : 'content-copy'
                           "
                           size="sm"
                         />
@@ -671,9 +596,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                     <!-- JSON field inline renderer -->
                     <JsonFieldRenderer
-                      v-if="
-                        (cell.column.columnDef.meta as any)?.showFieldAsJson
-                      "
+                      v-if="(cell.column.columnDef.meta as any)?.showFieldAsJson"
                       :value="cell.getValue()"
                     />
                     <!-- Default value with format fn -->
@@ -693,31 +616,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span
                       v-if="
                         enableCellCopy &&
-                        (cell.column.columnDef.meta as any)?.align !==
-                          'right' &&
+                        (cell.column.columnDef.meta as any)?.align !== 'right' &&
                         shouldShowCopyButton(cell.getValue())
                       "
                       class="ml-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
                       data-test="dashboard-table-cell-copy-btn"
-                      :data-copied="isCellCopied(idx as number, cell.column.id) ? 'true' : undefined"
+                      :data-copied="
+                        isCellCopied(idx as number, cell.column.id) ? 'true' : undefined
+                      "
                     >
                       <OButton
                         variant="ghost"
                         size="icon-xs-sq"
                         class="h-4! w-4! min-h-0!"
                         @click.stop="
-                          copyCellContent(
-                            getCellDisplayValue(cell),
-                            idx as number,
-                            cell.column.id,
-                          )
+                          copyCellContent(getCellDisplayValue(cell), idx as number, cell.column.id)
                         "
                       >
                         <OIcon
                           :name="
-                            isCellCopied(idx as number, cell.column.id)
-                              ? 'check'
-                              : 'content-copy'
+                            isCellCopied(idx as number, cell.column.id) ? 'check' : 'content-copy'
                           "
                           size="sm"
                         />
@@ -728,10 +646,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </td>
             </tr>
             <!-- Bottom spacer for dashboard virtual scroll -->
-            <tr
-              v-if="dashVirtualEnabled && dashVirtualPaddingBottom > 0"
-              aria-hidden="true"
-            >
+            <tr v-if="dashVirtualEnabled && dashVirtualPaddingBottom > 0" aria-hidden="true">
               <td
                 :colspan="columnOrder.length"
                 :style="{
@@ -745,338 +660,304 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- ── Virtual scroll rows (logs / traces only — no `data` prop) ────── -->
           <template v-if="!showPagination && useVirtualScroll">
-          <template
-            v-for="virtualRow in virtualRows"
-            :key="virtualRow.index"
-          >
-            <tr
-              :data-test="`o2-table-detail-${
-                (formattedRows[virtualRow.index]?.original as any)?.[
-                  store.state.zoConfig.timestamp_column || '_timestamp'
-                ]
-              }`"
-              :style="{
-                transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
-                minWidth: '100%',
-              }"
-              :data-index="virtualRow.index"
-              :data-expanded="
-                formattedRows?.[virtualRow.index]?.original?.isExpandedRow
-              "
-              :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
-              class="absolute flex w-max items-center justify-start border-b border-b-table-row-divider cursor-pointer hover:bg-table-row-hover-bg transition-colors duration-150 ease-in-out"
-              :class="[
-                defaultColumns &&
-                !wrap &&
-                !(formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-                  ? 'table-row'
-                  : 'flex',
-                (formattedRows[virtualRow.index]?.original as any)?.[
-                  store.state.zoConfig.timestamp_column
-                ] === highlightTimestamp &&
-                !(formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-                  ? 'bg-table-row-selected-bg'
-                  : '',
-                !(formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow
-                  ? rowClass?.(formattedRows[virtualRow.index]?.original as any)
-                  : undefined,
-              ]"
-              @click="
-                !(formattedRows[virtualRow.index]?.original as any)
-                  ?.isExpandedRow &&
-                handleDataRowClick(
-                  formattedRows[virtualRow.index]?.original,
-                  virtualRow.index,
-                  $event,
-                )
-              "
-            >
-              <!-- Status color line for entire row -->
-              <div
-                v-if="
-                  enableStatusBar &&
-                  !(formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow
-                "
-                class="absolute left-0 inset-y-0 w-1 z-10"
+            <template v-for="virtualRow in virtualRows" :key="virtualRow.index">
+              <tr
+                :data-test="`o2-table-detail-${
+                  (formattedRows[virtualRow.index]?.original as any)?.[
+                    store.state.zoConfig.timestamp_column || '_timestamp'
+                  ]
+                }`"
                 :style="{
-                  backgroundColor: getRowStatusColor(
-                    formattedRows[virtualRow.index]?.original,
-                  ),
+                  transform: `translateY(${virtualRow.start + (isFirefox ? baseOffset : 0)}px)`,
+                  minWidth: '100%',
                 }"
-              />
-              <td
-                v-if="
-                  enableRowExpand &&
-                  (formattedRows[virtualRow.index]?.original as any)
-                    ?.isExpandedRow
+                :data-index="virtualRow.index"
+                :data-expanded="formattedRows?.[virtualRow.index]?.original?.isExpandedRow"
+                :ref="(node: any) => node && rowVirtualizer.measureElement(node)"
+                class="absolute flex w-max items-center justify-start border-b border-b-table-row-divider cursor-pointer hover:bg-table-row-hover-bg transition-colors duration-150 ease-in-out"
+                :class="[
+                  defaultColumns &&
+                  !wrap &&
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                    ? 'table-row'
+                    : 'flex',
+                  (formattedRows[virtualRow.index]?.original as any)?.[
+                    store.state.zoConfig.timestamp_column
+                  ] === highlightTimestamp &&
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                    ? 'bg-table-row-selected-bg'
+                    : '',
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                    ? rowClass?.(formattedRows[virtualRow.index]?.original as any)
+                    : undefined,
+                ]"
+                @click="
+                  !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow &&
+                  handleDataRowClick(
+                    formattedRows[virtualRow.index]?.original,
+                    virtualRow.index,
+                    $event,
+                  )
                 "
-                :colspan="columnOrder.length"
-                :data-test="`o2-table-expanded-row-${virtualRow.index}`"
-                class="w-full relative"
               >
-                <slot
-                  name="expanded-row"
-                  :row="formattedRows[virtualRow.index - 1]?.original"
-                  :index="calculateActualIndex(virtualRow.index - 1)"
-                  :hide-field-options="hideExpandFieldOptions"
-                />
-              </td>
-              <template v-else>
-                <td
-                  v-for="(cell, cellIndex) in formattedRows[
-                    virtualRow.index
-                  ].getVisibleCells()"
-                  :key="cell.id"
-                  :data-test="
-                    'o2-table-column-' +
-                    virtualRow.index +
-                    '-' +
-                    cell.column.columnDef.id
+                <!-- Status color line for entire row -->
+                <div
+                  v-if="
+                    enableStatusBar &&
+                    !(formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
                   "
-                  class="py-none px-2 items-center justify-start relative table-cell group/copy"
-                  :class="[
-                    ...tableCellClass,
-                    { 'pl-2': cellIndex === 0 },
-                    (cell.column.columnDef.meta as any)?.align === 'center'
-                      ? 'justify-center! text-center!'
-                      : '',
-                    (cell.column.columnDef.meta as any)?.align === 'right'
-                      ? 'justify-end! text-right!'
-                      : '',
-                    (cell.column.columnDef.meta as any)?.cellClass ?? '',
-                    {
-                      'sticky-column bg-inherit': (cell.column.columnDef.meta as any)
-                        ?.sticky,
-                    },
-                    {
-                      'pivot-total-col font-semibold':
-                        stickyColTotals &&
-                        (cell.column.columnDef.meta as any)?._isTotalColumn,
-                    },
-                    isPivotMergeNoBorder(
-                      cell.row.original,
-                      (cell.column.columnDef.meta as any)?._col,
-                    )
-                      ? 'pivot-no-border border-b-0!'
-                      : '',
-                  ]"
-                  :style="[
-                    {
-                      width:
-                        cell.column.columnDef.id !== 'source' ||
-                        cell.column.columnDef.enableResizing
-                          ? `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`
-                          : wrap
-                            ? width - 260 - 12 + 'px'
-                            : 'auto',
-                      height: wrap
-                        ? 'stretch'
-                        : rowHeight != null
-                          ? (rowHeight ?? 28) + 'px'
-                          : undefined,
-                    },
-                    props.getCellStyle?.(cell),
-                    getStickyColumnStyle(
-                      (cell.column.columnDef.meta as any)?._col,
-                    ) as any,
-                    getStickyTotalColumnStyle(
-                      (cell.column.columnDef.meta as any)?._col,
-                    ) as any,
-                  ]"
-                  @mouseover="handleCellMouseOver(cell)"
-                  @mouseleave="handleCellMouseLeave()"
+                  class="absolute left-0 inset-y-0 w-1 z-10"
+                  :style="{
+                    backgroundColor: getRowStatusColor(formattedRows[virtualRow.index]?.original),
+                  }"
+                />
+                <td
+                  v-if="
+                    enableRowExpand &&
+                    (formattedRows[virtualRow.index]?.original as any)?.isExpandedRow
+                  "
+                  :colspan="columnOrder.length"
+                  :data-test="`o2-table-expanded-row-${virtualRow.index}`"
+                  class="w-full relative"
                 >
-                  <div
-                    class="h-full w-full flex items-center"
+                  <slot
+                    name="expanded-row"
+                    :row="formattedRows[virtualRow.index - 1]?.original"
+                    :index="calculateActualIndex(virtualRow.index - 1)"
+                    :hide-field-options="hideExpandFieldOptions"
+                  />
+                </td>
+                <template v-else>
+                  <td
+                    v-for="(cell, cellIndex) in formattedRows[virtualRow.index].getVisibleCells()"
+                    :key="cell.id"
+                    :data-test="
+                      'o2-table-column-' + virtualRow.index + '-' + cell.column.columnDef.id
+                    "
+                    class="py-none px-2 items-center justify-start relative table-cell group/copy"
                     :class="[
+                      ...tableCellClass,
+                      { 'pl-2': cellIndex === 0 },
                       (cell.column.columnDef.meta as any)?.align === 'center'
                         ? 'justify-center! text-center!'
                         : '',
                       (cell.column.columnDef.meta as any)?.align === 'right'
                         ? 'justify-end! text-right!'
                         : '',
+                      (cell.column.columnDef.meta as any)?.cellClass ?? '',
+                      {
+                        'sticky-column bg-inherit': (cell.column.columnDef.meta as any)?.sticky,
+                      },
+                      {
+                        'pivot-total-col font-semibold':
+                          stickyColTotals && (cell.column.columnDef.meta as any)?._isTotalColumn,
+                      },
+                      isPivotMergeNoBorder(
+                        cell.row.original,
+                        (cell.column.columnDef.meta as any)?._col,
+                      )
+                        ? 'pivot-no-border border-b-0!'
+                        : '',
                     ]"
+                    :style="[
+                      {
+                        width:
+                          cell.column.columnDef.id !== 'source' ||
+                          cell.column.columnDef.enableResizing
+                            ? `calc(var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px)`
+                            : wrap
+                              ? width - 260 - 12 + 'px'
+                              : 'auto',
+                        height: wrap
+                          ? 'stretch'
+                          : rowHeight != null
+                            ? (rowHeight ?? 28) + 'px'
+                            : undefined,
+                      },
+                      props.getCellStyle?.(cell),
+                      getStickyColumnStyle((cell.column.columnDef.meta as any)?._col) as any,
+                      getStickyTotalColumnStyle((cell.column.columnDef.meta as any)?._col) as any,
+                    ]"
+                    @mouseover="handleCellMouseOver(cell)"
+                    @mouseleave="handleCellMouseLeave()"
                   >
-                    <OButton
-                      v-if="enableRowExpand && cellIndex == 0"
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      class="mr-1"
-                      data-test="table-row-expand-menu"
-                      @click.capture.stop="handleExpandRow(virtualRow.index)"
+                    <div
+                      class="h-full w-full flex items-center"
+                      :class="[
+                        (cell.column.columnDef.meta as any)?.align === 'center'
+                          ? 'justify-center! text-center!'
+                          : '',
+                        (cell.column.columnDef.meta as any)?.align === 'right'
+                          ? 'justify-end! text-right!'
+                          : '',
+                      ]"
                     >
-                      <OIcon
-                        :name="
-                          expandedRowIndices.has(virtualRow.index)
-                            ? 'expand-more'
-                            : 'chevron-right'
-                        "
-                        size="sm"
-                      />
-                    </OButton>
-                    <slot
-                      name="cell-actions"
-                      :row="cell.row.original"
-                      :column="cell.column"
-                      :active="
-                        activeCellActionId === `${cell.id}_${cell.column.id}`
-                      "
-                    />
-                    <!-- If column.meta.slot is set, delegate to the named cell slot -->
-                    <slot
-                      v-if="(cell.column.columnDef.meta as any)?.slot"
-                      :name="`cell-${cell.column.id}`"
-                      :item="cell.row.original"
-                      :cell="cell"
-                    />
-                    <!-- Otherwise render the default cell content inline -->
-                    <template v-else>
-                      <!-- Pivot merge: skip content for hidden (merged) cells -->
-                      <template
-                        v-if="
-                          !isPivotMergeHidden(
-                            cell.row.original,
-                            (cell.column.columnDef.meta as any)?._col,
-                          )
-                        "
+                      <OButton
+                        v-if="enableRowExpand && cellIndex == 0"
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        class="mr-1"
+                        data-test="table-row-expand-menu"
+                        @click.capture.stop="handleExpandRow(virtualRow.index)"
                       >
-                        <!-- Dashboard: copy button LEFT (right-aligned columns) -->
-                        <span
-                          v-if="
-                            enableCellCopy &&
-                            (cell.column.columnDef.meta as any)?.align ===
-                              'right' &&
-                            shouldShowCopyButton(cell.getValue())
+                        <OIcon
+                          :name="
+                            expandedRowIndices.has(virtualRow.index)
+                              ? 'expand-more'
+                              : 'chevron-right'
                           "
-                          class="mr-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
-                          data-test="dashboard-table-cell-copy-btn"
-                          :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
-                        >
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs-sq"
-                            class="h-4! w-4! min-h-0!"
-                            @click.stop="
-                              copyCellContent(
-                                getCellDisplayValue(cell),
-                                virtualRow.index,
-                                cell.column.id,
-                              )
-                            "
-                          >
-                            <OIcon
-                              :name="
-                                isCellCopied(virtualRow.index, cell.column.id)
-                                  ? 'check'
-                                  : 'content-copy'
-                              "
-                              size="sm"
-                            />
-                          </OButton>
-                        </span>
-                        <!-- Dashboard: JSON field inline renderer -->
-                        <JsonFieldRenderer
-                          v-if="
-                            (cell.column.columnDef.meta as any)?.showFieldAsJson
-                          "
-                          :value="cell.getValue()"
+                          size="sm"
                         />
-                        <!-- Logs: FTS-highlighted text -->
-                        <span
-                          v-else-if="
-                            highlightedResults[
-                              `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                            ]
-                          "
-                          :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
-                          v-html="
-                            highlightedResults[
-                              `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
-                            ]
-                          "
-                        />
-                        <!-- Default value (dashboard: format fn; logs: renderValue) -->
-                        <span
-                          data-test="dashboard-table-cell-value"
-                          :style="{
-                            width:
-                              cell.column.columnDef.id !== 'source' ||
-                              cell.column.columnDef.enableResizing
-                                ? `calc((var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px) - 0.5rem)`
-                                : wrap
-                                  ? width - 260 - 12 + 'px'
-                                  : 'auto',
-                          }"
-                          :class="[
-                            !props.wrap
-                              ? 'overflow-hidden text-ellipsis whitespace-nowrap'
-                              : '',
-                            props.wrap ? 'break-words' : '',
-                          ]"
-                          v-else
-                        >
-                          {{ getCellDisplayValue(cell) }}
-                        </span>
-                        <!-- Logs: AI context button -->
-                        <O2AIContextAddBtn
+                      </OButton>
+                      <slot
+                        name="cell-actions"
+                        :row="cell.row.original"
+                        :column="cell.column"
+                        :active="activeCellActionId === `${cell.id}_${cell.column.id}`"
+                      />
+                      <!-- If column.meta.slot is set, delegate to the named cell slot -->
+                      <slot
+                        v-if="(cell.column.columnDef.meta as any)?.slot"
+                        :name="`cell-${cell.column.id}`"
+                        :item="cell.row.original"
+                        :cell="cell"
+                      />
+                      <!-- Otherwise render the default cell content inline -->
+                      <template v-else>
+                        <!-- Pivot merge: skip content for hidden (merged) cells -->
+                        <template
                           v-if="
-                            enableAiContextButton &&
-                            cell.column.columnDef.id ===
-                              store.state.zoConfig.timestamp_column
-                          "
-                          class="invisible ai-btn"
-                          @send-to-ai-chat="
-                            sendToAiChat(
-                              JSON.stringify(cell.row.original),
-                              true,
+                            !isPivotMergeHidden(
+                              cell.row.original,
+                              (cell.column.columnDef.meta as any)?._col,
                             )
                           "
-                        />
-                        <!-- Dashboard: copy button RIGHT (left/center-aligned) -->
-                        <span
-                          v-if="
-                            enableCellCopy &&
-                            (cell.column.columnDef.meta as any)?.align !==
-                              'right' &&
-                            shouldShowCopyButton(cell.getValue())
-                          "
-                          class="ml-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
-                          data-test="dashboard-table-cell-copy-btn"
-                          :data-copied="isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined"
                         >
-                          <OButton
-                            variant="ghost"
-                            size="icon-xs-sq"
-                            class="h-4! w-4! min-h-0!"
-                            @click.stop="
-                              copyCellContent(
-                                getCellDisplayValue(cell),
-                                virtualRow.index,
-                                cell.column.id,
-                              )
+                          <!-- Dashboard: copy button LEFT (right-aligned columns) -->
+                          <span
+                            v-if="
+                              enableCellCopy &&
+                              (cell.column.columnDef.meta as any)?.align === 'right' &&
+                              shouldShowCopyButton(cell.getValue())
+                            "
+                            class="mr-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
+                            data-test="dashboard-table-cell-copy-btn"
+                            :data-copied="
+                              isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined
                             "
                           >
-                            <OIcon
-                              :name="
-                                isCellCopied(virtualRow.index, cell.column.id)
-                                  ? 'check'
-                                  : 'content-copy'
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-sq"
+                              class="h-4! w-4! min-h-0!"
+                              @click.stop="
+                                copyCellContent(
+                                  getCellDisplayValue(cell),
+                                  virtualRow.index,
+                                  cell.column.id,
+                                )
                               "
-                              size="sm"
-                            />
-                          </OButton>
-                        </span>
+                            >
+                              <OIcon
+                                :name="
+                                  isCellCopied(virtualRow.index, cell.column.id)
+                                    ? 'check'
+                                    : 'content-copy'
+                                "
+                                size="sm"
+                              />
+                            </OButton>
+                          </span>
+                          <!-- Dashboard: JSON field inline renderer -->
+                          <JsonFieldRenderer
+                            v-if="(cell.column.columnDef.meta as any)?.showFieldAsJson"
+                            :value="cell.getValue()"
+                          />
+                          <!-- Logs: FTS-highlighted text -->
+                          <span
+                            v-else-if="
+                              highlightedResults[
+                                `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                              ]
+                            "
+                            :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
+                            v-html="
+                              highlightedResults[
+                                `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
+                              ]
+                            "
+                          />
+                          <!-- Default value (dashboard: format fn; logs: renderValue) -->
+                          <span
+                            data-test="dashboard-table-cell-value"
+                            :style="{
+                              width:
+                                cell.column.columnDef.id !== 'source' ||
+                                cell.column.columnDef.enableResizing
+                                  ? `calc((var(--col-${sanitizeCssId(cell.column.columnDef.id)}-size) * 1px) - 0.5rem)`
+                                  : wrap
+                                    ? width - 260 - 12 + 'px'
+                                    : 'auto',
+                            }"
+                            :class="[
+                              !props.wrap ? 'overflow-hidden text-ellipsis whitespace-nowrap' : '',
+                              props.wrap ? 'break-words' : '',
+                            ]"
+                            v-else
+                          >
+                            {{ getCellDisplayValue(cell) }}
+                          </span>
+                          <!-- Logs: AI context button -->
+                          <O2AIContextAddBtn
+                            v-if="
+                              enableAiContextButton &&
+                              cell.column.columnDef.id === store.state.zoConfig.timestamp_column
+                            "
+                            class="invisible ai-btn"
+                            @send-to-ai-chat="sendToAiChat(JSON.stringify(cell.row.original), true)"
+                          />
+                          <!-- Dashboard: copy button RIGHT (left/center-aligned) -->
+                          <span
+                            v-if="
+                              enableCellCopy &&
+                              (cell.column.columnDef.meta as any)?.align !== 'right' &&
+                              shouldShowCopyButton(cell.getValue())
+                            "
+                            class="ml-1 opacity-0 transition-opacity duration-[150ms] inline-flex items-center leading-none group-hover/copy:opacity-100"
+                            data-test="dashboard-table-cell-copy-btn"
+                            :data-copied="
+                              isCellCopied(virtualRow.index, cell.column.id) ? 'true' : undefined
+                            "
+                          >
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-sq"
+                              class="h-4! w-4! min-h-0!"
+                              @click.stop="
+                                copyCellContent(
+                                  getCellDisplayValue(cell),
+                                  virtualRow.index,
+                                  cell.column.id,
+                                )
+                              "
+                            >
+                              <OIcon
+                                :name="
+                                  isCellCopied(virtualRow.index, cell.column.id)
+                                    ? 'check'
+                                    : 'content-copy'
+                                "
+                                size="sm"
+                              />
+                            </OButton>
+                          </span>
+                        </template>
                       </template>
-                    </template>
-                  </div>
-                </td>
-              </template>
-            </tr>
-          </template>
+                    </div>
+                  </td>
+                </template>
+              </tr>
+            </template>
           </template>
           <!-- Empty slot: shown when rows is empty and not loading -->
           <tr v-if="!loading && tableRows.length === 0" class="w-full">
@@ -1110,16 +991,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 { 'sticky-column bg-inherit': col.sticky },
                 { 'pivot-total-col font-semibold': stickyColTotals && col._isTotalColumn },
               ]"
-              :style="
-                [
-                  getStickyTotalColumnStyle(col),
-                  getStickyColumnStyle(col),
-                ] as any
-              "
+              :style="[getStickyTotalColumnStyle(col), getStickyColumnStyle(col)] as any"
             >
               {{
-                stickyTotalRow[col.field] === undefined ||
-                stickyTotalRow[col.field] === null
+                stickyTotalRow[col.field] === undefined || stickyTotalRow[col.field] === null
                   ? ""
                   : col.format
                     ? col.format(stickyTotalRow[col.field], stickyTotalRow)
@@ -1420,9 +1295,7 @@ const colFilterSearch = reactive<Record<string, string>>({});
 
 const setColumnFilters = (updater: Updater<ColumnFiltersState>) => {
   columnFiltersState.value =
-    typeof updater === "function"
-      ? updater(columnFiltersState.value)
-      : updater;
+    typeof updater === "function" ? updater(columnFiltersState.value) : updater;
 };
 
 const uniqueValuesCache = shallowRef<Map<string, any[]>>(new Map());
@@ -1451,9 +1324,7 @@ const getFilteredUniqueValues = (colId: string): any[] => {
   const all = getUniqueValuesForColumn(colId);
   const q = (colFilterSearch[colId] ?? "").trim().toLowerCase();
   if (!q) return all;
-  return all.filter((v) =>
-    getFilterDisplayValue(colId, v).toLowerCase().includes(q),
-  );
+  return all.filter((v) => getFilterDisplayValue(colId, v).toLowerCase().includes(q));
 };
 
 /** Return the formatted display label for a raw cell value in the filter dropdown. */
@@ -1468,9 +1339,7 @@ const getFilterDisplayValue = (colId: string, rawVal: any): string => {
 };
 
 const isColFiltered = (colId: string): boolean =>
-  columnFiltersState.value.some(
-    (f) => f.id === colId && (f.value as any[])?.length > 0,
-  );
+  columnFiltersState.value.some((f) => f.id === colId && (f.value as any[])?.length > 0);
 
 const getColFilterValues = (colId: string): any[] =>
   (columnFiltersState.value.find((f) => f.id === colId)?.value as any[]) ?? [];
@@ -1516,11 +1385,7 @@ const handleHeaderSortClick = (e: Event, column: any, toggleFn: any) => {
   if (props.sortBy !== undefined && column.columnDef.meta?.sortable) {
     const field = props.sortFieldMap?.[column.id] ?? column.id;
     const newOrder =
-      field === props.sortBy
-        ? props.sortOrder === "desc"
-          ? "asc"
-          : "desc"
-        : "desc";
+      field === props.sortBy ? (props.sortOrder === "desc" ? "asc" : "desc") : "desc";
     emits("sort-change", field, newOrder);
   } else {
     getSortingHandler(e, toggleFn);
@@ -1543,7 +1408,9 @@ const columnOrder = ref<any>([]);
 
 const tableRows = shallowRef<any[]>([...(props.rows ?? [])]);
 // Invalidate unique-values filter cache whenever rows are replaced
-watch(tableRows, () => { uniqueValuesCache.value = new Map(); });
+watch(tableRows, () => {
+  uniqueValuesCache.value = new Map();
+});
 
 // ── Dashboard: convert legacy column defs → TanStack ColumnDef[] ─────────────
 const dashboardColumns = computed<ColumnDef<unknown, any>[] | null>(() => {
@@ -1591,9 +1458,7 @@ const isPivotMode = computed(() => pivotHeaderLevels.value.length > 0);
 const hasStickyColumns = computed(() =>
   ((props.columns as any[]) || []).some((c: any) => c.sticky),
 );
-const usesSeparateBorders = computed(
-  () => isPivotMode.value || hasStickyColumns.value,
-);
+const usesSeparateBorders = computed(() => isPivotMode.value || hasStickyColumns.value);
 
 // Dashboard virtual scroll: enabled when not using logs virtual scroll and not paginated.
 // Uses spacer rows + @tanstack/vue-virtual to render only visible rows (matching
@@ -1628,24 +1493,19 @@ watch(
   () => `${pivotSortState.value.sortBy}_${pivotSortState.value.descending}`,
   () => {
     if (!isPivotMode.value) return;
-    const rows = ((props.rows as any[]) || []).filter(
-      (r: any) => !r.__isTotalRow,
-    );
+    const rows = ((props.rows as any[]) || []).filter((r: any) => !r.__isTotalRow);
     const { sortBy, descending } = pivotSortState.value;
     if (!sortBy) {
       tableRows.value = [...rows];
       return;
     }
-    const col = ((props.columns as any[]) || []).find(
-      (c: any) => c.name === sortBy,
-    );
+    const col = ((props.columns as any[]) || []).find((c: any) => c.name === sortBy);
     tableRows.value = [...rows].sort((a: any, b: any) => {
       const va = a[sortBy];
       const vb = b[sortBy];
       let result: number;
       if (col?.sort) result = col.sort(va, vb, a, b);
-      else if (typeof va === "number" && typeof vb === "number")
-        result = va - vb;
+      else if (typeof va === "number" && typeof vb === "number") result = va - vb;
       else result = String(va ?? "").localeCompare(String(vb ?? ""));
       return descending ? -result : result;
     });
@@ -1654,19 +1514,14 @@ watch(
 
 // ── Dashboard: pivot merge map ───────────────────────────────────────────────
 const pivotMergeMap = computed(() => {
-  const map = new Map<
-    string,
-    Record<string, { hideContent: boolean; hideBorder: boolean }>
-  >();
+  const map = new Map<string, Record<string, { hideContent: boolean; hideBorder: boolean }>>();
   const rowCols = pivotRowColumns.value;
   if (rowCols.length === 0) return map;
   const rows = tableRows.value.filter((r: any) => !r.__isTotalRow);
   if (rows.length === 0) return map;
 
   const getRowKey = (row: any) =>
-    rowCols
-      .map((c: any) => String(row[c.name] ?? ""))
-      .join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
+    rowCols.map((c: any) => String(row[c.name] ?? "")).join(PIVOT_TABLE_ROW_KEY_SEPARATOR);
 
   for (let colIdx = 0; colIdx < rowCols.length; colIdx++) {
     const col = rowCols[colIdx];
@@ -1707,22 +1562,17 @@ const pivotRowKey = (row: any) =>
 
 const isPivotMergeHidden = (row: any, col: any): boolean => {
   if (!col?._isRowField) return false;
-  return (
-    pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideContent === true
-  );
+  return pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideContent === true;
 };
 const isPivotMergeNoBorder = (row: any, col: any): boolean => {
   if (!col?._isRowField) return false;
-  return (
-    pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideBorder === true
-  );
+  return pivotMergeMap.value.get(pivotRowKey(row))?.[col.name]?.hideBorder === true;
 };
 
 // ── Dashboard: sticky total columns ─────────────────────────────────────────
 const getStickyTotalColumnStyle = (col: any) => {
   if (!stickyColTotals.value || !col?._isTotalColumn) return {};
-  const rightOffset =
-    (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  const rightOffset = (col._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
   const style = {
     position: "sticky",
     right: `${rightOffset}px`,
@@ -1740,8 +1590,7 @@ const getStickyTotalColumnStyle = (col: any) => {
 
 const getStickyTotalHeaderForPivot = (cell: any) => {
   if (!stickyColTotals.value) return {};
-  const rightOffset =
-    (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  const rightOffset = (cell._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
   const width = cell.colspan
     ? cell.colspan * PIVOT_TABLE_TOTAL_COLUMN_WIDTH
     : PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
@@ -1782,8 +1631,7 @@ const isCellCopied = (rowIndex: number, colName: string) =>
   copiedCells.value.has(`${rowIndex}_${colName}`);
 
 const shouldShowCopyButton = (value: any) => {
-  if (value === null || value === undefined || value === "undefined")
-    return false;
+  if (value === null || value === undefined || value === "undefined") return false;
   return String(value).trim() !== "";
 };
 
@@ -1799,17 +1647,13 @@ const copyCellContent = (value: any, rowIndex: number, colName: string) => {
 // ── Dashboard: pagination ────────────────────────────────────────────────────
 const currentPage = ref(1);
 const localRowsPerPage = ref(
-  props.showPagination
-    ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
-    : 0,
+  props.showPagination ? props.rowsPerPage || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0,
 );
 
 watch(
   () => [props.showPagination, props.rowsPerPage] as const,
   ([newShow, newRpp]) => {
-    localRowsPerPage.value = newShow
-      ? newRpp || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE
-      : 0;
+    localRowsPerPage.value = newShow ? newRpp || TABLE_ROWS_PER_PAGE_DEFAULT_VALUE : 0;
     currentPage.value = 1;
   },
 );
@@ -1853,11 +1697,7 @@ watch(
 
     await nextTick();
 
-    if (
-      props.enableTextHighlight &&
-      props.columns?.length &&
-      props.rows?.length
-    ) {
+    if (props.enableTextHighlight && props.columns?.length && props.rows?.length) {
       processHitsInChunks(
         props.rows,
         props.columns,
@@ -1898,8 +1738,7 @@ watch(
         const vb = b[sortBy];
         let result: number;
         if (col?.sort) result = col.sort(va, vb, a, b);
-        else if (typeof va === "number" && typeof vb === "number")
-          result = va - vb;
+        else if (typeof va === "number" && typeof vb === "number") result = va - vb;
         else result = String(va ?? "").localeCompare(String(vb ?? ""));
         return descending ? -result : result;
       });
@@ -1913,11 +1752,7 @@ watch(
 
     await nextTick();
 
-    if (
-      props.enableTextHighlight &&
-      props.columns?.length &&
-      props.rows?.length
-    ) {
+    if (props.enableTextHighlight && props.columns?.length && props.rows?.length) {
       processHitsInChunks(
         props.rows,
         props.columns,
@@ -1947,10 +1782,7 @@ let table: any = useVueTable({
   },
   get columns() {
     // Dashboard: use converted TanStack columns; Logs: use columns prop as-is.
-    return (dashboardColumns.value ?? props.columns) as ColumnDef<
-      unknown,
-      any
-    >[];
+    return (dashboardColumns.value ?? props.columns) as ColumnDef<unknown, any>[];
   },
   state: {
     get sorting() {
@@ -1992,8 +1824,7 @@ const columnSizeVars = computed(() => {
   for (let i = 0; i < headers.length; i++) {
     const header = headers[i]!;
     colSizes[`--header-${sanitizeCssId(header.id)}-size`] = header.getSize();
-    colSizes[`--col-${sanitizeCssId(header.column.id)}-size`] =
-      header.column.getSize();
+    colSizes[`--col-${sanitizeCssId(header.column.id)}-size`] = header.column.getSize();
   }
   return colSizes;
 });
@@ -2042,12 +1873,8 @@ watch(
   () => [hasDefaultSourceColumn.value, props.wrap],
   () => {
     tableCellClass.value = [
-      hasDefaultSourceColumn.value && !props.wrap
-        ? "table-cell"
-        : "block self-stretch",
-      !props.wrap
-        ? "overflow-hidden text-ellipsis whitespace-nowrap"
-        : "",
+      hasDefaultSourceColumn.value && !props.wrap ? "table-cell" : "block self-stretch",
+      !props.wrap ? "overflow-hidden text-ellipsis whitespace-nowrap" : "",
       props.wrap ? "break-all" : "",
     ];
   },
@@ -2129,9 +1956,7 @@ const skelTdStyle = (header: any): Record<string, string> => {
 watch(
   () => headers.value,
   (newVal) => {
-    isResizingHeader.value = newVal.some((header: any) =>
-      header.column.getIsResizing(),
-    );
+    isResizingHeader.value = newVal.some((header: any) => header.column.getIsResizing());
   },
   {
     deep: true,
@@ -2203,8 +2028,7 @@ const rowVirtualizerOptions = computed(() => {
     // Delegate to a parent scroll container when provided (unified scroll with
     // content above the table, e.g. the traces RED-metrics charts); otherwise
     // this component's own wrapper is the scroller.
-    getScrollElement: () =>
-      (props.scrollEl as HTMLElement | null) ?? parentRef.value,
+    getScrollElement: () => (props.scrollEl as HTMLElement | null) ?? parentRef.value,
     scrollMargin: props.scrollMargin,
     estimateSize: (index: number) => {
       // Dashboard virtual scroll: always use 28px regardless of rowHeight prop.
@@ -2234,8 +2058,7 @@ const rowVirtualizerOptions = computed(() => {
                 return element.getBoundingClientRect().height;
               }
               // Logs/traces: only measure expanded or wrapped rows
-              const isExpandedRow =
-                formattedRows.value[index]?.original?.isExpandedRow;
+              const isExpandedRow = formattedRows.value[index]?.original?.isExpandedRow;
               if (isExpandedRow || props.wrap) {
                 const height = element.getBoundingClientRect().height;
                 expandedRowHeights.value[index] = height;
@@ -2282,9 +2105,7 @@ const measureDashboardRow = (node: any) => {
 
 const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
 
-const totalSize = computed(
-  () => rowVirtualizer.value.getTotalSize() + (props.rowHeight ?? 0),
-);
+const totalSize = computed(() => rowVirtualizer.value.getTotalSize() + (props.rowHeight ?? 0));
 
 // ── Dashboard virtual scroll: spacer row heights ─────────────────────────────
 const dashVirtualPaddingTop = computed(() => {
@@ -2333,9 +2154,7 @@ const closeColumn = (data: any) => {
 };
 
 const handleDragStart = (event: any) => {
-  if (
-    columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column
-  ) {
+  if (columnOrder.value[event.oldIndex] === store.state.zoConfig.timestamp_column) {
     isResizingHeader.value = true;
   } else {
     isResizingHeader.value = false;
@@ -2418,9 +2237,7 @@ const expandRow = async (index: number) => {
     // Force the virtualizer to recalculate all sizes
     if (rowVirtualizer.value) {
       // Find the actual expanded row element
-      const expandedElement = document.querySelector(
-        `[data-index="${index + 1}"]`,
-      );
+      const expandedElement = document.querySelector(`[data-index="${index + 1}"]`);
       if (expandedElement && rowVirtualizer.value.measureElement) {
         rowVirtualizer.value.measureElement(expandedElement);
       }
@@ -2522,11 +2339,7 @@ const handleCellMouseLeave = () => {
   activeCellActionId.value = "";
 };
 
-const sendToAiChat = (
-  value: any,
-  isEntireRow: boolean = false,
-  append: boolean = true,
-) => {
+const sendToAiChat = (value: any, isEntireRow: boolean = false, append: boolean = true) => {
   if (isEntireRow) {
     //here we will get the original value of the "row"
     //and we need to filter the row if props.columns have any filtered cols that user applied
@@ -2558,9 +2371,7 @@ const checkIfSourceColumnPresent = (columns: any) => {
 const filterRowBasedOnColumns = (row: any, columns: any) => {
   //we need to filter the row based on the columns that user have applied
   //here we need to filter row not columns based on the columns that user have applied
-  const columnsToFilter = columns.filter(
-    (column: any) => column.id !== "source",
-  );
+  const columnsToFilter = columns.filter((column: any) => column.id !== "source");
   return columnsToFilter.reduce((acc: any, column: any) => {
     acc[column.id] = row[column.id];
     return acc;
@@ -2585,9 +2396,9 @@ defineExpose({
 .o2-skel-pill {
   background: linear-gradient(
     90deg,
-    var(--color-skeleton-base)     0%,
+    var(--color-skeleton-base) 0%,
     var(--color-skeleton-highlight) 50%,
-    var(--color-skeleton-base)     100%
+    var(--color-skeleton-base) 100%
   );
   background-size: 200% 100%;
   animation: o2-skel-shimmer 1.5s ease-in-out infinite;
@@ -2596,6 +2407,8 @@ defineExpose({
 /* The row half is expressed in the template via motion-reduce:* utilities; the
    pill needs the CSS form because the scoped rule above outranks a utility. */
 @media (prefers-reduced-motion: reduce) {
-  .o2-skel-pill { animation: none; }
+  .o2-skel-pill {
+    animation: none;
+  }
 }
 </style>

@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-custom-html-editor-container"
     class="bg-card-glass-bg w-full h-full overflow-hidden"
   >
-    <div class="w-full h-full"
-      data-test="dashboard-custom-html-editor-inner"
-    >
+    <div class="w-full h-full" data-test="dashboard-custom-html-editor-inner">
       <OSplitter
         v-model="splitterModel"
         class="w-full h-full!"
@@ -29,11 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-html-editor-splitter"
       >
         <template #before>
-          <div
-            data-test="dashboard-custom-html-editor-flex-col"
-            class="flex flex-col h-full"
-          >
-            <CodeQueryEditor class="h-full flex-1"
+          <div data-test="dashboard-custom-html-editor-flex-col" class="flex flex-col h-full">
+            <CodeQueryEditor
+              class="h-full flex-1"
               language="html"
               v-model:query="htmlContent"
               :debounceTime="500"
@@ -43,7 +39,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #separator>
-          <div class="w-1 h-full bg-border-default transition-colors hover:bg-table-resize-handle"></div>
+          <div
+            class="w-1 h-full bg-border-default transition-colors hover:bg-table-resize-handle"
+          ></div>
         </template>
         <template #after>
           <HTMLRenderer
@@ -65,9 +63,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   components: {
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     HTMLRenderer,
     OSplitter,
   },

@@ -22,17 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :data-test="`pattern-card-${index}`"
   >
     <!-- Status level left border (colored via currentColor from the severity class) -->
-    <div
-      class="absolute left-0 inset-y-0 w-1 z-10 bg-current"
-      :class="severityClass"
-    />
+    <div class="absolute left-0 inset-y-0 w-1 z-10 bg-current" :class="severityClass" />
 
     <!-- Count + share bar -->
     <div class="w-28 flex-shrink-0 pl-3 pr-1">
       <div
         class="text-sm font-bold tabular-nums text-text-body"
         :data-test="`pattern-card-${index}-frequency`"
-        :title="volumeCount !== null ? t('logs.patternList.exactCountTooltip', { count: volumeCount.toLocaleString() }) : undefined"
+        :title="
+          volumeCount !== null
+            ? t('logs.patternList.exactCountTooltip', { count: volumeCount.toLocaleString() })
+            : undefined
+        "
       >
         {{ countLabel }}
       </div>
@@ -52,11 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Volume sparkline -->
     <div class="w-44 flex-shrink-0 flex items-center">
-      <PatternVolumeCell
-        :pattern="pattern"
-        :color-class="severityClass"
-        @volume="onVolume"
-      />
+      <PatternVolumeCell :pattern="pattern" :color-class="severityClass" @volume="onVolume" />
     </div>
 
     <!-- Status -->
@@ -83,7 +80,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-2xs text-text-secondary bg-card-glass-solid border border-solid border-border-default rounded-default px-1 shrink-0"
         >
           +{{ pattern.service_other_count }}
-          <OTooltip :content="t('logs.patternList.serviceOthers', { count: pattern.service_other_count })" />
+          <OTooltip
+            :content="t('logs.patternList.serviceOthers', { count: pattern.service_other_count })"
+          />
         </span>
       </template>
       <span v-else class="text-2xs text-text-muted">—</span>
@@ -92,7 +91,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Message: badges row + tokenized template -->
     <div class="flex-1 min-w-0" :class="wrap ? '' : 'overflow-hidden'">
       <!-- Trend / rarity / anomaly badges -->
-      <div v-if="badges.length || pattern.is_anomaly" class="flex items-center gap-1 mb-1 flex-wrap">
+      <div
+        v-if="badges.length || pattern.is_anomaly"
+        class="flex items-center gap-1 mb-1 flex-wrap"
+      >
         <span
           v-for="badge in badges"
           :key="badge.key"
@@ -118,20 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="font-mono text-xs w-full text-text-secondary"
         :class="
-          wrap
-            ? 'whitespace-pre-wrap break-all'
-            : 'whitespace-pre overflow-hidden text-ellipsis'
+          wrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre overflow-hidden text-ellipsis'
         "
         :data-test="`pattern-card-${index}-template`"
       >
         <template v-for="(tok, i) in templateTokens" :key="i">
           <span v-if="tok.kind === 'text'">
             <template v-for="(seg, si) in highlightLevels(tok.value)" :key="si">
-              <span
-                v-if="seg.colorClass"
-                :class="seg.colorClass"
-                class="font-bold"
-              >{{ seg.text }}</span>
+              <span v-if="seg.colorClass" :class="seg.colorClass" class="font-bold">{{
+                seg.text
+              }}</span>
               <span v-else>{{ seg.text }}</span>
             </template>
           </span>
@@ -141,7 +139,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="pattern-card-wildcard-chip"
             @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
             @mouseleave="onMouseLeave"
-          >{{ tok.mask ?? wildcardLabel(tok.value, tok.sampleValues) }}</span>
+            >{{ tok.mask ?? wildcardLabel(tok.value, tok.sampleValues) }}</span
+          >
         </template>
       </div>
     </div>
@@ -215,13 +214,9 @@ const countLabel = computed(() =>
 
 // Share of the analyzed sample — a clean partition (every analyzed log belongs
 // to exactly one pattern), so these percentages sum to ~100%.
-const percentageLabel = computed(
-  () => `${(props.pattern.percentage ?? 0).toFixed(2)}%`,
-);
+const percentageLabel = computed(() => `${(props.pattern.percentage ?? 0).toFixed(2)}%`);
 
-const severityKey = computed<PatternSeverityKey>(() =>
-  patternSeverityKeyForPattern(props.pattern),
-);
+const severityKey = computed<PatternSeverityKey>(() => patternSeverityKeyForPattern(props.pattern));
 const severityClass = computed(() => severityTextClass(severityKey.value));
 
 const STATUS_LABEL_KEY: Record<PatternSeverityKey, string> = {

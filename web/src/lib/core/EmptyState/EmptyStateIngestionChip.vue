@@ -61,15 +61,13 @@ const emit = defineEmits<{ click: [] }>();
 }
 
 .dark .ai-hover-btn {
-  box-shadow: 0 0.25rem 0.75rem 0
-    color-mix(in srgb, var(--color-ai-accent) 20%, transparent);
+  box-shadow: 0 0.25rem 0.75rem 0 color-mix(in srgb, var(--color-ai-accent) 20%, transparent);
   color: white !important;
 }
 
 .ai-hover-btn:hover {
   background: var(--color-gradient-ai) !important;
-  box-shadow: 0 0.25rem 0.75rem 0
-    color-mix(in srgb, var(--color-ai-accent) 35%, transparent);
+  box-shadow: 0 0.25rem 0.75rem 0 color-mix(in srgb, var(--color-ai-accent) 35%, transparent);
   color: white !important;
 }
 

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -62,11 +62,11 @@ export default defineComponent({
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
 
-    const ingestTabType = ref(resolveTab("security", router.currentRoute.value.name as string, "falco"));
+    const ingestTabType = ref(
+      resolveTab("security", router.currentRoute.value.name as string, "falco"),
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "security") {
@@ -176,7 +176,7 @@ export default defineComponent({
         icon: "img:" + getImageURL("images/ingestion/google-workspace.png"),
         label: t("ingestion.gworkspace"),
         contentClass: "tab_content",
-      }
+      },
     ];
 
     return {
@@ -195,4 +195,3 @@ export default defineComponent({
   },
 });
 </script>
-

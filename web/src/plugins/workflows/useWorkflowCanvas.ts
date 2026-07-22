@@ -267,16 +267,10 @@ export const buildChildrenMap = (edges: any[]): Map<string, string[]> => {
 // Example — for Trigger(t) → Function(f) → Destination(d):
 //   flowOrderedNodeIds(nodes, edges)         => ["t", "f", "d"]  // from trigger
 //   flowOrderedNodeIds(nodes, edges, "f")    => ["f", "d"]       // run-from "f"
-export const flowOrderedNodeIds = (
-  nodes: any[],
-  edges: any[],
-  startId?: string,
-): string[] => {
+export const flowOrderedNodeIds = (nodes: any[], edges: any[], startId?: string): string[] => {
   const children = buildChildrenMap(edges);
   const start =
-    startId ||
-    (nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger")
-      ?.id;
+    startId || (nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger")?.id;
   const order: string[] = [];
   const seen = new Set<string>();
   const queue = start ? [start] : [];
@@ -296,10 +290,7 @@ export const flowOrderedNodeIds = (
 // Example — for Trigger(t) → Function(f) → Destination(d):
 //   reachableFrom(edges, ["f"])   => Set { "f", "d" }   // "f" and downstream
 //   reachableFrom(edges, ["t"])   => Set { "t", "f", "d" }
-export const reachableFrom = (
-  edges: any[],
-  startIds: string[],
-): Set<string> => {
+export const reachableFrom = (edges: any[], startIds: string[]): Set<string> => {
   const children = buildChildrenMap(edges);
   const reached = new Set<string>(startIds);
   const queue = [...startIds];
@@ -319,10 +310,7 @@ export const reachableFrom = (
 // neutral "not verified" badge rather than a ✓.
 const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
   if (!errorIds.length) return [];
-  const set = reachableFrom(
-    workflowObj.currentSelectedWorkflow.edges || [],
-    errorIds,
-  );
+  const set = reachableFrom(workflowObj.currentSelectedWorkflow.edges || [], errorIds);
   for (const id of errorIds) set.delete(id);
   return [...set];
 };
@@ -353,9 +341,7 @@ export const executeTestRun = async (opts: {
       (n: any) => n.data?.node_type === "workflow_trigger",
     )?.id;
     const startId = opts.fromNode || triggerId;
-    const ranNodeIds = startId
-      ? [...reachableFrom(wf.edges || [], [startId])]
-      : [];
+    const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
     workflowObj.testRun.result = {
       errors,
       ranNodeIds,
@@ -393,16 +379,12 @@ export const loadWorkflowRun = async (opts: {
 
     // errors.data (array) -> map keyed by node_id, in the same
     // { error_count, errors: [[message], …] } shape the badges + drawer read.
-    const errList = Array.isArray(payload.errors?.data)
-      ? payload.errors.data
-      : [];
+    const errList = Array.isArray(payload.errors?.data) ? payload.errors.data : [];
     const errors: Record<string, any> = {};
     for (const e of errList) {
       // Drop null/empty messages so a message-less error entry doesn't render
       // the literal string "undefined"/"null" as an error line.
-      const msgs = (Array.isArray(e.error) ? e.error : [e.error]).filter(
-        Boolean,
-      );
+      const msgs = (Array.isArray(e.error) ? e.error : [e.error]).filter(Boolean);
       errors[e.node_id] = {
         error_count: msgs.length,
         errors: msgs.map((m: string) => [m]),
@@ -416,9 +398,9 @@ export const loadWorkflowRun = async (opts: {
     // would silently vanish and the run would look cleaner than it was. Surface
     // them so the Runs view can say the graph no longer matches this run.
     const currentNodeIds = new Set((wf.nodes || []).map((n: any) => n.id));
-    const ghostNodeIds = [
-      ...new Set([...Object.keys(errors), ...Object.keys(nodeInputs)]),
-    ].filter((id) => !currentNodeIds.has(id));
+    const ghostNodeIds = [...new Set([...Object.keys(errors), ...Object.keys(nodeInputs)])].filter(
+      (id) => !currentNodeIds.has(id),
+    );
 
     workflowObj.testRun.result = {
       errors,
@@ -458,8 +440,7 @@ export const hydrateWorkflow = (wf: any) => {
     if (node.data?.node_type === "workflow_trigger" && node.meta) {
       node.data = {
         ...node.data,
-        trigger_kind:
-          node.meta.trigger_kind || node.data.trigger_kind || "alert_fired",
+        trigger_kind: node.meta.trigger_kind || node.data.trigger_kind || "alert_fired",
       };
     }
     return node;
@@ -482,8 +463,7 @@ export const hydrateWorkflow = (wf: any) => {
 };
 
 export default function useWorkflowCanvas() {
-  const { screenToFlowCoordinate, onNodesInitialized, updateNode } =
-    useVueFlow();
+  const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   // --- edge helpers ----------------------------------------------------------
   // Edge factory + cycle detection are shared with the pipeline canvas
@@ -505,9 +485,7 @@ export default function useWorkflowCanvas() {
     // real edit, so gate the dirty flag on that. Otherwise inspecting a run
     // (hover a node → click its error badge → Esc) would mark the workflow
     // unsaved and wrongly force a Save-before-Test on the next run.
-    const structural = changes.some(
-      (c: any) => c?.type === "add" || c?.type === "remove",
-    );
+    const structural = changes.some((c: any) => c?.type === "add" || c?.type === "remove");
     if (structural && workflowObj.isEditWorkflow) workflowObj.dirtyFlag = true;
     if (structural) workflowObj.edgesChange = true;
   }
@@ -582,9 +560,7 @@ export default function useWorkflowCanvas() {
       return;
     }
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
-    wf.edges = wf.edges.filter(
-      (e: any) => e.source !== nodeId && e.target !== nodeId,
-    );
+    wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
     // The graph changed — prior Test badges are stale.
     workflowObj.testRun.result = null;
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
@@ -612,18 +588,15 @@ export default function useWorkflowCanvas() {
     const sources = new Set((wf.edges || []).map((e: any) => e.source));
     const leaves = nodes.filter((n: any) => !sources.has(n.id));
     const pool = leaves.length ? leaves : nodes;
-    return pool.reduce((a: any, b: any) =>
-      (b.position?.y ?? 0) > (a.position?.y ?? 0) ? b : a,
-    ).id;
+    return pool.reduce((a: any, b: any) => ((b.position?.y ?? 0) > (a.position?.y ?? 0) ? b : a))
+      .id;
   }
 
   // A terminal node (output io_type, e.g. Destination) can't have children — the
   // chain ends there. Used to block appending past it from the palette / drop.
   function isTerminal(nodeId?: string): boolean {
     if (!nodeId) return false;
-    const node = workflowObj.currentSelectedWorkflow.nodes.find(
-      (n: any) => n.id === nodeId,
-    );
+    const node = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === nodeId);
     return nodeMeta(node?.data?.node_type)?.ioType === "output";
   }
 
@@ -661,9 +634,7 @@ export default function useWorkflowCanvas() {
   // pipeline canvas. (Palette click still appends+wires via addNodeToEnd.)
   function onDrop(event: DragEvent) {
     const nodeType =
-      workflowObj.draggedNodeType ||
-      event.dataTransfer?.getData("application/vueflow") ||
-      "";
+      workflowObj.draggedNodeType || event.dataTransfer?.getData("application/vueflow") || "";
     workflowObj.draggedNodeType = "";
     const meta = nodeMeta(nodeType);
     if (!meta) return;
@@ -705,8 +676,7 @@ export default function useWorkflowCanvas() {
     const sourceHandle = handle === "out" ? undefined : handle;
     // Offset siblings on the same output so they don't overlap (fan-out).
     const siblings = wf.edges.filter(
-      (e: any) =>
-        e.source === sourceId && (e.sourceHandle || undefined) === sourceHandle,
+      (e: any) => e.source === sourceId && (e.sourceHandle || undefined) === sourceHandle,
     ).length;
     const position = {
       x: (src.position?.x ?? 0) + siblings * (NODE_W + 40),
@@ -744,11 +714,7 @@ export default function useWorkflowCanvas() {
       if (workflowObj.pendingEdge) {
         wf.edges = [
           ...wf.edges,
-          newEdge(
-            workflowObj.pendingEdge.source,
-            node.id,
-            workflowObj.pendingEdge.sourceHandle,
-          ),
+          newEdge(workflowObj.pendingEdge.source, node.id, workflowObj.pendingEdge.sourceHandle),
         ];
       }
     }
@@ -774,9 +740,7 @@ export default function useWorkflowCanvas() {
 
   // Open an existing node's config drawer.
   function editNode(nodeId: string) {
-    const node = workflowObj.currentSelectedWorkflow.nodes.find(
-      (n: any) => n.id === nodeId,
-    );
+    const node = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === nodeId);
     if (!node) return;
     workflowObj.isEditNode = true;
     workflowObj.pendingEdge = null;
@@ -787,12 +751,8 @@ export default function useWorkflowCanvas() {
   }
 
   function resetWorkflowData() {
-    workflowObj.currentSelectedWorkflow = JSON.parse(
-      JSON.stringify(defaultWorkflow),
-    );
-    workflowObj.workflowWithoutChange = JSON.parse(
-      JSON.stringify(defaultWorkflow),
-    );
+    workflowObj.currentSelectedWorkflow = JSON.parse(JSON.stringify(defaultWorkflow));
+    workflowObj.workflowWithoutChange = JSON.parse(JSON.stringify(defaultWorkflow));
     workflowObj.currentSelectedNodeData = null;
     workflowObj.currentSelectedNodeID = "";
     workflowObj.dialog = { ...defaultDialog };

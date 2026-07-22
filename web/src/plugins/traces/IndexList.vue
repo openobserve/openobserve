@@ -21,11 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
-        :label="
-          searchObj.data.stream.selectedStream?.label
-            ? ''
-            : t('search.selectIndex')
-        "
+        :label="searchObj.data.stream.selectedStream?.label ? '' : t('search.selectIndex')"
         :options="streamOptions"
         data-cy="index-dropdown"
         @search="onStreamSearch"
@@ -81,17 +77,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @toggle-field="toggleField"
                 @add-search-term="handleAddSearchTerm"
                 @add-multiple-search-terms="handleAddMultipleSearchTerms"
-                @remove-field-filter="(fieldName: string) => searchObj.data.stream.removeFilterField = fieldName"
+                @remove-field-filter="
+                  (fieldName: string) => (searchObj.data.stream.removeFilterField = fieldName)
+                "
                 @search-field-values="handleSearchFieldValues"
                 @load-more-values="handleLoadMoreValues"
                 @before-show="openFilterCreator"
                 @before-hide="cancelFilterCreator"
               >
                 <template v-if="field.name === 'duration'" #body>
-                  <div
-                    v-if="durationPercentilesLoading"
-                    class="flex justify-center py-2"
-                  >
+                  <div v-if="durationPercentilesLoading" class="flex justify-center py-2">
                     <OSpinner size="xs" />
                   </div>
                   <template v-else-if="hasDurationPercentiles">
@@ -110,7 +105,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration>='${formatPercentile(durationPercentiles[p.key])}'`)"
+                          @click.stop="
+                            addSearchTerm(
+                              `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
+                            )
+                          "
                           class="o2-custom-button-hover ml-1! border! border-card-glass-border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
@@ -119,7 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           variant="ghost"
                           size="icon-xs-circle"
                           :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
-                          @click.stop="addSearchTerm(`duration<='${formatPercentile(durationPercentiles[p.key])}'`)"
+                          @click.stop="
+                            addSearchTerm(
+                              `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
+                            )
+                          "
                           class="o2-custom-button-hover mr-2.5! border! border-card-glass-border! ml-auto!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
@@ -128,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </template>
                   <div v-else class="pl-3 py-1 text-sm font-medium">
-                    {{ durationPercentileErrMsg || t('traces.indexList.noValuesFound') }}
+                    {{ durationPercentileErrMsg || t("traces.indexList.noValuesFound") }}
                   </div>
                 </template>
               </FieldExpansion>
@@ -152,12 +155,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #loading>
-          <div
-            class="flex items-center justify-center w-full pt-8"
-          >
-            <div
-              class="text-sm font-medium w-fit mx-auto my-0 flex items-center gap-1.5"
-            >
+          <div class="flex items-center justify-center w-full pt-8">
+            <div class="text-sm font-medium w-fit mx-auto my-0 flex items-center gap-1.5">
               <OSpinner size="sm" />
               {{ t("traces.loadingStream") }}
             </div>
@@ -174,7 +173,12 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
-import { getImageURL, b64EncodeUnicode, b64DecodeUnicode, formatTimeWithSuffix } from "../../utils/zincutils";
+import {
+  getImageURL,
+  b64EncodeUnicode,
+  b64DecodeUnicode,
+  formatTimeWithSuffix,
+} from "../../utils/zincutils";
 import FieldRow from "@/components/common/FieldRow.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -182,7 +186,9 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
-import useDurationPercentiles, { parseDurationWhereClause } from "@/composables/useDurationPercentiles";
+import useDurationPercentiles, {
+  parseDurationWhereClause,
+} from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
@@ -200,10 +206,8 @@ export default defineComponent({
     GroupedFieldListPagination: defineAsyncComponent(
       () => import("@/components/common/FieldListPagination.vue"),
     ),
-    FieldExpansion: defineAsyncComponent(
-      () => import("@/components/common/FieldExpansion.vue"),
-    ),
-},
+    FieldExpansion: defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue")),
+  },
   emits: ["update:changeStream", "update:selectedFields"],
   props: {
     fieldList: {
@@ -244,14 +248,11 @@ export default defineComponent({
       },
     });
 
-    const showFtsFieldValues = computed(
-      () => store.state.zoConfig?.show_fts_field_values ?? false,
-    );
+    const showFtsFieldValues = computed(() => store.state.zoConfig?.show_fts_field_values ?? false);
 
     const fnMarkerLabel = computed(() => {
       const markers = [];
-      const diffDuration =
-        duration.value.slider.max - duration.value.slider.min;
+      const diffDuration = duration.value.slider.max - duration.value.slider.min;
       const step = diffDuration / 4;
       for (let i = 0; i < 5; i++) {
         markers.push({
@@ -271,7 +272,6 @@ export default defineComponent({
         );
       });
     };
-
 
     const addToFilter = (field: any) => {
       searchObj.data.stream.addToFilter = field;
@@ -294,9 +294,7 @@ export default defineComponent({
     const onStreamChange = (selectedValue: SelectModelValue) => {
       const streamValue = typeof selectedValue === "string" ? selectedValue : null;
       const matched = streamValue
-        ? searchObj.data.stream.streamLists.find(
-            (s: any) => s.value === streamValue,
-          )
+        ? searchObj.data.stream.streamLists.find((s: any) => s.value === streamValue)
         : undefined;
       // No match clears to the empty-stream sentinel (the codebase's "cleared"
       // convention everywhere else — resetSearchObj, SearchBar, Index).
@@ -312,16 +310,14 @@ export default defineComponent({
 
     // Column ID "status" maps to stream field "span_status" — the only mismatch.
     const TRACES_LOCKED_FIELD_NAMES = new Set(
-      [...DEFAULT_TRACE_COLUMNS.traces].map((id) =>
-        id === "status" ? "span_status" : id,
-      ),
+      [...DEFAULT_TRACE_COLUMNS.traces].map((id) => (id === "status" ? "span_status" : id)),
     );
 
     const normalizedFieldList = computed(() =>
       (props.fieldList as any[]).map((f: any) => ({
         ...f,
         isGroup: !!f.label,
-        groupName: f.label ? f.name : (f.group || f.name),
+        groupName: f.label ? f.name : f.group || f.name,
         stream: f.group || f.name,
         isSchemaField: f.label === true ? false : true,
         enableVisibility: f.label === true ? false : !TRACES_LOCKED_FIELD_NAMES.has(f.name),
@@ -350,8 +346,7 @@ export default defineComponent({
     );
 
     const isFieldEditable = (fieldName: string): boolean =>
-      searchObj.meta.searchMode === "traces" &&
-      !TRACES_LOCKED_FIELD_NAMES.has(fieldName);
+      searchObj.meta.searchMode === "traces" && !TRACES_LOCKED_FIELD_NAMES.has(fieldName);
 
     const toggleField = async (field: any) => {
       emit("update:selectedFields", field);
@@ -394,10 +389,7 @@ export default defineComponent({
 
     logsUtils();
 
-    const removeFieldFromWhereStr = (
-      whereClause: string,
-      fieldName: string,
-    ): string => {
+    const removeFieldFromWhereStr = (whereClause: string, fieldName: string): string => {
       const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const fieldPattern = new RegExp(`^"?${escaped}"?\\s*[=!<>]`, "i");
       const multiPattern = new RegExp(`^\\(\\s*"?${escaped}"?\\s*[=!<>]`, "i");
@@ -441,15 +433,9 @@ export default defineComponent({
       return b64EncodeUnicode(sql) || "";
     };
 
-    const defaultValuesCount = computed(
-      () => store.state.zoConfig?.query_values_default_num || 10,
-    );
+    const defaultValuesCount = computed(() => store.state.zoConfig?.query_values_default_num || 10);
 
-    const fetchFieldValuesData = (
-      fieldName: string,
-      from: number = 0,
-      keyword: string = "",
-    ) => {
+    const fetchFieldValuesData = (fieldName: string, from: number = 0, keyword: string = "") => {
       const fetchPayload: any = {
         fields: [fieldName],
         size: from + defaultValuesCount.value,
@@ -515,37 +501,24 @@ export default defineComponent({
       fetchFieldValuesData(fieldName, newFrom, fieldValuesCurrentKeyword.value[fieldName] ?? "");
     };
 
-    const handleAddSearchTerm = (
-      fieldName: string,
-      value: string,
-      action: string,
-    ) => {
+    const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
       if (action === "include") {
         addSearchTerm(
-          fieldName === "duration"
-            ? `${fieldName}>=${value}`
-            : `${fieldName}='${value}'`,
+          fieldName === "duration" ? `${fieldName}>=${value}` : `${fieldName}='${value}'`,
         );
       } else {
         addSearchTerm(
-          fieldName === "duration"
-            ? `${fieldName}<=${value}`
-            : `${fieldName}!='${value}'`,
+          fieldName === "duration" ? `${fieldName}<=${value}` : `${fieldName}!='${value}'`,
         );
       }
     };
 
-    const handleAddMultipleSearchTerms = (
-      fieldName: string,
-      values: string[],
-      action: string,
-    ) => {
+    const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
       const joinOp = action === "include" ? " or " : " and ";
       const expressions = values.map((v) =>
         action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
       );
-      const combined =
-        expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
+      const combined = expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
       addSearchTerm(combined);
     };
 

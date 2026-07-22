@@ -100,19 +100,16 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
         'data-disabled:cursor-not-allowed',
       ]"
     >
-      <RadioGroupIndicator
-        :class="[
-          'rounded-full bg-radio-checked-dot',
-          dotSize[resolvedSize],
-        ]"
-      />
+      <RadioGroupIndicator :class="['rounded-full bg-radio-checked-dot', dotSize[resolvedSize]]" />
     </RadioGroupItem>
 
     <span
       v-if="$slots.label || props.label"
       :class="[
         'o-input-label text-compact select-none leading-tight',
-        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        props.disabled
+          ? 'font-normal text-input-label-text-disabled'
+          : 'font-medium text-input-label-text',
       ]"
     >
       <slot name="label">{{ props.label }}</slot>

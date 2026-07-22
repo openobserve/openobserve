@@ -15,57 +15,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import type { ToastProps, ToastEmits } from "./OToast.types"
-import { computed, ref, onUnmounted } from "vue"
-import OIcon from "@/lib/core/Icon/OIcon.vue"
-import OTag from "@/lib/core/Badge/OTag.vue"
-import { pauseTimer, resumeTimer, isPageVisible } from "./useToast"
-import {
-  ToastRoot,
-  ToastTitle,
-  ToastDescription,
-  ToastClose,
-} from "reka-ui"
+import type { ToastProps, ToastEmits } from "./OToast.types";
+import { computed, ref, onUnmounted } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { pauseTimer, resumeTimer, isPageVisible } from "./useToast";
+import { ToastRoot, ToastTitle, ToastDescription, ToastClose } from "reka-ui";
 
-defineOptions({ inheritAttrs: false })
+defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<ToastProps>(), {
   variant: "default",
   position: "bottom-right",
   open: true,
   count: 1,
-})
+});
 
-const emit = defineEmits<ToastEmits>()
+const emit = defineEmits<ToastEmits>();
 
 // ── Variant class maps ───────────────────────────────────────────────────────
 
 const variantClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: [
-    "bg-toast-success-bg border border-toast-success-border",
-    "text-toast-fg",
-  ].join(" "),
-  error: [
-    "bg-toast-error-bg border border-toast-error-border",
-    "text-toast-fg",
-  ].join(" "),
-  warning: [
-    "bg-toast-warning-bg border border-toast-warning-border",
-    "text-toast-fg",
-  ].join(" "),
-  info: [
-    "bg-toast-info-bg border border-toast-info-border",
-    "text-toast-fg",
-  ].join(" "),
-  loading: [
-    "bg-toast-loading-bg border border-toast-loading-border",
-    "text-toast-fg",
-  ].join(" "),
-  default: [
-    "bg-toast-default-bg border border-toast-default-border",
-    "text-toast-fg",
-  ].join(" "),
-}
+  success: ["bg-toast-success-bg border border-toast-success-border", "text-toast-fg"].join(" "),
+  error: ["bg-toast-error-bg border border-toast-error-border", "text-toast-fg"].join(" "),
+  warning: ["bg-toast-warning-bg border border-toast-warning-border", "text-toast-fg"].join(" "),
+  info: ["bg-toast-info-bg border border-toast-info-border", "text-toast-fg"].join(" "),
+  loading: ["bg-toast-loading-bg border border-toast-loading-border", "text-toast-fg"].join(" "),
+  default: ["bg-toast-default-bg border border-toast-default-border", "text-toast-fg"].join(" "),
+};
 
 const iconColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
   success: "text-toast-success-icon",
@@ -74,7 +51,7 @@ const iconColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
   info: "text-toast-info-icon",
   loading: "text-toast-loading-icon",
   default: "text-toast-fg",
-}
+};
 
 const badgeColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
   success: "bg-toast-success-icon text-white",
@@ -83,7 +60,7 @@ const badgeColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
   info: "bg-toast-info-icon text-white",
   loading: "bg-toast-loading-icon text-white",
   default: "bg-toast-default-border text-toast-fg",
-}
+};
 
 const progressBarColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
   success: "bg-toast-success-icon",
@@ -92,27 +69,27 @@ const progressBarColorClasses: Record<NonNullable<ToastProps["variant"]>, string
   info: "bg-toast-info-icon",
   loading: "bg-toast-loading-icon",
   default: "bg-toast-default-border",
-}
+};
 
-const isHovered = ref(false)
+const isHovered = ref(false);
 
 // isPaused drives the CSS progress-bar animation. It is a computed so it is
 // always derived from the two independent pause sources: hover AND page
 // visibility. A plain ref could fall out of sync; a computed never can.
-const isPaused = computed(() => isHovered.value || !isPageVisible.value)
+const isPaused = computed(() => isHovered.value || !isPageVisible.value);
 
 function onMouseEnter() {
-  isHovered.value = true
-  pauseTimer(props.id)
+  isHovered.value = true;
+  pauseTimer(props.id);
 }
 
 function onMouseLeave() {
-  isHovered.value = false
+  isHovered.value = false;
   // Only resume if the page is actually visible right now; if the user somehow
   // triggered mouseleave while the tab was backgrounded (unlikely but safe),
   // we must not restart the timer.
   if (isPageVisible.value) {
-    resumeTimer(props.id)
+    resumeTimer(props.id);
   }
 }
 
@@ -120,39 +97,35 @@ function onMouseLeave() {
 
 const rootRole = computed<"alert" | "status">(() =>
   props.variant === "error" || props.variant === "warning" ? "alert" : "status",
-)
+);
 
-const hasIcon = computed(() => props.variant !== "default")
+const hasIcon = computed(() => props.variant !== "default");
 
-const screenReaderTitle = computed(() =>
-  props.title ? props.title : props.message,
-)
+const screenReaderTitle = computed(() => (props.title ? props.title : props.message));
 
-const isTopPosition = computed(() =>
-  props.position.startsWith("top-"),
-)
+const isTopPosition = computed(() => props.position.startsWith("top-"));
 
-const detailsExpanded = ref(false)
+const detailsExpanded = ref(false);
 
 // Temporary success state for the action button (e.g. "Copied!")
-const actionSucceeded = ref(false)
-let actionResetTimer: ReturnType<typeof setTimeout> | undefined
+const actionSucceeded = ref(false);
+let actionResetTimer: ReturnType<typeof setTimeout> | undefined;
 
 function handleActionClick() {
-  if (!props.action) return
-  props.action.handler()
+  if (!props.action) return;
+  props.action.handler();
   if (props.action.successLabel) {
-    actionSucceeded.value = true
-    clearTimeout(actionResetTimer)
+    actionSucceeded.value = true;
+    clearTimeout(actionResetTimer);
     actionResetTimer = setTimeout(() => {
-      actionSucceeded.value = false
-    }, 2000)
+      actionSucceeded.value = false;
+    }, 2000);
   }
 }
 
 onUnmounted(() => {
-  clearTimeout(actionResetTimer)
-})
+  clearTimeout(actionResetTimer);
+});
 </script>
 
 <template>
@@ -164,9 +137,13 @@ onUnmounted(() => {
       details && details.length > 0 ? 'w-[28rem]' : 'w-[22rem]',
       'max-w-[calc(100vw-2rem)]',
       'data-[state=open]:animate-in data-[state=open]:fade-in-0',
-      isTopPosition ? 'data-[state=open]:slide-in-from-top-4' : 'data-[state=open]:slide-in-from-bottom-4',
+      isTopPosition
+        ? 'data-[state=open]:slide-in-from-top-4'
+        : 'data-[state=open]:slide-in-from-bottom-4',
       'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
-      isTopPosition ? 'data-[state=closed]:slide-out-to-top-4' : 'data-[state=closed]:slide-out-to-bottom-4',
+      isTopPosition
+        ? 'data-[state=closed]:slide-out-to-top-4'
+        : 'data-[state=closed]:slide-out-to-bottom-4',
     ]"
     :role="rootRole"
     :data-test="`o-toast-${id}`"
@@ -186,7 +163,8 @@ onUnmounted(() => {
       ]"
       :data-test="`o-toast-count-${count}`"
       aria-hidden="true"
-    >{{ count > 99 ? "99+" : count }}</span>
+      >{{ count > 99 ? "99+" : count }}</span
+    >
 
     <!-- Inner shell: carries all visual styling + overflow-hidden to clip the progress bar -->
     <div
@@ -202,49 +180,34 @@ onUnmounted(() => {
         :class="['shrink-0 flex items-center', iconColorClasses[variant ?? 'default']]"
         aria-hidden="true"
       >
-        <OIcon name="autorenew" size="sm" v-if="variant === 'loading'"
-          class="size-5 animate-spin" />
-        <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'"
-          class="size-5" />
-        <OIcon name="cancel" size="sm" v-else-if="variant === 'error'"
-          class="size-5" />
-        <OIcon name="warning" size="sm" v-else-if="variant === 'warning'"
-          class="size-5" />
-        <OIcon name="info" size="sm" v-else-if="variant === 'info'"
-          class="size-5" />
+        <OIcon
+          name="autorenew"
+          size="sm"
+          v-if="variant === 'loading'"
+          class="size-5 animate-spin"
+        />
+        <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'" class="size-5" />
+        <OIcon name="cancel" size="sm" v-else-if="variant === 'error'" class="size-5" />
+        <OIcon name="warning" size="sm" v-else-if="variant === 'warning'" class="size-5" />
+        <OIcon name="info" size="sm" v-else-if="variant === 'info'" class="size-5" />
       </div>
 
       <!-- Content -->
       <div class="flex-1 min-w-0">
         <!-- Title row: text + optional count badge side-by-side -->
-        <div
-          :class="[
-            'flex items-center gap-2',
-            !title ? 'sr-only' : '',
-          ]"
-        >
+        <div :class="['flex items-center gap-2', !title ? 'sr-only' : '']">
           <ToastTitle class="text-sm font-semibold text-toast-fg leading-snug">
             {{ title ?? screenReaderTitle }}
           </ToastTitle>
-          <OTag
-            v-if="title && titleCount !== undefined"
-            type="countChip"
-            value="errorstrong"
-          >{{ titleCount }}</OTag>
+          <OTag v-if="title && titleCount !== undefined" type="countChip" value="errorstrong">{{
+            titleCount
+          }}</OTag>
         </div>
 
         <!-- Message + inline action -->
-        <div
-          :class="[
-            'flex flex-wrap items-start gap-x-3 gap-y-1.5',
-            title ? 'mt-1' : '',
-          ]"
-        >
+        <div :class="['flex flex-wrap items-start gap-x-3 gap-y-1.5', title ? 'mt-1' : '']">
           <ToastDescription
-            :class="[
-              'text-sm leading-snug',
-              title ? 'text-toast-fg-secondary' : 'text-toast-fg',
-            ]"
+            :class="['text-sm leading-snug', title ? 'text-toast-fg-secondary' : 'text-toast-fg']"
             data-test="o-toast-message"
           >
             {{ message }}
@@ -265,17 +228,19 @@ onUnmounted(() => {
             ]"
             @click.stop="handleActionClick"
           >
-            <OIcon v-if="actionSucceeded" name="check" size="sm" class="size-3.5" aria-hidden="true" />
+            <OIcon
+              v-if="actionSucceeded"
+              name="check"
+              size="sm"
+              class="size-3.5"
+              aria-hidden="true"
+            />
             {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
           </button>
         </div>
 
         <!-- Expandable affected-sections list -->
-        <div
-          v-if="details && details.length > 0"
-          class="mt-2 w-full"
-          data-test="o-toast-details"
-        >
+        <div v-if="details && details.length > 0" class="mt-2 w-full" data-test="o-toast-details">
           <button
             type="button"
             class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-toast-fg-secondary hover:text-toast-fg transition-colors cursor-pointer"
@@ -291,11 +256,7 @@ onUnmounted(() => {
             />
             Affected Sections
           </button>
-          <ul
-            v-if="detailsExpanded"
-            class="mt-1.5 space-y-1.5"
-            data-test="o-toast-details-list"
-          >
+          <ul v-if="detailsExpanded" class="mt-1.5 space-y-1.5" data-test="o-toast-details-list">
             <li
               v-for="detail in details"
               :key="detail.url"
@@ -305,7 +266,8 @@ onUnmounted(() => {
               <span
                 class="text-toast-fg-secondary truncate font-mono text-right"
                 :title="detail.url"
-              >{{ detail.url }}</span>
+                >{{ detail.url }}</span
+              >
             </li>
           </ul>
         </div>
@@ -313,7 +275,10 @@ onUnmounted(() => {
 
       <!-- Dismiss button -->
       <ToastClose
-        :class="['shrink-0 flex items-center rounded-default p-0.5 text-toast-fg-secondary hover:text-toast-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toast-info-border', title ? 'self-start' : 'self-center']"
+        :class="[
+          'shrink-0 flex items-center rounded-default p-0.5 text-toast-fg-secondary hover:text-toast-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-toast-info-border',
+          title ? 'self-start' : 'self-center',
+        ]"
         aria-label="Dismiss notification"
       >
         <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
@@ -329,7 +294,10 @@ onUnmounted(() => {
         aria-hidden="true"
       >
         <div
-          :class="['toast-progress-bar h-full w-full origin-left', progressBarColorClasses[variant ?? 'default']]"
+          :class="[
+            'toast-progress-bar h-full w-full origin-left',
+            progressBarColorClasses[variant ?? 'default'],
+          ]"
           :style="{
             animationDuration: `${timeout}ms`,
             animationPlayState: isPaused ? 'paused' : 'running',
@@ -360,4 +328,3 @@ onUnmounted(() => {
   }
 }
 </style>
-

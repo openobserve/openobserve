@@ -14,10 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div
-    class="rounded-default overflow-hidden min-h-0 h-full flex flex-col"
-    data-test="home-page"
-  >
+  <div class="rounded-default overflow-hidden min-h-0 h-full flex flex-col" data-test="home-page">
     <!-- No card-container here: the page already renders inside MainLayout's
          bordered content card, so an inner panel border would double-frame the
          home page. Keep only the layout classes.
@@ -39,41 +36,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            exists we hand-draw the border so the header still reads as a header.
            The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);
            OTabs draws the active underline flush with the header's divider. -->
-        <template v-if="tabOrder.length > 1" #header-tabs>
-          <OTabs
-            v-model="activeHomeTab"
-            align="left"
-            reorderable
-            data-test="home-tab-bar"
-            @reorder="onTabReorder"
+      <template v-if="tabOrder.length > 1" #header-tabs>
+        <OTabs
+          v-model="activeHomeTab"
+          align="left"
+          reorderable
+          data-test="home-tab-bar"
+          @reorder="onTabReorder"
+        >
+          <OTab
+            v-for="tab in tabOrder"
+            :key="tab.id"
+            :name="tab.id"
+            :data-test="`home-tab-${tab.id}`"
           >
-            <OTab
-              v-for="tab in tabOrder"
-              :key="tab.id"
-              :name="tab.id"
-              :data-test="`home-tab-${tab.id}`"
+            <span class="o-tab__label truncate">{{ tab.label }}</span>
+            <button
+              v-if="tab.id.startsWith('dash:')"
+              type="button"
+              class="ml-1 inline-flex items-center justify-center w-4 h-4 leading-none border-none bg-transparent rounded-default cursor-pointer opacity-60 text-sm text-text-secondary transition-all duration-200 ease-[ease] hover:opacity-100 hover:bg-surface-subtle-hover hover:text-text-body"
+              :data-test="`home-tab-close-${tab.id}`"
+              :aria-label="t('home.removeHomeDashboard')"
+              @mousedown.stop.prevent
+              @pointerdown.stop.prevent
+              @click.stop.prevent="onCloseTab(tab.id)"
             >
-              <span class="o-tab__label truncate">{{ tab.label }}</span>
-              <button
-                v-if="tab.id.startsWith('dash:')"
-                type="button"
-                class="ml-1 inline-flex items-center justify-center w-4 h-4 leading-none border-none bg-transparent rounded-default cursor-pointer opacity-60 text-sm text-text-secondary transition-all duration-200 ease-[ease] hover:opacity-100 hover:bg-surface-subtle-hover hover:text-text-body"
-                :data-test="`home-tab-close-${tab.id}`"
-                :aria-label="t('home.removeHomeDashboard')"
-                @mousedown.stop.prevent
-                @pointerdown.stop.prevent
-                @click.stop.prevent="onCloseTab(tab.id)"
-              >
-                &times;
-              </button>
-              <OTooltip
-                v-if="tab.id.startsWith('dash:')"
-                side="bottom"
-                :content="t('home.removeHomeDashboard')"
-              />
-            </OTab>
-          </OTabs>
-        </template>
+              &times;
+            </button>
+            <OTooltip
+              v-if="tab.id.startsWith('dash:')"
+              side="bottom"
+              :content="t('home.removeHomeDashboard')"
+            />
+          </OTab>
+        </OTabs>
+      </template>
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
            here (not on the root) so the header above stays full-bleed. The
@@ -84,22 +81,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="activeHomeTab.startsWith('dash:') ? '' : 'pt-px px-2.5 pb-2.5'"
       >
         <!-- O2 AI Assistant tab -->
-        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden">
+        <div
+          v-if="activeHomeTab === 'ai'"
+          class="home-ai-panel flex-1 min-h-0 flex flex-row overflow-hidden"
+        >
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
-          <O2AIChat
-            ref="homeChat"
-            :is-open="true"
-            :header-height="0"
-            :centered-start="true"
-          />
+          <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
         </div>
 
         <!-- Overview tab (no inner card-container — the outer section panel
              already provides the border; avoids a double-bordered card). -->
-        <div
-          v-if="activeHomeTab === 'overview'"
-          class="flex-1 min-h-0 overflow-hidden"
-        >
+        <div v-if="activeHomeTab === 'overview'" class="flex-1 min-h-0 overflow-hidden">
           <OverviewTab />
         </div>
 
@@ -109,10 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Pinned dashboard tab -->
-        <div
-          v-else-if="activeHomeTab.startsWith('dash:')"
-          class="flex-1 min-h-0 overflow-hidden"
-        >
+        <div v-else-if="activeHomeTab.startsWith('dash:')" class="flex-1 min-h-0 overflow-hidden">
           <PinnedDashboardTab
             :key="activeHomeTab"
             :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
@@ -127,14 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  ref,
-  watch,
-  onMounted,
-  onUnmounted,
-} from "vue";
+import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import config from "../aws-exports";
@@ -159,11 +141,9 @@ export default defineComponent({
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
-    const isEnterpriseOrCloud =
-      config.isEnterprise === "true" || config.isCloud === "true";
+    const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
 
-    const { homeDashboard, clearHomeDashboard, updateLabel } =
-      useHomeDashboard();
+    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard();
 
     const DEFAULT_TABS = computed(() => {
       const tabs: { id: string; label: string; closable?: boolean }[] = [];
@@ -193,11 +173,7 @@ export default defineComponent({
     }
 
     function onPinnedLabel(dashboardId: string, label: string) {
-      updateLabel(
-        store.state.selectedOrganization?.identifier,
-        dashboardId,
-        label,
-      );
+      updateLabel(store.state.selectedOrganization?.identifier, dashboardId, label);
     }
 
     // Remove the pin and recover the active tab. Shared by the "dashboard is
@@ -315,10 +291,7 @@ export default defineComponent({
       order.splice(toIdx, 0, moved);
 
       tabOrder.value = order;
-      localStorage.setItem(
-        LS_TAB_ORDER_KEY,
-        JSON.stringify(order.map((t) => t.id)),
-      );
+      localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.id)));
     }
 
     const homeChat = ref<any>(null);
@@ -336,9 +309,7 @@ export default defineComponent({
       }
     }
     onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
-    onUnmounted(() =>
-      window.removeEventListener("o2:home-switch-tab", onSwitchTab),
-    );
+    onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
 
     return {
       t,
@@ -474,5 +445,4 @@ export default defineComponent({
 .home-ai-panel :deep(.unified-input-box:focus-within::before) {
   opacity: 0.4;
 }
-
 </style>

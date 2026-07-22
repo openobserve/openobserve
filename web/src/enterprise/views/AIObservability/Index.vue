@@ -43,10 +43,7 @@ import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import type {
-  SectionHubGroup,
-  SectionHubItem,
-} from "@/components/common/SectionHub.vue";
+import type { SectionHubGroup, SectionHubItem } from "@/components/common/SectionHub.vue";
 
 defineOptions({ name: "AIObservabilityShell" });
 

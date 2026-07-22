@@ -91,9 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="icon"
           icon-left="settings"
-          :aria-label="
-            t('metrics.explorer.card.configureAria', { name: card.name })
-          "
+          :aria-label="t('metrics.explorer.card.configureAria', { name: card.name })"
           :data-test="`metrics-explorer-card-fn-${card.name}`"
           @click="$emit('configure', card)"
         >
@@ -176,9 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon"
           icon-left="refresh"
           :loading="preview?.status === 'loading'"
-          :aria-label="
-            t('metrics.explorer.card.refreshAria', { name: card.name })
-          "
+          :aria-label="t('metrics.explorer.card.refreshAria', { name: card.name })"
           :data-test="`metrics-explorer-card-refresh-${card.name}`"
           @click="$emit('refresh', card)"
         >
@@ -194,10 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            progress bar over the body, with whatever chart is already there kept
            visible beneath it. The card has no chunk-level progress to report,
            so the bar runs at its indeterminate floor with the shimmer. -->
-      <LoadingProgress
-        :loading="preview?.status === 'loading'"
-        :loading-progress-percentage="0"
-      />
+      <LoadingProgress :loading="preview?.status === 'loading'" :loading-progress-percentage="0" />
 
       <!-- Unsupported: a placeholder rather than a wrong chart. The open-in-
            editor icon still works, so the metric stays explorable. -->
@@ -271,9 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="xs"
-            :aria-label="
-              t('metrics.explorer.card.copyErrorAria', { name: card.name })
-            "
+            :aria-label="t('metrics.explorer.card.copyErrorAria', { name: card.name })"
             :data-test="`metrics-explorer-card-copy-error-${card.name}`"
             @click.stop="copyErrorReport"
           >
@@ -390,11 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
       >
         <span class="inline-flex cursor-help">
-          <OTooltip
-            :content="t('metrics.explorer.card.nanGuard')"
-            max-width="360px"
-            :delay="200"
-          />
+          <OTooltip :content="t('metrics.explorer.card.nanGuard')" max-width="360px" :delay="200" />
           <OIcon name="info-outline" size="xs" />
         </span>
       </div>
@@ -411,9 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           class="inline-flex cursor-pointer"
-          :aria-label="
-            t('metrics.explorer.card.staleCopyAria', { name: card.name })
-          "
+          :aria-label="t('metrics.explorer.card.staleCopyAria', { name: card.name })"
           :data-test="`metrics-explorer-card-stale-copy-${card.name}`"
           @click.stop="copyErrorReport"
         >
@@ -514,10 +499,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { BADGE_LABELS, cardColorForIndex } from "@/utils/metrics/metricPalette";
 import { toO2Unit } from "@/utils/metrics/metricDefaults";
 import type { MetricCard as MetricCardModel } from "@/utils/metrics/metricFamily";
-import {
-  hasSamples,
-  type CardPreview,
-} from "@/composables/metrics/useMetricsExplorerGrid";
+import { hasSamples, type CardPreview } from "@/composables/metrics/useMetricsExplorerGrid";
 
 /** Human-facing unit text for the card footer. */
 const UNIT_LABELS: Record<string, string> = {
@@ -612,11 +594,7 @@ export default defineComponent({
      */
     const alertMenu = reactive({ visible: false, x: 0, y: 0, value: 0 });
 
-    const onChartContextMenu = (event: {
-      x: number;
-      y: number;
-      value: number;
-    }) => {
+    const onChartContextMenu = (event: { x: number; y: number; value: number }) => {
       // The clicked point's value seeds the threshold, so the alert opens
       // pre-filled with the number the user actually pointed at.
       if (!Number.isFinite(event?.value)) return;
@@ -634,10 +612,7 @@ export default defineComponent({
      * `yAxisColumn` is deliberately absent — it is SQL-only there too; a PromQL
      * alert thresholds the expression's own value.
      */
-    const onCreateAlert = (selection: {
-      condition: string;
-      threshold: number;
-    }) => {
+    const onCreateAlert = (selection: { condition: string; threshold: number }) => {
       alertMenu.visible = false;
 
       const queries = props.queries ?? [];
@@ -676,17 +651,13 @@ export default defineComponent({
       () => BADGE_LABELS[props.card.typeFilterBucket] ?? t("metrics.metricCard.other"),
     );
 
-    const o2Unit = computed(() =>
-      toO2Unit(props.preview?.unit ?? props.card.unit),
-    );
+    const o2Unit = computed(() => toO2Unit(props.preview?.unit ?? props.card.unit));
     const bucketO2Unit = computed(() =>
       props.preview?.bucketUnit
         ? toO2Unit(props.preview.bucketUnit)
         : { unit: null, unitCustom: null },
     );
-    const unitLabel = computed(
-      () => UNIT_LABELS[props.preview?.unit ?? props.card.unit] ?? "",
-    );
+    const unitLabel = computed(() => UNIT_LABELS[props.preview?.unit ?? props.card.unit] ?? "");
 
     /**
      * The failure, in full: the message, then the backend's internal cause and
@@ -704,9 +675,7 @@ export default defineComponent({
       return [
         preview.error,
         preview.errorDetail,
-        preview.errorTraceId
-          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
-          : "",
+        preview.errorTraceId ? t("metrics.metricCard.traceId", { id: preview.errorTraceId }) : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -744,9 +713,7 @@ export default defineComponent({
         preview.errorDetail
           ? t("metrics.metricCard.causeLabel", { cause: preview.errorDetail })
           : "",
-        preview.errorTraceId
-          ? t("metrics.metricCard.traceId", { id: preview.errorTraceId })
-          : "",
+        preview.errorTraceId ? t("metrics.metricCard.traceId", { id: preview.errorTraceId }) : "",
       ]
         .filter(Boolean)
         .join("\n");
@@ -809,9 +776,7 @@ export default defineComponent({
      * one sparse series would otherwise invent a two-day axis — so it must pin to
      * the window that is actually true of the data.
      */
-    const dataTimeRange = computed(
-      () => props.preview?.cachedTimeRange ?? props.timeRange,
-    );
+    const dataTimeRange = computed(() => props.preview?.cachedTimeRange ?? props.timeRange);
 
     // Lazy queries: only cards in (or within one viewport of) the scroll window
     // fetch anything.

@@ -16,24 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPageLayout
-    :title="headerBasedOnRoute()"
-    icon="paid"
-    bleed
-  >
-      <template #actions>
-        <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
-          <OButton
-            v-if="orgGroupInvite.canInvite"
-            variant="primary"
-            size="sm-action"
-            data-test="org-group-invite-org-btn"
-            @click="orgGroupInvite.trigger++"
-          >
-            {{ t("billing.billingGroup.inviteOrgButton") }}
-          </OButton>
-        </div>
-      </template>
+  <OPageLayout :title="headerBasedOnRoute()" icon="paid" bleed>
+    <template #actions>
+      <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
+        <OButton
+          v-if="orgGroupInvite.canInvite"
+          variant="primary"
+          size="sm-action"
+          data-test="org-group-invite-org-btn"
+          @click="orgGroupInvite.trigger++"
+        >
+          {{ t("billing.billingGroup.inviteOrgButton") }}
+        </OButton>
+      </div>
+    </template>
     <OSplitter
       v-model="splitterModel"
       unit="px"
@@ -44,59 +40,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-slot:before>
         <div class="w-full h-full pl-2.5 pt-2 pb-2.5">
           <div class="overflow-y-auto h-full">
-            <OTabs
-              v-model="billingtab"
-              orientation="vertical"
-            >
-
-          <ORouteTab
-            exact
-            name="plans"
-            :to="
-              '/billings/plans?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
-            :label="t('billing.plansLabel')"
-          />
-          <ORouteTab
-            exact
-            name="usage"
-            :to="
-              '/billings/usage?org_identifier=' +
-              store.state.selectedOrganization.identifier +
-              '&usage_date=' +
-              usageDate +
-              '&data_type=' +
-              usageDataType
-            "
-            :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
-            :label="t('billing.usageLabel')"
-          />
-          <ORouteTab
-            v-if="showInvoiceTab"
-            exact
-            name="invoice_history"
-            :to="
-              '/billings/invoice_history?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
-            :label="t('billing.invoiceHistoryLabel')"
-          />
-          <ORouteTab
-            v-if="config.isCloud == 'true'"
-            exact
-            name="billing_group"
-            :to="
-              '/billings/billing_group?org_identifier=' +
-              store.state.selectedOrganization.identifier
-            "
-            icon="groups"
-            :label="t('billing.billingGroup.tabLabel')"
-          />
-        </OTabs>
-        <!-- <OButton
+            <OTabs v-model="billingtab" orientation="vertical">
+              <ORouteTab
+                exact
+                name="plans"
+                :to="
+                  '/billings/plans?org_identifier=' + store.state.selectedOrganization.identifier
+                "
+                :icon="'img:' + getImageURL('images/common/plan_icon.svg')"
+                :label="t('billing.plansLabel')"
+              />
+              <ORouteTab
+                exact
+                name="usage"
+                :to="
+                  '/billings/usage?org_identifier=' +
+                  store.state.selectedOrganization.identifier +
+                  '&usage_date=' +
+                  usageDate +
+                  '&data_type=' +
+                  usageDataType
+                "
+                :icon="'img:' + getImageURL('images/common/usage_icon.svg')"
+                :label="t('billing.usageLabel')"
+              />
+              <ORouteTab
+                v-if="showInvoiceTab"
+                exact
+                name="invoice_history"
+                :to="
+                  '/billings/invoice_history?org_identifier=' +
+                  store.state.selectedOrganization.identifier
+                "
+                :icon="'img:' + getImageURL('images/common/invoice_icon.svg')"
+                :label="t('billing.invoiceHistoryLabel')"
+              />
+              <ORouteTab
+                v-if="config.isCloud == 'true'"
+                exact
+                name="billing_group"
+                :to="
+                  '/billings/billing_group?org_identifier=' +
+                  store.state.selectedOrganization.identifier
+                "
+                icon="groups"
+                :label="t('billing.billingGroup.tabLabel')"
+              />
+            </OTabs>
+            <!-- <OButton
               data-test="logs-search-field-list-collapse-btn"
               :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
               variant="ghost"
@@ -108,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton> -->
           </div>
         </div>
-
       </template>
 
       <template v-slot:after>
@@ -145,7 +135,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <div class="flex items-center">
               <div class="app-tabs-container h-9">
-                <AppTabs class="tabs-selection-container" :tabs="tabs" :activeTab="usageDataType" @update:activeTab="(value: any) => updateActiveTab(value)" />
+                <AppTabs
+                  class="tabs-selection-container"
+                  :tabs="tabs"
+                  :activeTab="usageDataType"
+                  @update:activeTab="(value: any) => updateActiveTab(value)"
+                />
               </div>
             </div>
           </div>
@@ -155,10 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-65 shrink-0 h-full"
               data-test="usage-member-list"
             >
-              <UsageMemberList
-                v-model="usageMember.selected"
-                :members="billingMembers"
-              />
+              <UsageMemberList v-model="usageMember.selected" :members="billingMembers" />
             </div>
             <div class="overflow-y-auto pb-3 flex-1 min-w-0 h-full">
               <router-view title=""> </router-view>
@@ -171,10 +163,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OSelect from '@/lib/forms/Select/OSelect.vue'
-import OButton from '@/lib/core/Button/OButton.vue'
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-ignore
 import { defineComponent, ref, computed, onMounted, provide, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -196,8 +188,17 @@ import { getConsumableRelativeTime } from "@/utils/date";
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OPageLayout, OTabs, ORouteTab, AppTabs, OSelect,
-    OIcon, OSplitter, OButton, UsageMemberList, DateTimePickerDashboard },
+    OPageLayout,
+    OTabs,
+    ORouteTab,
+    AppTabs,
+    OSelect,
+    OIcon,
+    OSplitter,
+    OButton,
+    UsageMemberList,
+    DateTimePickerDashboard,
+  },
   setup() {
     const { t } = useI18n();
     const store = useStore();
@@ -205,7 +206,9 @@ export default defineComponent({
     // Default/fallback tab is "plans" — that's where /billings redirects on
     // mount, so falling back to "usage" made the Usage tab flash-highlight
     // first before the redirect settled.
-    const billingtab = ref(resolveTab("billings", router.currentRoute.value.name as string, "plans"));
+    const billingtab = ref(
+      resolveTab("billings", router.currentRoute.value.name as string, "plans"),
+    );
     const usageDataType = ref(router.currentRoute.value.query.data_type || "gb");
     const showSidebar = ref(true);
     const lastSplitterPosition = ref(200);
@@ -221,9 +224,7 @@ export default defineComponent({
     provide("usageMember", usageMember);
     const fetchBillingMembers = () => {
       if (config.isCloud !== "true") return;
-      BillingService.list_billing_group_members(
-        store.state.selectedOrganization.identifier
-      )
+      BillingService.list_billing_group_members(store.state.selectedOrganization.identifier)
         .then((res: any) => {
           billingMembers.value = (res.data ?? []).map((m: any) => ({
             id: m.member_org_id,
@@ -239,7 +240,7 @@ export default defineComponent({
     const fetchBillingInfo = async () => {
       try {
         const res = await BillingService.list_subscription(
-          store.state.selectedOrganization.identifier
+          store.state.selectedOrganization.identifier,
         );
         billingProvider.value = res.data?.provider || "";
         isPaidUser.value = res.data?.customer_id.length > 0;
@@ -255,24 +256,23 @@ export default defineComponent({
     const showInvoiceTab = computed(() => {
       return billingInfoLoaded.value && billingProvider.value === "stripe";
     });
-    const options = computed(()=>{
-      return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value ?
-        [
-          {label: "Previous Cycle", value: "-1cycle"},
-          {label: "Current Cycle", value: "1cycle"},
-          {label: "30 Days", value: "30days"},
-          {label: "60 Days", value: "60days"},
-          {label: "3 Months", value: "3months"},
-          {label: "6 Months", value: "6months"},
-        ]
-        :
-        [
-          {label: "30 Days", value: "30days"},
-          {label: "60 Days", value: "60days"},
-          {label: "3 Months", value: "3months"},
-          {label: "6 Months", value: "6months"},
-        ]
-    })
+    const options = computed(() => {
+      return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value
+        ? [
+            { label: "Previous Cycle", value: "-1cycle" },
+            { label: "Current Cycle", value: "1cycle" },
+            { label: "30 Days", value: "30days" },
+            { label: "60 Days", value: "60days" },
+            { label: "3 Months", value: "3months" },
+            { label: "6 Months", value: "6months" },
+          ]
+        : [
+            { label: "30 Days", value: "30days" },
+            { label: "60 Days", value: "60days" },
+            { label: "3 Months", value: "3months" },
+            { label: "6 Months", value: "6months" },
+          ];
+    });
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
       if (showSidebar.value) {
@@ -296,12 +296,18 @@ export default defineComponent({
         isPaidUser.value
       ) {
         usageDate.value = "1cycle";
-          selectUsageDate();
+        selectUsageDate();
       }
 
-      if (router.currentRoute.value.name == "billings" || router.currentRoute.value.name == "plans") {
+      if (
+        router.currentRoute.value.name == "billings" ||
+        router.currentRoute.value.name == "plans"
+      ) {
         billingtab.value = "plans";
-        router.push({ path: "/billings/plans", query: { org_identifier: store.state.selectedOrganization.identifier } });
+        router.push({
+          path: "/billings/plans",
+          query: { org_identifier: store.state.selectedOrganization.identifier },
+        });
       }
     });
 
@@ -321,13 +327,11 @@ export default defineComponent({
 
     const isUsageRoute = computed(() => {
       return router.currentRoute.value.name == "usage";
-    })
+    });
     // Self-usage reporting on → the Usage tab renders the daily view (which has
     // its own date-range picker), so the billing-cycle range dropdown is hidden.
     const usageStreamEnabled = computed(
-      () =>
-        !!store.state?.organizationData?.organizationSettings
-          ?.usage_stream_enabled,
+      () => !!store.state?.organizationData?.organizationSettings?.usage_stream_enabled,
     );
 
     // Daily-view date range: the picker lives here (toolbar, next to GB/MB) and
@@ -370,7 +374,7 @@ export default defineComponent({
     watch(dateRange, onRangeChange, { deep: true });
     const isOrgGroupRoute = computed(() => {
       return router.currentRoute.value.name == "billing_group";
-    })
+    });
     // Shared with the BillingGroup route component (via inject): the child sets
     // canInvite based on the org's role and we bump trigger to open its invite panel.
     const orgGroupInvite = reactive({
@@ -380,31 +384,30 @@ export default defineComponent({
     provide("orgGroupInvite", orgGroupInvite);
     const selectUsageDate = () => {
       router.push({
-        path: '/billings/usage',
+        path: "/billings/usage",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           usage_date: usageDate.value,
-          data_type: usageDataType.value
-        }
-      })
-
-    }
+          data_type: usageDataType.value,
+        },
+      });
+    };
     const updateActiveTab = (value: any) => {
       usageDataType.value = value;
       selectUsageDate();
-    }
+    };
     const tabs = [
-    {
-        label: 'GB',
+      {
+        label: "GB",
         value: "gb",
         icon: "storage",
       },
       {
-        label: 'MB',
+        label: "MB",
         value: "mb",
         icon: "database",
-      }
-    ]
+      },
+    ];
 
     return {
       t,

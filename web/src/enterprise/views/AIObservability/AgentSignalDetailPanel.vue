@@ -26,10 +26,7 @@
     <!-- Signal-type icon in the drawer header, so the drawer's subject reads at
          a glance (⟳ loop / ⚠ failure / $ cost). -->
     <template #header-left>
-      <div
-        class="flex items-center justify-center h-7 w-7 rounded-default"
-        :class="signalIconWrap"
-      >
+      <div class="flex items-center justify-center h-7 w-7 rounded-default" :class="signalIconWrap">
         <OIcon :name="signalIcon" size="sm" />
       </div>
     </template>
@@ -39,23 +36,13 @@
       data-test="agent-signal-detail-body"
     >
       <!-- Headline: the finding, stated plainly -->
-      <div
-        class="flex items-start gap-2"
-        data-test="agent-signal-detail-headline"
-      >
-        <OIcon
-          :name="signalIcon"
-          size="sm"
-          class="mt-0.5 shrink-0"
-          :class="signalIconColor"
-        />
+      <div class="flex items-start gap-2" data-test="agent-signal-detail-headline">
+        <OIcon :name="signalIcon" size="sm" class="mt-0.5 shrink-0" :class="signalIconColor" />
         <div class="flex flex-col gap-1">
           <p class="m-0 text-compact leading-normal text-text-heading">
             {{ headline }}
           </p>
-          <p
-            class="m-0 text-2xs leading-normal text-text-secondary"
-          >
+          <p class="m-0 text-2xs leading-normal text-text-secondary">
             {{ explanation }}
           </p>
         </div>
@@ -67,11 +54,7 @@
         class="card-container py-3 px-3.5 pb-3.5 bg-surface-base border border-border-default rounded-surface"
       >
         <header class="mb-1.5 flex items-center gap-1.5">
-          <OIcon
-            name="error-outline"
-            size="xs"
-            class="text-badge-error-soft-text"
-          />
+          <OIcon name="error-outline" size="xs" class="text-badge-error-soft-text" />
           <h4 class="m-0 text-compact font-semibold text-text-heading">
             {{ t("aiObservability.behavior.detail.errorsTitle") }}
           </h4>
@@ -225,9 +208,7 @@ const toggleError = (key: string) => {
   expandedErrors.value = next;
 };
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 const signalType = computed(() => props.row?.signalType);
 
 // Signal-type iconography — a distinct icon + accent per drawer so the subject
@@ -243,10 +224,8 @@ const signalIconColor = computed(() => {
   return "text-badge-error-soft-text";
 });
 const signalIconWrap = computed(() => {
-  if (signalType.value === "loop")
-    return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
-  if (signalType.value === "cost")
-    return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
+  if (signalType.value === "loop") return "bg-badge-warning-soft-bg text-badge-warning-soft-text";
+  if (signalType.value === "cost") return "bg-badge-primary-soft-bg text-badge-primary-soft-text";
   return "bg-badge-error-soft-bg text-badge-error-soft-text";
 });
 
@@ -291,19 +270,15 @@ const headline = computed(() => {
 const explanation = computed(() => {
   const r = props.row;
   if (!r) return "";
-  if (r.signalType === "loop")
-    return t("aiObservability.behavior.detail.loopExplain");
-  if (r.signalType === "failure")
-    return t("aiObservability.behavior.detail.failExplain");
+  if (r.signalType === "loop") return t("aiObservability.behavior.detail.loopExplain");
+  if (r.signalType === "failure") return t("aiObservability.behavior.detail.failExplain");
   return t("aiObservability.behavior.detail.costExplain");
 });
 
 const tracesTitle = computed(() => {
   const r = props.row;
-  if (r?.signalType === "loop")
-    return t("aiObservability.behavior.detail.worstLoopTraces");
-  if (r?.signalType === "cost")
-    return t("aiObservability.behavior.detail.topCostTraces");
+  if (r?.signalType === "loop") return t("aiObservability.behavior.detail.worstLoopTraces");
+  if (r?.signalType === "cost") return t("aiObservability.behavior.detail.topCostTraces");
   return t("aiObservability.behavior.detail.tracesTitle");
 });
 
@@ -401,8 +376,7 @@ const AGENT_INHERIT_DEPTH = 4;
  *  falling back to service_name. Mirrors sql.rs::agent_coalesce. */
 const callerExpr = () => {
   const parts = ["c.gen_ai_agent_name"];
-  for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++)
-    parts.push(`p${k}.gen_ai_agent_name`);
+  for (let k = 1; k <= AGENT_INHERIT_DEPTH; k++) parts.push(`p${k}.gen_ai_agent_name`);
   parts.push("c.service_name");
   return `COALESCE(${parts.join(", ")})`;
 };
@@ -438,7 +412,10 @@ const condenseError = (raw: string): string => {
   const m = s.match(/"message"\s*:\s*"([^"]{3,})"/);
   if (m) {
     // Keep the leading error class (before the first "{") + the inner message.
-    const prefix = s.split("{")[0].replace(/[-:\s]+$/, "").trim();
+    const prefix = s
+      .split("{")[0]
+      .replace(/[-:\s]+$/, "")
+      .trim();
     s = prefix ? `${prefix} — ${m[1]}` : m[1];
   }
   if (s.length > MAX_ERR_LEN) s = s.slice(0, MAX_ERR_LEN).trimEnd() + "…";
@@ -485,8 +462,7 @@ const fetchDetails = async () => {
   // The error detail can live in status_message OR error_message depending on
   // the framework — COALESCE so the message shows wherever it was populated
   // (mirrors the rollup's configurable error-detail-field coalescing).
-  const detail =
-    "COALESCE(NULLIF(c.status_message, ''), NULLIF(c.error_message, ''))";
+  const detail = "COALESCE(NULLIF(c.status_message, ''), NULLIF(c.error_message, ''))";
   try {
     if (r.signalType === "failure") {
       // The real, grouped error messages behind this class — the actionable content.

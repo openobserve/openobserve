@@ -5,17 +5,32 @@
     v-model:open="isOpen"
     persistent
     size="lg"
-    :title="isEditMode ? t('dashboard.addAnnotation.editAnnotation') : t('dashboard.addAnnotation.addAnnotation')"
+    :title="
+      isEditMode
+        ? t('dashboard.addAnnotation.editAnnotation')
+        : t('dashboard.addAnnotation.addAnnotation')
+    "
     form-id="add-annotation-form"
-    :primary-button-label="annotationData.annotation_id ? t('dashboard.addAnnotation.update') : t('dashboard.addAnnotation.save')"
+    :primary-button-label="
+      annotationData.annotation_id
+        ? t('dashboard.addAnnotation.update')
+        : t('dashboard.addAnnotation.save')
+    "
     :secondary-button-label="t('dashboard.addAnnotation.cancel')"
-    :neutral-button-label="annotationData.annotation_id ? t('dashboard.addAnnotation.delete') : undefined"
+    :neutral-button-label="
+      annotationData.annotation_id ? t('dashboard.addAnnotation.delete') : undefined
+    "
     neutral-button-variant="destructive"
     @click:secondary="handleClose"
     @click:neutral="handleDeleteWithConfirm"
   >
-    <OForm id="add-annotation-form" :schema="addAnnotationSchema" :default-values="addAnnotationDefaults" @submit="saveAnnotation">
-    <div class="flex flex-col">
+    <OForm
+      id="add-annotation-form"
+      :schema="addAnnotationSchema"
+      :default-values="addAnnotationDefaults"
+      @submit="saveAnnotation"
+    >
+      <div class="flex flex-col">
         <OFormInput
           name="title"
           :label="t('dashboard.addAnnotation.titleLabel')"
@@ -30,21 +45,22 @@
         />
 
         <OFormSelect
-            name="panels"
-            :hint="t('dashboard.addAnnotation.panelsHint')"
-            :options="groupedPanelsOptions"
-            multiple
-            :label="t('dashboard.addAnnotation.selectPanels')"
-            class="textbox flex flex-col no-case showLabelOnTop min-w-37.5"
-            data-test="dashboard-add-annotation-panels-select"
+          name="panels"
+          :hint="t('dashboard.addAnnotation.panelsHint')"
+          :options="groupedPanelsOptions"
+          multiple
+          :label="t('dashboard.addAnnotation.selectPanels')"
+          class="textbox flex flex-col no-case showLabelOnTop min-w-37.5"
+          data-test="dashboard-add-annotation-panels-select"
         />
         <div class="text-xs mt-3">
-          {{ t('dashboard.addAnnotation.timestamp') }} {{ annotationDateString }}
+          {{ t("dashboard.addAnnotation.timestamp") }} {{ annotationDateString }}
         </div>
-    </div>
+      </div>
     </OForm>
 
-    <ODialog data-test="add-annotation-delete-confirm-dialog"
+    <ODialog
+      data-test="add-annotation-delete-confirm-dialog"
       v-model:open="showDeleteConfirm"
       size="xs"
       :title="t('dashboard.addAnnotation.confirmDelete')"
@@ -55,7 +71,7 @@
       @click:secondary="showDeleteConfirm = false"
       @click:primary="deleteAnnotation.execute()"
     >
-      <p>{{ t('dashboard.addAnnotation.deleteConfirmMessage') }}</p>
+      <p>{{ t("dashboard.addAnnotation.deleteConfirmMessage") }}</p>
     </ODialog>
   </ODialog>
 </template>
@@ -68,7 +84,7 @@ import { useI18n } from "vue-i18n";
 import { useLoading } from "@/composables/useLoading";
 import { annotationService } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -152,15 +168,12 @@ const groupedPanelsOptions = computed(() =>
 );
 
 const groupPanels = () => {
-  groupedPanels.value = props.panelsList.reduce(
-    (acc: Record<string, AnnotationPanel[]>, panel) => {
-      const tabName = panel.tabName || t('dashboard.addAnnotation.unknownTab');
-      if (!acc[tabName]) acc[tabName] = [];
-      acc[tabName].push({ id: panel.id, title: panel.title });
-      return acc;
-    },
-    {},
-  );
+  groupedPanels.value = props.panelsList.reduce((acc: Record<string, AnnotationPanel[]>, panel) => {
+    const tabName = panel.tabName || t("dashboard.addAnnotation.unknownTab");
+    if (!acc[tabName]) acc[tabName] = [];
+    acc[tabName].push({ id: panel.id, title: panel.title });
+    return acc;
+  }, {});
 };
 
 watch(
@@ -186,8 +199,7 @@ const annotationDateString = computed(() => {
 
   if (end) {
     const endDate = new Date(end / 1000);
-    timestampString +=
-      " - " + endDate.toLocaleString("sv-SE").replace("T", " ");
+    timestampString += " - " + endDate.toLocaleString("sv-SE").replace("T", " ");
   }
 
   return timestampString;
@@ -230,7 +242,8 @@ const handleSave = async () => {
         );
       } catch (error) {
         showErrorNotification(
-          errorMessage(error) ?? t('dashboard.addAnnotation.failedUpdateAnnotation', { error: errorMessage(error) }),
+          errorMessage(error) ??
+            t("dashboard.addAnnotation.failedUpdateAnnotation", { error: errorMessage(error) }),
         );
         return;
       }
@@ -244,7 +257,8 @@ const handleSave = async () => {
         );
       } catch (error) {
         showErrorNotification(
-          errorMessage(error) ?? t('dashboard.addAnnotation.failedCreateAnnotation', { error: errorMessage(error) }),
+          errorMessage(error) ??
+            t("dashboard.addAnnotation.failedCreateAnnotation", { error: errorMessage(error) }),
         );
         return;
       }
@@ -261,11 +275,7 @@ const handleDeleteWithConfirm = () => {
 const confirmDelete = async () => {
   // Delete is reachable only for a persisted annotation, so `annotation_id` is a string.
   const annotationId = annotationData.value.annotation_id ?? "";
-  await annotationService.delete_timed_annotations(
-    organization,
-    props.dashboardId,
-    [annotationId],
-  );
+  await annotationService.delete_timed_annotations(organization, props.dashboardId, [annotationId]);
 
   handleClose();
 };

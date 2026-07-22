@@ -6,11 +6,20 @@
       @click="handleDialogClick"
     >
       <div class="confirmation-header flex items-start gap-3">
-        <OIcon name="help-outline" size="md" class="confirmation-icon shrink-0 mt-0.5 text-icon-color" />
-        <span class="confirmation-title flex-1 text-sm font-medium leading-normal text-text-heading">{{ formattedMessage }}</span>
+        <OIcon
+          name="help-outline"
+          size="md"
+          class="confirmation-icon shrink-0 mt-0.5 text-icon-color"
+        />
+        <span
+          class="confirmation-title flex-1 text-sm font-medium leading-normal text-text-heading"
+          >{{ formattedMessage }}</span
+        >
       </div>
 
-      <div class="confirmation-buttons flex flex-col gap-2.5 w-full pt-3.5 mt-1 border-t border-border-default">
+      <div
+        class="confirmation-buttons flex flex-col gap-2.5 w-full pt-3.5 mt-1 border-t border-border-default"
+      >
         <!-- For navigation actions, show 3 buttons -->
         <template v-if="isNavigationAction">
           <OButton
@@ -18,34 +27,49 @@
             variant="outline"
             :block="true"
             class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
-            :class="isFocusedYes ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40' : ''"
+            :class="
+              isFocusedYes
+                ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40'
+                : ''
+            "
             tabindex="0"
             @click="handleConfirm"
             @focus="handleYesFocus"
             @blur="handleYesBlur"
-          >Allow</OButton>
+            >Allow</OButton
+          >
           <OButton
             ref="alwaysButtonRef"
             variant="outline"
             :block="true"
             class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-status-positive border-2 border-border-default bg-surface-base hover:bg-button-ghost-success-hover-bg hover:border-status-positive"
-            :class="isFocusedAlways ? 'text-white! bg-status-positive! border-status-positive! ring-3 ring-status-positive/40' : ''"
+            :class="
+              isFocusedAlways
+                ? 'text-white! bg-status-positive! border-status-positive! ring-3 ring-status-positive/40'
+                : ''
+            "
             tabindex="1"
             @click="handleAlwaysConfirm"
             @focus="handleAlwaysFocus"
             @blur="handleAlwaysBlur"
-          >Always Allow</OButton>
+            >Always Allow</OButton
+          >
           <OButton
             ref="noButtonRef"
             variant="outline"
             :block="true"
             class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
-            :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
+            :class="
+              isFocusedNo
+                ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40'
+                : ''
+            "
             tabindex="2"
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
-          >No</OButton>
+            >No</OButton
+          >
         </template>
 
         <!-- For other actions, show 2 buttons -->
@@ -55,23 +79,33 @@
             variant="outline"
             :block="true"
             class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-theme-accent border-2 border-border-default bg-surface-base hover:bg-button-ghost-primary-hover-bg hover:border-theme-accent"
-            :class="isFocusedYes ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40' : ''"
+            :class="
+              isFocusedYes
+                ? 'text-white! bg-theme-accent! border-theme-accent! ring-3 ring-theme-accent/40'
+                : ''
+            "
             tabindex="0"
             @click="handleConfirm"
             @focus="handleYesFocus"
             @blur="handleYesBlur"
-          >{{ confirmLabel }}</OButton>
+            >{{ confirmLabel }}</OButton
+          >
           <OButton
             ref="noButtonRef"
             variant="outline"
             :block="true"
             class="confirmation-btn w-full text-sm font-semibold rounded-default normal-case tracking-normal transition-all duration-200 text-text-body border-2 border-border-default bg-surface-base hover:bg-button-ghost-destructive-hover-bg hover:border-status-negative"
-            :class="isFocusedNo ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40' : ''"
+            :class="
+              isFocusedNo
+                ? 'text-white! bg-status-negative! border-status-negative! ring-3 ring-status-negative/40'
+                : ''
+            "
             tabindex="1"
             @click="handleCancel"
             @focus="handleNoFocus"
             @blur="handleNoBlur"
-          >{{ cancelLabel }}</OButton>
+            >{{ cancelLabel }}</OButton
+          >
         </template>
       </div>
     </div>
@@ -79,8 +113,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted, onUnmounted } from 'vue';
-import OButton from '@/lib/core/Button/OButton.vue';
+import { ref, watch, nextTick, computed, onMounted, onUnmounted } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 interface ConfirmationData {
@@ -97,8 +131,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  confirmLabel: 'Yes',
-  cancelLabel: 'No',
+  confirmLabel: "Yes",
+  cancelLabel: "No",
   confirmation: null,
 });
 
@@ -109,11 +143,11 @@ const emit = defineEmits<{
 }>();
 
 // Check if this is a navigation action
-const isNavigationAction = computed(() => props.confirmation?.tool === 'navigation_action');
+const isNavigationAction = computed(() => props.confirmation?.tool === "navigation_action");
 
 // Format message based on confirmation data
 const formattedMessage = computed(() => {
-  if (!props.confirmation) return '';
+  if (!props.confirmation) return "";
 
   // Handle navigation_action
   if (isNavigationAction.value) {
@@ -129,18 +163,19 @@ const formattedMessage = computed(() => {
       return `Allow O2 Assistant to navigate to ${target.name}?`;
     }
 
-    return 'Allow O2 Assistant to navigate?';
+    return "Allow O2 Assistant to navigate?";
   }
 
   // Handle Delete* operations generically (DeleteAlert, DeleteDashboard, DeletePipeline, etc.)
-  if (props.confirmation.tool && props.confirmation.tool.startsWith('Delete')) {
+  if (props.confirmation.tool && props.confirmation.tool.startsWith("Delete")) {
     // Extract entity type (e.g., "Alert" from "DeleteAlert")
-    const entityType = props.confirmation.tool.replace('Delete', '');
+    const entityType = props.confirmation.tool.replace("Delete", "");
     const entityTypeLower = entityType.toLowerCase();
     const args = props.confirmation.args || {};
 
     // Try to find a name or title for the entity
-    const name = args.name || args.title || args.alert_id || args.dashboard_id || args.pipeline_id || args.id;
+    const name =
+      args.name || args.title || args.alert_id || args.dashboard_id || args.pipeline_id || args.id;
 
     if (name) {
       return `Do you really want to delete the "${name}" ${entityTypeLower}?`;
@@ -151,7 +186,7 @@ const formattedMessage = computed(() => {
   }
 
   // Fallback to message property
-  return props.confirmation.message || '';
+  return props.confirmation.message || "";
 });
 
 const yesButtonRef = ref<any>(null);
@@ -171,7 +206,7 @@ watch(
       nextTick(() => {
         setTimeout(() => {
           // Check if this is a delete operation
-          const isDeleteOperation = props.confirmation?.tool?.startsWith('Delete');
+          const isDeleteOperation = props.confirmation?.tool?.startsWith("Delete");
 
           if (isDeleteOperation) {
             // Focus "No" button for delete operations
@@ -191,19 +226,19 @@ watch(
         }, 100);
       });
     }
-  }
+  },
 );
 
 const handleConfirm = () => {
-  emit('confirm');
+  emit("confirm");
 };
 
 const handleCancel = () => {
-  emit('cancel');
+  emit("cancel");
 };
 
 const handleAlwaysConfirm = () => {
-  emit('alwaysConfirm');
+  emit("alwaysConfirm");
 };
 
 const focusYes = () => {
@@ -260,7 +295,7 @@ const handleAlwaysBlur = () => {
 const handleDialogClick = (event: MouseEvent) => {
   // If click is not on a button, refocus the last focused button
   const target = event.target as HTMLElement;
-  if (!target.closest('.confirmation-btn')) {
+  if (!target.closest(".confirmation-btn")) {
     nextTick(() => {
       if (isFocusedNo.value) {
         focusNo();
@@ -274,8 +309,7 @@ const handleDialogClick = (event: MouseEvent) => {
 };
 
 const handleDialogKeydown = (event: KeyboardEvent) => {
-
-  if (event.key === 'Enter') {
+  if (event.key === "Enter") {
     event.preventDefault();
     if (isFocusedYes.value) {
       handleConfirm();
@@ -284,7 +318,7 @@ const handleDialogKeydown = (event: KeyboardEvent) => {
     } else if (isFocusedNo.value) {
       handleCancel();
     }
-  } else if (event.key === 'ArrowDown' || event.key === 'Down') {
+  } else if (event.key === "ArrowDown" || event.key === "Down") {
     event.preventDefault();
     if (isNavigationAction.value) {
       // For navigation: Allow -> Always Allow -> No -> Allow
@@ -299,7 +333,7 @@ const handleDialogKeydown = (event: KeyboardEvent) => {
       // For other actions: Yes -> No -> Yes
       focusNo();
     }
-  } else if (event.key === 'ArrowUp' || event.key === 'Up') {
+  } else if (event.key === "ArrowUp" || event.key === "Up") {
     event.preventDefault();
     if (isNavigationAction.value) {
       // For navigation: No -> Always Allow -> Allow -> No
@@ -334,10 +368,10 @@ onMounted(() => {
 
     if (yesBtnEl) {
       yesBtnHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
           e.preventDefault();
           handleConfirm();
-        } else if (e.key === 'ArrowDown') {
+        } else if (e.key === "ArrowDown") {
           e.preventDefault();
           if (isNavigationAction.value) {
             focusAlways();
@@ -346,31 +380,31 @@ onMounted(() => {
           }
         }
       };
-      yesBtnEl.addEventListener('keydown', yesBtnHandler);
+      yesBtnEl.addEventListener("keydown", yesBtnHandler);
     }
 
     if (alwaysBtnEl) {
       alwaysBtnHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
           e.preventDefault();
           handleAlwaysConfirm();
-        } else if (e.key === 'ArrowDown') {
+        } else if (e.key === "ArrowDown") {
           e.preventDefault();
           focusNo();
-        } else if (e.key === 'ArrowUp') {
+        } else if (e.key === "ArrowUp") {
           e.preventDefault();
           focusYes();
         }
       };
-      alwaysBtnEl.addEventListener('keydown', alwaysBtnHandler);
+      alwaysBtnEl.addEventListener("keydown", alwaysBtnHandler);
     }
 
     if (noBtnEl) {
       noBtnHandler = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') {
+        if (e.key === "Enter") {
           e.preventDefault();
           handleCancel();
-        } else if (e.key === 'ArrowUp') {
+        } else if (e.key === "ArrowUp") {
           e.preventDefault();
           if (isNavigationAction.value) {
             focusAlways();
@@ -379,20 +413,20 @@ onMounted(() => {
           }
         }
       };
-      noBtnEl.addEventListener('keydown', noBtnHandler);
+      noBtnEl.addEventListener("keydown", noBtnHandler);
     }
   });
 });
 
 onUnmounted(() => {
   if (yesBtnEl && yesBtnHandler) {
-    yesBtnEl.removeEventListener('keydown', yesBtnHandler);
+    yesBtnEl.removeEventListener("keydown", yesBtnHandler);
   }
   if (alwaysBtnEl && alwaysBtnHandler) {
-    alwaysBtnEl.removeEventListener('keydown', alwaysBtnHandler);
+    alwaysBtnEl.removeEventListener("keydown", alwaysBtnHandler);
   }
   if (noBtnEl && noBtnHandler) {
-    noBtnEl.removeEventListener('keydown', noBtnHandler);
+    noBtnEl.removeEventListener("keydown", noBtnHandler);
   }
 });
 </script>
@@ -416,4 +450,3 @@ onUnmounted(() => {
   }
 }
 </style>
-

@@ -109,7 +109,13 @@ describe("parseUsageDetails", () => {
   });
 
   it("parses gen_ai usage fields from object", () => {
-    expect(parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20, gen_ai_usage_total_tokens: 30 })).toEqual({
+    expect(
+      parseUsageDetails({
+        gen_ai_usage_input_tokens: 10,
+        gen_ai_usage_output_tokens: 20,
+        gen_ai_usage_total_tokens: 30,
+      }),
+    ).toEqual({
       input: 10,
       output: 20,
       total: 30,
@@ -117,7 +123,9 @@ describe("parseUsageDetails", () => {
   });
 
   it("computes total from input + output when total is absent", () => {
-    expect(parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20 })).toEqual({
+    expect(
+      parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20 }),
+    ).toEqual({
       input: 10,
       output: 20,
       total: 30,
@@ -143,7 +151,11 @@ describe("parseUsageDetails", () => {
 
   it("parses a JSON string", () => {
     const result = parseUsageDetails(
-      JSON.stringify({ gen_ai_usage_input_tokens: 7, gen_ai_usage_output_tokens: 3, gen_ai_usage_total_tokens: 10 }),
+      JSON.stringify({
+        gen_ai_usage_input_tokens: 7,
+        gen_ai_usage_output_tokens: 3,
+        gen_ai_usage_total_tokens: 10,
+      }),
     );
     expect(result).toEqual({ input: 7, output: 3, total: 10 });
   });
@@ -167,7 +179,11 @@ describe("parseCostDetails", () => {
 
   it("parses gen_ai cost fields from object", () => {
     expect(
-      parseCostDetails({ gen_ai_usage_cost_input: 0.001, gen_ai_usage_cost_output: 0.002, gen_ai_usage_cost: 0.003 }),
+      parseCostDetails({
+        gen_ai_usage_cost_input: 0.001,
+        gen_ai_usage_cost_output: 0.002,
+        gen_ai_usage_cost: 0.003,
+      }),
     ).toEqual({
       input: 0.001,
       output: 0.002,
@@ -176,13 +192,20 @@ describe("parseCostDetails", () => {
   });
 
   it("computes total from input + output when total is absent", () => {
-    const result = parseCostDetails({ gen_ai_usage_cost_input: 0.001, gen_ai_usage_cost_output: 0.002 });
+    const result = parseCostDetails({
+      gen_ai_usage_cost_input: 0.001,
+      gen_ai_usage_cost_output: 0.002,
+    });
     expect(result.total).toBeCloseTo(0.003);
   });
 
   it("parses a JSON string", () => {
     const result = parseCostDetails(
-      JSON.stringify({ gen_ai_usage_cost_input: 0.01, gen_ai_usage_cost_output: 0.02, gen_ai_usage_cost: 0.03 }),
+      JSON.stringify({
+        gen_ai_usage_cost_input: 0.01,
+        gen_ai_usage_cost_output: 0.02,
+        gen_ai_usage_cost: 0.03,
+      }),
     );
     expect(result).toEqual({ input: 0.01, output: 0.02, total: 0.03 });
   });
@@ -310,9 +333,7 @@ describe("truncateLLMContent", () => {
       { role: "system", content: "You are helpful." },
       { role: "user", content: "Tell me a joke." },
     ];
-    expect(truncateLLMContent(JSON.stringify(messages))).toBe(
-      "Tell me a joke.",
-    );
+    expect(truncateLLMContent(JSON.stringify(messages))).toBe("Tell me a joke.");
   });
 
   it("falls back to first message with content when no user message", () => {
@@ -330,9 +351,7 @@ describe("truncateLLMContent", () => {
       tools: [],
       messages: [{ role: "user", content: "Nested user prompt" }],
     };
-    expect(truncateLLMContent(JSON.stringify(content))).toBe(
-      "Nested user prompt",
-    );
+    expect(truncateLLMContent(JSON.stringify(content))).toBe("Nested user prompt");
   });
 
   it("extracts text part from multimodal content array", () => {
@@ -345,9 +364,7 @@ describe("truncateLLMContent", () => {
         ],
       },
     ];
-    expect(truncateLLMContent(JSON.stringify(messages))).toBe(
-      "Describe this image.",
-    );
+    expect(truncateLLMContent(JSON.stringify(messages))).toBe("Describe this image.");
   });
 
   it("extracts from object with 'prompt' field", () => {
@@ -628,9 +645,7 @@ describe("formatModelParameters", () => {
   });
 
   it("formats a single parameter", () => {
-    expect(formatModelParameters({ temperature: 0.7 })).toBe(
-      "temperature: 0.7",
-    );
+    expect(formatModelParameters({ temperature: 0.7 })).toBe("temperature: 0.7");
   });
 
   it("formats multiple parameters with newlines", () => {

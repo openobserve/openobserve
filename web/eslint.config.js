@@ -4,6 +4,7 @@ import typescript from "@typescript-eslint/eslint-plugin";
 import typescriptParser from "@typescript-eslint/parser";
 import vueParser from "vue-eslint-parser";
 import prettier from "eslint-plugin-prettier";
+import vuePrettierSkipFormatting from "@vue/eslint-config-prettier/skip-formatting";
 import cypress from "eslint-plugin-cypress";
 import fs from "fs";
 
@@ -230,4 +231,8 @@ export default [
       ...cypress.configs.recommended.rules,
     },
   },
+  // Must be last: disables core/TS/Vue stylistic rules that could conflict
+  // with Prettier's formatting decisions. Formatting is owned by `format:check`,
+  // not this lint gate — see "prettier/prettier": "off" above.
+  vuePrettierSkipFormatting,
 ];

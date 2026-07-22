@@ -16,29 +16,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="add-dashboard-form-card-section">
-      <OForm id="add-dashboard-form" ref="addDashboardForm" :schema="addDashboardSchema" :default-values="addDashboardDefaults()" @submit="onSubmit">
-        <OFormInput
-          name="name"
-          :label="t('dashboard.name')"
-          required
-          data-test="add-dashboard-name"
-        />
-        <span>&nbsp;</span>
-        <OFormInput
-          name="description"
-          :label="t('dashboard.typeDesc')"
-          data-test="add-dashboard-description"
-        />
+    <OForm
+      id="add-dashboard-form"
+      ref="addDashboardForm"
+      :schema="addDashboardSchema"
+      :default-values="addDashboardDefaults()"
+      @submit="onSubmit"
+    >
+      <OFormInput
+        name="name"
+        :label="t('dashboard.name')"
+        required
+        data-test="add-dashboard-name"
+      />
+      <span>&nbsp;</span>
+      <OFormInput
+        name="description"
+        :label="t('dashboard.typeDesc')"
+        data-test="add-dashboard-description"
+      />
 
-        <span>&nbsp;</span>
-        <!-- select folder or create new folder and select -->
-        <select-folder-dropdown
-          v-if="showFolderSelection"
-          :active-folder-id="selectedFolder.value"
-          @folder-selected="selectedFolder = $event"
-        />
-        <span>&nbsp;</span> 
-      </OForm>
+      <span>&nbsp;</span>
+      <!-- select folder or create new folder and select -->
+      <select-folder-dropdown
+        v-if="showFolderSelection"
+        :active-folder-id="selectedFolder.value"
+        @folder-selected="selectedFolder = $event"
+      />
+      <span>&nbsp;</span>
+    </OForm>
   </div>
 </template>
 
@@ -83,8 +89,7 @@ export default defineComponent({
     const isValidIdentifier: any = ref(true);
     const { t } = useI18n();
     const addDashboardSchema = makeAddDashboardSchema(t);
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const activeFolder: any = store.state.organizationData.folders.find(
       (item: any) => item.folderId === props.activeFolderId,
@@ -142,9 +147,7 @@ export default defineComponent({
           selectedFolder.value.value ?? "default",
         );
 
-        const data = convertDashboardSchemaVersion(
-          res?.data["v" + res?.data?.version],
-        );
+        const data = convertDashboardSchemaVersion(res?.data["v" + res?.data?.version]);
 
         //update store
         await getAllDashboards(store, selectedFolder.value.value);
@@ -179,7 +182,9 @@ export default defineComponent({
     onRejected(rejectedEntries: string | any[]) {
       toast({
         variant: "error",
-        message: this.t("dashboard.addDashboardPage.filesFailedValidation", { count: rejectedEntries.length }),
+        message: this.t("dashboard.addDashboardPage.filesFailedValidation", {
+          count: rejectedEntries.length,
+        }),
       });
     },
   },

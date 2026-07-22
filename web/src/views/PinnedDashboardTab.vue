@@ -41,7 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
     <template v-else-if="dashboardData">
-      <div class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default">
+      <div
+        class="flex justify-end items-center gap-2 px-4 py-2 shrink-0 border-b border-border-default"
+      >
         <DateTimePickerDashboard
           v-if="selectedDate"
           ref="dateTimePicker"
@@ -198,11 +200,7 @@ const load = async () => {
     // conversion to the current tabs[].panels shape, and ensures variables.
     // The raw service returns {version, v5:{...}} whose top level has no `tabs`,
     // which made RenderDashboardCharts render "No panels here yet".
-    const dashboard = await getDashboard(
-      store,
-      props.dashboardId,
-      props.folderId,
-    );
+    const dashboard = await getDashboard(store, props.dashboardId, props.folderId);
 
     // getDashboard returns {} (not a throw) for a missing/deleted dashboard.
     if (!dashboard || typeof dashboard !== "object" || !dashboard.title) {

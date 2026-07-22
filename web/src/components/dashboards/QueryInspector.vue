@@ -1,5 +1,6 @@
 <template>
-  <ODialog data-test="query-inspector"
+  <ODialog
+    data-test="query-inspector"
     :open="open"
     @update:open="$emit('update:open', $event)"
     :title="t('dashboard.queryInspector.title')"
@@ -19,232 +20,187 @@
     </template>
 
     <!-- Body -->
-      <div
-        v-if="queryData.length === 0"
-        class="flex flex-col items-center justify-center h-64 text-text-muted"
-      >
-        <OIcon class="w-12 h-12" name="info" />
-        <p class="mt-2">{{ t('dashboard.queryInspector.noQueries') }}</p>
-      </div>
+    <div
+      v-if="queryData.length === 0"
+      class="flex flex-col items-center justify-center h-64 text-text-muted"
+    >
+      <OIcon class="w-12 h-12" name="info" />
+      <p class="mt-2">{{ t("dashboard.queryInspector.noQueries") }}</p>
+    </div>
 
-      <div v-else class="space-y-4">
+    <div v-else class="space-y-4">
+      <div
+        v-for="(query, index) in queryData"
+        :key="query?.originalQuery + index"
+        class="bg-card-glass-bg rounded-default border border-card-glass-border overflow-hidden"
+      >
+        <!-- Query Header -->
         <div
-          v-for="(query, index) in queryData"
-          :key="query?.originalQuery + index"
-          class="bg-card-glass-bg rounded-default border border-card-glass-border overflow-hidden"
+          class="p-2 gap-3 bg-theme-body-bg-primary border-b border-card-glass-border flex items-start justify-start"
         >
-          <!-- Query Header -->
-          <div
-            class="p-2 gap-3 bg-theme-body-bg-primary border-b border-card-glass-border flex items-start justify-start"
+          <span
+            class="text-sm font-bold rounded-default"
+            :data-test="`query-inspector-query-name-${index}`"
           >
-            <span class="text-sm font-bold rounded-default"
-                :data-test="`query-inspector-query-name-${index}`"
-            >
-              {{ query.tabName || t('dashboard.queryInspector.queryN', { n: index + 1 }) }}
-            </span>
-            <span
-              class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-3xs font-bold px-2 py-0.5 rounded-default"
-            >
-              {{ getQueryTypeDisplay(query.queryType) }}
-            </span>
+            {{ query.tabName || t("dashboard.queryInspector.queryN", { n: index + 1 }) }}
+          </span>
+          <span
+            class="bg-theme-body-bg-primary border border-card-glass-border text-text-secondary text-3xs font-bold px-2 py-0.5 rounded-default"
+          >
+            {{ getQueryTypeDisplay(query.queryType) }}
+          </span>
+        </div>
+
+        <!-- Query Content -->
+        <div class="p-3 space-y-4">
+          <!-- Original Query -->
+          <div v-if="query.originalQuery">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold tracking-wider">{{
+                t("dashboard.queryInspector.originalQuery")
+              }}</label>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                @click="copyText(query.originalQuery)"
+                icon-left="content-copy"
+              >
+                {{ t("dashboard.queryInspector.copy") }}
+              </OButton>
+            </div>
+            <div class="relative group mt-1">
+              <div
+                class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
+                :data-test="`query-inspector-original-query-${index}`"
+                v-html="
+                  highlightSearch(
+                    colorizedQueries[`${index}-Original Query`] || query.originalQuery,
+                    !!colorizedQueries[`${index}-Original Query`],
+                  )
+                "
+              ></div>
+            </div>
           </div>
 
-          <!-- Query Content -->
-          <div class="p-3 space-y-4">
-            <!-- Original Query -->
-            <div v-if="query.originalQuery">
-              <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider"
-                  >{{ t('dashboard.queryInspector.originalQuery') }}</label
-                >
-                <OButton
-                  variant="ghost-primary"
-                  size="sm"
-                  @click="copyText(query.originalQuery)"
-                  icon-left="content-copy"
-                >
-                  {{ t('dashboard.queryInspector.copy') }}
-                </OButton>
+          <!-- Executed Query -->
+          <div>
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-bold tracking-wider">{{
+                t("dashboard.queryInspector.executedQuery")
+              }}</label>
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                @click="copyText(query.query)"
+                icon-left="content-copy"
+              >
+                {{ t("dashboard.queryInspector.copy") }}
+              </OButton>
+            </div>
+            <div class="relative group mt-1">
+              <div
+                class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
+                :data-test="`query-inspector-executed-query-${index}`"
+                v-html="
+                  highlightSearch(
+                    colorizedQueries[`${index}-Query`] || query.query,
+                    !!colorizedQueries[`${index}-Query`],
+                  )
+                "
+              ></div>
+            </div>
+          </div>
+
+          <!-- Time Metadata -->
+          <div class="grid grid-cols-2 gap-4 border-t border-card-glass-border pt-2">
+            <div class="space-y-1" :data-test="`dashboard-query-inspector-start-time-${index}`">
+              <label class="text-xs font-bold tracking-wider">{{
+                t("dashboard.queryInspector.startTime")
+              }}</label>
+              <div class="text-xs text-text-secondary font-medium flex items-center gap-2">
+                <OIcon name="login" size="xs" class="text-text-muted" />
+                {{ formatTimestamp(query.startTime) }}
               </div>
-              <div class="relative group mt-1">
-                <div
-                  class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
-                  :data-test="`query-inspector-original-query-${index}`"
-                  v-html="
-                    highlightSearch(
-                      colorizedQueries[`${index}-Original Query`] ||
-                        query.originalQuery,
-                      !!colorizedQueries[`${index}-Original Query`],
-                    )
-                  "
-                ></div>
+            </div>
+            <div class="space-y-1" :data-test="`dashboard-query-inspector-end-time-${index}`">
+              <label class="text-xs font-bold tracking-wider">{{
+                t("dashboard.queryInspector.endTime")
+              }}</label>
+              <div class="text-xs text-text-secondary font-medium flex items-center gap-2">
+                <OIcon name="logout" size="xs" class="text-text-muted" />
+                {{ formatTimestamp(query.endTime) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Variables List (Row by Row) -->
+          <div class="space-y-3 border-t border-card-glass-border">
+            <!-- Standard Variables -->
+            <div class="pt-2">
+              <label class="text-xs font-bold tracking-wider">{{
+                t("dashboard.queryInspector.variables")
+              }}</label>
+              <div class="flex flex-wrap gap-2 mt-1">
+                <template v-if="getVariablesByType(query, 'variable').length">
+                  <div
+                    v-for="v in getVariablesByType(query, 'variable')"
+                    :key="v.name"
+                    class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
+                  >
+                    <span class="font-bold text-text-label">{{ v.name }}</span>
+                    <span class="text-text-muted">:</span>
+                    <span class="text-text-secondary italic">{{ v.value }}</span>
+                  </div>
+                </template>
+                <span v-else class="text-xs text-text-muted">-</span>
               </div>
             </div>
 
-            <!-- Executed Query -->
+            <!-- Fixed Variables -->
             <div>
-              <div class="flex items-center justify-between">
-                <label class="text-xs font-bold tracking-wider"
-                  >{{ t('dashboard.queryInspector.executedQuery') }}</label
-                >
-                <OButton
-                  variant="ghost-primary"
-                  size="sm"
-                  @click="copyText(query.query)"
-                  icon-left="content-copy"
-                >
-                  {{ t('dashboard.queryInspector.copy') }}
-                </OButton>
-              </div>
-              <div class="relative group mt-1">
-                <div
-                  class="p-2 rounded-default bg-theme-body-bg-primary border border-card-glass-border font-mono text-sm max-h-40 overflow-y-auto whitespace-pre-wrap break-all [scrollbar-width:thin] [scrollbar-color:color-mix(in_srgb,var(--color-grey-500)_20%,transparent)_transparent] inspector-query-editor"
-                  :data-test="`query-inspector-executed-query-${index}`"
-                  v-html="
-                    highlightSearch(
-                      colorizedQueries[`${index}-Query`] || query.query,
-                      !!colorizedQueries[`${index}-Query`],
-                    )
-                  "
-                ></div>
+              <label class="text-xs font-bold tracking-wider">{{
+                t("dashboard.queryInspector.fixedVariables")
+              }}</label>
+              <div class="flex flex-wrap gap-2 mt-1">
+                <template v-if="getVariablesByType(query, 'fixed').length">
+                  <div
+                    v-for="v in getVariablesByType(query, 'fixed')"
+                    :key="v.name"
+                    class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
+                  >
+                    <span class="font-bold text-text-label">{{ v.name }}</span>
+                    <span class="text-text-muted">:</span>
+                    <span class="text-text-secondary italic">{{ v.value }}</span>
+                  </div>
+                </template>
+                <span v-else class="text-xs text-text-muted">-</span>
               </div>
             </div>
 
-            <!-- Time Metadata -->
-            <div
-              class="grid grid-cols-2 gap-4 border-t border-card-glass-border pt-2"
-            >
-              <div class="space-y-1"
-                :data-test="`dashboard-query-inspector-start-time-${index}`"
-              >
-                <label class="text-xs font-bold tracking-wider"
-                  >{{ t('dashboard.queryInspector.startTime') }}</label
-                >
-                <div
-                  class="text-xs text-text-secondary font-medium flex items-center gap-2"
-                >
-                  <OIcon
-                    name="login"
-                    size="xs"
-                    class="text-text-muted"
-                  />
-                  {{ formatTimestamp(query.startTime) }}
-                </div>
-              </div>
-              <div class="space-y-1"
-                :data-test="`dashboard-query-inspector-end-time-${index}`"
-              >
-                <label class="text-xs font-bold tracking-wider"
-                  >{{ t('dashboard.queryInspector.endTime') }}</label
-                >
-                <div
-                  class="text-xs text-text-secondary font-medium flex items-center gap-2"
-                >
-                  <OIcon
-                    name="logout"
-                    size="xs"
-                    class="text-text-muted"
-                  />
-                  {{ formatTimestamp(query.endTime) }}
-                </div>
-              </div>
-            </div>
-
-            <!-- Variables List (Row by Row) -->
-            <div
-              class="space-y-3 border-t border-card-glass-border"
-            >
-              <!-- Standard Variables -->
-              <div class="pt-2">
-                <label class="text-xs font-bold tracking-wider"
-                  >{{ t('dashboard.queryInspector.variables') }}</label
-                >
-                <div class="flex flex-wrap gap-2 mt-1">
-                  <template v-if="getVariablesByType(query, 'variable').length">
-                    <div
-                      v-for="v in getVariablesByType(query, 'variable')"
-                      :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
-                    >
-                      <span
-                        class="font-bold text-text-label"
-                      >{{ v.name }}</span
-                      >
-                      <span class="text-text-muted">:</span>
-                      <span
-                        class="text-text-secondary italic"
-                      >{{ v.value }}</span
-                      >
-                    </div>
-                  </template>
-                  <span v-else class="text-xs text-text-muted">-</span
+            <!-- Dynamic Variables -->
+            <div>
+              <label class="text-xs font-bold tracking-wider">{{
+                t("dashboard.queryInspector.dynamicVariables")
+              }}</label>
+              <div class="flex flex-wrap gap-2 mt-1">
+                <template v-if="getVariablesByType(query, 'dynamicVariable').length">
+                  <div
+                    v-for="v in getVariablesByType(query, 'dynamicVariable')"
+                    :key="v.name"
+                    class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
                   >
-                </div>
-              </div>
-
-              <!-- Fixed Variables -->
-              <div>
-                <label class="text-xs font-bold tracking-wider"
-                  >{{ t('dashboard.queryInspector.fixedVariables') }}</label
-                >
-                <div class="flex flex-wrap gap-2 mt-1">
-                  <template v-if="getVariablesByType(query, 'fixed').length">
-                    <div
-                      v-for="v in getVariablesByType(query, 'fixed')"
-                      :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
-                    >
-                      <span
-                        class="font-bold text-text-label"
-                      >{{ v.name }}</span
-                      >
-                      <span class="text-text-muted">:</span>
-                      <span
-                        class="text-text-secondary italic"
-                      >{{ v.value }}</span
-                      >
-                    </div>
-                  </template>
-                  <span v-else class="text-xs text-text-muted">-</span
-                  >
-                </div>
-              </div>
-
-              <!-- Dynamic Variables -->
-              <div>
-                <label class="text-xs font-bold tracking-wider"
-                  >{{ t('dashboard.queryInspector.dynamicVariables') }}</label
-                >
-                <div class="flex flex-wrap gap-2 mt-1">
-                  <template
-                    v-if="getVariablesByType(query, 'dynamicVariable').length"
-                  >
-                    <div
-                      v-for="v in getVariablesByType(query, 'dynamicVariable')"
-                      :key="v.name"
-                      class="flex items-center gap-2 p-1 rounded-default border border-card-glass-border bg-card-glass-bg text-xs"
-                    >
-                      <span
-                        class="font-bold text-text-label"
-                      >{{ v.name }}</span
-                      >
-                      <span class="text-text-muted">{{
-                        v.operator
-                      }}</span>
-                      <span
-                        class="text-text-secondary italic"
-                      >{{ v.value }}</span
-                      >
-                    </div>
-                  </template>
-                  <span v-else class="text-xs text-text-muted">-</span
-                  >
-                </div>
+                    <span class="font-bold text-text-label">{{ v.name }}</span>
+                    <span class="text-text-muted">{{ v.operator }}</span>
+                    <span class="text-text-secondary italic">{{ v.value }}</span>
+                  </div>
+                </template>
+                <span v-else class="text-xs text-text-muted">-</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+    </div>
   </ODialog>
 </template>
 
@@ -274,9 +230,7 @@ interface QueryInspectorQuery {
 export default defineComponent({
   name: "QueryInspector",
   emits: ["update:open"],
-  components: { OButton, ODialog, OSearchInput,
-    OIcon,
-},
+  components: { OButton, ODialog, OSearchInput, OIcon },
   props: {
     open: {
       type: Boolean,
@@ -294,9 +248,7 @@ export default defineComponent({
   setup(props: any) {
     const { t } = useI18n();
     const store = useStore();
-    const queryData = computed<QueryInspectorQuery[]>(
-      () => props.metaData?.queries || [],
-    );
+    const queryData = computed<QueryInspectorQuery[]>(() => props.metaData?.queries || []);
     const searchQuery = ref("");
     const colorizedQueries = ref<Record<string, string>>({});
 
@@ -324,18 +276,12 @@ export default defineComponent({
 
         // Original Query
         if (query.originalQuery) {
-          newColorized[`${index}-Original Query`] = await colorizeQuery(
-            query.originalQuery,
-            lang,
-          );
+          newColorized[`${index}-Original Query`] = await colorizeQuery(query.originalQuery, lang);
         }
 
         // Executed Query
         if (query.query) {
-          newColorized[`${index}-Query`] = await colorizeQuery(
-            query.query,
-            lang,
-          );
+          newColorized[`${index}-Query`] = await colorizeQuery(query.query, lang);
         }
       }
       colorizedQueries.value = newColorized;
@@ -349,28 +295,16 @@ export default defineComponent({
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 
-    const highlightSearch = (
-      html: string | undefined,
-      isColorized: boolean,
-    ) => {
+    const highlightSearch = (html: string | undefined, isColorized: boolean) => {
       if (!html) return "";
-      const safeHtml = isColorized
-        ? DOMPurify.sanitize(html)
-        : escapeHtml(html);
+      const safeHtml = isColorized ? DOMPurify.sanitize(html) : escapeHtml(html);
       if (!searchQuery.value) return safeHtml;
 
       try {
-        const escapedSearch = searchQuery.value.replace(
-          /[.*+?^${}()|[\]\\]/g,
-          "\\$&",
-        );
+        const escapedSearch = searchQuery.value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const regex = new RegExp(`(?![^<]*>)(${escapedSearch})`, "gi");
 
-        return safeHtml.replace(
-          regex,
-          (match) =>
-            `<mark class="rounded-default">${match}</mark>`,
-        );
+        return safeHtml.replace(regex, (match) => `<mark class="rounded-default">${match}</mark>`);
       } catch (e) {
         return safeHtml;
       }

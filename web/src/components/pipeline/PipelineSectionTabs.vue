@@ -47,7 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ? 'bg-primary-100 text-primary-700'
             : 'bg-surface-subtle text-text-secondary'
         "
-      >{{ s.count }}</span>
+        >{{ s.count }}</span
+      >
     </OTab>
   </OTabs>
 </template>
@@ -65,9 +66,7 @@ const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
 
-const orgIdentifier = computed(
-  () => store.state.selectedOrganization?.identifier,
-);
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 // Route name → section key. Detail/sub routes resolve to their parent section
 // so the right tab stays highlighted on editor/history/add pages.
@@ -127,9 +126,7 @@ const sections = computed<Section[]>(() => {
   ];
 });
 
-const visibleSections = computed(() =>
-  sections.value.filter((s) => s.visible),
-);
+const visibleSections = computed(() => sections.value.filter((s) => s.visible));
 
 const navigateToSection = (key: string | number) => {
   if (key === activeSectionKey.value) return;

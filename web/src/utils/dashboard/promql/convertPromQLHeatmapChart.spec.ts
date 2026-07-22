@@ -14,10 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import {
-  HeatmapConverter,
-  PROMETHEUS_HISTOGRAM_MODE,
-} from "./convertPromQLHeatmapChart";
+import { HeatmapConverter, PROMETHEUS_HISTOGRAM_MODE } from "./convertPromQLHeatmapChart";
 import type { ProcessedPromQLData } from "./shared/types";
 import { SPECTRAL_HEATMAP_STOP_COUNT } from "./shared/spectral";
 import { chartColor } from "@/utils/chartTheme";
@@ -86,9 +83,7 @@ describe("HeatmapConverter", () => {
       const processedData: ProcessedPromQLData[] = [
         { series: [], timestamps: [], queryIndex: 0 }, // no data in range
         {
-          series: [
-            { name: "live", values: [], data: { "1": "7", "2": "9" } },
-          ],
+          series: [{ name: "live", values: [], data: { "1": "7", "2": "9" } }],
           timestamps: [
             [1, "00:00:00"],
             [2, "00:00:01"],
@@ -97,12 +92,7 @@ describe("HeatmapConverter", () => {
         },
       ];
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.xAxis[0].data).toEqual(["00:00:00", "00:00:01"]);
       expect(result.series[0].data).toEqual([
@@ -136,12 +126,7 @@ describe("HeatmapConverter", () => {
         },
       ];
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       // Union of both grids, ascending.
       expect(result.xAxis[0].data).toEqual(["00:00:00", "00:00:01", "00:00:02"]);
@@ -161,27 +146,18 @@ describe("HeatmapConverter", () => {
       // background colour, which looks exactly like "this bucket is empty".
       const processedData: ProcessedPromQLData[] = [
         {
-          series: [
-            { name: 'a{le="1"}', values: [], data: { "1": "4" }, metric: { le: "1" } },
-          ],
+          series: [{ name: 'a{le="1"}', values: [], data: { "1": "4" }, metric: { le: "1" } }],
           timestamps: [[1, "00:00:00"]],
           queryIndex: 0,
         },
         {
-          series: [
-            { name: 'b{le="2"}', values: [], data: { "2": "8" }, metric: { le: "2" } },
-          ],
+          series: [{ name: 'b{le="2"}', values: [], data: { "2": "8" }, metric: { le: "2" } }],
           timestamps: [[2, "00:00:01"]],
           queryIndex: 1,
         },
       ];
 
-      const result = converter.convert(
-        processedData,
-        histogramSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, histogramSchema, mockStore, mockExtras);
 
       expect(result.xAxis[0].data).toEqual(["00:00:00", "00:00:01"]);
       // The second histogram's 8 must survive — it used to be read as 0.
@@ -223,12 +199,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series).toHaveLength(1);
       expect(result.series[0].type).toBe("heatmap");
@@ -306,12 +277,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([
         [0, 0, 10], // timeIndex=0, seriesIndex=0, value=10
@@ -347,12 +313,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toContainEqual([1, 0, 0]); // Missing value defaults to 0
     });
@@ -385,12 +346,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.visualMap.min).toBe(0);
       expect(result.visualMap.max).toBe(100);
@@ -421,12 +377,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       // The implementation extracts only the time portion (HH:MM:SS) from timestamps
       expect(result.xAxis[0].data).toEqual(["00:00:00", "00:01:00"]);
@@ -461,12 +412,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.yAxis.data).toEqual(["cpu", "memory"]);
     });
@@ -495,12 +441,7 @@ describe("HeatmapConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.yAxis.axisLabel.width).toBe(200);
     });
@@ -527,12 +468,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.yAxis.axisLabel.width).toBe(150);
     });
@@ -559,12 +495,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.visualMap.calculable).toBe(true);
       expect(result.visualMap.orient).toBe("horizontal");
@@ -595,19 +526,10 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.tooltip.textStyle.color).toBe(
-        chartColor("--color-tooltip-text"),
-      );
-      expect(result.tooltip.backgroundColor).toBe(
-        chartColor("--color-tooltip-bg"),
-      );
+      expect(result.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
+      expect(result.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
     });
 
     it("should configure tooltip for dark theme", () => {
@@ -634,19 +556,10 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.tooltip.textStyle.color).toBe(
-        chartColor("--color-tooltip-text"),
-      );
-      expect(result.tooltip.backgroundColor).toBe(
-        chartColor("--color-tooltip-bg"),
-      );
+      expect(result.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
+      expect(result.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
     });
 
     describe("label formatter", () => {
@@ -672,12 +585,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 100],
@@ -713,12 +621,7 @@ describe("HeatmapConverter", () => {
           },
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 2048],
@@ -751,12 +654,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 100],
@@ -795,12 +693,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: undefined,
@@ -839,12 +732,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 42],
@@ -883,12 +771,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 75],
@@ -929,12 +812,7 @@ describe("HeatmapConverter", () => {
           },
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 2048],
@@ -970,12 +848,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 100],
@@ -1015,12 +888,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 0, 42],
@@ -1060,12 +928,7 @@ describe("HeatmapConverter", () => {
           config: {},
         };
 
-        const result = converter.convert(
-          processedData,
-          panelSchema,
-          mockStore,
-          mockExtras,
-        );
+        const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
         const params = {
           value: [0, 999, 100], // Invalid series index
@@ -1102,18 +965,11 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].emphasis).toBeDefined();
       expect(result.series[0].emphasis.itemStyle.shadowBlur).toBe(10);
-      expect(result.series[0].emphasis.itemStyle.shadowColor).toBe(
-        "rgba(0, 0, 0, 0.5)",
-      );
+      expect(result.series[0].emphasis.itemStyle.shadowColor).toBe("rgba(0, 0, 0, 0.5)");
     });
 
     it("should configure grid layout", () => {
@@ -1138,12 +994,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.grid.left).toBe("3%");
       expect(result.grid.right).toBe("4%");
@@ -1159,12 +1010,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([]);
       expect(result.xAxis[0].data).toEqual([]);
@@ -1185,12 +1031,7 @@ describe("HeatmapConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([]);
     });
@@ -1216,12 +1057,7 @@ describe("HeatmapConverter", () => {
         type: "heatmap",
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result).toBeDefined();
       expect(result.series[0].data).toHaveLength(1);
@@ -1357,16 +1193,9 @@ describe("HeatmapConverter", () => {
 
     it("falls back to the series name when metric labels are absent", () => {
       const data = histogramData();
-      data[0].series = data[0].series.map(
-        ({ metric: _metric, ...rest }) => rest,
-      ) as any;
+      data[0].series = data[0].series.map(({ metric: _metric, ...rest }) => rest) as any;
 
-      const result: any = converter.convert(
-        data,
-        histogramSchema(),
-        mockStore,
-        mockExtras,
-      );
+      const result: any = converter.convert(data, histogramSchema(), mockStore, mockExtras);
 
       expect(result.yAxis.data).toEqual(["0.10", "0.50", "1.00", "+Inf"]);
     });
@@ -1393,9 +1222,7 @@ describe("HeatmapConverter", () => {
       expect(result.visualMap.inRange.color.at(-1)).toBe("#9e0142");
       // Exponent 0.5 is pre-warped into the stop positions, so the midpoint
       // stop is sampled from the ramp well past its middle.
-      expect(result.visualMap.inRange.color[16]).not.toBe(
-        result.visualMap.inRange.color[15],
-      );
+      expect(result.visualMap.inRange.color[16]).not.toBe(result.visualMap.inRange.color[15]);
     });
 
     it("keeps config.unit as the cell-intensity unit in the tooltip", () => {
@@ -1426,28 +1253,16 @@ describe("HeatmapConverter", () => {
         data: { 100: "999", 200: "999" },
       } as any);
 
-      const result: any = converter.convert(
-        data,
-        histogramSchema(),
-        mockStore,
-        mockExtras,
-      );
+      const result: any = converter.convert(data, histogramSchema(), mockStore, mockExtras);
 
       expect(result.yAxis.data).toHaveLength(4);
-      expect(result.series[0].data.some((cell: any) => cell[2] === 999)).toBe(
-        false,
-      );
+      expect(result.series[0].data.some((cell: any) => cell[2] === 999)).toBe(false);
     });
 
     it("leaves generic heatmaps untouched (no histogram transform)", () => {
       const data = histogramData();
 
-      const histogram: any = converter.convert(
-        data,
-        histogramSchema(),
-        mockStore,
-        { legends: [] },
-      );
+      const histogram: any = converter.convert(data, histogramSchema(), mockStore, { legends: [] });
 
       const generic: any = converter.convert(
         histogramData(),
@@ -1458,12 +1273,7 @@ describe("HeatmapConverter", () => {
       );
 
       // y-axis is still the raw series names, in insertion order
-      expect(generic.yAxis.data).toEqual([
-        '{le="1"}',
-        '{le="0.1"}',
-        '{le="inf"}',
-        '{le="0.5"}',
-      ]);
+      expect(generic.yAxis.data).toEqual(['{le="1"}', '{le="0.1"}', '{le="inf"}', '{le="0.5"}']);
       // raw cumulative values, NOT de-accumulated
       expect(generic.series[0].data).toEqual([
         [0, 0, 9],
@@ -1484,9 +1294,7 @@ describe("HeatmapConverter", () => {
       // heatmap in the app. Styling is not what corrupts a heatmap; the
       // de-accumulation is, and that is still gated on heatmap_mode.
       expect(generic.visualMap.inRange.color).toHaveLength(SPECTRAL_HEATMAP_STOP_COUNT);
-      expect(generic.visualMap.inRange.color).toEqual(
-        histogram.visualMap.inRange.color,
-      );
+      expect(generic.visualMap.inRange.color).toEqual(histogram.visualMap.inRange.color);
       expect(generic.series[0].itemStyle.borderWidth).toBe(1);
       expect(generic.xAxis[0].splitArea.show).toBe(false);
 
@@ -1504,12 +1312,7 @@ describe("HeatmapConverter", () => {
       );
 
       // No de-accumulation, no le-sort — the mode string has to match exactly.
-      expect(result.yAxis.data).toEqual([
-        '{le="1"}',
-        '{le="0.1"}',
-        '{le="inf"}',
-        '{le="0.5"}',
-      ]);
+      expect(result.yAxis.data).toEqual(['{le="1"}', '{le="0.1"}', '{le="inf"}', '{le="0.5"}']);
       expect(result.series[0].data[0]).toEqual([0, 0, 9]);
       // The shared look still applies — it is presentation, not a transform.
       expect(result.visualMap.inRange.color).toHaveLength(SPECTRAL_HEATMAP_STOP_COUNT);
@@ -1569,12 +1372,9 @@ describe("regressions", () => {
       ],
       queryIndex: 0,
     };
-    const result: any = converter.convert(
-      [negative],
-      { type: "heatmap", config: {} },
-      store,
-      { legends: [] },
-    );
+    const result: any = converter.convert([negative], { type: "heatmap", config: {} }, store, {
+      legends: [],
+    });
 
     expect(result.visualMap.min).toBe(-5);
     expect(result.visualMap.max).toBe(-1);
@@ -1624,7 +1424,9 @@ describe("prometheus_histogram mode with more than one query", () => {
 
     // Query 1: 10 in the first bucket, 30-10=20 in +Inf.
     // Query 2: 100 and 300-100=200. Nothing merged, nothing subtracted across.
-    const values = result.series[0].data.map((cell: any) => cell[2]).sort((a: number, b: number) => a - b);
+    const values = result.series[0].data
+      .map((cell: any) => cell[2])
+      .sort((a: number, b: number) => a - b);
     expect(values).toEqual([10, 20, 100, 200]);
   });
 });

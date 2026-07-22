@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="filter-mode-bar flex items-center justify-between px-2 py-1 border-b border-card-glass-border"
       data-test="field-values-panel-filter-mode-bar"
     >
-      <div class="flex items-center gap-1 ">
+      <div class="flex items-center gap-1">
         <span
           v-if="selectedValues.length > 0"
           class="selection-count text-3! text-3xs font-medium text-accent"
@@ -43,7 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ selectedValues.length }} selected
         </span>
-        <span v-else class="selection-hint  text-3! text-3xs text-text-secondary">Select to filter</span>
+        <span v-else class="selection-hint text-3! text-3xs text-text-secondary"
+          >Select to filter</span
+        >
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
@@ -93,10 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Scrollable values area -->
     <div class="max-h-64 overflow-y-auto">
       <!-- Loading state (only shown when there are no interim cached results) -->
-      <div
-        v-show="fieldValues?.isLoading && !displayValues.length"
-        class="relative pl-3 py-1 h-15"
-      >
+      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative pl-3 py-1 h-15">
         <!-- scrim off: this box is empty while loading, so there is nothing to
              dim — and the scrim is 70% of surface-base (white), which on this
              panel's grey surface just reads as a white block. -->
@@ -126,7 +125,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Selected values with no count data available (synthetic fallback) -->
       <div
-        v-if="displayValues.length > 0 && (displayValues[0] as any)?.synthetic && !fieldValues?.isLoading"
+        v-if="
+          displayValues.length > 0 &&
+          (displayValues[0] as any)?.synthetic &&
+          !fieldValues?.isLoading
+        "
         class="pl-3 pb-1 text-xs text-o2-text-secondary italic"
         data-test="field-values-panel-no-count-msg"
       >
@@ -134,10 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Field values list -->
-      <ul
-        class="flex flex-col m-0 p-0 list-none"
-        data-test="field-values-panel-values-list"
-      >
+      <ul class="flex flex-col m-0 p-0 list-none" data-test="field-values-panel-values-list">
         <li v-for="value in displayValues" :key="value.key" class="py-1">
           <label
             class="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-muted/50"
@@ -240,11 +240,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "add-multiple-search-terms": [
-    fieldName: string,
-    values: string[],
-    action: string,
-  ];
+  "add-multiple-search-terms": [fieldName: string, values: string[], action: string];
   "remove-field-filter": [fieldName: string];
   "load-more-values": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
@@ -303,15 +299,9 @@ watch(
 // synthesise the selected values as items so the user can see and deselect them
 // instead of seeing a contradictory "N selected / No values found" state.
 const displayValues = computed(() => {
-  if (
-    props.fieldValues?.isLoading &&
-    valueSearchTerm.value &&
-    cachedValues.value.length
-  ) {
+  if (props.fieldValues?.isLoading && valueSearchTerm.value && cachedValues.value.length) {
     const term = valueSearchTerm.value.toLowerCase();
-    return cachedValues.value.filter((v) =>
-      String(v.key).toLowerCase().includes(term),
-    );
+    return cachedValues.value.filter((v) => String(v.key).toLowerCase().includes(term));
   }
 
   const apiValues = props.fieldValues?.values || [];
@@ -334,9 +324,7 @@ const displayValues = computed(() => {
 
 // Show search box whenever there are values to search.
 const showValueSearch = computed(
-  () =>
-    cachedValues.value.length > 0 ||
-    (props.fieldValues?.values?.length ?? 0) > 0,
+  () => cachedValues.value.length > 0 || (props.fieldValues?.values?.length ?? 0) > 0,
 );
 
 watchDebounced(
@@ -404,12 +392,7 @@ const handleUserCheckboxChange = (value: CheckboxModelValue) => {
   if (newValues.length === 0) {
     emit("remove-field-filter", props.fieldName);
   } else {
-    emit(
-      "add-multiple-search-terms",
-      props.fieldName,
-      [...newValues],
-      filterMode.value,
-    );
+    emit("add-multiple-search-terms", props.fieldName, [...newValues], filterMode.value);
   }
 };
 
@@ -459,8 +442,7 @@ const reset = () => {
   selectedValues.value = allActiveValues.value;
   valueSearchTerm.value = "";
   cachedValues.value = [];
-  filterMode.value =
-    (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
+  filterMode.value = (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
   isLoadingMore.value = false;
 };
 

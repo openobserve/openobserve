@@ -1,10 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  DateRangeCalendarProps,
-  DateRangeCalendarEmits,
-} from "./ODateRangeCalendar.types";
+import type { DateRangeCalendarProps, DateRangeCalendarEmits } from "./ODateRangeCalendar.types";
 import { computed, ref, watch, type Ref } from "vue";
 import {
   RangeCalendarRoot,
@@ -48,18 +45,12 @@ function fromIso(s: string) {
 // picked, so the parent's startDate/endDate stay valid (avoiding "[object
 // Object]" display artifacts from formatters that assume both are non-empty).
 // Casts: ref() deep-unwraps DateValue's class type structurally, breaking DateValue params
-const internalStart = ref<DateValue | undefined>(undefined) as Ref<
-  DateValue | undefined
->;
-const internalEnd = ref<DateValue | undefined>(undefined) as Ref<
-  DateValue | undefined
->;
+const internalStart = ref<DateValue | undefined>(undefined) as Ref<DateValue | undefined>;
+const internalEnd = ref<DateValue | undefined>(undefined) as Ref<DateValue | undefined>;
 // Tracks the hovered cell while awaiting the second click — used to render
 // the dashed preview range only between start and hover (not all valid-to-pick
 // cells, which is what reka-ui's data-highlighted alone would give us).
-const hoverDate = ref<DateValue | undefined>(undefined) as Ref<
-  DateValue | undefined
->;
+const hoverDate = ref<DateValue | undefined>(undefined) as Ref<DateValue | undefined>;
 
 // Resync internal state when parent provides new dates (initial load, external
 // changes, or after a committed range round-trip).
@@ -95,16 +86,10 @@ const calendarMaxDate = computed(() =>
 
 // "Awaiting second click" — start is picked but end isn't. While in this
 // state, cells get a dashed-outline preview based on hover position.
-const isAwaitingEndClick = computed(
-  () => !!internalStart.value && !internalEnd.value,
-);
+const isAwaitingEndClick = computed(() => !!internalStart.value && !internalEnd.value);
 
 function isCellInPreview(d: DateValue): boolean {
-  if (
-    !isAwaitingEndClick.value ||
-    !hoverDate.value ||
-    !internalStart.value
-  ) {
+  if (!isAwaitingEndClick.value || !hoverDate.value || !internalStart.value) {
     return false;
   }
   const start = internalStart.value;
@@ -153,17 +138,12 @@ function handleRangeChange(value: DateRange | undefined) {
     :max-value="calendarMaxDate"
     :disabled="disabled"
     week-start-on="0"
-    :class="[
-      'o-range-cal',
-      isAwaitingEndClick ? 'o-range-cal--awaiting' : 'o-range-cal--complete',
-    ]"
+    :class="['o-range-cal', isAwaitingEndClick ? 'o-range-cal--awaiting' : 'o-range-cal--complete']"
     data-test="daterangecalendar-root"
     @update:model-value="handleRangeChange"
   >
     <template #default="{ weekDays, grid }">
-      <RangeCalendarHeader
-        class="flex items-center justify-between mb-3"
-      >
+      <RangeCalendarHeader class="flex items-center justify-between mb-3">
         <RangeCalendarPrev
           class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-[disabled]:opacity-40 data-[disabled]:cursor-not-allowed data-[disabled]:pointer-events-none"
           data-test="daterangecalendar-prev"
@@ -223,11 +203,7 @@ function handleRangeChange(value: DateRange | undefined) {
             :key="idx"
             class="flex gap-1 mb-1"
           >
-            <RangeCalendarCell
-              v-for="d in weekDates"
-              :key="d.toString()"
-              :date="d"
-            >
+            <RangeCalendarCell v-for="d in weekDates" :key="d.toString()" :date="d">
               <RangeCalendarCellTrigger
                 :day="d"
                 :month="month.value"

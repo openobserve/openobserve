@@ -26,9 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="summary-text m-0 whitespace-pre-line tracking-[0.03em]"
         v-html="summaryText"
       />
-      <p v-else class="m-0 italic opacity-60">
-        Fill in the setup step to see a summary.
-      </p>
+      <p v-else class="m-0 italic opacity-60">Fill in the setup step to see a summary.</p>
     </div>
 
     <div v-show="showScrollToBottom" class="absolute bottom-5 right-5 z-1000 pointer-events-none">
@@ -47,11 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, onMounted } from 'vue';
-import { generateAnomalySummary } from '@/utils/alerts/anomalySummaryGenerator';
-import OButton from '@/lib/core/Button/OButton.vue';
-import OIcon from '@/lib/core/Icon/OIcon.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import { computed, ref, nextTick, watch, onMounted } from "vue";
+import { generateAnomalySummary } from "@/utils/alerts/anomalySummaryGenerator";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 const props = defineProps<{
   config: any;
@@ -77,7 +75,10 @@ const checkScrollState = () => {
 const scrollToBottom = async () => {
   await nextTick();
   if (summaryContainer.value) {
-    summaryContainer.value.scrollTo({ top: summaryContainer.value.scrollHeight, behavior: 'smooth' });
+    summaryContainer.value.scrollTo({
+      top: summaryContainer.value.scrollHeight,
+      behavior: "smooth",
+    });
     showScrollToBottom.value = false;
   }
 };

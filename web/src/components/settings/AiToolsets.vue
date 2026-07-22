@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px);">
+  <div class="p-0" style="min-height: inherit; height: calc(100vh - 88px)">
     <OPageLayout
       v-if="!showAddDialog"
       :title="t('aiToolset.header')"
@@ -24,86 +24,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="t('settings.aiToolsetsPage.subtitle')"
       bleed
     >
-        <template #actions>
-          <OButton
-            data-test="ai-toolsets-add-btn"
-            variant="primary"
-            size="sm-action"
-            @click="addToolset"
-          >{{ t('aiToolset.add') }}</OButton>
-        </template>
+      <template #actions>
+        <OButton
+          data-test="ai-toolsets-add-btn"
+          variant="primary"
+          size="sm-action"
+          @click="addToolset"
+          >{{ t("aiToolset.add") }}</OButton
+        >
+      </template>
 
       <!-- Table -->
       <div class="bg-card-glass-bg mt-2.5 overflow-hidden">
-      <OTable
-        :frame="false"
-        :data="visibleRows"
-        :columns="columns"
-        row-key="id"
-        pagination="client"
-        :page-size="20"
-        :page-size-options="[20, 50, 100]"
-        sorting="client"
-        :default-columns="false"
-        show-index
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="settings-ai-toolsets"
-        :show-global-filter="false"
-      >
-        <template #toolbar>
-          <OSearchInput
-            v-model="filterQuery"
-            class="w-64 no-border o2-search-input"
-            :placeholder="t('aiToolset.search')"
-          />
-        </template>
-        <template #toolbar-trailing>
-          <OButton
-            variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
-            data-test="ai-toolsets-list-refresh-btn"
-            @click="getData"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="aiToolsetsRefresh" />
-          </OButton>
-        </template>
-        <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-ai-toolsets"
-            :filtered="!!filterQuery"
-            @action="(id) => id === 'clear-filters' ? (filterQuery = '') : addToolset()"
-          />
-        </template>
+        <OTable
+          :frame="false"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="id"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100]"
+          sorting="client"
+          :default-columns="false"
+          show-index
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-ai-toolsets"
+          :show-global-filter="false"
+        >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              class="w-64 no-border o2-search-input"
+              :placeholder="t('aiToolset.search')"
+            />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="ai-toolsets-list-refresh-btn"
+              @click="getData"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="aiToolsetsRefresh"
+              />
+            </OButton>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-ai-toolsets"
+              :filtered="!!filterQuery"
+              @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : addToolset())"
+            />
+          </template>
 
-        <template #cell-kind="{ row }">
-          <OTag type="aiToolsetKind" :value="row.kind" />
-        </template>
+          <template #cell-kind="{ row }">
+            <OTag type="aiToolsetKind" :value="row.kind" />
+          </template>
 
-        <template #cell-actions="{ row }">
-          <OButton
-            :data-test="`ai-toolset-${row.name}-edit`"
-            data-row-action="edit"
-            variant="ghost"
-            size="icon-sm"
-            :title="t('common.edit')"
-            @click="editToolset(row)"
-            icon-left="edit"
-          />
-          <OButton
-            :data-test="`ai-toolset-${row.name}-delete`"
-            data-row-action="delete"
-            variant="ghost-destructive"
-            size="icon-sm"
-            :title="t('common.delete')"
-            @click="confirmDeleteToolset(row)"
-            icon-left="delete"
-          />
-        </template>
-      </OTable>
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`ai-toolset-${row.name}-edit`"
+              data-row-action="edit"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('common.edit')"
+              @click="editToolset(row)"
+              icon-left="edit"
+            />
+            <OButton
+              :data-test="`ai-toolset-${row.name}-delete`"
+              data-row-action="delete"
+              variant="ghost-destructive"
+              size="icon-sm"
+              :title="t('common.delete')"
+              @click="confirmDeleteToolset(row)"
+              icon-left="delete"
+            />
+          </template>
+        </OTable>
       </div>
     </OPageLayout>
 
@@ -124,16 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
-import {
-  defineComponent,
-  ref,
-  computed,
-  watch,
-  onMounted,
-  onUpdated,
-  Ref,
-} from "vue";
+import { defineComponent, ref, computed, watch, onMounted, onUpdated, Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -164,7 +160,7 @@ export default defineComponent({
     OTag,
     OSearchInput,
     OTable,
-},
+  },
   setup() {
     const store = useStore();
     const router = useRouter();
@@ -176,9 +172,36 @@ export default defineComponent({
     const filterQuery = ref("");
 
     const columns: OTableColumnDef[] = [
-      { id: "name", header: t("aiToolset.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
-      { id: "kind", header: t("aiToolset.kind"), accessorKey: "kind", sortable: true, resizable: true, hideable: true, size: COL.type, meta: { align: "left" } },
-      { id: "description", header: t("aiToolset.description"), accessorKey: "description", resizable: true, hideable: true, size: COL.description, meta: { align: "left" } },
+      {
+        id: "name",
+        header: t("aiToolset.name"),
+        accessorKey: "name",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
+      },
+      {
+        id: "kind",
+        header: t("aiToolset.kind"),
+        accessorKey: "kind",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.type,
+        meta: { align: "left" },
+      },
+      {
+        id: "description",
+        header: t("aiToolset.description"),
+        accessorKey: "description",
+        resizable: true,
+        hideable: true,
+        size: COL.description,
+        meta: { align: "left" },
+      },
       {
         id: "actions",
         header: t("aiToolset.actions"),
@@ -203,7 +226,7 @@ export default defineComponent({
       () => router.currentRoute.value.query?.action,
       (action) => {
         showAddDialog.value = action === "add" || action === "edit";
-      }
+      },
     );
 
     onMounted(() => {
@@ -224,8 +247,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("common.loading"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       aiToolsetsService
         .list(store.state.selectedOrganization.identifier)
@@ -243,9 +266,7 @@ export default defineComponent({
           if (err?.status !== 403) {
             toast({
               variant: "error",
-              message:
-                err?.response?.data?.message ||
-                t("aiToolset.loadFailed"),
+              message: err?.response?.data?.message || t("aiToolset.loadFailed"),
               timeout: 5000,
             });
           }
@@ -268,14 +289,25 @@ export default defineComponent({
         (r: any) =>
           r.name.toLowerCase().includes(q) ||
           r.kind.toLowerCase().includes(q) ||
-          (r.description || "").toLowerCase().includes(q)
+          (r.description || "").toLowerCase().includes(q),
       );
     });
 
-    watch(visibleRows, (rows) => { resultTotal.value = rows.length; }, { immediate: true });
+    watch(
+      visibleRows,
+      (rows) => {
+        resultTotal.value = rows.length;
+      },
+      { immediate: true },
+    );
 
     useShortcuts([
-      { id: "aiToolsetsRefresh", handler: () => { if (!isInputFocused()) getData(); } },
+      {
+        id: "aiToolsetsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getData();
+        },
+      },
     ]);
 
     // -----------------------------------------------------------------------
@@ -327,8 +359,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("common.pleaseWait"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       aiToolsetsService
         .delete(store.state.selectedOrganization.identifier, row.id)
@@ -372,4 +404,3 @@ export default defineComponent({
   },
 });
 </script>
-

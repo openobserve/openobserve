@@ -27,17 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="ghost"
           size="sm"
           :disabled="
-            queryData.queryResults.hasOwnProperty('hits') &&
-            !queryData.queryResults.hits.length
+            queryData.queryResults.hasOwnProperty('hits') && !queryData.queryResults.hits.length
           "
           :title="t('search.exportLogs')"
           @click="downloadLogs"
           icon-left="download"
         />
-        <div
-          class="float-left"
-          v-show="queryData.streamType !== 'enrichment_tables'"
-        >
+        <div class="float-left" v-show="queryData.streamType !== 'enrichment_tables'">
           <date-time
             data-test="logs-search-bar-date-time-dropdown"
             auto-apply
@@ -85,7 +81,7 @@ import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
 
@@ -106,9 +102,7 @@ export default defineComponent({
   components: {
     DateTime,
     OButton,
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
   },
   emits: ["searchdata", "update-query", "change:date-time"],
   methods: {
@@ -152,8 +146,7 @@ export default defineComponent({
 
     const updateQuery = () => {
       // alert(searchObj.data.query);
-      if (queryEditorRef.value?.setValue)
-        queryEditorRef.value.setValue(props.queryData.query);
+      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(props.queryData.query);
     };
 
     const jsonToCsv = (jsonData) => {

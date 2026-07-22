@@ -17,16 +17,12 @@ import { reactive, ref, type Ref, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 // import { useI18n } from "vue-i18n";
-import type {
-  SearchRequestPayload,
-  ParsedSQLResult,
-} from "@/ts/interfaces";
+import type { SearchRequestPayload, ParsedSQLResult } from "@/ts/interfaces";
 import {
   DEFAULT_LOGS_CONFIG,
   DEFAULT_SEARCH_DEBUG_DATA,
   DEFAULT_SEARCH_AGG_DATA,
 } from "@/utils/logs/constants";
-
 
 // Cross-link definition returned by the backend cross-linking API.
 export interface CrossLinkField {
@@ -188,7 +184,12 @@ export interface SearchObjectData {
   highlightQuery: string;
   crossLinks: { stream_links: CrossLink[]; org_links: CrossLink[] };
   crossLinkQuery: string;
-  sqlSyntaxErrorRanges: Array<{ startLine: number; endLine: number; column?: number; error: string }>;
+  sqlSyntaxErrorRanges: Array<{
+    startLine: number;
+    endLine: number;
+    column?: number;
+    error: string;
+  }>;
 }
 
 export interface SearchObject {
@@ -213,9 +214,7 @@ export interface SearchObject {
 // Main search object containing all search state.
 // DEFAULT_LOGS_CONFIG is declared `as const`, so its readonly literal type does
 // not overlap with the mutable SearchObject interface; bridge via unknown.
-const searchObj = reactive(
-  Object.assign({}, DEFAULT_LOGS_CONFIG),
-) as unknown as SearchObject;
+const searchObj = reactive(Object.assign({}, DEFAULT_LOGS_CONFIG)) as unknown as SearchObject;
 
 // Debug data for search operations
 const searchObjDebug = reactive(Object.assign({}, DEFAULT_SEARCH_DEBUG_DATA));
@@ -325,34 +324,24 @@ export const searchState = () => {
       await nextTick();
 
       // Restore cached query results and histogram data
-      searchObj.data.queryResults = JSON.parse(
-        JSON.stringify(state.data.queryResults),
-      );
-      searchObj.data.sortedQueryResults = JSON.parse(
-        JSON.stringify(state.data.sortedQueryResults),
-      );
+      searchObj.data.queryResults = JSON.parse(JSON.stringify(state.data.queryResults));
+      searchObj.data.sortedQueryResults = JSON.parse(JSON.stringify(state.data.sortedQueryResults));
       // Restore histogram — breakdownSeries was serialized as an entries array
       // (Map is not JSON-serializable), so reconstruct the Map here.
       const savedBreakdown = state.data.histogram.breakdownSeries;
       searchObj.data.histogram = {
-        ...JSON.parse(
-          JSON.stringify({ ...state.data.histogram, breakdownSeries: null }),
-        ),
-        breakdownSeries: Array.isArray(savedBreakdown)
-          ? new Map(savedBreakdown)
-          : null,
+        ...JSON.parse(JSON.stringify({ ...state.data.histogram, breakdownSeries: null })),
+        breakdownSeries: Array.isArray(savedBreakdown) ? new Map(savedBreakdown) : null,
       };
 
       await nextTick();
       return true;
     } catch (error: unknown) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("Error while initializing logs state:", errorMessage);
 
       // Fallback to current organization and reset state
-      searchObj.organizationIdentifier =
-        store.state?.selectedOrganization?.identifier || "";
+      searchObj.organizationIdentifier = store.state?.selectedOrganization?.identifier || "";
       resetSearchObj();
       return true;
     } finally {

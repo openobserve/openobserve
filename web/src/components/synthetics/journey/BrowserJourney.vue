@@ -1,21 +1,21 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
-import type { BrowserStep, ReplayPhase, StepReplayResult } from '@/types/synthetics'
-import type { StepDotState } from './JourneySteps.vue'
-import useSyntheticsRecorder from '@/composables/useSyntheticsRecorder'
-import { getUUIDv7 } from '@/utils/zincutils'
-import OButton from '@/lib/core/Button/OButton.vue'
-import OIcon from '@/lib/core/Icon/OIcon.vue'
-import OInput from '@/lib/forms/Input/OInput.vue'
-import OSelect from '@/lib/forms/Select/OSelect.vue'
-import OBadge from '@/lib/core/Badge/OBadge.vue'
-import OCheckbox from '@/lib/forms/Checkbox/OCheckbox.vue'
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import { toast } from '@/lib/feedback/Toast/useToast'
-import JourneySteps from './JourneySteps.vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useI18n } from "vue-i18n";
+import type { BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
+import type { StepDotState } from "./JourneySteps.vue";
+import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
+import { getUUIDv7 } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import JourneySteps from "./JourneySteps.vue";
 import {
   ACTION_LABELS,
   SELECTOR_ACTIONS as SELECTOR_ACTIONS_CONST,
@@ -25,218 +25,236 @@ import {
   actionOptions,
   VALUE_WIDTH_MAP,
   VALUE_TOOLTIP_MAP,
-} from '@/constants/synthetics'
+} from "@/constants/synthetics";
 
 const props = defineProps<{
-  modelValue: BrowserStep[]
-  readonly?: boolean
-  startUrl?: string        // URL shown in the recording banner
-  extensionReady?: boolean // when false, Record button triggers need-extension-setup
-  autoRecord?: boolean     // if true, start recording immediately on mount
+  modelValue: BrowserStep[];
+  readonly?: boolean;
+  startUrl?: string; // URL shown in the recording banner
+  extensionReady?: boolean; // when false, Record button triggers need-extension-setup
+  autoRecord?: boolean; // if true, start recording immediately on mount
   /** Owned by the parent (CreateBrowserTest). */
-  replayPhase?: ReplayPhase
+  replayPhase?: ReplayPhase;
   /** Per-step replay results, keyed by step id. Owned by the parent. */
-  stepResults?: Map<string, StepReplayResult>
+  stepResults?: Map<string, StepReplayResult>;
   /** Id of the step currently being executed (set by stepReplayStarted). */
-  activeStepId?: string | null
+  activeStepId?: string | null;
   /** When true, show the incognito blocked warning in the toolbar area. */
-  blockedReason?: 'incognito' | null
-}>()
+  blockedReason?: "incognito" | null;
+}>();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: BrowserStep[]]
-  'need-extension-setup': []
-  'clear-results': []
-  'replay': []
-  'stop-replay': []
-  'auto-record-consumed': []
-  'selection-changed': [{ count: number; isRecording: boolean }]
-}>()
+  "update:modelValue": [value: BrowserStep[]];
+  "need-extension-setup": [];
+  "clear-results": [];
+  replay: [];
+  "stop-replay": [];
+  "auto-record-consumed": [];
+  "selection-changed": [{ count: number; isRecording: boolean }];
+}>();
 
 // ── Filter / expand / select state ──────────────────────────────────────────
-const filterQuery = ref('')
-const expandedStepIds = ref<string[]>([])
-const selectedStepIds = ref<string[]>([])
+const filterQuery = ref("");
+const expandedStepIds = ref<string[]>([]);
+const selectedStepIds = ref<string[]>([]);
 
 // Delete confirmation
 const deleteConfirm = ref<{ show: boolean; step: BrowserStep | null }>({
   show: false,
   step: null,
-})
+});
 
 const deleteConfirmMessage = computed(() => {
-  const step = deleteConfirm.value.step
-  if (!step) return ''
-  const label = step.name || `#${props.modelValue.indexOf(step) + 1}`
-  return t('synthetics.journey.confirmDeleteMessage', { label })
-})
+  const step = deleteConfirm.value.step;
+  if (!step) return "";
+  const label = step.name || `#${props.modelValue.indexOf(step) + 1}`;
+  return t("synthetics.journey.confirmDeleteMessage", { label });
+});
 
 // ── Drag-and-drop ──────────────────────────────────────────────────────────
-const dragReady = computed(() =>
-  !isRecording.value && !isReplayActive.value && !props.readonly && !filterQuery.value.trim()
-)
+const dragReady = computed(
+  () => !isRecording.value && !isReplayActive.value && !props.readonly && !filterQuery.value.trim(),
+);
 // Column stays visible during replay (handles invisible) to prevent layout shift
-const showDragColumn = computed(() =>
-  !isRecording.value && !props.readonly && !filterQuery.value.trim()
-)
+const showDragColumn = computed(
+  () => !isRecording.value && !props.readonly && !filterQuery.value.trim(),
+);
 
 // ── Replay helpers ──────────────────────────────────────────────────────────
-const isReplayRunning = computed(() => props.replayPhase === 'running')
-const isReplayActive = computed(() => props.replayPhase && props.replayPhase !== 'idle')
-const isReplayTerminal = computed(() =>
-  props.replayPhase === 'passed' || props.replayPhase === 'failed' || props.replayPhase === 'stopped'
-)
-const isReplayLocked = computed(() => isReplayRunning.value) // editing suppressed during running
+const isReplayRunning = computed(() => props.replayPhase === "running");
+const isReplayActive = computed(() => props.replayPhase && props.replayPhase !== "idle");
+const isReplayTerminal = computed(
+  () =>
+    props.replayPhase === "passed" ||
+    props.replayPhase === "failed" ||
+    props.replayPhase === "stopped",
+);
+const isReplayLocked = computed(() => isReplayRunning.value); // editing suppressed during running
 
 /** Index of the first failing step in journey order, or -1 when none failed. */
 const firstFailedIndex = computed(() =>
   props.modelValue.findIndex((s) => {
-    const r = props.stepResults?.get(s.id)
-    return r && !r.passed
-  })
-)
+    const r = props.stepResults?.get(s.id);
+    return r && !r.passed;
+  }),
+);
 
 /** Replay result for the first failing step (for the inline error card). */
 const failedStepResult = computed<StepReplayResult | undefined>(() => {
-  if (firstFailedIndex.value < 0) return undefined
-  const step = props.modelValue[firstFailedIndex.value]
-  return props.stepResults?.get(step.id)
-})
+  if (firstFailedIndex.value < 0) return undefined;
+  const step = props.modelValue[firstFailedIndex.value];
+  return props.stepResults?.get(step.id);
+});
 
 /** Derive the status dot state for a step based on replay results. */
 function stepDotState(stepId: string): StepDotState | undefined {
-  if (!isReplayActive.value || !props.replayPhase) return undefined
-  const result = props.stepResults?.get(stepId)
+  if (!isReplayActive.value || !props.replayPhase) return undefined;
+  const result = props.stepResults?.get(stepId);
   if (result) {
-    return result.passed ? 'pass' : 'fail'
+    return result.passed ? "pass" : "fail";
   }
   // Currently executing step
-  if (props.activeStepId === stepId) return 'active'
-  const stepIndex = props.modelValue.findIndex((s) => s.id === stepId)
-  if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return 'skip'
-  if (props.replayPhase === 'running') return 'pending'
-  return 'pending'
+  if (props.activeStepId === stepId) return "active";
+  const stepIndex = props.modelValue.findIndex((s) => s.id === stepId);
+  if (firstFailedIndex.value >= 0 && stepIndex > firstFailedIndex.value) return "skip";
+  if (props.replayPhase === "running") return "pending";
+  return "pending";
 }
 
 // ── Selection helpers ──────────────────────────────────────────────────────
-const selectedCount = computed(() => selectedStepIds.value.length)
+const selectedCount = computed(() => selectedStepIds.value.length);
 
-const allSelected = computed(() =>
-  props.modelValue.length > 0 && props.modelValue.every((s) => selectedStepIds.value.includes(s.id))
-)
+const allSelected = computed(
+  () =>
+    props.modelValue.length > 0 &&
+    props.modelValue.every((s) => selectedStepIds.value.includes(s.id)),
+);
 
 function toggleSelectAll() {
-  selectedStepIds.value = allSelected.value
-    ? []
-    : props.modelValue.map((s) => s.id)
+  selectedStepIds.value = allSelected.value ? [] : props.modelValue.map((s) => s.id);
 }
 
 function deleteSelectedSteps() {
-  const ids = new Set(selectedStepIds.value)
-  emit('update:modelValue', props.modelValue.filter((s) => !ids.has(s.id)))
-  selectedStepIds.value = []
+  const ids = new Set(selectedStepIds.value);
+  emit(
+    "update:modelValue",
+    props.modelValue.filter((s) => !ids.has(s.id)),
+  );
+  selectedStepIds.value = [];
 }
 
 // Clear selection when the step list changes, filter changes, or replay starts
-watch(() => props.modelValue.length, () => { selectedStepIds.value = [] })
-watch(filterQuery, () => { selectedStepIds.value = [] })
-watch(() => props.replayPhase, (phase) => {
-  if (phase === 'running') {
-    selectedStepIds.value = []
-    expandedStepIds.value = [] // collapse all on new replay
-    return
-  }
-  // Auto-expand the first failing step when replay fails
-  if (phase === 'failed' && firstFailedIndex.value >= 0) {
-    const stepId = props.modelValue[firstFailedIndex.value]?.id
-    if (stepId) expandedStepIds.value = [stepId]
-  }
-})
+watch(
+  () => props.modelValue.length,
+  () => {
+    selectedStepIds.value = [];
+  },
+);
+watch(filterQuery, () => {
+  selectedStepIds.value = [];
+});
+watch(
+  () => props.replayPhase,
+  (phase) => {
+    if (phase === "running") {
+      selectedStepIds.value = [];
+      expandedStepIds.value = []; // collapse all on new replay
+      return;
+    }
+    // Auto-expand the first failing step when replay fails
+    if (phase === "failed" && firstFailedIndex.value >= 0) {
+      const stepId = props.modelValue[firstFailedIndex.value]?.id;
+      if (stepId) expandedStepIds.value = [stepId];
+    }
+  },
+);
 
-const multiSelectEnabled = computed(() =>
-  !isRecording.value && !props.readonly && !isReplayRunning.value
-)
-
+const multiSelectEnabled = computed(
+  () => !isRecording.value && !props.readonly && !isReplayRunning.value,
+);
 
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
-const { t } = useI18n()
+const { t } = useI18n();
 
 // Chrome UI element names — must stay in English across all locales
 // because they reference the actual Chrome browser interface.
 const CHROME_UI = {
-  details: 'Details',
-  allowIncognito: 'Allow in Incognito',
-  recorderName: 'OpenObserve Recorder',
-} as const
+  details: "Details",
+  allowIncognito: "Allow in Incognito",
+  recorderName: "OpenObserve Recorder",
+} as const;
 
-const recorder = useSyntheticsRecorder()
-const isRecording = recorder.isRecording
-const capturedSteps = recorder.liveSteps
-const currentUrl = recorder.currentUrl
-const recordingError = recorder.error
+const recorder = useSyntheticsRecorder();
+const isRecording = recorder.isRecording;
+const capturedSteps = recorder.liveSteps;
+const currentUrl = recorder.currentUrl;
+const recordingError = recorder.error;
 
 // Emit selection state changes for the parent's sticky footer
 watch([selectedCount, isRecording], ([count, recording]) => {
-  emit('selection-changed', { count, isRecording: recording })
-})
+  emit("selection-changed", { count, isRecording: recording });
+});
 
 // ── Step validation (Continue button + save) ──────────────────────────────
-const selectorErrors = ref<Set<string>>(new Set())
-const firstStepError = ref(false)
+const selectorErrors = ref<Set<string>>(new Set());
+const firstStepError = ref(false);
 
 function validateJourneySteps(): boolean {
   // 1. First step must be "navigate"
-  const first = props.modelValue[0]
-  firstStepError.value = first ? first.action !== 'navigate' : false
+  const first = props.modelValue[0];
+  firstStepError.value = first ? first.action !== "navigate" : false;
 
   // 2. Selector-requiring steps must have a selector
-  const selErrs = new Set<string>()
+  const selErrs = new Set<string>();
   for (const step of props.modelValue) {
     if (
       SELECTOR_ACTIONS_CONST.includes(step.action as any) &&
-      (!step.selector || step.selector.trim() === '')
+      (!step.selector || step.selector.trim() === "")
     ) {
-      selErrs.add(step.id)
+      selErrs.add(step.id);
     }
   }
-  selectorErrors.value = selErrs
+  selectorErrors.value = selErrs;
 
   // Auto-expand errored steps so the inline error is visible
-  const erroredIds = [...selErrs]
-  if (firstStepError.value && first) erroredIds.push(first.id)
+  const erroredIds = [...selErrs];
+  if (firstStepError.value && first) erroredIds.push(first.id);
   if (erroredIds.length > 0) {
-    expandedStepIds.value = [
-      ...new Set([...expandedStepIds.value, ...erroredIds]),
-    ]
+    expandedStepIds.value = [...new Set([...expandedStepIds.value, ...erroredIds])];
   }
 
-  const valid = !firstStepError.value && selErrs.size === 0
+  const valid = !firstStepError.value && selErrs.size === 0;
   if (!valid) {
     // Surface the first error as a toast so the user knows why
     // navigation was blocked, then expand the step to see inline details.
-    const firstErrId = erroredIds[0]
-    const stepIdx = props.modelValue.findIndex((s) => s.id === firstErrId)
-    const stepLabel = props.modelValue[stepIdx]?.name || t('synthetics.results.steps.step', { step: (stepIdx ?? 0) + 1 })
+    const firstErrId = erroredIds[0];
+    const stepIdx = props.modelValue.findIndex((s) => s.id === firstErrId);
+    const stepLabel =
+      props.modelValue[stepIdx]?.name ||
+      t("synthetics.results.steps.step", { step: (stepIdx ?? 0) + 1 });
     if (firstStepError.value && (!first || first.id === firstErrId)) {
-      toast({ variant: 'error', message: t('synthetics.validation.firstStepMustNavigate') })
+      toast({ variant: "error", message: t("synthetics.validation.firstStepMustNavigate") });
     } else {
-      toast({ variant: 'error', message: t('synthetics.validation.selectorRequired', { step: stepLabel }) })
+      toast({
+        variant: "error",
+        message: t("synthetics.validation.selectorRequired", { step: stepLabel }),
+      });
     }
   }
 
-  return valid
+  return valid;
 }
 
 function clearSelectorError(stepId: string) {
-  const next = new Set(selectorErrors.value)
-  next.delete(stepId)
-  selectorErrors.value = next
+  const next = new Set(selectorErrors.value);
+  next.delete(stepId);
+  selectorErrors.value = next;
 }
 
 function clearFirstStepError() {
-  firstStepError.value = false
+  firstStepError.value = false;
 }
 
 // Expose selection state + validation for the parent's sticky footer
@@ -247,29 +265,29 @@ defineExpose({
   stopActiveRecording,
   stopActiveReplay,
   validateStepSelectors: validateJourneySteps,
-})
+});
 
 function startRecording() {
-  recorder.startRecording(props.startUrl ?? '').catch((err) => {
+  recorder.startRecording(props.startUrl ?? "").catch((err) => {
     console.log("error ---", err);
-    recorder.error.value = err instanceof Error ? err.message : String(err)
-  })
+    recorder.error.value = err instanceof Error ? err.message : String(err);
+  });
 }
 
 async function stopRecording() {
-  const steps = await recorder.stopRecording()
-  if (steps.length > 0) emit('update:modelValue', [...props.modelValue, ...steps])
+  const steps = await recorder.stopRecording();
+  if (steps.length > 0) emit("update:modelValue", [...props.modelValue, ...steps]);
 }
 
 function cancelRecording() {
-  recorder.cancelRecording()
+  recorder.cancelRecording();
 }
 
 function onRecordButtonClick() {
   if (props.extensionReady) {
-    startRecording()
+    startRecording();
   } else {
-    emit('need-extension-setup')
+    emit("need-extension-setup");
   }
 }
 
@@ -277,174 +295,193 @@ function onRecordButtonClick() {
  *  Commits captured recording steps so they aren't lost. Returns true if
  *  anything was stopped. */
 function stopActiveRecording(): boolean {
-  if (!recorder.isRecording.value) return false
-  const steps = recorder.stopAndForget()
-  if (steps.length > 0) emit('update:modelValue', [...props.modelValue, ...steps])
-  return true
+  if (!recorder.isRecording.value) return false;
+  const steps = recorder.stopAndForget();
+  if (steps.length > 0) emit("update:modelValue", [...props.modelValue, ...steps]);
+  return true;
 }
 
 /** Sync stop for replay — called by parent's route guard. */
 function stopActiveReplay(): boolean {
-  if (!isReplayRunning.value) return false
-  recorder.stopReplayAndForget()
-  return true
+  if (!isReplayRunning.value) return false;
+  recorder.stopReplayAndForget();
+  return true;
 }
 
 /** Sync fire-and-forget on tab close — prevents orphaned extension tabs. */
 function handleBeforeUnload() {
-  if (recorder.isRecording.value) recorder.stopAndForget()
-  else if (isReplayRunning.value) recorder.stopReplayAndForget()
+  if (recorder.isRecording.value) recorder.stopAndForget();
+  else if (isReplayRunning.value) recorder.stopReplayAndForget();
 }
 
 onMounted(() => {
   // Register the external-stop callback: the composable calls this synchronously
   // when recordingStopped arrives over the port, avoiding any async timing races.
   recorder.setOnExternalStop((steps: BrowserStep[]) => {
-    emit('update:modelValue', [...props.modelValue, ...steps])
-  })
-  window.addEventListener('beforeunload', handleBeforeUnload)
+    emit("update:modelValue", [...props.modelValue, ...steps]);
+  });
+  window.addEventListener("beforeunload", handleBeforeUnload);
   if (props.autoRecord) {
-    startRecording()
-    emit('auto-record-consumed')
+    startRecording();
+    emit("auto-record-consumed");
   }
-})
+});
 
 onBeforeUnmount(() => {
-  window.removeEventListener('beforeunload', handleBeforeUnload)
-  recorder.setOnExternalStop(null)
-  recorder.cleanup()
-})
+  window.removeEventListener("beforeunload", handleBeforeUnload);
+  recorder.setOnExternalStop(null);
+  recorder.cleanup();
+});
 
 // ── Step list (single flat list — one journey, one start URL) ───────────────
 const filteredSteps = computed<BrowserStep[]>(() => {
-  const q = filterQuery.value.trim().toLowerCase()
-  if (!q) return props.modelValue
-  return props.modelValue.filter((step) =>
-    (step.name?.toLowerCase().includes(q)) ||
-    step.action.toLowerCase().includes(q) ||
-    (step.selector?.toLowerCase().includes(q)) ||
-    (step.value?.toLowerCase().includes(q))
-  )
-})
+  const q = filterQuery.value.trim().toLowerCase();
+  if (!q) return props.modelValue;
+  return props.modelValue.filter(
+    (step) =>
+      step.name?.toLowerCase().includes(q) ||
+      step.action.toLowerCase().includes(q) ||
+      step.selector?.toLowerCase().includes(q) ||
+      step.value?.toLowerCase().includes(q),
+  );
+});
 
 // ── Expand / collapse ─────────────────────────────────────────────────────
-const allExpanded = computed(() =>
-  props.modelValue.length > 0 && props.modelValue.every((s) => expandedStepIds.value.includes(s.id))
-)
+const allExpanded = computed(
+  () =>
+    props.modelValue.length > 0 &&
+    props.modelValue.every((s) => expandedStepIds.value.includes(s.id)),
+);
 
 function toggleExpandAll() {
-  expandedStepIds.value = allExpanded.value ? [] : props.modelValue.map((s) => s.id)
+  expandedStepIds.value = allExpanded.value ? [] : props.modelValue.map((s) => s.id);
 }
 
-function isStepExpanded(id: string) { return expandedStepIds.value.includes(id) }
+function isStepExpanded(id: string) {
+  return expandedStepIds.value.includes(id);
+}
 
 function handleToggleExpand(row: BrowserStep) {
   if (expandedStepIds.value.includes(row.id)) {
-    expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id)
+    expandedStepIds.value = expandedStepIds.value.filter((id) => id !== row.id);
   } else {
-    expandedStepIds.value = [...expandedStepIds.value, row.id]
+    expandedStepIds.value = [...expandedStepIds.value, row.id];
   }
 }
 
 // ── Step CRUD — find by id and mutate ──────────────────────────────────────
 function findIndex(row: BrowserStep): number {
-  return props.modelValue.findIndex((s) => s.id === row.id)
+  return props.modelValue.findIndex((s) => s.id === row.id);
 }
 
 function handleDelete(row: BrowserStep) {
-  deleteConfirm.value = { show: true, step: row }
+  deleteConfirm.value = { show: true, step: row };
 }
 
 function confirmDelete() {
-  if (!deleteConfirm.value.step) return
-  const idx = findIndex(deleteConfirm.value.step)
-  deleteConfirm.value = { show: false, step: null }
-  if (idx < 0) return
-  const next = [...props.modelValue]; next.splice(idx, 1); emit('update:modelValue', next)
+  if (!deleteConfirm.value.step) return;
+  const idx = findIndex(deleteConfirm.value.step);
+  deleteConfirm.value = { show: false, step: null };
+  if (idx < 0) return;
+  const next = [...props.modelValue];
+  next.splice(idx, 1);
+  emit("update:modelValue", next);
 }
 
 function cancelDelete() {
-  deleteConfirm.value = { show: false, step: null }
+  deleteConfirm.value = { show: false, step: null };
 }
 function handleDuplicate(row: BrowserStep) {
-  const idx = findIndex(row)
-  if (idx < 0) return
-  const next = [...props.modelValue]
-  next.splice(idx + 1, 0, { ...next[idx], id: getUUIDv7(true) })
-  emit('update:modelValue', next)
+  const idx = findIndex(row);
+  if (idx < 0) return;
+  const next = [...props.modelValue];
+  next.splice(idx + 1, 0, { ...next[idx], id: getUUIDv7(true) });
+  emit("update:modelValue", next);
 }
 function handleInsertBelow(row: BrowserStep) {
-  const idx = findIndex(row)
-  if (idx < 0) return
-  const next = [...props.modelValue]
-  next.splice(idx + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000, code: '' })
-  emit('update:modelValue', next)
+  const idx = findIndex(row);
+  if (idx < 0) return;
+  const next = [...props.modelValue];
+  next.splice(idx + 1, 0, {
+    id: getUUIDv7(true),
+    action: "click",
+    name: "",
+    timeout: 30000,
+    code: "",
+  });
+  emit("update:modelValue", next);
 }
 function handleRowReorder(reordered: BrowserStep[]) {
-  emit('update:modelValue', reordered)
+  emit("update:modelValue", reordered);
 }
 function handleUpdateSelected(ids: string[]) {
-  selectedStepIds.value = ids
+  selectedStepIds.value = ids;
 }
 function handleUpdateExpanded(ids: string[]) {
-  expandedStepIds.value = ids
+  expandedStepIds.value = ids;
 }
 function addStep() {
-  emit('update:modelValue', [...props.modelValue, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000, code: '' }])
+  emit("update:modelValue", [
+    ...props.modelValue,
+    { id: getUUIDv7(true), action: "click", name: "", timeout: 30000, code: "" },
+  ]);
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {
-  capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) })
+  capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) });
 }
 
 // ── Dot state wrapper for JourneySteps ────────────────────────────────────
 function dotStateForRow(row: BrowserStep): StepDotState | undefined {
-  return stepDotState(row.id)
+  return stepDotState(row.id);
 }
 
 // ── Row status color: red left border for rows with validation errors ──────
 function getRowStatusColor(row: BrowserStep): string | undefined {
-  const first = props.modelValue[0]
-  const hasFirstStepErr = firstStepError.value && first?.id === row.id
-  const hasSelectorErr = selectorErrors.value.has(row.id)
-  if (hasFirstStepErr || hasSelectorErr) return 'var(--color-status-error-text)'
-  return undefined
+  const first = props.modelValue[0];
+  const hasFirstStepErr = firstStepError.value && first?.id === row.id;
+  const hasSelectorErr = selectorErrors.value.has(row.id);
+  if (hasFirstStepErr || hasSelectorErr) return "var(--color-status-error-text)";
+  return undefined;
 }
 
 // ── Inline editor helpers ──────────────────────────────────────────────────
-const selectorActions = SELECTOR_ACTIONS_CONST
-const valueActions = VALUE_ACTIONS_CONST
-const selectorTypeOptions = SELECTOR_TYPE_OPTIONS
+const selectorActions = SELECTOR_ACTIONS_CONST;
+const valueActions = VALUE_ACTIONS_CONST;
+const selectorTypeOptions = SELECTOR_TYPE_OPTIONS;
 
 function valueActionLabel(action: string): string {
-  return VALUE_LABELS[action] || t('synthetics.journey.valueFallback')
+  return VALUE_LABELS[action] || t("synthetics.journey.valueFallback");
 }
 
 function valueWidthClass(action: string): string {
-  return VALUE_WIDTH_MAP[action] || 'w-152!'
+  return VALUE_WIDTH_MAP[action] || "w-152!";
 }
 
 function valueTooltip(action: string): string | undefined {
-  return VALUE_TOOLTIP_MAP[action]
+  return VALUE_TOOLTIP_MAP[action];
 }
 
 function handleStepUpdate(row: BrowserStep, patch: Partial<BrowserStep>) {
-  const idx = findIndex(row)
-  if (idx < 0) return
-  const next = [...props.modelValue]
-  next[idx] = { ...next[idx], ...patch }
-  emit('update:modelValue', next)
+  const idx = findIndex(row);
+  if (idx < 0) return;
+  const next = [...props.modelValue];
+  next[idx] = { ...next[idx], ...patch };
+  emit("update:modelValue", next);
 }
 
 function openChromeExtensions() {
-  const url = 'chrome://extensions'
-  try { window.open(url, '_blank')?.focus() } catch { /* ignore */ }
-  navigator.clipboard.writeText(url).catch(() => {})
+  const url = "chrome://extensions";
+  try {
+    window.open(url, "_blank")?.focus();
+  } catch {
+    /* ignore */
+  }
+  navigator.clipboard.writeText(url).catch(() => {});
 }
 </script>
 
 <template>
   <div class="flex flex-col min-h-0 w-full py-4">
-
     <!-- Toolbar — pl-4 mirrors the expand column (w-4) so the select-all checkbox
          aligns with the row checkboxes in the OTable below. -->
     <div class="flex items-center gap-4 mb-3 ml-5.5 px-3">
@@ -452,12 +489,14 @@ function openChromeExtensions() {
       <OCheckbox
         :model-value="allSelected || undefined"
         size="sm"
-        :class="{ 'invisible': isRecording || readonly }"
+        :class="{ invisible: isRecording || readonly }"
         data-test="synthetics-journey-select-all"
         @update:model-value="toggleSelectAll()"
       />
       <div class="flex">
-        <h3 class="text-base font-semibold text-text-heading mr-0">{{ t('synthetics.journey.steps') }}</h3>
+        <h3 class="text-base font-semibold text-text-heading mr-0">
+          {{ t("synthetics.journey.steps") }}
+        </h3>
         <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
       </div>
       <OInput
@@ -477,7 +516,7 @@ function openChromeExtensions() {
           @click="addStep"
           icon-left="add"
         >
-          {{ t('synthetics.journey.addStep') }}
+          {{ t("synthetics.journey.addStep") }}
         </OButton>
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
@@ -491,7 +530,7 @@ function openChromeExtensions() {
             @click="emit('replay')"
             icon-left="replay"
           >
-            {{ t('synthetics.journey.replay') }}
+            {{ t("synthetics.journey.replay") }}
           </OButton>
           <OButton
             v-else-if="replayPhase === 'running'"
@@ -501,7 +540,7 @@ function openChromeExtensions() {
             @click="emit('stop-replay')"
             icon-left="stop"
           >
-            {{ t('synthetics.journey.stop') }}
+            {{ t("synthetics.journey.stop") }}
           </OButton>
           <OButton
             v-else-if="isReplayTerminal"
@@ -511,7 +550,7 @@ function openChromeExtensions() {
             @click="emit('replay')"
             icon-left="replay"
           >
-            {{ t('synthetics.journey.replay') }}
+            {{ t("synthetics.journey.replay") }}
           </OButton>
         </template>
 
@@ -522,7 +561,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-cancel-btn"
           @click="cancelRecording"
         >
-          {{ t('synthetics.journey.cancel') }}
+          {{ t("synthetics.journey.cancel") }}
         </OButton>
 
         <OButton
@@ -534,7 +573,7 @@ function openChromeExtensions() {
           icon-left="stop"
           class="w-24!"
         >
-          {{ t('synthetics.journey.stop') }}
+          {{ t("synthetics.journey.stop") }}
         </OButton>
         <OButton
           v-else
@@ -546,7 +585,7 @@ function openChromeExtensions() {
           icon-left="smart-display"
           class="w-24!"
         >
-          {{ t('synthetics.journey.record') }}
+          {{ t("synthetics.journey.record") }}
         </OButton>
       </div>
     </div>
@@ -560,17 +599,25 @@ function openChromeExtensions() {
     >
       <div class="flex items-center gap-2">
         <OIcon name="visibility-off" size="sm" class="text-warning-600" aria-hidden="true" />
-        <span class="text-sm font-semibold text-text-heading">{{ t('synthetics.journey.incognitoTitle') }}</span>
+        <span class="text-sm font-semibold text-text-heading">{{
+          t("synthetics.journey.incognitoTitle")
+        }}</span>
       </div>
       <p class="text-xs text-text-secondary m-0">
-        {{ t('synthetics.journey.incognitoDescription') }}
+        {{ t("synthetics.journey.incognitoDescription") }}
       </p>
       <ol class="list-decimal pl-4 text-xs text-text-body flex flex-col gap-1 m-0">
-        <li>{{ t('synthetics.journey.incognitoStep1Full') }}</li>
-        <li>{{ t('synthetics.journey.incognitoStep2Full', { name: CHROME_UI.recorderName }) }}</li>
-        <li>{{ t('synthetics.journey.incognitoStep3Full', { button: CHROME_UI.details }) }}</li>
-        <li>{{ t('synthetics.journey.incognitoStep4Full', { setting: CHROME_UI.allowIncognito }) }}</li>
-        <li>{{ t('synthetics.journey.incognitoStep5Full', { button: t('synthetics.journey.retry') }) }}</li>
+        <li>{{ t("synthetics.journey.incognitoStep1Full") }}</li>
+        <li>{{ t("synthetics.journey.incognitoStep2Full", { name: CHROME_UI.recorderName }) }}</li>
+        <li>{{ t("synthetics.journey.incognitoStep3Full", { button: CHROME_UI.details }) }}</li>
+        <li>
+          {{ t("synthetics.journey.incognitoStep4Full", { setting: CHROME_UI.allowIncognito }) }}
+        </li>
+        <li>
+          {{
+            t("synthetics.journey.incognitoStep5Full", { button: t("synthetics.journey.retry") })
+          }}
+        </li>
       </ol>
       <div class="flex items-center gap-2">
         <OButton
@@ -579,7 +626,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-incognito-retry-btn"
           @click="emit('replay')"
         >
-          {{ t('synthetics.journey.retry') }}
+          {{ t("synthetics.journey.retry") }}
         </OButton>
         <OButton
           variant="ghost"
@@ -587,7 +634,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-incognito-dismiss-btn"
           @click="emit('clear-results')"
         >
-          {{ t('synthetics.journey.dismiss') }}
+          {{ t("synthetics.journey.dismiss") }}
         </OButton>
         <span class="flex-1" />
         <OButton
@@ -596,7 +643,7 @@ function openChromeExtensions() {
           data-test="synthetics-journey-incognito-extensions-btn"
           @click="openChromeExtensions"
         >
-          {{ t('synthetics.journey.openExtensions') }}
+          {{ t("synthetics.journey.openExtensions") }}
         </OButton>
       </div>
     </div>
@@ -609,14 +656,16 @@ function openChromeExtensions() {
       data-test="synthetics-journey-replay-banner"
     >
       <OIcon name="sync" size="sm" class="animate-spin text-primary-500" aria-hidden="true" />
-      <span
-        class="text-sm text-text-body"
-        data-test="synthetics-journey-replay-banner-text"
-      >
-        {{ t('synthetics.journey.replaying') }}
+      <span class="text-sm text-text-body" data-test="synthetics-journey-replay-banner-text">
+        {{ t("synthetics.journey.replaying") }}
       </span>
       <span class="text-sm text-text-secondary">
-        {{ t('synthetics.journey.replayProgress', { current: stepResults?.size ?? 0, total: modelValue.length }) }}
+        {{
+          t("synthetics.journey.replayProgress", {
+            current: stepResults?.size ?? 0,
+            total: modelValue.length,
+          })
+        }}
       </span>
     </div>
 
@@ -627,10 +676,22 @@ function openChromeExtensions() {
       role="status"
       data-test="synthetics-journey-passed-banner"
     >
-      <OIcon name="check-circle" size="sm" class="text-[var(--color-timeline-dot-success)]" aria-hidden="true" />
-      <span class="text-sm text-badge-success-ol-text font-semi-bold">{{ t('synthetics.journey.replayPassed', { count: modelValue.length }) }}</span>
+      <OIcon
+        name="check-circle"
+        size="sm"
+        class="text-[var(--color-timeline-dot-success)]"
+        aria-hidden="true"
+      />
+      <span class="text-sm text-badge-success-ol-text font-semi-bold">{{
+        t("synthetics.journey.replayPassed", { count: modelValue.length })
+      }}</span>
       <span class="flex-1" />
-      <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
+      <OButton
+        variant="ghost"
+        size="xs"
+        data-test="synthetics-journey-clear-results-btn"
+        @click="emit('clear-results')"
+      >
         <OIcon name="close" size="sm" />
       </OButton>
     </div>
@@ -644,10 +705,24 @@ function openChromeExtensions() {
     >
       <OIcon name="error" size="sm" class="mt-0.5 text-badge-error-ol-text" aria-hidden="true" />
       <div class="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span class="text-sm text-badge-error-ol-text font-semibold">{{ t('synthetics.journey.replayFailed', { failed: firstFailedIndex + 1, total: modelValue.length }) }}</span>
-        <span v-if="failedStepResult?.stepName" class="text-xs truncate text-badge-error-ol-text pt-1">{{ failedStepResult.stepName }}</span>
+        <span class="text-sm text-badge-error-ol-text font-semibold">{{
+          t("synthetics.journey.replayFailed", {
+            failed: firstFailedIndex + 1,
+            total: modelValue.length,
+          })
+        }}</span>
+        <span
+          v-if="failedStepResult?.stepName"
+          class="text-xs truncate text-badge-error-ol-text pt-1"
+          >{{ failedStepResult.stepName }}</span
+        >
       </div>
-      <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
+      <OButton
+        variant="ghost"
+        size="xs"
+        data-test="synthetics-journey-clear-results-btn"
+        @click="emit('clear-results')"
+      >
         <OIcon name="close" size="sm" />
       </OButton>
     </div>
@@ -660,12 +735,27 @@ function openChromeExtensions() {
       data-test="synthetics-journey-stopped-banner"
     >
       <OIcon name="stop" size="sm" class="text-text-secondary" aria-hidden="true" />
-      <span class="text-sm text-text-body">{{ t('synthetics.journey.replayStopped', { completed: stepResults?.size ?? 0, total: modelValue.length }) }}</span>
+      <span class="text-sm text-text-body">{{
+        t("synthetics.journey.replayStopped", {
+          completed: stepResults?.size ?? 0,
+          total: modelValue.length,
+        })
+      }}</span>
       <span class="flex-1" />
-      <OButton variant="outline" size="xs" data-test="synthetics-journey-stopped-retry-btn" @click="emit('replay')">
-        {{ t('synthetics.journey.reRun') }}
+      <OButton
+        variant="outline"
+        size="xs"
+        data-test="synthetics-journey-stopped-retry-btn"
+        @click="emit('replay')"
+      >
+        {{ t("synthetics.journey.reRun") }}
       </OButton>
-      <OButton variant="ghost" size="xs" data-test="synthetics-journey-clear-results-btn" @click="emit('clear-results')">
+      <OButton
+        variant="ghost"
+        size="xs"
+        data-test="synthetics-journey-clear-results-btn"
+        @click="emit('clear-results')"
+      >
         <OIcon name="close" size="sm" />
       </OButton>
     </div>
@@ -684,13 +774,22 @@ function openChromeExtensions() {
     <!-- Live capture area (shown while recording) -->
     <template v-if="isRecording">
       <!-- Recording banner with current URL + controls -->
-      <div class="flex items-center gap-3 px-3 py-2 mb-3 rounded-default bg-status-error-bg border border-border-default">
+      <div
+        class="flex items-center gap-3 px-3 py-2 mb-3 rounded-default bg-status-error-bg border border-border-default"
+      >
         <span class="flex items-center gap-1.5">
-          <span class="relative inline-flex items-center justify-center w-[0.7rem] h-[0.7rem]" aria-hidden="true">
+          <span
+            class="relative inline-flex items-center justify-center w-[0.7rem] h-[0.7rem]"
+            aria-hidden="true"
+          >
             <span class="absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text z-1" />
-            <span class="recording-pulse-ring absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text opacity-0" />
+            <span
+              class="recording-pulse-ring absolute w-[0.7rem] h-[0.7rem] rounded-full bg-status-error-text opacity-0"
+            />
           </span>
-          <span class="text-sm font-semibold text-status-error-text pl-1.5">{{ t('synthetics.journey.recording') }}</span>
+          <span class="text-sm font-semibold text-status-error-text pl-1.5">{{
+            t("synthetics.journey.recording")
+          }}</span>
         </span>
         <span class="flex items-center gap-1 text-xs text-text-secondary truncate flex-1 min-w-0">
           <span class="truncate">{{ currentUrl }}</span>
@@ -707,14 +806,32 @@ function openChromeExtensions() {
         detail-key="selector"
         :locked="true"
         :selection-enabled="false"
-        @delete="(row: BrowserStep) => capturedSteps.splice(capturedSteps.findIndex(s => s.id === row.id), 1)"
-        @duplicate="(row: BrowserStep) => { const idx = capturedSteps.findIndex(s => s.id === row.id); duplicateCapturedStep(idx, row) }"
+        @delete="
+          (row: BrowserStep) =>
+            capturedSteps.splice(
+              capturedSteps.findIndex((s) => s.id === row.id),
+              1,
+            )
+        "
+        @duplicate="
+          (row: BrowserStep) => {
+            const idx = capturedSteps.findIndex((s) => s.id === row.id);
+            duplicateCapturedStep(idx, row);
+          }
+        "
       />
 
       <!-- Waiting for first step -->
       <div v-else class="flex flex-col items-center justify-center gap-3 py-16 text-center">
-        <OIcon name="fiber-manual-record" size="xl" class="text-text-muted animate-pulse" aria-hidden="true" />
-        <p class="text-sm text-text-secondary m-0">{{ t('synthetics.journey.waitingForActions') }}</p>
+        <OIcon
+          name="fiber-manual-record"
+          size="xl"
+          class="text-text-muted animate-pulse"
+          aria-hidden="true"
+        />
+        <p class="text-sm text-text-secondary m-0">
+          {{ t("synthetics.journey.waitingForActions") }}
+        </p>
       </div>
     </template>
 
@@ -725,10 +842,16 @@ function openChromeExtensions() {
       class="flex flex-col items-center justify-center gap-4 py-16 text-center"
     >
       <OIcon name="open-in-browser" size="xl" class="text-text-muted" aria-hidden="true" />
-      <h3 class="text-base font-semibold text-text-heading m-0">{{ t('synthetics.journey.noSteps') }}</h3>
+      <h3 class="text-base font-semibold text-text-heading m-0">
+        {{ t("synthetics.journey.noSteps") }}
+      </h3>
       <div class="flex items-center gap-3">
-        <OButton variant="primary" size="sm" @click="onRecordButtonClick">{{ t('synthetics.journey.recordJourney') }}</OButton>
-        <OButton variant="outline" size="sm" @click="addStep">{{ t('synthetics.journey.addStepManually') }}</OButton>
+        <OButton variant="primary" size="sm" @click="onRecordButtonClick">{{
+          t("synthetics.journey.recordJourney")
+        }}</OButton>
+        <OButton variant="outline" size="sm" @click="addStep">{{
+          t("synthetics.journey.addStepManually")
+        }}</OButton>
       </div>
     </div>
 
@@ -770,9 +893,18 @@ function openChromeExtensions() {
               :options="actionOptions"
               class="w-50! shrink-0"
               :error="firstStepError && props.modelValue[0]?.id === row.id"
-              :error-message="firstStepError && props.modelValue[0]?.id === row.id ? t('synthetics.validation.firstStepMustNavigate') : ''"
+              :error-message="
+                firstStepError && props.modelValue[0]?.id === row.id
+                  ? t('synthetics.validation.firstStepMustNavigate')
+                  : ''
+              "
               data-test="synthetics-journey-step-action-select"
-              @update:model-value="(v: any) => { handleStepUpdate(row, { action: v as any }); clearFirstStepError() }"
+              @update:model-value="
+                (v: any) => {
+                  handleStepUpdate(row, { action: v as any });
+                  clearFirstStepError();
+                }
+              "
             />
             <OInput
               :model-value="row.name ?? ''"
@@ -801,9 +933,24 @@ function openChromeExtensions() {
                 class="w-100!"
                 :required="true"
                 :error="selectorErrors.has(row.id)"
-                :error-message="selectorErrors.has(row.id) ? t('synthetics.validation.selectorRequired', { step: row.name || t('synthetics.results.steps.step', { step: props.modelValue.indexOf(row) + 1 }) }) : ''"
+                :error-message="
+                  selectorErrors.has(row.id)
+                    ? t('synthetics.validation.selectorRequired', {
+                        step:
+                          row.name ||
+                          t('synthetics.results.steps.step', {
+                            step: props.modelValue.indexOf(row) + 1,
+                          }),
+                      })
+                    : ''
+                "
                 data-test="synthetics-journey-step-selector-input"
-                @update:model-value="(v: any) => { handleStepUpdate(row, { selector: v }); clearSelectorError(row.id) }"
+                @update:model-value="
+                  (v: any) => {
+                    handleStepUpdate(row, { selector: v });
+                    clearSelectorError(row.id);
+                  }
+                "
               />
             </div>
           </template>
@@ -829,7 +976,9 @@ function openChromeExtensions() {
             type="number"
             class="w-50!"
             data-test="synthetics-journey-step-timeout-input"
-            @update:model-value="(v: any) => handleStepUpdate(row, { timeout: v ? Number(v) : undefined })"
+            @update:model-value="
+              (v: any) => handleStepUpdate(row, { timeout: v ? Number(v) : undefined })
+            "
           />
         </div>
       </template>

@@ -26,10 +26,7 @@ const toggleableColumns = computed(() =>
 );
 
 const hiddenCount = computed(
-  () =>
-    toggleableColumns.value.filter(
-      (col) => props.columnVisibility[col.id] === false,
-    ).length,
+  () => toggleableColumns.value.filter((col) => props.columnVisibility[col.id] === false).length,
 );
 
 function isVisible(columnId: string): boolean {
@@ -83,13 +80,8 @@ function resetToDefault(): void {
     </template>
 
     <!-- Column list panel -->
-    <div
-      class="py-1 min-w-44"
-      data-test="o2-table-column-toggle-panel"
-    >
-      <p class="px-3 py-1 text-xs font-medium text-text-secondary">
-        Columns
-      </p>
+    <div class="py-1 min-w-44" data-test="o2-table-column-toggle-panel">
+      <p class="px-3 py-1 text-xs font-medium text-text-secondary">Columns</p>
 
       <ul role="listbox" aria-label="Toggle column visibility" aria-multiselectable="true">
         <li

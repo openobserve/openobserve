@@ -117,9 +117,7 @@ describe("SetupCardRenderer — advanced section", () => {
 
   it("omits the accordion entirely when no advanced content is given", () => {
     wrapper = mountCard({ ...CONTENT, extras: { troubleshooting: [] } });
-    expect(wrapper.find('[data-test="ai-advanced-accordion"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="ai-advanced-accordion"]').exists()).toBe(false);
   });
 });
 
@@ -139,17 +137,13 @@ describe("SetupCardRenderer — footer doc links", () => {
         { label: "Third Guide", url: "https://example.com/third" },
       ],
     });
-    const hrefs = wrapper
-      .findAll(".pv-foot a")
-      .map((a) => a.attributes("href"));
+    const hrefs = wrapper.findAll(".pv-foot a").map((a) => a.attributes("href"));
     expect(hrefs).toEqual([
       "https://example.com/main",
       "https://example.com/second",
       "https://example.com/third",
     ]);
-    expect(wrapper.find('[data-test="ai-doc-link-second-guide"]').text()).toBe(
-      "Second Guide →",
-    );
+    expect(wrapper.find('[data-test="ai-doc-link-second-guide"]').text()).toBe("Second Guide →");
   });
 
   it("renders only the primary link when there are no docLinks", () => {

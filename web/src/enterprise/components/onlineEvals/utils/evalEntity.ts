@@ -56,5 +56,5 @@ export function scorerRefId(ref: EvalJobScorerRef) {
 }
 
 export function scorerRefVersion(ref: EvalJobScorerRef) {
-  return typeof ref === "string" ? null : ref.version ?? null;
+  return typeof ref === "string" ? null : (ref.version ?? null);
 }

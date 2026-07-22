@@ -17,12 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex items-center">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
-    <ODropdown
-      v-if="isCompact"
-      v-model:open="btnRefreshInterval"
-      side="bottom"
-      align="start"
-    >
+    <ODropdown v-if="isCompact" v-model:open="btnRefreshInterval" side="bottom" align="start">
       <template #trigger>
         <OButton
           data-test="logs-search-bar-refresh-interval-btn"
@@ -46,7 +41,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
               size="sm"
               :block="true"
-              @click="() => { onItemClick({ label: t('common.off'), value: 0 }); btnRefreshInterval = false; }"
+              @click="
+                () => {
+                  onItemClick({ label: t('common.off'), value: 0 });
+                  btnRefreshInterval = false;
+                }
+              "
             >
               {{ t("common.off") }}
             </OButton>
@@ -63,7 +63,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
               :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
               size="sm"
-              @click="() => { onItemClick(item); btnRefreshInterval = false; }"
+              @click="
+                () => {
+                  onItemClick(item);
+                  btnRefreshInterval = false;
+                }
+              "
               :disabled="item.disabled"
             >
               <OTooltip
@@ -81,12 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODropdown>
 
     <!-- Full mode: Dropdown with label -->
-    <ODropdown
-      v-else
-      v-model:open="btnRefreshInterval"
-      side="bottom"
-      align="start"
-    >
+    <ODropdown v-else v-model:open="btnRefreshInterval" side="bottom" align="start">
       <template #trigger>
         <OButton
           data-test="logs-search-bar-refresh-interval-btn-dropdown"
@@ -265,9 +265,7 @@ export default defineComponent({
       }
 
       // Find the label from refreshTimes
-      const found = refreshTimes.value
-        .flat()
-        .find((it: any) => it.value == selectedValue.value);
+      const found = refreshTimes.value.flat().find((it: any) => it.value == selectedValue.value);
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
@@ -344,10 +342,9 @@ export default defineComponent({
           item.disabled = isDisabled(item.value);
         });
       });
-      minRangeRestrictionMessageVal.value = t(
-        "common.minRefreshIntervalMessage",
-        { interval: props.minRefreshInterval },
-      );
+      minRangeRestrictionMessageVal.value = t("common.minRefreshIntervalMessage", {
+        interval: props.minRefreshInterval,
+      });
     };
 
     onMounted(() => {
@@ -403,4 +400,3 @@ export default defineComponent({
   }
 }
 </style>
-

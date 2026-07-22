@@ -71,9 +71,7 @@ vi.mock("@/utils/zincutils", () => ({
   })),
   isWebSocketEnabled: vi.fn(() => false),
   isStreamingEnabled: vi.fn(() => false),
-  escapeSingleQuotes: vi.fn((str) =>
-    str.replace(/\\/g, "\\\\").replace(/'/g, "\\'"),
-  ),
+  escapeSingleQuotes: vi.fn((str) => str.replace(/\\/g, "\\\\").replace(/'/g, "\\'")),
   useLocalWrapContent: vi.fn(() => null),
 }));
 
@@ -111,24 +109,22 @@ let shouldWebSocketThrow = false;
 
 vi.mock("@/composables/useSearchWebSocket", () => ({
   default: () => ({
-    fetchQueryDataWithWebSocket: vi
-      .fn()
-      .mockImplementation((payload, callbacks) => {
-        if (shouldWebSocketThrow) {
-          callbacks?.error?.(payload, { message: "WebSocket error" });
-          return "error-trace-id";
-        }
-        // Simulate successful connection
-        setTimeout(() => {
-          callbacks?.open?.(payload);
-          callbacks?.message?.(payload, {
-            content: { results: { hits: [] } },
-            type: "search_response",
-          });
-          callbacks?.close?.(payload, { code: 1000 });
-        }, 10);
-        return "test-trace-id";
-      }),
+    fetchQueryDataWithWebSocket: vi.fn().mockImplementation((payload, callbacks) => {
+      if (shouldWebSocketThrow) {
+        callbacks?.error?.(payload, { message: "WebSocket error" });
+        return "error-trace-id";
+      }
+      // Simulate successful connection
+      setTimeout(() => {
+        callbacks?.open?.(payload);
+        callbacks?.message?.(payload, {
+          content: { results: { hits: [] } },
+          type: "search_response",
+        });
+        callbacks?.close?.(payload, { code: 1000 });
+      }, 10);
+      return "test-trace-id";
+    }),
     sendSearchMessageBasedOnRequestId: vi.fn(),
     cancelSearchQueryBasedOnRequestId: vi.fn(),
     cleanUpListeners: vi.fn(),
@@ -155,23 +151,21 @@ let shouldStreamingThrow = false;
 
 vi.mock("../useStreamingSearch", () => ({
   default: () => ({
-    fetchQueryDataWithHttpStream: vi
-      .fn()
-      .mockImplementation((payload, callbacks) => {
-        if (shouldStreamingThrow) {
-          callbacks?.error?.(payload, { message: "Streaming error" });
-          return "error-stream-id";
-        }
-        // Simulate streaming response
-        setTimeout(() => {
-          callbacks?.data?.(payload, {
-            content: { results: { hits: [] } },
-            type: "search_response",
-          });
-          callbacks?.complete?.(payload, { status: "complete" });
-        }, 10);
-        return "test-stream-id";
-      }),
+    fetchQueryDataWithHttpStream: vi.fn().mockImplementation((payload, callbacks) => {
+      if (shouldStreamingThrow) {
+        callbacks?.error?.(payload, { message: "Streaming error" });
+        return "error-stream-id";
+      }
+      // Simulate streaming response
+      setTimeout(() => {
+        callbacks?.data?.(payload, {
+          content: { results: { hits: [] } },
+          type: "search_response",
+        });
+        callbacks?.complete?.(payload, { status: "complete" });
+      }, 10);
+      return "test-stream-id";
+    }),
     cancelStreamQueryBasedOnRequestId: vi.fn(),
     closeStreamWithError: vi.fn(),
     closeStream: vi.fn(),
@@ -281,9 +275,7 @@ describe("usePanelDataLoader", () => {
     resetAllMocks();
     vi.clearAllMocks();
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    windowAddEventListenerSpy = vi
-      .spyOn(window, "addEventListener")
-      .mockImplementation(() => {});
+    windowAddEventListenerSpy = vi.spyOn(window, "addEventListener").mockImplementation(() => {});
     windowRemoveEventListenerSpy = vi
       .spyOn(window, "removeEventListener")
       .mockImplementation(() => {});
@@ -1128,8 +1120,7 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Mock streaming enabled, WebSocket disabled
-        const { isWebSocketEnabled, isStreamingEnabled } =
-          await import("@/utils/zincutils");
+        const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(false);
         (isStreamingEnabled as any).mockReturnValue(true);
 
@@ -1170,9 +1161,7 @@ describe("usePanelDataLoader", () => {
             status: "success",
             data: {
               resultType: "vector",
-              result: [
-                { metric: { __name__: "up" }, value: [1234567890, "1"] },
-              ],
+              result: [{ metric: { __name__: "up" }, value: [1234567890, "1"] }],
             },
           },
         };
@@ -1323,10 +1312,9 @@ describe("usePanelDataLoader", () => {
         await loader.loadData();
 
         // Check that some error state was set (either errorDetail has content or data is empty)
-        expect(
-          loader.errorDetail.value.message.length > 0 ||
-            loader.data.value.length === 0,
-        ).toBe(true);
+        expect(loader.errorDetail.value.message.length > 0 || loader.data.value.length === 0).toBe(
+          true,
+        );
       });
     });
 
@@ -1337,8 +1325,7 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable WebSocket
-        const { isWebSocketEnabled, isStreamingEnabled } =
-          await import("@/utils/zincutils");
+        const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(true);
         (isStreamingEnabled as any).mockReturnValue(false);
 
@@ -1365,8 +1352,7 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable WebSocket with error
-        const { isWebSocketEnabled, isStreamingEnabled } =
-          await import("@/utils/zincutils");
+        const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(true);
         (isStreamingEnabled as any).mockReturnValue(false);
         shouldWebSocketThrow = true;
@@ -1396,8 +1382,7 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable streaming, disable WebSocket
-        const { isWebSocketEnabled, isStreamingEnabled } =
-          await import("@/utils/zincutils");
+        const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(false);
         (isStreamingEnabled as any).mockReturnValue(true);
 
@@ -1424,8 +1409,7 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable streaming with error
-        const { isWebSocketEnabled, isStreamingEnabled } =
-          await import("@/utils/zincutils");
+        const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(false);
         (isStreamingEnabled as any).mockReturnValue(true);
         shouldStreamingThrow = true;
@@ -1558,9 +1542,7 @@ describe("usePanelDataLoader", () => {
 
         await loader.loadData();
 
-        expect(
-          loader.isCachedDataDifferWithCurrentTimeRange.value,
-        ).toBeDefined();
+        expect(loader.isCachedDataDifferWithCurrentTimeRange.value).toBeDefined();
       });
 
       it("should handle cache retrieval errors", async () => {
@@ -1796,8 +1778,7 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query:
-                "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
+              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
               fields: { stream_type: "logs" },
             },
           ],
@@ -1833,8 +1814,7 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query:
-                "SELECT * FROM logs WHERE time >= now() - INTERVAL '${__range}'",
+              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '${__range}'",
               fields: { stream_type: "logs" },
             },
           ],
@@ -1869,8 +1849,7 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query:
-                "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
+              query: "SELECT * FROM logs WHERE time >= now() - INTERVAL '$__range'",
               fields: { stream_type: "logs" },
             },
           ],
@@ -1960,8 +1939,7 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query:
-                "SELECT * FROM logs WHERE service IN (${services:singlequote})",
+              query: "SELECT * FROM logs WHERE service IN (${services:singlequote})",
               fields: { stream_type: "logs" },
             },
           ],
@@ -2103,8 +2081,7 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query:
-                "SELECT * FROM logs WHERE service IN (${services:doublequote})",
+              query: "SELECT * FROM logs WHERE service IN (${services:doublequote})",
               fields: { stream_type: "logs" },
             },
           ],
@@ -2413,8 +2390,7 @@ describe("usePanelDataLoader", () => {
         const panelSchema = createMockPanelSchema({
           queries: [
             {
-              query:
-                "SELECT * FROM logs WHERE service IN (${services:singlequote})",
+              query: "SELECT * FROM logs WHERE service IN (${services:singlequote})",
               fields: { stream_type: "logs" },
             },
           ],
@@ -2763,8 +2739,7 @@ describe("usePanelDataLoader", () => {
         const variablesData = createMockVariablesData();
 
         // Enable WebSocket and simulate error
-        const { isWebSocketEnabled, isStreamingEnabled } =
-          await import("@/utils/zincutils");
+        const { isWebSocketEnabled, isStreamingEnabled } = await import("@/utils/zincutils");
         (isWebSocketEnabled as any).mockReturnValue(true);
         (isStreamingEnabled as any).mockReturnValue(false);
 
@@ -2875,8 +2850,7 @@ describe("usePanelDataLoader", () => {
         queryType: "sql",
         queries: [
           {
-            query:
-              "SELECT * FROM logs WHERE service = $service AND time >= $__interval_ms",
+            query: "SELECT * FROM logs WHERE service = $service AND time >= $__interval_ms",
             fields: {
               stream_type: "logs",
               x: [{ alias: "timestamp" }],
@@ -2893,9 +2867,7 @@ describe("usePanelDataLoader", () => {
         hits: [[{ test: "data" }]],
         per_query_response: true,
       };
-      mockAnnotations = [
-        { id: "test", title: "Test Annotation", time: Date.now() },
-      ];
+      mockAnnotations = [{ id: "test", title: "Test Annotation", time: Date.now() }];
 
       const loader = usePanelDataLoader(
         panelSchema,

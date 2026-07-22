@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex flex-col min-h-0"
-    :data-test="`metrics-explorer-${mode}-panel`"
-  >
+  <div class="flex flex-col min-h-0" :data-test="`metrics-explorer-${mode}-panel`">
     <!-- The rail's own search — narrows the facet LIST, not the grid. Its own
          inline ✕ clears the SEARCH TEXT only. Clearing the selected FILTERS is a
          separate, explicitly-labelled row below, so the two are never confused. -->
@@ -83,9 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="toggle(facet.id)"
         >
           <template #label>
-            <span class="truncate text-xs" :title="facet.label">{{
-              facet.label
-            }}</span>
+            <span class="truncate text-xs" :title="facet.label">{{ facet.label }}</span>
           </template>
         </OCheckbox>
 
@@ -150,11 +145,7 @@ const search = ref("");
 const isPrefix = computed(() => props.mode === "prefix");
 
 const title = computed(() =>
-  t(
-    isPrefix.value
-      ? "metrics.explorer.filterByPrefix"
-      : "metrics.explorer.filterBySuffix",
-  ),
+  t(isPrefix.value ? "metrics.explorer.filterByPrefix" : "metrics.explorer.filterBySuffix"),
 );
 
 const searchPlaceholder = computed(() =>

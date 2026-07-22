@@ -67,9 +67,7 @@ describe("AwsMarketplaceSetup", () => {
 
     router = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: "/", name: "home", component: { template: "<div>Home</div>" } },
-      ],
+      routes: [{ path: "/", name: "home", component: { template: "<div>Home</div>" } }],
     });
 
     // Default: no orgs returned by list() unless a test overrides it.
@@ -142,12 +140,8 @@ describe("AwsMarketplaceSetup", () => {
     const wrapper = mountSetup();
     await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="aws-marketplace-org-name"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="aws-marketplace-create-link-btn"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="aws-marketplace-org-name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="aws-marketplace-create-link-btn"]').exists()).toBe(true);
   });
 
   it("should display processing state", async () => {
@@ -278,9 +272,7 @@ describe("AwsMarketplaceSetup", () => {
   // This also guards the Options-API "schema returned from setup()" requirement
   // (an unwired `:schema` would resolve to undefined → always valid).
   describe("OForm schema validation (real forms)", () => {
-    const mountSelectOrg = async (
-      orgs: { identifier: string; name: string }[] = [],
-    ) => {
+    const mountSelectOrg = async (orgs: { identifier: string; name: string }[] = []) => {
       document.cookie = "aws_marketplace_token=test_token; path=/";
       (organizationsService.list as any).mockResolvedValue({
         data: { data: orgs },
@@ -323,9 +315,7 @@ describe("AwsMarketplaceSetup", () => {
     });
 
     it("link form: blocks submit + does NOT link when no org is selected", async () => {
-      const wrapper = await mountSelectOrg([
-        { identifier: "org1", name: "Org 1" },
-      ]);
+      const wrapper = await mountSelectOrg([{ identifier: "org1", name: "Org 1" }]);
       const linkForm = wrapper.findAllComponents({ name: "OForm" })[1];
 
       await (linkForm.vm as any).form.handleSubmit();
@@ -340,9 +330,7 @@ describe("AwsMarketplaceSetup", () => {
         data: { success: true, customer_identifier: "cust-1" },
       });
 
-      const wrapper = await mountSelectOrg([
-        { identifier: "org1", name: "Org 1" },
-      ]);
+      const wrapper = await mountSelectOrg([{ identifier: "org1", name: "Org 1" }]);
       const linkForm = wrapper.findAllComponents({ name: "OForm" })[1];
 
       (linkForm.vm as any).form.setFieldValue("selectedOrg", "org1");
@@ -350,10 +338,7 @@ describe("AwsMarketplaceSetup", () => {
       await flushPromises();
 
       expect((linkForm.vm as any).form.state.isValid).toBe(true);
-      expect(awsMarketplace.linkSubscription).toHaveBeenCalledWith(
-        "org1",
-        "test_token",
-      );
+      expect(awsMarketplace.linkSubscription).toHaveBeenCalledWith("org1", "test_token");
     });
   });
 });

@@ -29,11 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span class="text-xs font-mono text-typography-meta shrink-0">
       {{ formatEventTimestamp(sourceEvent.timestamp) }}
     </span>
-    <OSeparator
-      v-if="sourceEvent.message"
-      vertical
-      class="mx-0"
-    />
+    <OSeparator v-if="sourceEvent.message" vertical class="mx-0" />
     <span
       v-if="sourceEvent.message"
       class="text-xs flex-1 font-mono text-typography-meta line-clamp-2 text-ellipsis whitespace-normal wrap-break-word leading-[1.4]"
@@ -54,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="contextChips && contextChips.length > 0"
       ref="containerRef"
-      class="flex items-center gap-3  py-2 flex-1 min-w-0"
+      class="flex items-center gap-3 py-2 flex-1 min-w-0"
     >
       <span class="text-2! m-0 text-typography-meta shrink-0">Correlated by:</span>
       <div class="flex items-center gap-2 min-w-0 overflow-hidden">
@@ -76,7 +72,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="cursor-default"
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
-            <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
+            <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount
+            }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
           </OTag>
           <OTooltip side="top" :disabled="hiddenChipCount === 0">
             <template #content>
@@ -98,10 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Subject chips (View by) — shown when subjectChips are provided -->
-    <div
-      v-if="showSubjectSection"
-      class="flex items-center gap-3 shrink-0"
-    >
+    <div v-if="showSubjectSection" class="flex items-center gap-3 shrink-0">
       <OSeparator vertical class="my-2" />
       <span class="text-2! m-0 text-typography-meta">View by:</span>
       <OToggleGroup
@@ -109,7 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="single"
         size="xs"
         class="h-7!"
-        @update:model-value="(v: boolean | AcceptableValue | AcceptableValue[]) => emit('update:activeSubject', typeof v === 'string' ? v : null)"
+        @update:model-value="
+          (v: boolean | AcceptableValue | AcceptableValue[]) =>
+            emit('update:activeSubject', typeof v === 'string' ? v : null)
+        "
       >
         <OToggleGroupItem
           v-for="chip in subjectChips"
@@ -200,7 +197,6 @@ const emit = defineEmits<{
   "update:activeSubject": [value: string | null];
 }>();
 
-
 // ── Responsive overflow (ResizeObserver) ─────────────────────────────────────
 
 const containerRef = ref<HTMLElement>();
@@ -236,9 +232,7 @@ onBeforeUnmount(() => {
 
 // ── Derived display state ─────────────────────────────────────────────────────
 
-const showSubjectSection = computed(
-  () => (props.subjectChips?.length ?? 0) > 0,
-);
+const showSubjectSection = computed(() => (props.subjectChips?.length ?? 0) > 0);
 
 // The currently-selected subject chip, shown as a "label = value" badge after the
 // View-by toggles. Only meaningful when it carries a concrete value (trace/log);
@@ -247,10 +241,7 @@ const activeSubjectChip = computed<DimensionChip | undefined>(() =>
   props.subjectChips?.find((c) => c.key === props.activeSubject),
 );
 
-const hasChips = computed(
-  () =>
-    (props.contextChips?.length ?? 0) > 0 || showSubjectSection.value,
-);
+const hasChips = computed(() => (props.contextChips?.length ?? 0) > 0 || showSubjectSection.value);
 
 const displayedChips = computed<DimensionChip[]>(() => {
   const chips = props.contextChips ?? [];
@@ -269,10 +260,8 @@ const displayedChips = computed<DimensionChip[]>(() => {
     for (let i = 0; i < chips.length; i++) {
       const chipWidth = estimateChipWidth(chips[i]);
       const remaining = chips.length - i - 1;
-      const overflowSpace =
-        remaining > 0 ? OVERFLOW_INDICATOR_WIDTH + CHIP_GAP : 0;
-      const neededWidth =
-        chipWidth + (i > 0 ? CHIP_GAP : 0) + overflowSpace;
+      const overflowSpace = remaining > 0 ? OVERFLOW_INDICATOR_WIDTH + CHIP_GAP : 0;
+      const neededWidth = chipWidth + (i > 0 ? CHIP_GAP : 0) + overflowSpace;
       if (usedWidth + neededWidth > available) break;
       usedWidth += chipWidth + (i > 0 ? CHIP_GAP : 0);
       visibleCount++;

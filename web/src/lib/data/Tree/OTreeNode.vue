@@ -18,9 +18,7 @@ const ctx = inject(TREE_CONTEXT_KEY)!;
 
 const key = computed<TreeNodeKey>(() => props.node[ctx.nodeKey] as TreeNodeKey);
 
-const isLeaf = computed(
-  () => !props.node.children || props.node.children.length === 0,
-);
+const isLeaf = computed(() => !props.node.children || props.node.children.length === 0);
 
 const isExpanded = computed(() => ctx.expanded.has(key.value));
 
@@ -45,8 +43,7 @@ function anyDescendantMatches(node: TreeNode): boolean {
     return ctx.filterMethod(node, ctx.filter);
   }
   return node.children.some(
-    (child) =>
-      ctx.filterMethod(child, ctx.filter) || anyDescendantMatches(child),
+    (child) => ctx.filterMethod(child, ctx.filter) || anyDescendantMatches(child),
   );
 }
 
@@ -68,9 +65,7 @@ const leafKeys = computed<TreeNodeKey[]>(() => {
 const tickedSet = computed(() => new Set(ctx.ticked));
 
 /** How many of this node's leaves are ticked */
-const tickedLeafCount = computed(
-  () => leafKeys.value.filter((k) => tickedSet.value.has(k)).length,
-);
+const tickedLeafCount = computed(() => leafKeys.value.filter((k) => tickedSet.value.has(k)).length);
 
 const checkboxState = computed<boolean | "indeterminate">(() => {
   if (isLeaf.value) return tickedSet.value.has(key.value);
@@ -105,7 +100,13 @@ function onTickChange(newVal: CheckboxModelValue) {
     role="treeitem"
     :aria-expanded="!isLeaf ? isExpanded : undefined"
     :data-test="`o-tree-node-${String(key)}`"
-    :data-test-checked="checkboxState === true ? 'true' : checkboxState === 'indeterminate' ? 'indeterminate' : 'false'"
+    :data-test-checked="
+      checkboxState === true
+        ? 'true'
+        : checkboxState === 'indeterminate'
+          ? 'indeterminate'
+          : 'false'
+    "
     class="list-none m-0 p-0"
   >
     <!-- Node row ────────────────────────────────────────────────────── -->
@@ -150,11 +151,7 @@ function onTickChange(newVal: CheckboxModelValue) {
         The negative left overflows into the ul's padding area which is
         NOT clipped by overflow:hidden (clips to padding box, not content box).
       -->
-      <span
-        v-else
-        class="relative shrink-0 self-stretch opacity-35 w-4"
-        aria-hidden="true"
-      >
+      <span v-else class="relative shrink-0 self-stretch opacity-35 w-4" aria-hidden="true">
         <!-- Elbow connector. The 0.75px offsets are half the 1.5px hairline, so
              the stroke lands on the same physical line as the sibling connectors.
              `- -0.75px` is deliberate and means `+ 0.75px`: Tailwind's candidate
@@ -191,10 +188,7 @@ function onTickChange(newVal: CheckboxModelValue) {
       class="overflow-hidden transition-[grid-template-rows] duration-200 ease-in-out grid"
       :style="{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }"
     >
-      <ul
-        role="group"
-        class="list-none m-0 p-0 pl-5 overflow-hidden min-h-0"
-      >
+      <ul role="group" class="list-none m-0 p-0 pl-5 overflow-hidden min-h-0">
         <template v-if="isExpanded">
           <OTreeNode
             v-for="child in node.children"

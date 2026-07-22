@@ -28,23 +28,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form-style sections (general, org params, license, domain): a section
          header above a centered reading column. -->
-    <div
-      v-if="isConstrainedSection"
-      class="h-full min-h-0 flex flex-col"
-    >
+    <div v-if="isConstrainedSection" class="h-full min-h-0 flex flex-col">
       <OPageHeader
         :title="activeSectionItem?.label || ''"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
         :subtitle="activeSectionItem?.description || ''"
-        :icon="(activeSectionItem?.icon as any)"
+        :icon="activeSectionItem?.icon as any"
         class="shrink-0 border-b border-border-default"
       />
-      <ConstrainedPage
-        size="lg"
-        align="left"
-        :padded="false"
-        class="flex-1 min-h-0 px-4 py-3"
-      >
+      <ConstrainedPage size="lg" align="left" :padded="false" class="flex-1 min-h-0 px-4 py-3">
         <router-view title="" />
       </ConstrainedPage>
     </div>
@@ -63,18 +55,8 @@ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import {
-  type SectionHubGroup,
-  type SectionHubItem,
-} from "@/components/common/SectionHub.vue";
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  onActivated,
-  onUpdated,
-  computed,
-} from "vue";
+import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
+import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
@@ -100,26 +82,26 @@ export default defineComponent({
 
     // Maps a route name → the section key used by the hub/switcher.
     const routeToSettingsTab: Record<string, string> = {
-      general:               "general",
-      organization:          "organization",
-      organizationSettings:  "organization",
-      nodes:                 "nodes",
-      queryManagement:       "queryManagement",
-      query_management:      "queryManagement",
-      domainManagement:      "domain_management",
-      alertDestinations:     "alert_destinations",
-      pipelineDestinations:  "pipeline_destinations",
-      alertTemplates:        "templates",
-      modelPricing:          "model_pricing",
-      modelPricingEditor:    "model_pricing",
-      llmProviders:          "llm_providers",
-      storageSettings:       "storageSettings",
-      cipherKeys:            "cipher-keys",
-      license:               "license",
+      general: "general",
+      organization: "organization",
+      organizationSettings: "organization",
+      nodes: "nodes",
+      queryManagement: "queryManagement",
+      query_management: "queryManagement",
+      domainManagement: "domain_management",
+      alertDestinations: "alert_destinations",
+      pipelineDestinations: "pipeline_destinations",
+      alertTemplates: "templates",
+      modelPricing: "model_pricing",
+      modelPricingEditor: "model_pricing",
+      llmProviders: "llm_providers",
+      storageSettings: "storageSettings",
+      cipherKeys: "cipher-keys",
+      license: "license",
       orgnizationManagement: "organization_management",
-      regexPatterns:         "regex_patterns",
-      correlationSettings:   "correlation_settings",
-      genAiAgentMapping:     "gen_ai_agent_mapping",
+      regexPatterns: "regex_patterns",
+      correlationSettings: "correlation_settings",
+      genAiAgentMapping: "gen_ai_agent_mapping",
     };
 
     const settingsTab = ref(
@@ -133,9 +115,7 @@ export default defineComponent({
       name: "settings",
       query: { org_identifier: store.state.selectedOrganization?.identifier },
     }));
-    const activeSection = computed(
-      () => routeToSettingsTab[route.name as string] ?? "",
-    );
+    const activeSection = computed(() => routeToSettingsTab[route.name as string] ?? "");
 
     // Form-style sections render in a centered reading column (ConstrainedPage);
     // table/list sections (nodes, destinations, templates, …) stay full-width.
@@ -145,9 +125,7 @@ export default defineComponent({
       "license",
       "domain_management",
     ]);
-    const isConstrainedSection = computed(() =>
-      CONSTRAINED_SECTIONS.has(activeSection.value),
-    );
+    const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
     // Full-width sections that still want the shell-owned header (their content
     // fills the whole width instead of a centered reading column).
@@ -169,8 +147,7 @@ export default defineComponent({
         return;
       }
       const notMeta =
-        store.state.zoConfig.meta_org &&
-        (!isMetaOrg.value || config.isEnterprise === "false");
+        store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
       if ((name === "nodes" || name === "license") && notMeta) {
         settingsTab.value = "general";
         router.push({
@@ -296,8 +273,7 @@ export default defineComponent({
           visible:
             isEnt &&
             (!isCloud ||
-              store.state.organizationData.organizationSettings
-                .org_storage_enabled === true),
+              store.state.organizationData.organizationSettings.org_storage_enabled === true),
           dataTest: "storage-settings-tab",
           group: "Data & AI",
         },
@@ -406,12 +382,12 @@ export default defineComponent({
       // Internal group keys stay English (used for bucketing + rank); only the
       // displayed label is translated so sorting/ranking is unaffected.
       const groupLabels: Record<string, string> = {
-        "General": t("settings.groupGeneral"),
+        General: t("settings.groupGeneral"),
         "Access & Security": t("settings.groupAccessSecurity"),
         "Destinations & Templates": t("settings.groupDestinationsTemplates"),
         "Data & AI": t("settings.groupDataAI"),
-        "Operations": t("settings.groupOperations"),
-        "Account": t("settings.groupAccount"),
+        Operations: t("settings.groupOperations"),
+        Account: t("settings.groupAccount"),
       };
       return [...buckets.keys()]
         .sort((a, b) => rank(a) - rank(b))

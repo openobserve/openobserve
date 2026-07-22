@@ -28,24 +28,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <!-- <div class="mt-2.5 text-xl">+</div> -->
       <OIcon
-        name="expand-all" size="sm"
+        name="expand-all"
+        size="sm"
         class="mt-2.5 text-xl rotate-90"
         data-test="dashboard-sidebar"
       />
       <div
         class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold"
         data-test="panel-sidebar-collapsed-title"
-      >{{ title }}</div>
+      >
+        {{ title }}
+      </div>
     </div>
     <div
       v-else
       class="flex items-center justify-between h-15 px-2.5 shrink-0"
       data-test="panel-sidebar-header-expanded"
     >
-      <div
-        class="font-bold"
-        data-test="panel-sidebar-expanded-title"
-      >{{ title }}</div>
+      <div class="font-bold" data-test="panel-sidebar-expanded-title">{{ title }}</div>
       <OButton
         variant="outline"
         size="icon-xs-sq"
@@ -72,12 +72,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, watch, provide } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
-  components: { OSeparator, OButton,
-    OIcon,
-},
+  components: { OSeparator, OButton, OIcon },
   props: {
     title: {
       type: String,
@@ -92,7 +90,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const isOpen = ref(props.modelValue);
     const sidebarScrollTick = ref(0);
-    provide('sidebarScrollTick', sidebarScrollTick);
+    provide("sidebarScrollTick", sidebarScrollTick);
 
     const toggleSidebar = () => {
       isOpen.value = !isOpen.value;
@@ -118,4 +116,3 @@ export default defineComponent({
   },
 });
 </script>
-

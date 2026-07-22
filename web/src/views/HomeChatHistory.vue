@@ -82,8 +82,7 @@ function formatTime(ts: string): string {
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays === 0)
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
@@ -97,12 +96,7 @@ function formatTime(ts: string): string {
     <!-- Header -->
     <div class="flex items-center justify-between px-3 pt-[0.625em] pb-[0.375em] shrink-0">
       <span class="text-[0.8125em] font-semibold opacity-70">{{ t("chatHistory.title") }}</span>
-      <OButton
-        variant="ghost-muted"
-        size="icon"
-        :title="t('chatHistory.newChat')"
-        @click="newChat"
-      >
+      <OButton variant="ghost-muted" size="icon" :title="t('chatHistory.newChat')" @click="newChat">
         <svg
           width="1em"
           height="1em"
@@ -142,12 +136,7 @@ function formatTime(ts: string): string {
           :placeholder="t('chatHistory.search')"
           type="text"
         />
-        <OButton
-          v-if="searchTerm"
-          variant="ghost-subtle"
-          size="icon"
-          @click="searchTerm = ''"
-        >
+        <OButton v-if="searchTerm" variant="ghost-subtle" size="icon" @click="searchTerm = ''">
           <svg
             width="0.75em"
             height="0.75em"
@@ -176,10 +165,19 @@ function formatTime(ts: string): string {
         @click="selectChat(chat.id)"
       >
         <div class="flex-1 min-w-0">
-          <div class="text-[0.8125em] leading-[1.35] truncate text-text-body" :class="{ 'font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
-          <div class="text-[0.6875em] text-text-secondary mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
+          <div
+            class="text-[0.8125em] leading-[1.35] truncate text-text-body"
+            :class="{ 'font-medium': activeChatId === chat.id }"
+          >
+            {{ chat.title }}
+          </div>
+          <div class="text-[0.6875em] text-text-secondary mt-[0.0625em]">
+            {{ formatTime(chat.timestamp) }}
+          </div>
         </div>
-        <span class="inline-flex items-center shrink-0 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100">
+        <span
+          class="inline-flex items-center shrink-0 opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100"
+        >
           <OButton
             variant="ghost-destructive"
             size="icon"
@@ -206,15 +204,19 @@ function formatTime(ts: string): string {
         </span>
       </div>
 
-      <div v-if="filtered.length === 0" class="text-center text-[0.8125em] opacity-[0.45] py-[1.5em]">
-        {{
-          searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory")
-        }}
+      <div
+        v-if="filtered.length === 0"
+        class="text-center text-[0.8125em] opacity-[0.45] py-[1.5em]"
+      >
+        {{ searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory") }}
       </div>
     </div>
 
     <!-- Clear all -->
-    <div v-if="history.length > 0" class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-card-glass-border">
+    <div
+      v-if="history.length > 0"
+      class="shrink-0 py-[0.375em] px-2 border-t border-t-[0.0625em] border-t-card-glass-border"
+    >
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"

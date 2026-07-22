@@ -18,41 +18,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
        and submenu-group triggers (<button>, used by ONavGroup) all share the
        exact same tile markup and styling — a group tile is literally a MenuLink. -->
-  <component
-    :is="rootComponent"
-    v-bind="rootProps"
-    :class="rootClass"
-    @click="onRootClick"
-  >
+  <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
     <div class="nav-menu-item-avatar flex flex-col items-center gap-0.5 w-full">
       <div
         class="icon-wrapper relative inline-flex items-center justify-center rounded-default p-0.5 transition-colors duration-250"
-        :class="isActive
-          ? activeIconClass
-          : 'text-tabs-inactive-text group-hover:text-primary-600'"
+        :class="isActive ? activeIconClass : 'text-tabs-inactive-text group-hover:text-primary-600'"
       >
         <!-- Rail icons are a hair smaller than the md (24px) default. -->
         <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
-        <component
-          v-else-if="hasIconComponent"
-          :is="iconComponent"
-          class="o-icon size-5.5"
-        />
+        <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
         <div
           v-if="badge && badge > 0"
           class="menu-badge absolute -top-1 -right-2 min-w-4 h-4 px-1 bg-[image:var(--color-gradient-notification)] border-2 border-[var(--color-grey-900)] rounded-full text-3xs font-bold text-text-inverse flex items-center justify-center leading-none shadow-[0_4px_8px_rgba(239,68,68,0.5)] animate-pulse z-1"
           aria-live="polite"
           :aria-label="`${badge} notifications`"
         >
-          {{ badge > 99 ? '99+' : badge }}
+          {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
       <div
         class="nav-menu-item-label text-xs tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
-        :class="isActive
-          ? activeLabelClass
-          : 'font-medium text-tabs-inactive-text group-hover:text-primary-600'"
-      >{{ title }}</div>
+        :class="
+          isActive
+            ? activeLabelClass
+            : 'font-medium text-tabs-inactive-text group-hover:text-primary-600'
+        "
+      >
+        {{ title }}
+      </div>
     </div>
 
     <!-- Submenu affordance: hidden at rest so a group/link-with-subnav tile is
@@ -61,9 +54,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <span
       v-if="asTrigger || submenu"
       class="absolute right-1 top-3 transition-opacity duration-150"
-      :class="isActive || expanded
-        ? 'opacity-100 text-primary-600'
-        : 'opacity-70 group-hover:opacity-100 text-tabs-inactive-text'"
+      :class="
+        isActive || expanded
+          ? 'opacity-100 text-primary-600'
+          : 'opacity-70 group-hover:opacity-100 text-tabs-inactive-text'
+      "
       aria-hidden="true"
     >
       <OIcon name="chevron-right" size="xs" />
@@ -206,9 +201,7 @@ export default defineComponent({
       isDark.value ? "text-tabs-active-text!" : "text-primary-700!",
     );
     const activeLabelClass = computed(() =>
-      isDark.value
-        ? "font-semibold text-tabs-active-text!"
-        : "font-semibold text-primary-600!",
+      isDark.value ? "font-semibold text-tabs-active-text!" : "font-semibold text-primary-600!",
     );
 
     // Compute ARIA label with fallback

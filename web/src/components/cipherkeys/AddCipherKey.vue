@@ -22,18 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-      <template #title>
-        <span data-test="add-template-title">
-          {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
-        </span>
-      </template>
+    <template #title>
+      <span data-test="add-template-title">
+        {{ isUpdatingCipherKey ? t("cipherKey.update") : t("cipherKey.add") }}
+      </span>
+    </template>
     <div class="create-cipher-form">
       <!-- One OForm owns every field across the stepper (the children render
            OForm* controls connected by name); a single Zod schema gates the
            whole form. Inline form → the footer Save is type="submit" (Enter
            works natively) and its spinner is form-driven via v-slot. -->
       <OForm :form="form" v-slot="{ isSubmitting }">
-        <div class="overflow-auto" style="height: calc(100vh -  var(--navbar-height) - 155px)">
+        <div class="overflow-auto" style="height: calc(100vh - var(--navbar-height) - 155px)">
           <!-- Constrain the whole form to a sensible reading width on wide screens
                while staying fluid below the breakpoint. -->
           <div class="w-full max-w-3xl">
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div style="height: calc(100vh -  var(--navbar-height) - 300px);">
+            <div style="height: calc(100vh - var(--navbar-height) - 300px)">
               <OStepper
                 v-model="step"
                 orientation="vertical"
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disabled="isSubmitting"
                       @click="step = 1"
                     >
-                      {{ t('common.back') }}
+                      {{ t("common.back") }}
                     </OButton>
                   </div>
                 </OStep>
@@ -130,7 +130,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
         <div class="mx-2">
-          <div class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky"
+          <div
+            class="flex justify-end px-2 py-4 w-full gap-2 border-t border-border-default sticky"
             style="bottom: 0px; z-index: 2"
           >
             <OButton
@@ -140,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="isSubmitting"
               @click="openCancelDialog"
             >
-              {{ t('common.cancel') }}
+              {{ t("common.cancel") }}
             </OButton>
             <OButton
               data-test="add-cipher-key-save-btn"
@@ -149,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               type="submit"
               :loading="isSubmitting"
             >
-              {{ t('common.save') }}
+              {{ t("common.save") }}
             </OButton>
           </div>
         </div>
@@ -215,8 +216,7 @@ const dialog = ref({
   okCallback: () => {},
 });
 
-const getTypeLabel = (type: string) =>
-  cipherKeyTypes.find((item) => item.value === type)?.label;
+const getTypeLabel = (type: string) => cipherKeyTypes.find((item) => item.value === type)?.label;
 
 // The parent OWNS the form (headless useOForm): it renders <OForm>, so it sits
 // above the provide boundary and can't inject — yet it needs store.type
@@ -235,9 +235,7 @@ const form = useOForm<AddCipherKeyForm>({
   onSubmit: (value) => onFormSubmit(value),
 });
 
-const storeType = form.useStore(
-  (s: any) => s?.values?.key?.store?.type ?? "local",
-);
+const storeType = form.useStore((s: any) => s?.values?.key?.store?.type ?? "local");
 
 const step1Title = computed(
   () => `${t("cipherKey.step1")} (Type: ${getTypeLabel(storeType.value)})`,
@@ -247,11 +245,7 @@ const step1Title = computed(
 // omits keeps its schema default (used for edit prefill).
 function mergeObjects(base: any, updates: any) {
   for (const key in updates) {
-    if (
-      updates[key] !== null &&
-      typeof updates[key] === "object" &&
-      !Array.isArray(updates[key])
-    ) {
+    if (updates[key] !== null && typeof updates[key] === "object" && !Array.isArray(updates[key])) {
       base[key] = mergeObjects(base[key] || {}, updates[key]);
     } else {
       base[key] = updates[key];
@@ -269,28 +263,19 @@ const setupTemplateData = () => {
       emit("cancel:hideform");
       return;
     }
-    CipherKeysService.get_by_name(
-      store.state.selectedOrganization.identifier,
-      name,
-    )
+    CipherKeysService.get_by_name(store.state.selectedOrganization.identifier, name)
       .then((response) => {
         // :default-values is read once at mount; re-seed via reset now the
         // record has arrived.
-        const record = mergeObjects(
-          addCipherKeyDefaults(),
-          response.data,
-        ) as AddCipherKeyForm;
+        const record = mergeObjects(addCipherKeyDefaults(), response.data) as AddCipherKeyForm;
         form.reset(record);
-        originalData.value = JSON.stringify(
-          form.state.values ?? record,
-        );
+        originalData.value = JSON.stringify(form.state.values ?? record);
       })
       .catch((error) => {
         if (error.status != 403) {
           toast({
             variant: "error",
-            message:
-              error.response?.data?.message || "Error fetching cipher key.",
+            message: error.response?.data?.message || "Error fetching cipher key.",
           });
         }
       });
@@ -300,9 +285,7 @@ const setupTemplateData = () => {
 onActivated(() => setupTemplateData());
 onMounted(() => {
   // Baseline for the cancel diff; edit mode re-snapshots after the record loads.
-  originalData.value = JSON.stringify(
-    form.state.values ?? addCipherKeyDefaults(),
-  );
+  originalData.value = JSON.stringify(form.state.values ?? addCipherKeyDefaults());
   setupTemplateData();
 });
 
@@ -345,10 +328,10 @@ const createCipherKey = async (value: AddCipherKeyForm) => {
     // `isUpdate` is a UI flag, not a form field — merged in here outside the
     // schema. The backend ignores it (KeyAddRequest deserializes only `name` +
     // `key`, no deny_unknown_fields).
-    await CipherKeysService.create(
-      store.state.selectedOrganization.identifier,
-      { ...value, isUpdate: isUpdatingCipherKey.value } as any,
-    );
+    await CipherKeysService.create(store.state.selectedOrganization.identifier, {
+      ...value,
+      isUpdate: isUpdatingCipherKey.value,
+    } as any);
     dismiss();
     toast({ variant: "success", message: "Cipher key created successfully" });
     emit("cancel:hideform");

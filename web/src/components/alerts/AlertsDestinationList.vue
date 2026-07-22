@@ -16,47 +16,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex flex-col h-full p-0">
-
-    <OPageLayout bleed
+    <OPageLayout
+      bleed
       v-if="!showDestinationEditor && !showImportDestination"
       :title="t('alert_destinations.header')"
       title-data-test="alert-destinations-list-title"
       icon="location-on"
       subtitle="Where triggered alerts are delivered"
     >
-        <template #actions>
-          <OToggleGroup
-            :model-value="activeTab"
-            @update:model-value="(v) => { activeTab = v as 'all' | 'prebuilt' | 'custom'; }"
-            data-test="destination-list-tabs"
-          >
-            <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
-              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-              {{ t("alert_destinations.filterAll") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
-              <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-              {{ t("alert_destinations.filterPrebuilt") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
-              <template #icon-left><OIcon name="settings" size="sm" /></template>
-              {{ t("alert_destinations.filterCustom") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <OButton
-            variant="outline"
-            size="sm"
-            @click="importDestination"
-            data-test="destination-import"
-          >{{ t(`dashboard.import`) }}</OButton>
-          <OButton
-            data-test="alert-destination-list-add-alert-btn"
-            variant="primary"
-            size="sm"
-            :disabled="!templates.length"
-            @click="editDestination(null)"
-          >{{ t(`alert_destinations.add`) }}</OButton>
-        </template>
+      <template #actions>
+        <OToggleGroup
+          :model-value="activeTab"
+          @update:model-value="
+            (v) => {
+              activeTab = v as 'all' | 'prebuilt' | 'custom';
+            }
+          "
+          data-test="destination-list-tabs"
+        >
+          <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+            {{ t("alert_destinations.filterAll") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+            {{ t("alert_destinations.filterPrebuilt") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+            <template #icon-left><OIcon name="settings" size="sm" /></template>
+            {{ t("alert_destinations.filterCustom") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="importDestination"
+          data-test="destination-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+        <OButton
+          data-test="alert-destination-list-add-alert-btn"
+          variant="primary"
+          size="sm"
+          :disabled="!templates.length"
+          @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton
+        >
+      </template>
       <div class="bg-card-glass-bg flex-1 min-h-0">
         <OTable
           data-test="alert-destinations-list-table"
@@ -96,13 +102,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-destinations-list-refresh-btn"
               @click="getDestinations"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="alertDestinationsRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="alertDestinationsRefresh"
+              />
             </OButton>
           </template>
 
           <template #bottom="{ totalRows }">
             <span class="text-xs font-normal">
-              {{ totalRows.toLocaleString() }} {{ t('alert_destinations.header') }}
+              {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
             </span>
             <OButton
               v-if="selectedDestinations.length > 0"
@@ -114,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #icon-left>
                 <OIcon name="delete" size="sm" />
               </template>
-              {{ t('common.delete') }}
+              {{ t("common.delete") }}
             </OButton>
           </template>
 
@@ -124,10 +134,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               preset="no-alert-destinations"
               :filtered="!!filterQuery"
               :actions="[
-                { id: 'create', icon: 'add', titleKey: 'emptyState.noAlertDestinations.action', descriptionKey: 'emptyState.noAlertDestinations.actionDesc' },
-                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noAlertDestinations.import', descriptionKey: 'emptyState.noAlertDestinations.importDesc' },
+                {
+                  id: 'create',
+                  icon: 'add',
+                  titleKey: 'emptyState.noAlertDestinations.action',
+                  descriptionKey: 'emptyState.noAlertDestinations.actionDesc',
+                },
+                {
+                  id: 'import',
+                  icon: 'upload-file',
+                  titleKey: 'emptyState.noAlertDestinations.import',
+                  descriptionKey: 'emptyState.noAlertDestinations.importDesc',
+                },
               ]"
-              @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importDestination() : (templates.length && editDestination(null))"
+              @action="
+                (id) =>
+                  id === 'clear-filters'
+                    ? (filterQuery = '')
+                    : id === 'import'
+                      ? importDestination()
+                      : templates.length && editDestination(null)
+              "
             />
           </template>
 
@@ -137,10 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 min-w-0"
               :data-test="`destination-template-${row.name}`"
             >
-              <span
-                class="truncate min-w-0"
-                :title="row.template"
-              >{{ row.template }}</span>
+              <span class="truncate min-w-0" :title="row.template">{{ row.template }}</span>
               <OTag
                 v-if="isDefaultPrebuiltTemplate(row)"
                 :data-test="`destination-template-default-badge-${row.name}`"
@@ -159,7 +183,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
                   type="destinationKind"
                   value="prebuilt"
-                >{{ getPrebuiltTypeName(row) }}</OTag>
+                  >{{ getPrebuiltTypeName(row) }}</OTag
+                >
                 <OIcon
                   name="auto-awesome"
                   size="sm"
@@ -171,12 +196,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="destination-type-badge-custom"
                   type="destinationKind"
                   value="custom"
-                >{{ getCustomDestinationLabel(row) }}</OTag>
-                <OIcon
-                  name="settings"
-                  size="sm"
-                  :title="getCustomDestinationLabel(row)"
-                />
+                  >{{ getCustomDestinationLabel(row) }}</OTag
+                >
+                <OIcon name="settings" size="sm" :title="getCustomDestinationLabel(row)" />
               </template>
             </div>
           </template>
@@ -253,16 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
-
-import {
-  ref,
-  onBeforeMount,
-  onActivated,
-  watch,
-  defineComponent,
-  onMounted,
-  computed,
-} from "vue";
+import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -281,10 +294,10 @@ import ImportDestination from "./ImportDestination.vue";
 import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTag from '@/lib/core/Badge/OTag.vue';
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -386,9 +399,7 @@ export default defineComponent({
       },
     ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
-    const templates: Ref<Template[]> = ref([
-      { name: "test", body: "", type: "http" },
-    ]);
+    const templates: Ref<Template[]> = ref([{ name: "test", body: "", type: "http" }]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
       data: null,
@@ -407,9 +418,7 @@ export default defineComponent({
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const map = new Map(destinations.value.map((r: any) => [r.name, r]));
-      selectedDestinations.value = ids
-        .map((id: any) => map.get(id))
-        .filter(Boolean);
+      selectedDestinations.value = ids.map((id: any) => map.get(id)).filter(Boolean);
     };
 
     onActivated(() => {
@@ -440,8 +449,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading alert destination...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
       if (store.state.organizationData.actions.length == 0) {
         await getAllActions()
           .catch(() => {
@@ -459,8 +468,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: "Please wait while loading destinations...",
-              timeout: 0,
-});
+        timeout: 0,
+      });
       loading.value = true;
       destinationService
         .list({
@@ -504,25 +513,19 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add")
-        editDestination(null);
+      if (router.currentRoute.value.query.action === "add") editDestination(null);
       if (router.currentRoute.value.query.action === "update")
-        editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string),
-        );
-      if (router.currentRoute.value.query.action === "import")
-        showImportDestination.value = true;
+        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
+      if (router.currentRoute.value.query.action === "import") showImportDestination.value = true;
     };
     const getDestinationByName = (name: string) => {
-      return destinations.value.find(
-        (destination) => destination.name === name,
-      );
+      return destinations.value.find((destination) => destination.name === name);
     };
     const editDestination = (destination: any) => {
       if (!destination) {
         track("Button Click", {
           button: "Add Destination",
-          page: "Alert Destinations"
+          page: "Alert Destinations",
         });
       }
       toggleDestinationEditor();
@@ -653,7 +656,7 @@ export default defineComponent({
       const prebuiltType = detectPrebuiltType(destination);
       if (!prebuiltType) return null;
 
-      const typeConfig = availableTypes.value.find(t => t.id === prebuiltType);
+      const typeConfig = availableTypes.value.find((t) => t.id === prebuiltType);
       return typeConfig ? typeConfig.name : prebuiltType;
     };
 
@@ -714,7 +717,7 @@ export default defineComponent({
 
         const response = await destinationService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
@@ -752,7 +755,10 @@ export default defineComponent({
         getDestinations();
       } catch (error: any) {
         dismiss();
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          "Error deleting destinations. Please try again.";
         if (error.response?.status != 403 || error?.status != 403) {
           toast({
             variant: "error",
@@ -764,21 +770,27 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
-
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "alertDestinationsAdd",
-        handler: () => { if (!isInputFocused()) editDestination(null); },
+        handler: () => {
+          if (!isInputFocused()) editDestination(null);
+        },
       },
       {
         id: "alertDestinationsRefresh",
-        handler: () => { if (!isInputFocused()) getDestinations(); },
+        handler: () => {
+          if (!isInputFocused()) getDestinations();
+        },
       },
       {
         id: "alertDestinationsFocusSearch",

@@ -3,20 +3,28 @@
 // Shared across all ODropdown instances (only one is open at a time).
 let lastWasPointer = false;
 // Guard prevents duplicate listeners on HMR re-execution of this module block.
-const _oDdKey = '__oDropdownListenersRegistered__';
-if (typeof document !== 'undefined' && !(globalThis as any)[_oDdKey]) {
+const _oDdKey = "__oDropdownListenersRegistered__";
+if (typeof document !== "undefined" && !(globalThis as any)[_oDdKey]) {
   (globalThis as any)[_oDdKey] = true;
-  document.addEventListener('pointerdown', () => { lastWasPointer = true; }, true);
-  document.addEventListener('keydown', () => { lastWasPointer = false; }, true);
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      lastWasPointer = true;
+    },
+    true,
+  );
+  document.addEventListener(
+    "keydown",
+    () => {
+      lastWasPointer = false;
+    },
+    true,
+  );
 }
 </script>
 
 <script setup lang="ts">
-import type {
-  DropdownProps,
-  DropdownEmits,
-  DropdownSlots,
-} from "./ODropdown.types";
+import type { DropdownProps, DropdownEmits, DropdownSlots } from "./ODropdown.types";
 import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
@@ -71,18 +79,21 @@ function handleOpenChange(v: boolean) {
   if (!v && lastWasPointer) {
     const el = document.activeElement;
     if (el instanceof HTMLElement) {
-      el.dataset.noFocusVisible = 'true';
-      el.addEventListener('blur', () => { delete el.dataset.noFocusVisible; }, { once: true });
+      el.dataset.noFocusVisible = "true";
+      el.addEventListener(
+        "blur",
+        () => {
+          delete el.dataset.noFocusVisible;
+        },
+        { once: true },
+      );
     }
   }
 }
 
 // Register with the nearest ancestor ODropdown while this dropdown is open
 // so the ancestor's pointer-down-outside handler ignores clicks from our portal.
-const parentDropdownRegistry = inject<DropdownNestedRegistry | null>(
-  O_DROPDOWN_NESTED_KEY,
-  null,
-);
+const parentDropdownRegistry = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
 let closeNestedRegistration: ((skipGrace?: boolean) => void) | null = null;
 // Set to true in handlePointerDownOutside when this dropdown is about to close
 // from a real outside click so the parent skips the grace period and also closes.
@@ -218,7 +229,7 @@ function handleFocusOutside(event: Event) {
 
 // Close this dropdown when the nearest sidebar scroll container scrolls,
 // preventing the portal from floating disconnected at the top of the screen.
-const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+const sidebarScrollTick = inject<Ref<number> | null>("sidebarScrollTick", null);
 if (sidebarScrollTick) {
   watch(sidebarScrollTick, () => {
     if (internalOpen.value) handleOpenChange(false);
@@ -264,11 +275,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <DropdownMenuRoot
-    :open="internalOpen"
-    :modal="modal"
-    @update:open="handleOpenChange"
-  >
+  <DropdownMenuRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
     <DropdownMenuTrigger ref="triggerRef" as-child>
       <slot name="trigger" />
     </DropdownMenuTrigger>

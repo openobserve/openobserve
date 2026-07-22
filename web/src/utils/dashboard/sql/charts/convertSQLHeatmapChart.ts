@@ -88,11 +88,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
   // exactly the grids that are already too big.
   const heatmapCells: any[] = zValues
     .map((it: any, index: any) =>
-      xAxisZerothPositionUniqueValue.map((_i: any, j: number) => [
-        j,
-        index,
-        it[j],
-      ]),
+      xAxisZerothPositionUniqueValue.map((_i: any, j: number) => [j, index, it[j]]),
     )
     .flat();
 
@@ -203,11 +199,9 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     // if histogram
     if (field) {
       // convert time string to selected timezone
-      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
-        (it: any) => {
-          return formatDate(toZonedTime(it + "Z", store.state.timezone));
-        },
-      );
+      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
+        return formatDate(toZonedTime(it + "Z", store.state.timezone));
+      });
     }
     // else custom sql
   } else {
@@ -219,11 +213,9 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     // if timeseries
     if (isTimeSeries(sample)) {
       // convert time string to selected timezone
-      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
-        (it: any) => {
-          return formatDate(toZonedTime(it + "Z", store.state.timezone));
-        },
-      );
+      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
+        return formatDate(toZonedTime(it + "Z", store.state.timezone));
+      });
     }
   }
 

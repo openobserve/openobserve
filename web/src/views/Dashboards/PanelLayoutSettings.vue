@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="panel-layout-settings-drawer"
+  <ODialog
+    data-test="panel-layout-settings-drawer"
     :open="open"
     size="sm"
     :title="t('panel.layout')"
@@ -25,40 +26,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
     @click:secondary="$emit('update:open', false)"
   >
-    <div
-    data-test="panel-layout-settings-content"
-    class="p-0 [min-height:inherit]"
-   
-    >
-    <div>
-      <div
-        data-test="panel-layout-settings-height"
-        class="o2-input"
-      >
-        <OForm id="panel-layout-settings-form" :form="form">
-          <OFormInput class="min-w-55"
-            name="h"
-            :label="t('dashboard.panelHeight')"
-            required
-            type="number"
-            data-test="panel-layout-settings-height-input"
-          />
-        </OForm>
+    <div data-test="panel-layout-settings-content" class="p-0 [min-height:inherit]">
+      <div>
+        <div data-test="panel-layout-settings-height" class="o2-input">
+          <OForm id="panel-layout-settings-form" :form="form">
+            <OFormInput
+              class="min-w-55"
+              name="h"
+              :label="t('dashboard.panelHeight')"
+              required
+              type="number"
+              data-test="panel-layout-settings-height-input"
+            />
+          </OForm>
 
-        <div class="text-xs flex items-center gap-1 mt-1">
-          <span class="whitespace-nowrap">Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span>
-          <OIcon
-            name="info-outline"
-            class="cursor-pointer shrink-0"
-            size="xs"
-          />
+          <div class="text-xs flex items-center gap-1 mt-1">
+            <span class="whitespace-nowrap"
+              >Approximately <strong>{{ getRowCount }}</strong> table rows will be displayed</span
+            >
+            <OIcon name="info-outline" class="cursor-pointer shrink-0" size="xs" />
             <OTooltip content="1 unit = 30px" />
+          </div>
         </div>
-
-
       </div>
     </div>
-  </div>
   </ODialog>
 </template>
 
@@ -80,9 +71,7 @@ import {
 } from "./PanelLayoutSettings.schema";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: { ODialog, OForm, OFormInput, OTooltip,
-    OIcon,
-},
+  components: { ODialog, OForm, OFormInput, OTooltip, OIcon },
   props: {
     layout: {
       type: Object,

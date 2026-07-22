@@ -1,11 +1,6 @@
 <template>
   <div class="flex items-center w-full">
-    <ODropdown
-      v-if="hasDropdownSlot"
-      v-model:open="isDropdownOpen"
-      side="bottom"
-      align="start"
-    >
+    <ODropdown v-if="hasDropdownSlot" v-model:open="isDropdownOpen" side="bottom" align="start">
       <template #trigger>
         <OButton
           data-test="attribute-value-cell-dropdown-btn"

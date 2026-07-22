@@ -38,7 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="flex-1 text-start truncate text-xs font-semibold leading-4 text-select-text"
           :data-test="`variable-selector-${variableItem.name}-inner-value`"
-        >{{ displayValue }}</span>
+          >{{ displayValue }}</span
+        >
       </template>
       <template #before-options>
         <template v-if="hasVisibleFilteredOptions">
@@ -53,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="toggleSelectAll"
               @click.stop
             />
-            <span>{{ t('dashboard.variableQueryValueSelector.selectAll') }}</span>
+            <span>{{ t("dashboard.variableQueryValueSelector.selectAll") }}</span>
           </div>
           <!-- single-select: show plain All -->
           <div
@@ -61,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex items-center gap-2 px-3 py-2 cursor-pointer"
             @click.stop="toggleSelectAll"
           >
-            <span>{{ t('dashboard.variableQueryValueSelector.all') }}</span>
+            <span>{{ t("dashboard.variableQueryValueSelector.all") }}</span>
           </div>
           <OSeparator data-test="dashboard-variable-all-separator" />
         </template>
@@ -70,11 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            take priority. The no-match case is handled by the #empty slot below. -->
       <template #after-options>
         <template
-          v-if="
-            hasVisibleFilteredOptions &&
-            currentSearchTerm &&
-            !isSearchTermExistingOption
-          "
+          v-if="hasVisibleFilteredOptions && currentSearchTerm && !isSearchTermExistingOption"
         >
           <OSeparator />
           <div
@@ -82,7 +79,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click.stop="handleCustomValue(currentSearchTerm)"
           >
             {{ currentSearchTerm }}
-            <span class="text-text-secondary text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
+            <span class="text-text-secondary text-xs italic">{{
+              t("dashboard.variableQueryValueSelector.custom")
+            }}</span>
           </div>
         </template>
         <div
@@ -103,10 +102,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="handleCustomValue(currentSearchTerm)"
         >
           {{ currentSearchTerm }}
-          <span class="text-text-secondary text-xs italic">{{ t('dashboard.variableQueryValueSelector.custom') }}</span>
+          <span class="text-text-secondary text-xs italic">{{
+            t("dashboard.variableQueryValueSelector.custom")
+          }}</span>
         </div>
-        <div v-else class="italic text-text-muted flex justify-center items-center py-3" data-test="variable-query-value-selector-no-data">
-          {{ t('dashboard.variableQueryValueSelector.noDataFound') }}
+        <div
+          v-else
+          class="italic text-text-muted flex justify-center items-center py-3"
+          data-test="variable-query-value-selector-no-data"
+        >
+          {{ t("dashboard.variableQueryValueSelector.noDataFound") }}
         </div>
       </template>
     </OSelect>
@@ -116,13 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
 import { debounce } from "lodash-es";
-import {
-  defineComponent,
-  ref,
-  watch,
-  computed,
-  onUnmounted,
-} from "vue";
+import { defineComponent, ref, watch, computed, onUnmounted } from "vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -146,12 +145,9 @@ export default defineComponent({
     // Options with (Custom) label transformation — OSelect handles local filtering
     const computedOptions = computed(() => {
       return availableOptions.value.map((opt: any) => {
-        if (
-          typeof opt.value === "string" &&
-          opt.value.endsWith(`${CUSTOM_VALUE}`)
-        ) {
+        if (typeof opt.value === "string" && opt.value.endsWith(`${CUSTOM_VALUE}`)) {
           const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
-          return { ...opt, label: `${base} ${t('dashboard.variableQueryValueSelector.custom')}` };
+          return { ...opt, label: `${base} ${t("dashboard.variableQueryValueSelector.custom")}` };
         }
         return opt;
       });
@@ -212,12 +208,8 @@ export default defineComponent({
       const term = currentSearchTerm.value?.trim();
       if (!term) return false;
       return availableOptions.value.some((opt: any) => {
-        if (typeof opt.label === "string" && opt.label.trim() === term)
-          return true;
-        if (
-          typeof opt.value === "string" &&
-          opt.value.endsWith(`${CUSTOM_VALUE}`)
-        ) {
+        if (typeof opt.label === "string" && opt.label.trim() === term) return true;
+        if (typeof opt.value === "string" && opt.value.endsWith(`${CUSTOM_VALUE}`)) {
           const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
           if (base === term) return true;
         }
@@ -229,18 +221,13 @@ export default defineComponent({
       const term = currentSearchTerm.value?.trim().toLowerCase();
       if (!term) return computedOptions.value.length > 0;
       return computedOptions.value.some(
-        (opt: any) =>
-          typeof opt.label === "string" &&
-          opt.label.toLowerCase().includes(term),
+        (opt: any) => typeof opt.label === "string" && opt.label.toLowerCase().includes(term),
       );
     });
 
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return (
-          Array.isArray(selectedValue.value) &&
-          selectedValue.value?.[0] === SELECT_ALL_VALUE
-        );
+        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
       }
       return selectedValue.value === SELECT_ALL_VALUE;
     });
@@ -277,20 +264,13 @@ export default defineComponent({
 
     const onUpdateValue = async (val: any) => {
       // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
-      if (
-        props.variableItem.multiSelect &&
-        Array.isArray(val) &&
-        val.length > 0
-      ) {
+      if (props.variableItem.multiSelect && Array.isArray(val) && val.length > 0) {
         // Remove SELECT_ALL if other values are selected
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
           val = val.filter((v) => v !== SELECT_ALL_VALUE);
         }
         // Remove custom value suffix if present
-        val = val.filter(
-          (v: any) =>
-            !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)),
-        );
+        val = val.filter((v: any) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)));
       }
       selectedValue.value = val;
       if (!props.variableItem.multiSelect) {
@@ -324,15 +304,16 @@ export default defineComponent({
             const firstTwoValues = selectedValue.value
               .slice(0, 2)
               .map((it: any) => {
-                if (it === "") return t('dashboard.variableQueryValueSelector.blank');
-                if (it === SELECT_ALL_VALUE) return t('dashboard.variableQueryValueSelector.allSelected');
+                if (it === "") return t("dashboard.variableQueryValueSelector.blank");
+                if (it === SELECT_ALL_VALUE)
+                  return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t('dashboard.variableQueryValueSelector.custom')}`;
+                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
                 return it;
               })
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
-            return t('dashboard.variableQueryValueSelector.moreCount', {
+            return t("dashboard.variableQueryValueSelector.moreCount", {
               firstTwoValues,
               remainingCount,
             });
@@ -340,14 +321,15 @@ export default defineComponent({
             props?.variableItem?.options?.length === 0 &&
             selectedValue.value.length === 0
           ) {
-            return t('dashboard.variableQueryValueSelector.noDataFoundParen');
+            return t("dashboard.variableQueryValueSelector.noDataFoundParen");
           } else {
             return selectedValue.value
               .map((it: any) => {
-                if (it === "") return t('dashboard.variableQueryValueSelector.blank');
-                if (it === SELECT_ALL_VALUE) return t('dashboard.variableQueryValueSelector.allSelected');
+                if (it === "") return t("dashboard.variableQueryValueSelector.blank");
+                if (it === SELECT_ALL_VALUE)
+                  return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t('dashboard.variableQueryValueSelector.custom')}`;
+                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
                 return it;
               })
               .join(", ");
@@ -358,22 +340,22 @@ export default defineComponent({
             props.variableItem.options &&
             props.variableItem.options.some((o: any) => o.value === "")
           ) {
-            return t('dashboard.variableQueryValueSelector.blank');
+            return t("dashboard.variableQueryValueSelector.blank");
           }
           // Otherwise treat empty-string as unset
-          return t('dashboard.variableQueryValueSelector.noDataFoundParen');
+          return t("dashboard.variableQueryValueSelector.noDataFoundParen");
         } else if (selectedValue.value === SELECT_ALL_VALUE) {
-          return t('dashboard.variableQueryValueSelector.allSelected');
+          return t("dashboard.variableQueryValueSelector.allSelected");
         } else if (
           typeof selectedValue.value === "string" &&
           selectedValue.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
-          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t('dashboard.variableQueryValueSelector.custom')}`;
+          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} ${t("dashboard.variableQueryValueSelector.custom")}`;
         } else {
           return selectedValue.value;
         }
       } else {
-        return t('dashboard.variableQueryValueSelector.noDataFoundParen');
+        return t("dashboard.variableQueryValueSelector.noDataFoundParen");
       }
     });
 
@@ -407,8 +389,7 @@ export default defineComponent({
       const inputValue = value.trim();
       // Check if value already exists in options (case-sensitive)
       const existingOption = availableOptions.value.find(
-        (opt: any) =>
-          typeof opt.label === "string" && opt.label.trim() === inputValue,
+        (opt: any) => typeof opt.label === "string" && opt.label.trim() === inputValue,
       );
       if (existingOption) {
         // Select the existing option

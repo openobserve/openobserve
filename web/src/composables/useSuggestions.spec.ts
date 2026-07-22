@@ -20,10 +20,12 @@ import { getFieldValuesForSuggestion } from "@/composables/useFieldValueStore";
 import useSqlSuggestions from "./useSuggestions";
 
 // ─── helper: build composable with common defaults ────────────────────────────
-const makeComposable = (overrides: {
-  storedValues?: string[];
-  inSessionValues?: Record<string, string[]>;
-} = {}) => {
+const makeComposable = (
+  overrides: {
+    storedValues?: string[];
+    inSessionValues?: Record<string, string[]>;
+  } = {},
+) => {
   const { storedValues = [], inSessionValues = {} } = overrides;
   vi.mocked(getFieldValuesForSuggestion).mockResolvedValue(storedValues);
 
@@ -55,13 +57,13 @@ describe("analyzeSqlWhereClause — operator detection", () => {
   beforeEach(() => vi.clearAllMocks());
 
   const operators: [string, string][] = [
-    ["=",  "status = "],
+    ["=", "status = "],
     ["!=", "status != "],
     ["<>", "status <> "],
     [">=", "code >= "],
     ["<=", "code <= "],
-    [">",  "code > "],
-    ["<",  "code < "],
+    [">", "code > "],
+    ["<", "code < "],
   ];
 
   it.each(operators)("detects field %s operator", async (_op, query) => {
@@ -303,11 +305,7 @@ describe("getSuggestions — IDB context forwarding", () => {
 describe("updateFieldKeywords", () => {
   it("adds field keywords excluding timestamp column", () => {
     const c = useSqlSuggestions();
-    c.updateFieldKeywords([
-      { name: "status" },
-      { name: "env" },
-      { name: "_timestamp" },
-    ]);
+    c.updateFieldKeywords([{ name: "status" }, { name: "env" }, { name: "_timestamp" }]);
     const labels = c.autoCompleteKeywords.value.map((k: any) => k.label);
     expect(labels).toContain("status");
     expect(labels).toContain("env");
@@ -317,9 +315,7 @@ describe("updateFieldKeywords", () => {
   it("sets kind = Field for all field keywords", () => {
     const c = useSqlSuggestions();
     c.updateFieldKeywords([{ name: "status" }, { name: "env" }]);
-    const fieldItems = c.autoCompleteKeywords.value.filter(
-      (k: any) => k.kind === "Field",
-    );
+    const fieldItems = c.autoCompleteKeywords.value.filter((k: any) => k.kind === "Field");
     expect(fieldItems.length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -338,9 +334,7 @@ describe("effectiveSuggestions — empty when value suggestions are shown", () =
   it("effectiveKeywords has no Text-kind function items during value context", async () => {
     const c = makeComposable({ storedValues: ["200"] });
     await run(c, "status = ");
-    const functionItems = c.effectiveKeywords.value.filter(
-      (k: any) => k.kind === "Text",
-    );
+    const functionItems = c.effectiveKeywords.value.filter((k: any) => k.kind === "Text");
     expect(functionItems).toHaveLength(0);
   });
 

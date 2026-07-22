@@ -108,9 +108,7 @@ export function useSyntheticResults() {
   async function fetchSchemaFields(): Promise<Set<string>> {
     try {
       const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
-      return new Set(
-        ((stream?.schema ?? []) as { name: string }[]).map((f) => f.name),
-      );
+      return new Set(((stream?.schema ?? []) as { name: string }[]).map((f) => f.name));
     } catch {
       // Schema not available — an empty set selects literals for every
       // optional column, which cannot fail.
@@ -153,9 +151,7 @@ export function useSyntheticResults() {
     try {
       let hasRetryHistory = false;
       try {
-        const stream: any = await getStream(
-          SYNTHETIC_RESULTS_STREAM, "logs", true,
-        );
+        const stream: any = await getStream(SYNTHETIC_RESULTS_STREAM, "logs", true);
         const schema: { name: string }[] = stream?.schema ?? [];
         hasRetryHistory = schema.some((f) => f.name === "retry_history");
       } catch {
@@ -188,11 +184,7 @@ export function useSyntheticResults() {
     };
   }
 
-  async function fetchAll(
-    monitorId: string,
-    startTime: number,
-    endTime: number,
-  ): Promise<void> {
+  async function fetchAll(monitorId: string, startTime: number, endTime: number): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     loading.value = true;
     kpiLoading.value = true;
@@ -220,55 +212,72 @@ export function useSyntheticResults() {
       const kpiPromise = Promise.all([
         executeQuery(buildKpiSql(monitorId, hasAttemptsField), startTime, endTime, "logs"),
         executeQuery(buildLastRunSql(monitorId), startTime, endTime, "logs"),
-      ]).then(([kpiRows, lastRunRows]) => {
-        kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
-      }).catch((e: unknown) => {
-        kpi.value = { ...EMPTY_KPI };
-        kpiError.value = e instanceof Error ? e.message : String(e ?? "KPI query failed");
-      }).finally(() => {
-        kpiLoading.value = false;
-        kpiHasLoadedOnce.value = true;
-      });
+      ])
+        .then(([kpiRows, lastRunRows]) => {
+          kpi.value = mapKpi(kpiRows[0] ?? null, lastRunRows[0] ?? null);
+        })
+        .catch((e: unknown) => {
+          kpi.value = { ...EMPTY_KPI };
+          kpiError.value = e instanceof Error ? e.message : String(e ?? "KPI query failed");
+        })
+        .finally(() => {
+          kpiLoading.value = false;
+          kpiHasLoadedOnce.value = true;
+        });
 
       // Group 2: Histogram — feeds response-time and errors charts.
       const histogramPromise = executeQuery(
-        buildHistogramSql(monitorId, interval), startTime, endTime, "logs",
-      ).then((histogramRows) => {
-        buckets.value = mapHistogram(histogramRows, startTime, endTime);
-      }).catch((e: unknown) => {
-        buckets.value = [];
-        histogramError.value = e instanceof Error ? e.message : String(e ?? "Histogram query failed");
-      }).finally(() => {
-        histogramLoading.value = false;
-        histogramHasLoadedOnce.value = true;
-      });
+        buildHistogramSql(monitorId, interval),
+        startTime,
+        endTime,
+        "logs",
+      )
+        .then((histogramRows) => {
+          buckets.value = mapHistogram(histogramRows, startTime, endTime);
+        })
+        .catch((e: unknown) => {
+          buckets.value = [];
+          histogramError.value =
+            e instanceof Error ? e.message : String(e ?? "Histogram query failed");
+        })
+        .finally(() => {
+          histogramLoading.value = false;
+          histogramHasLoadedOnce.value = true;
+        });
 
       // Group 3: Runs list — feeds timeline, breakdown cards, table,
       // steps tab, and errors tab. Typically the slowest query.
       const runsPromise = executeQuery(
-        buildRunsSql(monitorId, 500, schemaFields), startTime, endTime, "logs",
-      ).then((runsRows) => {
-        runs.value = runsRows.map(mapRun);
-      }).catch((e: unknown) => {
-        runs.value = [];
-        runsError.value = e instanceof Error ? e.message : String(e ?? "Runs query failed");
-      }).finally(() => {
-        runsLoading.value = false;
-        runsHasLoadedOnce.value = true;
-      });
+        buildRunsSql(monitorId, 500, schemaFields),
+        startTime,
+        endTime,
+        "logs",
+      )
+        .then((runsRows) => {
+          runs.value = runsRows.map(mapRun);
+        })
+        .catch((e: unknown) => {
+          runs.value = [];
+          runsError.value = e instanceof Error ? e.message : String(e ?? "Runs query failed");
+        })
+        .finally(() => {
+          runsLoading.value = false;
+          runsHasLoadedOnce.value = true;
+        });
 
       // Group 4: Steps — fetched via REST /runs API because the log
       // stream doesn't carry the step-level JSON fields.
-      const stepsPromise = fetchAndAggregateSteps(
-        monitorId, startTime, endTime,
-      ).then((stats) => {
-        stepStats.value = stats;
-      }).catch((e: unknown) => {
-        stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
-      }).finally(() => {
-        stepsLoading.value = false;
-        stepsHasLoadedOnce.value = true;
-      });
+      const stepsPromise = fetchAndAggregateSteps(monitorId, startTime, endTime)
+        .then((stats) => {
+          stepStats.value = stats;
+        })
+        .catch((e: unknown) => {
+          stepsError.value = e instanceof Error ? e.message : String(e ?? "Steps query failed");
+        })
+        .finally(() => {
+          stepsLoading.value = false;
+          stepsHasLoadedOnce.value = true;
+        });
 
       // Wait for all to settle so callers that await fetchAll still
       // get a meaningful completion signal.
@@ -344,11 +353,7 @@ export function useSyntheticResults() {
     }
   }
 
-  async function fetchSteps(
-    monitorId: string,
-    startTime: number,
-    endTime: number,
-  ): Promise<void> {
+  async function fetchSteps(monitorId: string, startTime: number, endTime: number): Promise<void> {
     if (!monitorId || !startTime || !endTime) return;
     stepsLoading.value = true;
     try {

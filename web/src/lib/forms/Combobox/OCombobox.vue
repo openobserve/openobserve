@@ -14,15 +14,7 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui";
-import {
-  computed,
-  nextTick,
-  ref,
-  useAttrs,
-  useId,
-  useSlots,
-  watch,
-} from "vue";
+import { computed, nextTick, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineOptions({ inheritAttrs: false });
@@ -90,9 +82,7 @@ const filteredOptions = computed<ComboboxOption[]>(() => {
   }
 
   const lower = needle.toLowerCase();
-  return (props.items ?? []).filter((opt) =>
-    opt.label.toLowerCase().includes(lower),
-  );
+  return (props.items ?? []).filter((opt) => opt.label.toLowerCase().includes(lower));
 });
 
 // ── Imperative reset ────────────────────────────────────────────────────────
@@ -174,14 +164,10 @@ const heightClass = computed(() => {
 });
 
 // ── Error ────────────────────────────────────────────────────────────────────
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
-const hasLabel = computed(
-  () => Boolean(slots.label) || props.label !== undefined,
-);
+const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
 const hasInsideLabel = computed(
   () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
 );
@@ -200,17 +186,21 @@ const hasInsideLabel = computed(
       :for="inputId"
       :class="[
         'o-input-label text-compact leading-tight flex items-center gap-1',
-        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        disabled
+          ? 'font-normal text-input-label-text-disabled'
+          : 'font-medium text-input-label-text',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <ComboboxRoot
@@ -227,7 +217,8 @@ const hasInsideLabel = computed(
           v-if="hasInsideLabel"
           class="absolute top-1 start-3 text-3xs leading-none text-input-placeholder select-none pointer-events-none z-10"
         >
-          <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
+          <slot name="label">{{ label }}</slot
+          ><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
         <ComboboxInput
           :id="inputId"
@@ -274,9 +265,7 @@ const hasInsideLabel = computed(
           ]"
         >
           <ComboboxViewport class="max-h-56 overflow-y-auto">
-            <ComboboxEmpty
-              class="py-2 px-3 text-sm text-select-placeholder text-center"
-            >
+            <ComboboxEmpty class="py-2 px-3 text-sm text-select-placeholder text-center">
               No options found
             </ComboboxEmpty>
 
@@ -298,7 +287,9 @@ const hasInsideLabel = computed(
               ]"
               :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
             >
-              <span class="flex-1 wrap-break-word whitespace-normal min-w-0">{{ option.label }}</span>
+              <span class="flex-1 wrap-break-word whitespace-normal min-w-0">{{
+                option.label
+              }}</span>
               <ComboboxItemIndicator
                 class="absolute end-2 top-1/2 -translate-y-1/2 flex items-center justify-center size-3.5"
               >
@@ -331,10 +322,7 @@ const hasInsideLabel = computed(
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span
-      v-else-if="helpText"
-      class="text-xs text-input-help-text leading-none"
-    >
+    <span v-else-if="helpText" class="text-xs text-input-help-text leading-none">
       {{ helpText }}
     </span>
   </div>

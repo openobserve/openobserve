@@ -42,19 +42,13 @@
         <AutoRefreshInterval
           v-model="refreshInterval"
           trigger
-          :min-refresh-interval="
-            store.state?.zoConfig?.min_auto_refresh_interval || 5
-          "
+          :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
           @trigger="refreshData"
           class="h-8 transition-all duration-200 hover:bg-interactive-hover-bg"
           data-test="dashboard-viewpanel-refresh-interval"
         />
         <OButton
-          v-if="
-            config.isEnterprise == 'true' &&
-            searchRequestTraceIds.length &&
-            disable
-          "
+          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length && disable"
           variant="outline-destructive"
           size="icon-sm"
           @click="cancelViewPanelQuery"
@@ -72,7 +66,9 @@
           data-test="dashboard-viewpanel-refresh-data-btn"
           icon-left="refresh"
         >
-          <OTooltip :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'" />
+          <OTooltip
+            :content="isVariablesChanged ? 'Refresh' : 'Refresh to apply latest variable changes'"
+          />
         </OButton>
         <OButton
           variant="outline"
@@ -92,12 +88,8 @@
             <div class="flex flex-col h-full">
               <VariablesValueSelector
                 :variablesConfig="currentDashboardData.data?.variables"
-                :showDynamicFilters="
-                  currentDashboardData.data?.variables?.showDynamicFilters
-                "
-                :selectedTimeDate="
-                  dateTimeForVariables || dashboardPanelData.meta.dateTime
-                "
+                :showDynamicFilters="currentDashboardData.data?.variables?.showDynamicFilters"
+                :selectedTimeDate="dateTimeForVariables || dashboardPanelData.meta.dateTime"
                 :initialVariableValues="getInitialVariablesData()"
                 @variablesData="variablesDataUpdated"
                 data-test="dashboard-viewpanel-variables-value-selector"
@@ -114,19 +106,16 @@
                   <PanelErrorButtons
                     :error="errorMessage"
                     :maxQueryRangeWarning="maxQueryRangeWarning"
-                    :limitNumberOfSeriesWarningMessage="
-                      limitNumberOfSeriesWarningMessage
-                    "
-                    :isCachedDataDifferWithCurrentTimeRange="
-                      isCachedDataDifferWithCurrentTimeRange
-                    "
+                    :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                    :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
                     :isPartialData="isPartialData"
                     :isPanelLoading="isPanelLoading"
                     :lastTriggeredAt="lastTriggeredAt"
                     :viewOnly="false"
                   />
                 </div>
-                <PanelSchemaRenderer class="h-[calc(100%_-_1.3125rem)]"
+                <PanelSchemaRenderer
+                  class="h-[calc(100%_-_1.3125rem)]"
                   v-if="chartData"
                   :key="dashboardPanelData.data.type"
                   :panelSchema="chartData"
@@ -167,10 +156,7 @@
         </div>
       </div>
     </div>
-    <ShowLegendsPopup
-      v-model:open="showLegendsDialog"
-      :panelData="currentPanelData"
-    />
+    <ShowLegendsPopup v-model:open="showLegendsDialog" :panelData="currentPanelData" />
   </div>
 </template>
 
@@ -188,11 +174,7 @@ import {
 } from "vue";
 
 import { useI18n } from "vue-i18n";
-import {
-  getDashboard,
-  getPanel,
-  checkIfVariablesAreLoaded,
-} from "../../../utils/commons";
+import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
@@ -216,7 +198,7 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 const ShowLegendsPopup = defineAsyncComponent(() => {
   return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
@@ -239,7 +221,7 @@ export default defineComponent({
     PanelErrorButtons,
     OButton,
     OTooltip,
-},
+  },
   props: {
     panelId: {
       type: String,
@@ -286,10 +268,7 @@ export default defineComponent({
     const currentVariablesDataRef: any = reactive({});
 
     let parser: any;
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, promqlMode, resetDashboardPanelData } =
       useDashboardPanelData(dashboardPanelDataPageKey);
     // default selected date will be absolute time
@@ -361,9 +340,7 @@ export default defineComponent({
       isPanelLoading.value = data;
     };
 
-    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
-      data: boolean,
-    ) => {
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
       isCachedDataDifferWithCurrentTimeRange.value = data;
     };
 
@@ -393,10 +370,7 @@ export default defineComponent({
         // replace the histogram interval in the query by finding histogram aggregation
         dashboardPanelData?.data?.queries?.forEach((query: any) => {
           const originalQuery = query.query;
-          const updatedQuery = replaceHistogramInterval(
-            originalQuery,
-            histogramInterval.value,
-          );
+          const updatedQuery = replaceHistogramInterval(originalQuery, histogramInterval.value);
 
           // Only update if the query actually changed
           if (updatedQuery !== originalQuery) {
@@ -449,10 +423,7 @@ export default defineComponent({
           route.query.folder,
           route.query.tab ?? dashboardPanelData.data.panels?.[0]?.tabId,
         );
-        Object.assign(
-          dashboardPanelData.data,
-          JSON.parse(JSON.stringify(panelData)),
-        );
+        Object.assign(dashboardPanelData.data, JSON.parse(JSON.stringify(panelData)));
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       }
@@ -473,19 +444,13 @@ export default defineComponent({
       // then set the default histogram interval
       if (histogramFields.value.length > 0) {
         for (let i = 0; i < histogramFields.value.length; i++) {
-          if (
-            histogramFields.value[i]?.args &&
-            histogramFields.value[i]?.args.length > 0
-          ) {
+          if (histogramFields.value[i]?.args && histogramFields.value[i]?.args.length > 0) {
             // Histogram function signature: histogram(field, interval)
             // args[0] = timestamp field (object)
             // args[1] = interval (string like '5m', '1h', etc.)
 
             // Check if there's a second argument (the interval)
-            if (
-              histogramFields.value[i].args.length > 1 &&
-              histogramFields.value[i].args[1]
-            ) {
+            if (histogramFields.value[i].args.length > 1 && histogramFields.value[i].args[1]) {
               const intervalArg = histogramFields.value[i].args[1];
 
               // Extract interval value with explicit type checking
@@ -494,15 +459,9 @@ export default defineComponent({
               if (typeof intervalArg === "string") {
                 // Direct string value
                 intervalValue = intervalArg;
-              } else if (
-                typeof intervalArg === "object" &&
-                intervalArg !== null
-              ) {
+              } else if (typeof intervalArg === "object" && intervalArg !== null) {
                 // Object with value property
-                if (
-                  "value" in intervalArg &&
-                  typeof intervalArg.value === "string"
-                ) {
+                if ("value" in intervalArg && typeof intervalArg.value === "string") {
                   intervalValue = intervalArg.value;
                 }
               }
@@ -547,9 +506,7 @@ export default defineComponent({
             const prevValue = currentVariablesDataRef.values[index]?.value;
             const newValue = variable.value;
             // Compare current and previous values; handle both string and array cases
-            return Array.isArray(newValue)
-              ? isEqual(prevValue, newValue)
-              : prevValue === newValue;
+            return Array.isArray(newValue) ? isEqual(prevValue, newValue) : prevValue === newValue;
           });
         // Set the `isChanged` flag if values are different
         isVariablesChanged.value = isValueChanged;
@@ -561,10 +518,7 @@ export default defineComponent({
         // Apply histogram interval to ALL queries before copying to chartData
         dashboardPanelData.data.queries?.forEach((query: any) => {
           const originalQuery = query.query;
-          const updatedQuery = replaceHistogramInterval(
-            originalQuery,
-            histogramInterval.value,
-          );
+          const updatedQuery = replaceHistogramInterval(originalQuery, histogramInterval.value);
           if (updatedQuery !== originalQuery) {
             query.query = updatedQuery;
           }
@@ -572,10 +526,7 @@ export default defineComponent({
 
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
         dateTimePickerRef.value.refresh();
-        Object.assign(
-          currentVariablesDataRef,
-          JSON.parse(JSON.stringify(variablesData)),
-        );
+        Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
         // Set to true to indicate everything is now in sync (flag logic is inverted)
         isVariablesChanged.value = true;
       }
@@ -586,11 +537,7 @@ export default defineComponent({
     const loadDashboard = async () => {
       let data = JSON.parse(
         JSON.stringify(
-          await getDashboard(
-            store,
-            route.query.dashboard,
-            route.query.folder ?? "default",
-          ),
+          await getDashboard(store, route.query.dashboard, route.query.folder ?? "default"),
         ),
       );
       currentDashboardData.data = data;
@@ -598,9 +545,7 @@ export default defineComponent({
       // Initialize variables manager with dashboard variables
       try {
         // Get current tab and panel IDs for initialization
-        const tabId =
-          (route.query.tab as string) ??
-          currentDashboardData.data?.tabs?.[0]?.tabId;
+        const tabId = (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
 
         // Initialize with panel-to-tab mapping (3rd parameter is critical for panel variables!)
         await variablesManager.initialize(
@@ -662,10 +607,7 @@ export default defineComponent({
 
       // if variables data is null, set it to empty list
       if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
+        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
       ) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
@@ -678,10 +620,7 @@ export default defineComponent({
       // CRITICAL: When date time changes (user clicked Apply), also commit any pending variable changes
       // This ensures that if user changed both variables and date time,
       // both changes are applied to the chart when Apply is clicked
-      Object.assign(
-        currentVariablesDataRef,
-        JSON.parse(JSON.stringify(variablesData)),
-      );
+      Object.assign(currentVariablesDataRef, JSON.parse(JSON.stringify(variablesData)));
 
       // Mark variables as in sync (flag logic is inverted)
       isVariablesChanged.value = true;
@@ -725,10 +664,7 @@ export default defineComponent({
       emit("closePanel");
     };
 
-    const handleChartApiError = (errorMsg: {
-      message: string;
-      code: string;
-    }) => {
+    const handleChartApiError = (errorMsg: { message: string; code: string }) => {
       if (errorMsg?.message) {
         errorMessage.value = errorMsg.message;
         const errorList = errorData.errors ?? [];
@@ -743,10 +679,7 @@ export default defineComponent({
     };
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      maxQueryRangeWarning.value = processQueryMetadataErrors(
-        metadata,
-        store.state.timezone,
-      );
+      maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
     };
 
     const getInitialVariablesData = () => {
@@ -761,9 +694,7 @@ export default defineComponent({
             operator: item.operator,
             value: item.value,
           }));
-          variableObj[`${variable.name}`] = encodeURIComponent(
-            JSON.stringify(encodedFilters),
-          );
+          variableObj[`${variable.name}`] = encodeURIComponent(JSON.stringify(encodedFilters));
         } else {
           variableObj[`${variable.name}`] = variable.value;
         }
@@ -786,10 +717,7 @@ export default defineComponent({
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
-    provide(
-      "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
-    );
+    provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
@@ -808,9 +736,7 @@ export default defineComponent({
     const disable = ref(false);
 
     watch(variablesAndPanelsDataLoadingState, () => {
-      const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
-      );
+      const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
@@ -818,10 +744,7 @@ export default defineComponent({
 
     // Computed properties for current tab and panel IDs
     const currentTabId = computed(() => {
-      return (
-        (route.query.tab as string) ??
-        currentDashboardData.data?.tabs?.[0]?.tabId
-      );
+      return (route.query.tab as string) ?? currentDashboardData.data?.tabs?.[0]?.tabId;
     });
 
     const currentPanelId = computed(() => {
@@ -894,7 +817,7 @@ export default defineComponent({
       maxQueryRangeWarning,
       limitNumberOfSeriesWarningMessage,
       errorMessage,
-      "warning": "warning",
+      warning: "warning",
       currentTabId,
       currentPanelId,
       showLegendsDialog,

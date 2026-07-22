@@ -37,14 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-  type PropType,
-} from "vue";
+import { defineComponent, onBeforeUnmount, onMounted, ref, watch, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import * as echarts from "echarts/core";
@@ -272,8 +265,7 @@ export default defineComponent({
                 hideOverlap: false,
                 // Count DOWN from the top row, so `+Inf` is always labelled and
                 // the spacing stays even.
-                interval: (index: number) =>
-                  (rowCount - 1 - index) % step === 0,
+                interval: (index: number) => (rowCount - 1 - index) % step === 0,
               };
             }
             if (options.xAxis) {
@@ -309,9 +301,9 @@ export default defineComponent({
     onMounted(() => {
       if (!chartPanelRef.value || typeof ResizeObserver === "undefined") return;
       resizeObserver = new ResizeObserver(() => {
-        const host = (
-          chartPanelRef.value as unknown as HTMLElement
-        )?.querySelector('[data-test="chart-renderer"]');
+        const host = (chartPanelRef.value as unknown as HTMLElement)?.querySelector(
+          '[data-test="chart-renderer"]',
+        );
         if (host) echarts.getInstanceByDom(host as HTMLElement)?.resize();
       });
       resizeObserver.observe(chartPanelRef.value as unknown as HTMLElement);

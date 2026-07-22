@@ -16,11 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="alerts-alert-summary" class="h-full flex flex-col relative">
-    <div data-test="alerts-alert-summary-content" class="text-compact leading-[2.2] flex-1 min-h-0 overflow-y-auto p-4 flex flex-col" ref="summaryContainer" @scroll="checkIfShouldShowScrollButton">
-      <p v-if="summaryText" data-test="alerts-alert-summary-text" class="summary-text m-0 whitespace-pre-line tracking-[0.03em]" v-html="DOMPurify.sanitize(summaryText)" @click="handleSummaryClick"></p>
-      <div v-else data-test="alerts-alert-summary-empty-state" class="flex flex-col items-center justify-center h-full min-h-30 gap-2 p-4">
+    <div
+      data-test="alerts-alert-summary-content"
+      class="text-compact leading-[2.2] flex-1 min-h-0 overflow-y-auto p-4 flex flex-col"
+      ref="summaryContainer"
+      @scroll="checkIfShouldShowScrollButton"
+    >
+      <p
+        v-if="summaryText"
+        data-test="alerts-alert-summary-text"
+        class="summary-text m-0 whitespace-pre-line tracking-[0.03em]"
+        v-html="DOMPurify.sanitize(summaryText)"
+        @click="handleSummaryClick"
+      ></p>
+      <div
+        v-else
+        data-test="alerts-alert-summary-empty-state"
+        class="flex flex-col items-center justify-center h-full min-h-30 gap-2 p-4"
+      >
         <OIcon name="article" size="lg" class="opacity-20" />
-        <span class="text-compact font-medium text-center opacity-50">{{ t('alerts.summary.configureAlert') || 'Configure your alert to see a summary' }}</span>
+        <span class="text-compact font-medium text-center opacity-50">{{
+          t("alerts.summary.configureAlert") || "Configure your alert to see a summary"
+        }}</span>
       </div>
     </div>
 
@@ -44,12 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, watch, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n';
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
-import DOMPurify from 'dompurify';
-import { generateAlertSummary } from '@/utils/alerts/alertSummaryGenerator';
+import { computed, ref, nextTick, watch, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import DOMPurify from "dompurify";
+import { generateAlertSummary } from "@/utils/alerts/alertSummaryGenerator";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const { t } = useI18n();
@@ -57,41 +74,48 @@ const { t } = useI18n();
 const props = defineProps({
   formData: {
     type: Object,
-    required: true
+    required: true,
   },
   destinations: {
     type: Array,
-    default: () => []
+    default: () => [],
   },
   focusManager: {
     type: Object,
-    required: false
+    required: false,
   },
   wizardStep: {
     type: Number,
     required: false,
-    default: 1
+    default: 1,
   },
   previewQuery: {
     type: String,
-    default: ''
+    default: "",
   },
   generatedSqlQuery: {
     type: String,
-    default: ''
-  }
+    default: "",
+  },
 });
 
 const summaryContainer = ref<HTMLElement | null>(null);
 const showScrollToBottom = ref(false);
 
 const summaryText = computed(() => {
-  return generateAlertSummary(props.formData, props.destinations, t, undefined, props.previewQuery, props.generatedSqlQuery);
+  return generateAlertSummary(
+    props.formData,
+    props.destinations,
+    t,
+    undefined,
+    props.previewQuery,
+    props.generatedSqlQuery,
+  );
 });
 
 const handleSummaryClick = (event: MouseEvent) => {
   const target = event.target as HTMLElement;
-  const focusTarget = target.getAttribute('data-focus-target');
+  const focusTarget = target.getAttribute("data-focus-target");
 
   if (focusTarget && props.focusManager) {
     props.focusManager.focusField(focusTarget);
@@ -115,7 +139,7 @@ const scrollToBottomSmooth = async () => {
   if (summaryContainer.value) {
     summaryContainer.value.scrollTo({
       top: summaryContainer.value.scrollHeight,
-      behavior: 'smooth'
+      behavior: "smooth",
     });
     // Hide the button immediately when user clicks it
     showScrollToBottom.value = false;

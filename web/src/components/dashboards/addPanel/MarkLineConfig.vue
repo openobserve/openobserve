@@ -16,13 +16,8 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div
-      v-for="(_, index) in dashboardPanelData.data.config.mark_line"
-      :key="index"
-    >
-      <div
-        class="flex justify-between pb-3 mb-3 border-b border-border-default"
-      >
+    <div v-for="(_, index) in dashboardPanelData.data.config.mark_line" :key="index">
+      <div class="flex justify-between pb-3 mb-3 border-b border-border-default">
         <div class="w-[90%] flex flex-col gap-2">
           <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
@@ -37,11 +32,7 @@
             :data-test="`dashboard-config-markline-name-${index}`"
           />
           <OInput
-            v-if="
-              ['xAxis', 'yAxis'].includes(
-                dashboardPanelData.data.config.mark_line[index].type,
-              )
-            "
+            v-if="['xAxis', 'yAxis'].includes(dashboardPanelData.data.config.mark_line[index].type)"
             v-model="dashboardPanelData.data.config.mark_line[index].value"
             :label="t('dashboard.markLineValue')"
             :data-test="`dashboard-config-markline-value-${index}`"
@@ -80,9 +71,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MarkLineConfig",
-  components: { OButton, OSelect, OInput,
-    OIcon,
-},
+  components: { OButton, OSelect, OInput, OIcon },
   setup() {
     const store = useStore();
     const { t } = useI18n();
@@ -96,13 +85,8 @@ export default defineComponent({
       { label: t("dashboard.markLineYAxis"), value: "yAxis" },
     ];
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     onBeforeMount(() => {
       // Ensure that the mark_line object is initialized in config

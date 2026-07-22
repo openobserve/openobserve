@@ -35,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @keydown.stop
     :primaryButtonLabel="!creating ? t('alerts.save') : undefined"
     :secondaryButtonLabel="!creating ? t('alerts.cancel') : undefined"
-    :neutralButtonLabel="
-      !creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined
-    "
+    :neutralButtonLabel="!creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
     neutralButtonVariant="outline-destructive"
     @click:primary="saveDestination"
     @click:secondary="handleCancel"
@@ -98,8 +96,7 @@ const picker = ref<any>(null);
 const creating = ref(false);
 
 // Edit prefill — pipelines store the destination under `destination_name`.
-const initialDestinationName =
-  pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "";
+const initialDestinationName = pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "";
 
 const dialog = ref({
   show: false,

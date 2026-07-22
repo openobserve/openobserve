@@ -31,44 +31,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-      <template #title-trail>
-        <!-- <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
+    <template #title-trail>
+      <!-- <OBadge v-if="statusBadge" :variant="statusBadge.variant" size="sm" dot>
           {{ statusBadge.label }}
         </OBadge> -->
-      </template>
-      <template #actions>
-        <DateTime
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="timeState.valueType"
-          :default-absolute-time="{
-            startTime: timeState.startTime ?? 0,
-            endTime: timeState.endTime ?? 0,
-          }"
-          :default-relative-time="timeState.relativeTimePeriod ?? ''"
-          data-test="synthetic-monitor-results-date-time"
-          class="h-8.5!"
-          @on:date-change="onDateChange"
-        />
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="edit"
-          data-test="synthetic-monitor-results-edit-btn"
-          @click="editMonitor"
-        >
-          {{ t("synthetics.results.editMonitor") }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="isRefreshing"
-          data-test="synthetic-monitor-results-refresh-btn"
-          @click="refresh"
-        />
-      </template>
+    </template>
+    <template #actions>
+      <DateTime
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="timeState.valueType"
+        :default-absolute-time="{
+          startTime: timeState.startTime ?? 0,
+          endTime: timeState.endTime ?? 0,
+        }"
+        :default-relative-time="timeState.relativeTimePeriod ?? ''"
+        data-test="synthetic-monitor-results-date-time"
+        class="h-8.5!"
+        @on:date-change="onDateChange"
+      />
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="edit"
+        data-test="synthetic-monitor-results-edit-btn"
+        @click="editMonitor"
+      >
+        {{ t("synthetics.results.editMonitor") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="refresh"
+        :loading="isRefreshing"
+        data-test="synthetic-monitor-results-refresh-btn"
+        @click="refresh"
+      />
+    </template>
     <div class="flex-1 min-h-0 overflow-hidden">
       <MonitorRuns
         ref="runsRef"
@@ -104,13 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ drawerRunStatus.label }}
       </OBadge>
-      <OBadge
-        v-if="drawerUrl"
-        variant="default"
-        size="sm"
-        icon="link"
-        class="truncate max-w-50"
-      >
+      <OBadge v-if="drawerUrl" variant="default" size="sm" icon="link" class="truncate max-w-50">
         {{ drawerUrl }}
       </OBadge>
     </template>
@@ -148,9 +142,7 @@ const router = useRouter();
 const DEFAULT_RELATIVE = "15m";
 
 const monitorId = computed(() => String(route.params.id ?? ""));
-const monitorName = computed(
-  () => String(route.query.name ?? "") || t("synthetics.results.title"),
-);
+const monitorName = computed(() => String(route.query.name ?? "") || t("synthetics.results.title"));
 const folderName = computed(() => String(route.query.folder ?? ""));
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
@@ -248,11 +240,7 @@ function readFromUrl(): boolean {
   if (typeof fromRaw === "string" && typeof toRaw === "string") {
     const startTime = Number(fromRaw);
     const endTime = Number(toRaw);
-    if (
-      Number.isFinite(startTime) &&
-      Number.isFinite(endTime) &&
-      endTime > startTime
-    ) {
+    if (Number.isFinite(startTime) && Number.isFinite(endTime) && endTime > startTime) {
       timeState.value = {
         valueType: "absolute",
         startTime,
@@ -312,10 +300,7 @@ async function refresh() {
       writeToUrl();
     }
     await nextTick();
-    await runsRef.value?.refresh?.(
-      timeRange.value.startTime,
-      timeRange.value.endTime,
-    );
+    await runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   } finally {
     isRefreshing.value = false;
   }
@@ -358,24 +343,24 @@ onMounted(() => {
   // when arriving from the synthetics list page (fresh navigation with no
   // explicit time range in the URL). Falls back to readFromUrl / default
   // relative period for direct page loads, refreshes, or never-run monitors.
-  const lastTriggeredAtRaw = route.query.last_triggered_at
-  const lastTriggeredAt = typeof lastTriggeredAtRaw === 'string' ? Number(lastTriggeredAtRaw) : 0
-  const hasExplicitRange = route.query.from || route.query.to || route.query.period
+  const lastTriggeredAtRaw = route.query.last_triggered_at;
+  const lastTriggeredAt = typeof lastTriggeredAtRaw === "string" ? Number(lastTriggeredAtRaw) : 0;
+  const hasExplicitRange = route.query.from || route.query.to || route.query.period;
 
   if (lastTriggeredAt > 0 && !hasExplicitRange) {
     // Convert microseconds → milliseconds
-    const tsMs = Math.floor(lastTriggeredAt / 1000)
-    const anchor = new Date(tsMs)
-    const PAD_US = 15 * 60 * 1000 * 1000
-    const startTime = Math.max(0, (anchor.getTime() - 15 * 60 * 1000) * 1000)
-    const endTime = Math.min(Date.now() * 1000, anchor.getTime() * 1000 + PAD_US)
+    const tsMs = Math.floor(lastTriggeredAt / 1000);
+    const anchor = new Date(tsMs);
+    const PAD_US = 15 * 60 * 1000 * 1000;
+    const startTime = Math.max(0, (anchor.getTime() - 15 * 60 * 1000) * 1000);
+    const endTime = Math.min(Date.now() * 1000, anchor.getTime() * 1000 + PAD_US);
     timeState.value = {
-      valueType: 'absolute',
+      valueType: "absolute",
       startTime,
       endTime,
       relativeTimePeriod: null,
-    }
-    timeRange.value = { startTime, endTime }
+    };
+    timeRange.value = { startTime, endTime };
   } else if (!readFromUrl()) {
     applyRelative(DEFAULT_RELATIVE);
   }
@@ -391,10 +376,7 @@ onMounted(() => {
   }
 
   nextTick(() => {
-    runsRef.value?.refresh?.(
-      timeRange.value.startTime,
-      timeRange.value.endTime,
-    );
+    runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
   });
 });
 </script>

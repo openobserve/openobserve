@@ -1,18 +1,15 @@
 <template>
-  <div
-    v-if="shouldShowJoins"
-    class="w-full"
-    data-test="dashboard-joins-container"
-  >
+  <div v-if="shouldShowJoins" class="w-full" data-test="dashboard-joins-container">
     <div class="flex flex-row pl-3">
-      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center">{{ t("panel.joins") }}</div>
+      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center">
+        {{ t("panel.joins") }}
+      </div>
       <span class="flex items-center mx-0.5">:</span>
-      <div class="m-1.25 flex flex-row items-center flex-wrap gap-2" data-test="dashboard-filter-layout">
-        <div
-          v-for="(joinObj, index) in currentJoins"
-          :key="index"
-          class="flex flex-row mr-2 my-1"
-        >
+      <div
+        class="m-1.25 flex flex-row items-center flex-wrap gap-2"
+        data-test="dashboard-filter-layout"
+      >
+        <div v-for="(joinObj, index) in currentJoins" :key="index" class="flex flex-row mr-2 my-1">
           <OButtonGroup class="axis-field" radius="sm">
             <ODropdown>
               <template #trigger>
@@ -42,10 +39,7 @@
                   </div>
                 </OButton>
               </template>
-              <div
-                class="p-4"
-                :data-test="`dashboard-join-menu-${index}`"
-              >
+              <div class="p-4" :data-test="`dashboard-join-menu-${index}`">
                 <AddJoinPopUp
                   v-model="currentJoins[index]"
                   :joinIndex="index"
@@ -157,14 +151,9 @@ export default defineComponent({
   },
 
   setup() {
-    const dashboardPanelDataPageKey = inject<string>(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject<string>("dashboardPanelDataPageKey", "dashboard");
 
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     const { t } = useI18n();
 
@@ -176,9 +165,7 @@ export default defineComponent({
       const currentQuery = getCurrentQuery();
       if (!currentQuery) return false;
 
-      return !(
-        currentQuery.customQuery && dashboardPanelData.data.queryType === "sql"
-      );
+      return !(currentQuery.customQuery && dashboardPanelData.data.queryType === "sql");
     });
 
     /**
@@ -203,11 +190,7 @@ export default defineComponent({
         const queries = dashboardPanelData?.data?.queries;
         const currentIndex = dashboardPanelData?.layout?.currentQueryIndex ?? 0;
 
-        if (
-          !Array.isArray(queries) ||
-          currentIndex < 0 ||
-          currentIndex >= queries.length
-        ) {
+        if (!Array.isArray(queries) || currentIndex < 0 || currentIndex >= queries.length) {
           return undefined;
         }
 
@@ -357,4 +340,3 @@ export default defineComponent({
   },
 });
 </script>
-

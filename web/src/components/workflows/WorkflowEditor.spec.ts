@@ -152,9 +152,7 @@ const mountEditor = () =>
 
 const wf = () => workflowObj.currentSelectedWorkflow;
 const dialogByTitle = (w: any, title: string) =>
-  w
-    .findAllComponents(ConfirmDialogStub)
-    .find((d: any) => d.props("title") === title)!;
+  w.findAllComponents(ConfirmDialogStub).find((d: any) => d.props("title") === title)!;
 const saveTestDialog = (w: any) => dialogByTitle(w, t("workflow.test.saveToTestTitle"));
 const deleteDialog = (w: any) => dialogByTitle(w, t("workflow.deleteNodeTitle"));
 const palette = (w: any) => w.findComponent({ name: "NodePalette" });
@@ -360,9 +358,7 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe(
-        "my workflow",
-      );
+      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe("my workflow");
       expect(wrapper.find('[data-test="workflow-editor-name"]').exists()).toBe(false);
       expect(wrapper.find('[data-test="workflow-editor-history"]').exists()).toBe(true);
     });
@@ -374,9 +370,7 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe(
-        t("workflow.header"),
-      );
+      expect(wrapper.find(".app-page-header").attributes("data-title")).toBe(t("workflow.header"));
     });
   });
 
@@ -426,10 +420,7 @@ describe("WorkflowEditor", () => {
       const event: any = { dataTransfer: { setData: vi.fn(), effectAllowed: "" } };
       palette(wrapper).props("onDragStart")(event, { subtype: "function" });
 
-      expect(event.dataTransfer.setData).toHaveBeenCalledWith(
-        "application/vueflow",
-        "function",
-      );
+      expect(event.dataTransfer.setData).toHaveBeenCalledWith("application/vueflow", "function");
       expect(workflowObj.draggedNodeType).toBe("function");
     });
   });
@@ -555,7 +546,12 @@ describe("WorkflowEditor", () => {
       wf().name = "wf";
       wf().nodes = [
         ...wf().nodes,
-        { id: "orphan", type: "output", position: { x: 0, y: 0 }, data: { node_type: "destination" } },
+        {
+          id: "orphan",
+          type: "output",
+          position: { x: 0, y: 0 },
+          data: { node_type: "destination" },
+        },
       ];
 
       await clickSave(wrapper);
@@ -1155,13 +1151,9 @@ describe("WorkflowEditor", () => {
         store.state.theme = theme;
         wrapper = mountEditor();
         await flushPromises();
-        expect(
-          wrapper.find("#workflow-workspace .bg-surface-subtle").exists(),
-        ).toBe(true);
+        expect(wrapper.find("#workflow-workspace .bg-surface-subtle").exists()).toBe(true);
         // No theme-conditional class survives.
-        expect(
-          wrapper.find("#workflow-workspace .bg-gray-100").exists(),
-        ).toBe(false);
+        expect(wrapper.find("#workflow-workspace .bg-gray-100").exists()).toBe(false);
         wrapper.unmount();
       }
       store.state.theme = "dark";

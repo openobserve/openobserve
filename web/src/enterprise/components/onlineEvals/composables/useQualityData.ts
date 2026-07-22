@@ -34,12 +34,7 @@ export function chooseBucketInterval(windowMs: number): string {
 }
 
 export interface KpiCard {
-  id:
-    | "evaluated"
-    | "evaluationCost"
-    | "jobSuccess"
-    | "scorerFailures"
-    | "latencyP95";
+  id: "evaluated" | "evaluationCost" | "jobSuccess" | "scorerFailures" | "latencyP95";
   value: number | null;
   prevValue: number | null;
   /** small series for the sparkline; oldest → newest. Empty when no data. */
@@ -166,10 +161,7 @@ function evaluatorSql(whereClause: string | null): string {
   ].join("\n");
 }
 
-function scoresSparklineSql(
-  interval: string,
-  whereClause: string | null,
-): string {
+function scoresSparklineSql(interval: string, whereClause: string | null): string {
   // Same span-level rollup as scoresSql() — distinct span_id per bucket.
   return [
     "SELECT",
@@ -182,10 +174,7 @@ function scoresSparklineSql(
   ].join("\n");
 }
 
-function evaluatorSparklineSql(
-  interval: string,
-  whereClause: string | null,
-): string {
+function evaluatorSparklineSql(interval: string, whereClause: string | null): string {
   return [
     "SELECT",
     `  histogram(_timestamp, '${interval}') AS bucket,`,
@@ -255,61 +244,47 @@ export function useQualityData(
       const selectedAgent = agentFilter?.value ?? null;
       const scoresWhere = buildScoresAgentFilterWhere(selectedAgent);
       const evaluatorWhere = buildEvaluatorAgentFilterWhere(selectedAgent);
-      const [
-        scoresNow,
-        scoresPrev,
-        evalNow,
-        evalPrev,
-        scoresSeries,
-        evalSeries,
-      ] = await Promise.all([
-        fetchAgg<ScoresAggRow>(
-          "logs",
-          scoresSql(scoresWhere),
-          startUs,
-          endUs,
-          "scores.now",
-        ),
-        fetchAgg<ScoresAggRow>(
-          "logs",
-          scoresSql(scoresWhere),
-          prevStartUs,
-          prevEndUs,
-          "scores.prev",
-        ),
-        fetchAgg<EvaluatorAggRow>(
-          "traces",
-          evaluatorSql(evaluatorWhere),
-          startUs,
-          endUs,
-          "eval.now",
-        ),
-        fetchAgg<EvaluatorAggRow>(
-          "traces",
-          evaluatorSql(evaluatorWhere),
-          prevStartUs,
-          prevEndUs,
-          "eval.prev",
-        ),
-        fetchHits<ScoresBucketRow>(
-          "logs",
-          scoresSparklineSql(interval, scoresWhere),
-          startUs,
-          endUs,
-          "scores.spark",
-        ),
-        fetchHits<EvaluatorBucketRow>(
-          "traces",
-          evaluatorSparklineSql(interval, evaluatorWhere),
-          startUs,
-          endUs,
-          "eval.spark",
-        ),
-      ]);
+      const [scoresNow, scoresPrev, evalNow, evalPrev, scoresSeries, evalSeries] =
+        await Promise.all([
+          fetchAgg<ScoresAggRow>("logs", scoresSql(scoresWhere), startUs, endUs, "scores.now"),
+          fetchAgg<ScoresAggRow>(
+            "logs",
+            scoresSql(scoresWhere),
+            prevStartUs,
+            prevEndUs,
+            "scores.prev",
+          ),
+          fetchAgg<EvaluatorAggRow>(
+            "traces",
+            evaluatorSql(evaluatorWhere),
+            startUs,
+            endUs,
+            "eval.now",
+          ),
+          fetchAgg<EvaluatorAggRow>(
+            "traces",
+            evaluatorSql(evaluatorWhere),
+            prevStartUs,
+            prevEndUs,
+            "eval.prev",
+          ),
+          fetchHits<ScoresBucketRow>(
+            "logs",
+            scoresSparklineSql(interval, scoresWhere),
+            startUs,
+            endUs,
+            "scores.spark",
+          ),
+          fetchHits<EvaluatorBucketRow>(
+            "traces",
+            evaluatorSparklineSql(interval, evaluatorWhere),
+            startUs,
+            endUs,
+            "eval.spark",
+          ),
+        ]);
 
-      const evaluatedSpark = scoresSeries.map(
-        (r) => toNumber(r.evaluated_c) ?? 0,
-      );
+      const evaluatedSpark = scoresSeries.map((r) => toNumber(r.evaluated_c) ?? 0);
       const jobSuccessSpark = evalSeries.map((r) => {
         const tot = toNumber(r.total) ?? 0;
         const ok = toNumber(r.success) ?? 0;
@@ -331,13 +306,9 @@ export function useQualityData(
       const successPrev = toNumber(evalPrev?.success_runs);
 
       const jobSuccessNow =
-        totalNow && totalNow > 0 && successNow != null
-          ? (successNow / totalNow) * 100
-          : null;
+        totalNow && totalNow > 0 && successNow != null ? (successNow / totalNow) * 100 : null;
       const jobSuccessPrev =
-        totalPrev && totalPrev > 0 && successPrev != null
-          ? (successPrev / totalPrev) * 100
-          : null;
+        totalPrev && totalPrev > 0 && successPrev != null ? (successPrev / totalPrev) * 100 : null;
 
       const latencyP95SecNow = toNumber(evalNow?.latency_p95_ms);
       const latencyP95SecPrev = toNumber(evalPrev?.latency_p95_ms);
@@ -386,8 +357,7 @@ export function useQualityData(
         {
           id: "latencyP95",
           value: latencyP95SecNow != null ? latencyP95SecNow / 1000 : null,
-          prevValue:
-            latencyP95SecPrev != null ? latencyP95SecPrev / 1000 : null,
+          prevValue: latencyP95SecPrev != null ? latencyP95SecPrev / 1000 : null,
           sparkline: latencySpark,
           healthyDirection: "down",
           format: "seconds",
@@ -400,8 +370,7 @@ export function useQualityData(
 
   const deltaByKpi = computed(() =>
     kpis.value.reduce<Record<string, number | null>>((acc, k) => {
-      acc[k.id] =
-        k.value != null && k.prevValue != null ? k.value - k.prevValue : null;
+      acc[k.id] = k.value != null && k.prevValue != null ? k.value - k.prevValue : null;
       return acc;
     }, {}),
   );

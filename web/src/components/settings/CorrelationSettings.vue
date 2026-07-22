@@ -23,7 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #title>
-      <span data-test="correlation-settings-page-title">{{ t('settings.correlationSettings') }}</span>
+      <span data-test="correlation-settings-page-title">{{
+        t("settings.correlationSettings")
+      }}</span>
     </template>
 
     <!-- Module tabs (Level-2 nav) -->
@@ -35,18 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="correlation-settings-tabs"
         @update:model-value="onTabChange"
       >
-        <OTab
-          name="services"
-          :label="t('settings.correlation.discoveredServicesTab')"
-        />
-        <OTab
-          name="discovery"
-          :label="t('settings.correlation.serviceDiscoveryTab')"
-        />
-        <OTab
-          name="alert-correlation"
-          :label="t('settings.correlation.alertCorrelationTab')"
-        />
+        <OTab name="services" :label="t('settings.correlation.discoveredServicesTab')" />
+        <OTab name="discovery" :label="t('settings.correlation.serviceDiscoveryTab')" />
+        <OTab name="alert-correlation" :label="t('settings.correlation.alertCorrelationTab')" />
         <OTab
           name="field-aliases"
           data-test="correlation-settings-field-aliases-tab"
@@ -104,8 +97,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import { defineComponent, ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
@@ -142,22 +135,20 @@ export default defineComponent({
     // URL slug ↔ internal tab name
     const slugToTab: Record<string, string> = {
       "service-discovery": "discovery",
-      "services": "services",
+      services: "services",
       "alert-correlation": "alert-correlation",
       "field-aliases": "field-aliases",
     };
     const tabToSlug: Record<string, string> = {
-      "discovery": "service-discovery",
-      "services": "services",
+      discovery: "service-discovery",
+      services: "services",
       "alert-correlation": "alert-correlation",
       "field-aliases": "field-aliases",
     };
 
     const initialSlug = route.params.tab as string;
     const activeTab = ref(slugToTab[initialSlug] ?? "services");
-    const aliasScrollToGroup = ref<string | undefined>(
-      route.query.group as string | undefined
-    );
+    const aliasScrollToGroup = ref<string | undefined>(route.query.group as string | undefined);
 
     const semanticGroups = ref<any[]>([]);
     const draftSemanticGroups = ref<any[]>([]);
@@ -212,7 +203,7 @@ export default defineComponent({
         const tab = slugToTab[slug as string] ?? "discovery";
         if (tab !== activeTab.value) activeTab.value = tab;
         aliasScrollToGroup.value = route.query.group as string | undefined;
-      }
+      },
     );
 
     // Clear the group deep-link after the scroll + blink animation completes,
@@ -321,7 +312,7 @@ export default defineComponent({
       try {
         const orgId = store.state.selectedOrganization.identifier;
         const updated = semanticGroups.value.map((g: any) =>
-          g.id === "service" ? { ...g, fields } : g
+          g.id === "service" ? { ...g, fields } : g,
         );
         await serviceStreamsService.updateSemanticGroups(orgId, updated);
         semanticGroups.value = updated;

@@ -24,7 +24,6 @@ const props = withDefaults(defineProps<SwitchProps>(), {
 
 const emit = defineEmits<SwitchEmits>();
 
-  
 defineSlots<SwitchSlots>();
 
 // ── Local state — immediate visual feedback ────────────────────────────────
@@ -48,9 +47,7 @@ function toggle() {
   const next = !isChecked.value;
   let emitValue: typeof props.modelValue;
   if (props.checkedValue !== undefined || props.uncheckedValue !== undefined) {
-    emitValue = next
-      ? (props.checkedValue ?? true)
-      : (props.uncheckedValue ?? false);
+    emitValue = next ? (props.checkedValue ?? true) : (props.uncheckedValue ?? false);
   } else {
     emitValue = next;
   }
@@ -159,17 +156,21 @@ const hasLabel = computed(
       :id="labelId"
       :class="[
         'o-input-label text-compact select-none leading-tight flex items-center gap-1',
-        disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        disabled
+          ? 'font-normal text-input-label-text-disabled'
+          : 'font-medium text-input-label-text',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true">&nbsp;*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </span>
   </div>
 </template>

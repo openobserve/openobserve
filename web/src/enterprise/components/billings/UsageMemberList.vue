@@ -24,14 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <OSeparator class="mb-1 mt-0.75" />
 
-        <OTabs
-          orientation="vertical"
-          v-model="activeMember"
-          data-test="usage-member-tab-current"
-        >
+        <OTabs orientation="vertical" v-model="activeMember" data-test="usage-member-tab-current">
           <OTab name="" :data-test="`usage-member-tab-current-item`">
             <div class="member-item flex flex-col items-start w-full min-w-0">
-              <div class="member-name font-semibold truncate max-w-full normal-case" :title="currentOrgToShow.title">
+              <div
+                class="member-name font-semibold truncate max-w-full normal-case"
+                :title="currentOrgToShow.title"
+              >
                 {{ currentOrgToShow.primary }}
               </div>
               <div
@@ -70,11 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div class="members-tabs flex-1 overflow-y-auto px-1.5">
-        <OTabs
-          orientation="vertical"
-          v-model="activeMember"
-          data-test="usage-member-tabs"
-        >
+        <OTabs orientation="vertical" v-model="activeMember" data-test="usage-member-tabs">
           <OTab
             v-for="opt in filteredOptions"
             :key="opt.value"
@@ -82,10 +77,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`usage-member-tab-${opt.value}`"
           >
             <div class="member-item flex flex-col items-start w-full min-w-0">
-              <div class="member-name font-semibold truncate max-w-full normal-case" :title="opt.title">
+              <div
+                class="member-name font-semibold truncate max-w-full normal-case"
+                :title="opt.title"
+              >
                 {{ opt.primary }}
               </div>
-              <div v-if="opt.secondary" class="member-id text-xs opacity-60 truncate max-w-full normal-case" :title="opt.secondary">
+              <div
+                v-if="opt.secondary"
+                class="member-id text-xs opacity-60 truncate max-w-full normal-case"
+                :title="opt.secondary"
+              >
                 {{ opt.secondary }}
               </div>
             </div>
@@ -178,9 +180,7 @@ export default defineComponent({
       const q = searchQuery.value?.toLowerCase().trim();
       if (!q) return options.value;
       return options.value.filter(
-        (o) =>
-          o.primary.toLowerCase().includes(q) ||
-          o.value.toLowerCase().includes(q)
+        (o) => o.primary.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
       );
     });
 

@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="o-field-label flex items-center gap-1.5 min-w-0 flex-1 py-1"
-  >
+  <div class="o-field-label flex items-center gap-1.5 min-w-0 flex-1 py-1">
     <OIcon
       v-if="showTypeIcon"
       :name="getTypeIcon(field.type)"

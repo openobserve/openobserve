@@ -37,14 +37,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
     >
       <div class="flex gap-3 items-start">
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">1</div>
+        <div
+          class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text"
+        >
+          1
+        </div>
         <div>
-          <div class="font-semibold mb-1 text-text-heading">
-            Deploy ARM Template
-          </div>
+          <div class="font-semibold mb-1 text-text-heading">Deploy ARM Template</div>
           <div class="text-sm m-0 mb-3 text-text-secondary">
-            Creates an Event Hub namespace, Event Hub, and all required
-            resources in your Azure subscription.
+            Creates an Event Hub namespace, Event Hub, and all required resources in your Azure
+            subscription.
           </div>
           <OButton
             variant="primary"
@@ -52,9 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="handleDeploy"
             data-test="azure-activity-logs-deploy-btn"
           >
-            <template #icon-left
-              ><OIcon name="rocket-launch" size="sm"
-            /></template>
+            <template #icon-left><OIcon name="rocket-launch" size="sm" /></template>
             Deploy to Azure
           </OButton>
         </div>
@@ -66,14 +66,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mb-4 p-4 rounded-default border-l-4 border-l-solid bg-surface-subtle border-l-border-strong"
     >
       <div class="flex gap-3 items-start">
-        <div class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text">2</div>
+        <div
+          class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 bg-status-info-bg text-status-info-text"
+        >
+          2
+        </div>
         <div>
-          <div class="font-semibold mb-1 text-text-heading">
-            Configure Diagnostic Settings
-          </div>
+          <div class="font-semibold mb-1 text-text-heading">Configure Diagnostic Settings</div>
           <div class="text-sm mb-3 text-text-secondary">
-            After the ARM deployment completes, route Activity Logs to the Event
-            Hub that was created.
+            After the ARM deployment completes, route Activity Logs to the Event Hub that was
+            created.
           </div>
 
           <!-- Portal / CLI toggle -->
@@ -87,9 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ol class="text-sm pl-4 space-y-1 text-text-secondary">
               <li>
                 Go to
-                <strong
-                  >Azure Portal → Subscriptions → your subscription</strong
-                >
+                <strong>Azure Portal → Subscriptions → your subscription</strong>
               </li>
               <li>Click <strong>Activity log</strong> in the left menu</li>
               <li>
@@ -102,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <strong>Stream to an event hub</strong>
               </li>
               <li>
-                Select the Event Hub namespace and Event Hub created in Step 1
-                (prefix: <code>o2-activity</code>)
+                Select the Event Hub namespace and Event Hub created in Step 1 (prefix:
+                <code>o2-activity</code>)
               </li>
               <li>Click <strong>Save</strong></li>
             </ol>
@@ -114,22 +114,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Categories -->
             <div class="mb-4">
               <div class="flex items-center justify-between mb-2">
-                <div class="text-xs font-semibold text-text-heading">
-                  Log categories to enable
-                </div>
+                <div class="text-xs font-semibold text-text-heading">Log categories to enable</div>
                 <div class="flex gap-2">
                   <OButton
                     variant="ghost-primary"
                     size="xs"
-                    @click="
-                      enabledCategories = LOG_CATEGORIES.map((c) => c.value)
-                    "
+                    @click="enabledCategories = LOG_CATEGORIES.map((c) => c.value)"
                     >Select all</OButton
                   >
-                  <OButton
-                    variant="ghost-primary"
-                    size="xs"
-                    @click="enabledCategories = []"
+                  <OButton variant="ghost-primary" size="xs" @click="enabledCategories = []"
                     >Clear</OButton
                   >
                 </div>
@@ -147,9 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
-                <div class="text-xs mb-1 text-text-heading">
-                  Resource Group
-                </div>
+                <div class="text-xs mb-1 text-text-heading">Resource Group</div>
                 <OInput
                   v-model="resourceGroup"
                   placeholder="rg-openobserve-activity-logs"
@@ -158,9 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div>
-                <div class="text-xs mb-1 text-text-heading">
-                  Deployment Name
-                </div>
+                <div class="text-xs mb-1 text-text-heading">Deployment Name</div>
                 <OInput
                   v-model="deploymentName"
                   placeholder="o2-activity-20260420"
@@ -170,20 +159,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
 
-            <div
-              v-if="enabledCategories.length === 0"
-              class="text-sm text-status-error-text mb-3"
-            >
+            <div v-if="enabledCategories.length === 0" class="text-sm text-status-error-text mb-3">
               Select at least one log category above.
             </div>
             <div v-else>
               <div class="text-xs mb-2 text-text-secondary">
                 Run this command after your ARM deployment completes:
               </div>
-              <CopyContent
-                :content="curlCommand"
-                data-test="azure-curl-command"
-              />
+              <CopyContent :content="curlCommand" data-test="azure-curl-command" />
             </div>
           </div>
         </div>
@@ -211,10 +194,7 @@ import { useStore } from "vuex";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
-import {
-  generateARMTemplateURL,
-  azureIntegrations,
-} from "@/utils/azureIntegrations";
+import { generateARMTemplateURL, azureIntegrations } from "@/utils/azureIntegrations";
 import CopyContent from "@/components/CopyContent.vue";
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -233,14 +213,17 @@ const LOG_CATEGORIES = [
   { value: "ResourceHealth", label: "Resource Health" },
 ];
 
-const activityLogsIntegration = azureIntegrations.find(
-  (i) => i.id === "activity-logs",
-)!;
+const activityLogsIntegration = azureIntegrations.find((i) => i.id === "activity-logs")!;
 
 export default defineComponent({
   name: "AzureConfig",
   components: {
-    CopyContent, OToggleGroup, OToggleGroupItem, OButton, OCheckbox, OInput,
+    CopyContent,
+    OToggleGroup,
+    OToggleGroupItem,
+    OButton,
+    OCheckbox,
+    OInput,
     OIcon,
   },
   setup() {
@@ -299,11 +282,7 @@ export default defineComponent({
       const accessKey = btoa(`${email}:${passcode}`);
       const endpointUrl = `${endpoint.url}/azure/${organizationId}/default/_event_hub`;
 
-      const url = generateARMTemplateURL(
-        activityLogsIntegration,
-        endpointUrl,
-        accessKey,
-      );
+      const url = generateARMTemplateURL(activityLogsIntegration, endpointUrl, accessKey);
       window.open(url, "_blank", "noopener,noreferrer");
 
       segment.track("Azure Activity Logs Deploy Started", {

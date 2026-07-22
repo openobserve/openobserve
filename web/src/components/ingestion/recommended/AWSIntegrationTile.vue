@@ -131,7 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </ODialog>
 
     <!-- Component Display Dialog -->
-    <ODialog data-test="aws-integration-tile-content-dialog" v-model:open="showComponentContent" size="xl" :title="selectedComponentTitle">
+    <ODialog
+      data-test="aws-integration-tile-content-dialog"
+      v-model:open="showComponentContent"
+      size="xl"
+      :title="selectedComponentTitle"
+    >
       <component
         :is="selectedComponent"
         :currOrgIdentifier="organizationId"
@@ -158,9 +163,7 @@ import type {
   CloudFormationTemplate,
   ComponentOption,
 } from "@/utils/awsIntegrations";
-import {
-  generateCloudFormationURL,
-} from "@/utils/awsIntegrations";
+import { generateCloudFormationURL } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import dashboardsService from "@/services/dashboards";
@@ -195,9 +198,7 @@ export default defineComponent({
     };
 
     // Get organization and user details
-    const organizationId = computed(
-      () => store.state?.selectedOrganization?.identifier || "",
-    );
+    const organizationId = computed(() => store.state?.selectedOrganization?.identifier || "");
     const userEmail = computed(() => store.state?.userInfo?.email || "");
 
     // Check if integration has CloudFormation template(s) or component options
@@ -206,8 +207,7 @@ export default defineComponent({
         props.integration.cloudFormationTemplate ||
         (props.integration.cloudFormationTemplates &&
           props.integration.cloudFormationTemplates.length > 0) ||
-        (props.integration.componentOptions &&
-          props.integration.componentOptions.length > 0)
+        (props.integration.componentOptions && props.integration.componentOptions.length > 0)
       );
     });
 
@@ -225,14 +225,9 @@ export default defineComponent({
         props.integration.cloudFormationTemplates &&
         props.integration.cloudFormationTemplates.length > 0;
       const hasComponents =
-        props.integration.componentOptions &&
-        props.integration.componentOptions.length > 0;
-      const templateCount = hasTemplates
-        ? props.integration.cloudFormationTemplates!.length
-        : 0;
-      const componentCount = hasComponents
-        ? props.integration.componentOptions!.length
-        : 0;
+        props.integration.componentOptions && props.integration.componentOptions.length > 0;
+      const templateCount = hasTemplates ? props.integration.cloudFormationTemplates!.length : 0;
+      const componentCount = hasComponents ? props.integration.componentOptions!.length : 0;
       const totalOptions = templateCount + componentCount;
 
       // If both templates and components exist, or multiple of one type, show dialog
@@ -249,9 +244,7 @@ export default defineComponent({
 
       // Single template option
       if (hasTemplates && templateCount === 1) {
-        openCloudFormationURL(
-          props.integration.cloudFormationTemplates![0].url,
-        );
+        openCloudFormationURL(props.integration.cloudFormationTemplates![0].url);
         return;
       }
 
@@ -306,8 +299,7 @@ export default defineComponent({
           });
           toast({
             variant: "error",
-            message:
-              "Missing organization credentials. Please refresh the page.",
+            message: "Missing organization credentials. Please refresh the page.",
           });
           return;
         }
@@ -395,11 +387,7 @@ export default defineComponent({
       // If replacing existing dashboard, delete it first
       if (existingDashboardId) {
         try {
-          await dashboardsService.delete(
-            orgId,
-            existingDashboardId,
-            folderId,
-          );
+          await dashboardsService.delete(orgId, existingDashboardId, folderId);
           // Wait a moment to ensure deletion completes
           await new Promise((resolve) => setTimeout(resolve, 500));
         } catch (deleteError) {
@@ -415,10 +403,7 @@ export default defineComponent({
     };
 
     const handleAddDashboard = async () => {
-      if (
-        !props.integration.hasDashboard ||
-        !props.integration.dashboardGithubUrl
-      ) {
+      if (!props.integration.hasDashboard || !props.integration.dashboardGithubUrl) {
         return;
       }
 
@@ -434,8 +419,7 @@ export default defineComponent({
           throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
         }
         const dashboardJson = await response.json();
-        const dashboardTitle =
-          dashboardJson.title || props.integration.displayName;
+        const dashboardTitle = dashboardJson.title || props.integration.displayName;
 
         // Step 3: Check if dashboard already exists by listing all dashboards in the folder
         const dashboardsResponse = await dashboardsService.list(
@@ -459,7 +443,6 @@ export default defineComponent({
           existingDashboard?.dashboard_id ||
           existingDashboard?.id;
 
-
         if (existingDashboard) {
           // Ask user if they want to replace the existing dashboard
           const ok = await confirm({
@@ -478,12 +461,7 @@ export default defineComponent({
           });
 
           try {
-            await importDashboard(
-              dashboardJson,
-              folderId,
-              orgId,
-              existingDashboardId,
-            );
+            await importDashboard(dashboardJson, folderId, orgId, existingDashboardId);
 
             loadingNotif();
             toast({
@@ -492,8 +470,7 @@ export default defineComponent({
               timeout: 5000,
               action: {
                 label: "View Dashboard",
-                handler: () =>
-                  router.push(`/dashboards?org_identifier=${orgId}`),
+                handler: () => router.push(`/dashboards?org_identifier=${orgId}`),
               },
             });
 
@@ -562,11 +539,7 @@ export default defineComponent({
       });
 
       // Open documentation in new tab
-      window.open(
-        props.integration.documentationUrl,
-        "_blank",
-        "noopener,noreferrer",
-      );
+      window.open(props.integration.documentationUrl, "_blank", "noopener,noreferrer");
     };
 
     return {

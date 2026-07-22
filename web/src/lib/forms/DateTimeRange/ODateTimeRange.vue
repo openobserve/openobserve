@@ -116,14 +116,7 @@ function tryParseDate(s: string): DateValue | undefined {
 }
 
 // ── Relative config ────────────────────────────────────────────
-const RELATIVE_UNITS: RelativeUnit[] = [
-  "seconds",
-  "minutes",
-  "hours",
-  "days",
-  "weeks",
-  "months",
-];
+const RELATIVE_UNITS: RelativeUnit[] = ["seconds", "minutes", "hours", "days", "weeks", "months"];
 
 const RELATIVE_OPTIONS: Record<RelativeUnit, number[]> = {
   seconds: [1, 5, 10, 15, 30, 45],
@@ -160,8 +153,9 @@ function isRelativeDisabled(unit: RelativeUnit, amount: number): boolean {
 // ── Timezones ──────────────────────────────────────────────────
 const timezones = computed((): string[] => {
   const list: string[] =
-    (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
-      .supportedValuesOf?.("timeZone") ?? [];
+    (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.(
+      "timeZone",
+    ) ?? [];
   return ["", "UTC", ...list.filter((t) => t !== "UTC")];
 });
 
@@ -175,9 +169,7 @@ const tzOpen = ref(false);
 const filteredTimezones = computed((): string[] => {
   const term = tzSearch.value.trim().toLowerCase();
   if (!term) return timezones.value;
-  return timezones.value.filter((tz) =>
-    tzLabel(tz).toLowerCase().includes(term),
-  );
+  return timezones.value.filter((tz) => tzLabel(tz).toLowerCase().includes(term));
 });
 
 function selectTimezone(tz: string) {
@@ -227,7 +219,7 @@ const rangeLabel = computed((): string | null => {
   if (!start && !end) return null;
   return start && end
     ? `${start.toString()} — ${end.toString()}`
-    : (start ?? end)?.toString() ?? null;
+    : ((start ?? end)?.toString() ?? null);
 });
 
 function handleRangeChange(value: DateRange | undefined) {
@@ -314,14 +306,16 @@ const triggerClasses = computed(() => [
       v-if="$slots.label || label || $slots.tooltip"
       class="text-xs font-medium text-datepicker-label leading-none flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help text-datepicker-label"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </div>
 
     <!-- Trigger + Popover -->
@@ -347,19 +341,14 @@ const triggerClasses = computed(() => [
             <path
               d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 12a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11Z"
             />
-            <path
-              d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z"
-            />
+            <path d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z" />
           </svg>
           <!-- Label -->
           <span
             class="flex-1 truncate"
-            :class="
-              isPlaceholder
-                ? 'text-datepicker-placeholder'
-                : 'text-datepicker-text'
-            "
-          >{{ triggerLabel }}</span>
+            :class="isPlaceholder ? 'text-datepicker-placeholder' : 'text-datepicker-text'"
+            >{{ triggerLabel }}</span
+          >
           <!-- Chevron -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -425,14 +414,10 @@ const triggerClasses = computed(() => [
           data-test="datetimerange-relative-panel"
         >
           <!-- Quick-select rows -->
-          <div
-            v-for="unit in RELATIVE_UNITS"
-            :key="unit"
-            class="flex items-center gap-2"
-          >
-            <span
-              class="w-14 text-xs text-datepicker-relative-label shrink-0 capitalize"
-            >{{ UNIT_LABELS[unit] }}</span>
+          <div v-for="unit in RELATIVE_UNITS" :key="unit" class="flex items-center gap-2">
+            <span class="w-14 text-xs text-datepicker-relative-label shrink-0 capitalize">{{
+              UNIT_LABELS[unit]
+            }}</span>
             <div class="flex gap-1 flex-wrap">
               <button
                 v-for="val in RELATIVE_OPTIONS[unit]"
@@ -441,24 +426,24 @@ const triggerClasses = computed(() => [
                 :disabled="isRelativeDisabled(unit, val) || disabled"
                 :class="[
                   'w-8 h-7 rounded-default text-xs transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring tabular-nums',
-                  stagedRelativeUnit === unit && stagedRelativeAmount === val && !isRelativeDisabled(unit, val)
+                  stagedRelativeUnit === unit &&
+                  stagedRelativeAmount === val &&
+                  !isRelativeDisabled(unit, val)
                     ? 'bg-datepicker-relative-btn-selected-bg text-datepicker-relative-btn-selected-text'
                     : isRelativeDisabled(unit, val)
                       ? 'bg-datepicker-relative-btn-bg text-datepicker-day-disabled-text cursor-not-allowed'
                       : 'bg-datepicker-relative-btn-bg text-datepicker-relative-btn-text hover:bg-datepicker-relative-btn-hover-bg cursor-pointer',
                 ]"
                 @click="selectRelative(unit, val)"
-              >{{ val }}</button>
+              >
+                {{ val }}
+              </button>
             </div>
           </div>
 
           <!-- Custom row -->
-          <div
-            class="flex items-center gap-2 mt-1 pt-2 border-t border-datepicker-popup-border"
-          >
-            <span
-              class="w-14 text-xs text-datepicker-relative-label shrink-0"
-            >Custom</span>
+          <div class="flex items-center gap-2 mt-1 pt-2 border-t border-datepicker-popup-border">
+            <span class="w-14 text-xs text-datepicker-relative-label shrink-0">Custom</span>
             <input
               v-model="customAmount"
               type="number"
@@ -474,11 +459,7 @@ const triggerClasses = computed(() => [
               class="flex-1 h-7 rounded-default border border-datepicker-border bg-datepicker-bg text-datepicker-text text-xs px-2 outline-none focus:border-datepicker-focus-border disabled:opacity-50"
               data-test="datetimerange-custom-unit"
             >
-              <option
-                v-for="u in RELATIVE_UNITS"
-                :key="u"
-                :value="u"
-              >{{ UNIT_LABELS[u] }}</option>
+              <option v-for="u in RELATIVE_UNITS" :key="u" :value="u">{{ UNIT_LABELS[u] }}</option>
             </select>
           </div>
 
@@ -487,9 +468,7 @@ const triggerClasses = computed(() => [
             v-if="showTimezone"
             class="flex flex-col gap-1 pt-2 border-t border-datepicker-popup-border"
           >
-            <span
-              class="text-xs text-datepicker-relative-label"
-            >Timezone</span>
+            <span class="text-xs text-datepicker-relative-label">Timezone</span>
             <button
               type="button"
               :disabled="disabled"
@@ -537,11 +516,15 @@ const triggerClasses = computed(() => [
                       : 'text-datepicker-text hover:bg-datepicker-relative-btn-hover-bg',
                   ]"
                   @click="selectTimezone(tz)"
-                >{{ tzLabel(tz) }}</button>
+                >
+                  {{ tzLabel(tz) }}
+                </button>
                 <div
                   v-if="filteredTimezones.length === 0"
                   class="px-2 py-2 text-xs text-datepicker-weekday-text"
-                >No timezones found</div>
+                >
+                  No timezones found
+                </div>
               </div>
             </div>
           </div>
@@ -557,7 +540,9 @@ const triggerClasses = computed(() => [
               class="px-4 py-1.5 rounded-default text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
-            >Apply</button>
+            >
+              Apply
+            </button>
           </div>
         </div>
 
@@ -577,9 +562,7 @@ const triggerClasses = computed(() => [
             @update:model-value="handleRangeChange"
           >
             <template #default="{ weekDays, grid }">
-              <RangeCalendarHeader
-                class="flex items-center justify-between mb-3"
-              >
+              <RangeCalendarHeader class="flex items-center justify-between mb-3">
                 <RangeCalendarPrev
                   class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
                 >
@@ -597,9 +580,7 @@ const triggerClasses = computed(() => [
                     />
                   </svg>
                 </RangeCalendarPrev>
-                <RangeCalendarHeading
-                  class="text-sm font-medium text-datepicker-heading-text"
-                />
+                <RangeCalendarHeading class="text-sm font-medium text-datepicker-heading-text" />
                 <RangeCalendarNext
                   class="flex items-center justify-center size-7 rounded-default transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring"
                 >
@@ -619,10 +600,7 @@ const triggerClasses = computed(() => [
                 </RangeCalendarNext>
               </RangeCalendarHeader>
 
-              <RangeCalendarGrid
-                v-for="month in grid"
-                :key="month.value.toString()"
-              >
+              <RangeCalendarGrid v-for="month in grid" :key="month.value.toString()">
                 <RangeCalendarGridHead>
                   <RangeCalendarGridRow class="flex gap-1 mb-1">
                     <RangeCalendarHeadCell
@@ -649,7 +627,8 @@ const triggerClasses = computed(() => [
                         :day="date"
                         :month="month.value"
                         class="flex items-center justify-center size-8 rounded-default text-xs cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 ring-offset-1 ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-unavailable:cursor-not-allowed data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text"
-                      >{{ date.day }}</RangeCalendarCellTrigger>
+                        >{{ date.day }}</RangeCalendarCellTrigger
+                      >
                     </RangeCalendarCell>
                   </RangeCalendarGridRow>
                 </RangeCalendarGridBody>
@@ -667,7 +646,10 @@ const triggerClasses = computed(() => [
           </p>
 
           <!-- Start / End time -->
-          <div v-if="!hideTime" class="flex gap-3 [--color-datepicker-border:var(--color-datepicker-inner-border)]">
+          <div
+            v-if="!hideTime"
+            class="flex gap-3 [--color-datepicker-border:var(--color-datepicker-inner-border)]"
+          >
             <OTime
               v-model="stagedStartTime"
               label="Start time"
@@ -736,11 +718,15 @@ const triggerClasses = computed(() => [
                       : 'text-datepicker-text hover:bg-datepicker-relative-btn-hover-bg',
                   ]"
                   @click="selectTimezone(tz)"
-                >{{ tzLabel(tz) }}</button>
+                >
+                  {{ tzLabel(tz) }}
+                </button>
                 <div
                   v-if="filteredTimezones.length === 0"
                   class="px-3 py-2 text-sm text-datepicker-weekday-text"
-                >No timezones found</div>
+                >
+                  No timezones found
+                </div>
               </div>
             </div>
           </div>
@@ -753,26 +739,25 @@ const triggerClasses = computed(() => [
               class="px-4 py-1.5 rounded-default text-sm font-medium transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text hover:opacity-90 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring disabled:opacity-50 disabled:cursor-not-allowed"
               data-test="datetimerange-apply"
               @click="handleApply"
-            >Apply</button>
+            >
+              Apply
+            </button>
           </div>
         </div>
       </PopoverContent>
     </PopoverRoot>
 
     <!-- Error / help text -->
-    <div
-      v-if="errorMessage || helpText"
-      class="flex items-center gap-2"
-    >
+    <div v-if="errorMessage || helpText" class="flex items-center gap-2">
       <span
         v-if="errorMessage"
         class="text-xs text-datepicker-error-text leading-none"
         role="alert"
-      >{{ errorMessage }}</span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-datepicker-label leading-none"
-      >{{ helpText }}</span>
+        >{{ errorMessage }}</span
+      >
+      <span v-else-if="helpText" class="text-xs text-datepicker-label leading-none">{{
+        helpText
+      }}</span>
     </div>
   </div>
 </template>

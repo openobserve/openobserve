@@ -25,10 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   buttons toast until then.
 -->
 <template>
-  <div
-    data-test="workflow-editor-page"
-    class="flex flex-col h-full min-h-0"
-  >
+  <div data-test="workflow-editor-page" class="flex flex-col h-full min-h-0">
     <!-- Toolbar — the shared OPageHeader (same as the pipeline editor): a
          back chevron in the module-icon slot, the workflow name input inline
          after the title, and the Test / Cancel / Save actions right-aligned. -->
@@ -116,10 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
          side-by-side with the canvas. -->
-    <div
-      id="workflow-workspace"
-      class="flex-1 flex min-h-0 relative pt-3 px-2"
-    >
+    <div id="workflow-workspace" class="flex-1 flex min-h-0 relative pt-3 px-2">
       <!-- Docked node palette — same shared component as Pipelines, so the two
            palettes can never drift apart. Workflows add click-to-append. -->
       <NodePalette
@@ -131,9 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <!-- Canvas drop area — gray rounded-default inset card, matching the pipeline
            editor's `#pipelineChartContainer` so both look identical. -->
-      <div
-        class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle"
-      >
+      <div class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle">
         <WorkflowCanvas />
       </div>
     </div>
@@ -275,12 +267,8 @@ const paletteCard = (nt: string) => {
   };
 };
 const paletteItems = computed(() => {
-  const transforms = ADDABLE_NODE_TYPES.filter(
-    (nt) => nodeMeta(nt)?.ioType !== "output",
-  );
-  const destinations = ADDABLE_NODE_TYPES.filter(
-    (nt) => nodeMeta(nt)?.ioType === "output",
-  );
+  const transforms = ADDABLE_NODE_TYPES.filter((nt) => nodeMeta(nt)?.ioType !== "output");
+  const destinations = ADDABLE_NODE_TYPES.filter((nt) => nodeMeta(nt)?.ioType === "output");
   return [
     { label: t("workflow.node.sectionTransform"), isSectionHeader: true },
     ...transforms.map(paletteCard),
@@ -382,9 +370,7 @@ const validate = (): boolean => {
   workflowObj.nameError = false;
 
   const nodes = wf.nodes || [];
-  const trigger = nodes.find(
-    (n: any) => n.data?.node_type === "workflow_trigger",
-  );
+  const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) {
     toast({ message: t("workflow.triggerRequired"), variant: "warning" });
     return false;
@@ -396,9 +382,7 @@ const validate = (): boolean => {
 
   // Every non-trigger node must have an incoming edge.
   const targets = new Set((wf.edges || []).map((e: any) => e.target));
-  const orphan = nodes.find(
-    (n: any) => n.id !== trigger.id && !targets.has(n.id),
-  );
+  const orphan = nodes.find((n: any) => n.id !== trigger.id && !targets.has(n.id));
   if (orphan) {
     toast({ message: t("workflow.connectAllNodes"), variant: "warning" });
     return false;

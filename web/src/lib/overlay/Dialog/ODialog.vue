@@ -12,7 +12,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, watchEffect, useSlots, computed, nextTick, useAttrs, inject, provide } from "vue";
+import {
+  ref,
+  watch,
+  watchEffect,
+  useSlots,
+  computed,
+  nextTick,
+  useAttrs,
+  inject,
+  provide,
+} from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
@@ -114,9 +124,8 @@ function handleInteractOutside(e: Event) {
   // and therefore sit outside the DialogContent DOM subtree, so reka-ui's
   // DismissableLayer fires interactOutside for them — which would wrongly dismiss
   // the dialog before the click on the item can register.
-  const originalEvent = (
-    e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }
-  ).detail?.originalEvent;
+  const originalEvent = (e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }).detail
+    ?.originalEvent;
   const target = originalEvent?.target as Element | null;
   if (
     target?.closest("[data-reka-popper-content-wrapper]") // reka-ui portals (ODropdown, OSelect, …)
@@ -147,16 +156,11 @@ const hasTrigger = computed(() => !!slots.trigger);
 
 // The primary button is loading when the consumer says so OR a nested OForm is
 // mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
-const primaryLoading = computed(
-  () => props.primaryButtonLoading || formSubmitting.value,
-);
+const primaryLoading = computed(() => props.primaryButtonLoading || formSubmitting.value);
 
 // Auto-disable all buttons when any one of them is loading
 const anyButtonLoading = computed(
-  () =>
-    primaryLoading.value ||
-    props.secondaryButtonLoading ||
-    props.neutralButtonLoading,
+  () => primaryLoading.value || props.secondaryButtonLoading || props.neutralButtonLoading,
 );
 
 const primaryEffectivelyDisabled = computed(
@@ -173,9 +177,7 @@ const neutralEffectivelyDisabled = computed(
 const sizeClasses = computed(() => {
   // When an explicit width is supplied, skip max-w presets (full-screen is the exception)
   if (props.width) {
-    return props.size === "full"
-      ? "w-screen h-screen max-w-none rounded-none"
-      : "max-w-none";
+    return props.size === "full" ? "w-screen h-screen max-w-none rounded-none" : "max-w-none";
   }
   switch (props.size) {
     case "xs":
@@ -216,10 +218,9 @@ const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 // shortcuts (e.g. "s" on logs opening Save View over an open dialog).
 const AUTOFOCUS_TEXT_FIELDS = [
   'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-  'textarea:not([disabled])',
-].join(', ');
-const AUTOFOCUS_COMBOBOX =
-  '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
+  "textarea:not([disabled])",
+].join(", ");
+const AUTOFOCUS_COMBOBOX = '[role="combobox"]:not([disabled]):not([aria-disabled="true"])';
 const AUTOFOCUS_ANY_FIELD = `${AUTOFOCUS_TEXT_FIELDS}, ${AUTOFOCUS_COMBOBOX}`;
 
 function findAutoFocusTarget(root: Element): HTMLElement | null {
@@ -228,16 +229,10 @@ function findAutoFocusTarget(root: Element): HTMLElement | null {
     return root.matches(selector) ? [root as HTMLElement, ...nested] : nested;
   };
   const textField = scan(AUTOFOCUS_TEXT_FIELDS).find(
-    (el) =>
-      !el.closest(
-        '.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]',
-      ),
+    (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
   );
   if (textField) return textField;
-  return (
-    scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest('[data-no-autofocus]')) ??
-    null
-  );
+  return scan(AUTOFOCUS_COMBOBOX).find((el) => !el.closest("[data-no-autofocus]")) ?? null;
 }
 
 function handleOpenAutoFocus(event: Event) {
@@ -272,16 +267,11 @@ watchEffect((cleanup) => {
 
   const containsField = (node: Node): node is Element =>
     node instanceof Element &&
-    (node.matches(AUTOFOCUS_ANY_FIELD) ||
-      !!node.querySelector(AUTOFOCUS_ANY_FIELD));
+    (node.matches(AUTOFOCUS_ANY_FIELD) || !!node.querySelector(AUTOFOCUS_ANY_FIELD));
 
   const observer = new MutationObserver((records) => {
-    const added = records
-      .flatMap((r) => Array.from(r.addedNodes))
-      .filter(containsField);
-    const removedField = records
-      .flatMap((r) => Array.from(r.removedNodes))
-      .some(containsField);
+    const added = records.flatMap((r) => Array.from(r.addedNodes)).filter(containsField);
+    const removedField = records.flatMap((r) => Array.from(r.removedNodes)).some(containsField);
     if (!added.length || !removedField) return;
 
     const active = document.activeElement;
@@ -341,7 +331,13 @@ watchEffect((cleanup) => {
 });
 
 // ── Scroll shadow ────────────────────────────────────────────────────────────
-const { canScrollUp, canScrollDown, update: updateShadow, attach: attachShadow, detach: detachShadow } = useScrollShadow(bodyRef);
+const {
+  canScrollUp,
+  canScrollDown,
+  update: updateShadow,
+  attach: attachShadow,
+  detach: detachShadow,
+} = useScrollShadow(bodyRef);
 
 watch(internalOpen, (open) => {
   if (open) {
@@ -464,7 +460,10 @@ watch(internalOpen, (open) => {
             </div>
 
             <!-- #header-left sub-slot — grows to fill space, content flows left-to-right after title -->
-            <div v-if="slots['header-left']" class="flex-1 min-w-0 flex items-center justify-start gap-2">
+            <div
+              v-if="slots['header-left']"
+              class="flex-1 min-w-0 flex items-center justify-start gap-2"
+            >
               <slot name="header-left" />
             </div>
 
@@ -528,7 +527,10 @@ watch(internalOpen, (open) => {
             'text-dialog-content-text',
             !isFullSize && canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             !isFullSize && canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize && canScrollUp && canScrollDown && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize &&
+              canScrollUp &&
+              canScrollDown &&
+              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
         >
           <slot />
@@ -546,10 +548,7 @@ watch(internalOpen, (open) => {
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
-          <div
-            v-if="!slots.footer"
-            class="flex items-center justify-between gap-2"
-          >
+          <div v-if="!slots.footer" class="flex items-center justify-between gap-2">
             <!-- Left: neutral button -->
             <div>
               <OButton

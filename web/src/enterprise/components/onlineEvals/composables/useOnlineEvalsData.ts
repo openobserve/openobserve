@@ -22,13 +22,14 @@ export function useOnlineEvalsData() {
     if (!orgId) return;
     isLoading.value = true;
     try {
-      const [providerResult, scoreConfigResult, scorerResult, jobResult] =
-        await Promise.allSettled([
+      const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
+        [
           onlineEvalsService.providers.list(orgId),
           onlineEvalsService.scoreConfigs.list(orgId),
           onlineEvalsService.scorers.list(orgId),
           onlineEvalsService.jobs.list(orgId),
-        ]);
+        ],
+      );
 
       if (providerResult.status === "fulfilled") {
         providers.value = providerResult.value;

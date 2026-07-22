@@ -7,10 +7,7 @@ defineSlots<TimelineSlots>();
 </script>
 
 <template>
-  <ol
-    class="o-timeline relative list-none m-0 p-0"
-    v-bind="$attrs"
-  >
+  <ol class="o-timeline relative list-none m-0 p-0" v-bind="$attrs">
     <slot />
   </ol>
 </template>

@@ -119,12 +119,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const placeholderText = computed(
-  () => props.searchPlaceholder || (t("common.search") as string),
-);
-const emptyText = computed(
-  () => props.noMatchText || (t("common.noMatches") as string),
-);
+const placeholderText = computed(() => props.searchPlaceholder || (t("common.search") as string));
+const emptyText = computed(() => props.noMatchText || (t("common.noMatches") as string));
 
 const search = ref("");
 const filtered = computed(() => {

@@ -1,6 +1,10 @@
 ﻿<script setup lang="ts">
 import { computed } from "vue";
-import type { TimelineItemProps, TimelineItemSlots, TimelineItemVariant } from "./OTimelineItem.types";
+import type {
+  TimelineItemProps,
+  TimelineItemSlots,
+  TimelineItemVariant,
+} from "./OTimelineItem.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { iconRegistry } from "@/lib/core/Icon/OIcon.icons";
 
@@ -44,15 +48,12 @@ const isOIcon = computed<boolean>(() =>
         :style="dotStyle"
         aria-hidden="true"
       >
-        <OIcon
-          v-if="icon && isOIcon"
-          :name="(icon as any)"
-          size="xs"
-        />
+        <OIcon v-if="icon && isOIcon" :name="icon as any" size="xs" />
         <span
           v-else-if="icon"
           class="material-icons text-sm leading-none text-timeline-dot-fg select-none"
-        >{{ icon }}</span>
+          >{{ icon }}</span
+        >
       </div>
 
       <!--
@@ -60,23 +61,15 @@ const isOIcon = computed<boolean>(() =>
         OTimeline's scoped :deep rule hides this element when the
         parent <li> is :last-child.
       -->
-      <div
-        class="timeline-connector w-px flex-1 bg-timeline-line mt-1"
-      />
+      <div class="timeline-connector w-px flex-1 bg-timeline-line mt-1" />
     </div>
 
     <!-- Right column: title, subtitle, extra slot content -->
     <div class="flex-1 min-w-0 pt-0.5 pb-1">
-      <p
-        v-if="title"
-        class="m-0 text-sm font-medium leading-snug text-text-heading"
-      >
+      <p v-if="title" class="m-0 text-sm font-medium leading-snug text-text-heading">
         {{ title }}
       </p>
-      <p
-        v-if="subtitle"
-        class="m-0 mt-0.5 text-xs leading-normal text-text-secondary"
-      >
+      <p v-if="subtitle" class="m-0 mt-0.5 text-xs leading-normal text-text-secondary">
         {{ subtitle }}
       </p>
       <slot />

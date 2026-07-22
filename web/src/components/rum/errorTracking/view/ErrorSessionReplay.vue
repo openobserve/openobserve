@@ -22,9 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-center justify-between gap-2">
       <div class="min-w-0">
         <h4>{{ t("rum.sessionReplay") }}</h4>
-        <small data-test="error-session-replay-hint">{{
-          t("rum.replayAtFailureHint")
-        }}</small>
+        <small data-test="error-session-replay-hint">{{ t("rum.replayAtFailureHint") }}</small>
         <div class="flex mt-1.5">
           <template v-for="(value, tag) in getSessionTags" :key="tag">
             <ErrorTag :tag="{ key: tag, value }" />

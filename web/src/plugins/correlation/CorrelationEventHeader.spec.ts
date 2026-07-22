@@ -92,18 +92,14 @@ describe("CorrelationEventHeader.vue", () => {
         activeSubject: "k8s-pod-name",
       });
       expect(
-        wrapper
-          .find('[data-test="correlation-event-header-active-subject-k8s-pod-name"]')
-          .exists(),
+        wrapper.find('[data-test="correlation-event-header-active-subject-k8s-pod-name"]').exists(),
       ).toBe(false);
     });
 
     it("should not render the badge when no subject is active", () => {
       wrapper = createWrapper({ activeSubject: null });
       expect(
-        wrapper
-          .find('[data-test="correlation-event-header-active-subject-k8s-pod-name"]')
-          .exists(),
+        wrapper.find('[data-test="correlation-event-header-active-subject-k8s-pod-name"]').exists(),
       ).toBe(false);
     });
 

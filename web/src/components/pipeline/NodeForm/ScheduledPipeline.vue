@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         :class="store.state.isAiChatEnabled ? 'w-[75%]' : 'w-full'"
         class="flex"
-        style="height: 100% !important;"
+        style="height: 100% !important"
       >
         <!-- Collapsed field list bar (shown when hidden) -->
         <div
@@ -33,7 +33,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="collapseFieldList"
         >
           <OIcon name="expand-all" size="sm" class="rotate-90 mt-2.5 text-xl" />
-          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">{{ t("pipeline.buildQuery") }}</div>
+          <div class="[writing-mode:vertical-rl] [text-orientation:mixed] font-bold text-xs">
+            {{ t("pipeline.buildQuery") }}
+          </div>
         </div>
 
         <OSplitter
@@ -43,737 +45,669 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #before>
             <div class="flex flex-col h-full">
-            <!-- Left panel header with collapse button -->
-            <div class="flex items-center justify-between shrink-0 px-2 py-1.5 border-b border-border-default bg-surface-panel">
-              <span class="font-semibold text-sm">{{ t("pipeline.buildQuery") }}</span>
-              <OButton
-                variant="outline"
-                size="icon-xs-sq"
-                class="rotate-90"
-                icon-left="unfold-less"
-                :title="t('search.collapseFields')"
-                data-test="scheduled-pipeline-collapse-btn"
-                @click="collapseFieldList"
-              />
-            </div>
-            <div class="pl-2 flex flex-col flex-1 min-h-0">
-            <div
-              class="flex-1 min-h-0 w-full overflow-y-auto"
-            >
-                <!-- fieldlist section -->
-                <div
-                  class="flex flex-col overflow-hidden"
-                >
-                  <span
-                    @click.stop="
-                      expandState.buildQuery = !expandState.buildQuery
-                    "
-                  >
-                    <FullViewContainer
-                      name="query"
-                      v-model:is-expanded="expandState.buildQuery"
-                      :label="t('pipeline.buildQuery')"
-                    />
-                  </span>
-                  <div
-                    v-show="expandState.buildQuery"
-                    class="flex flex-col pt-2"
-                  >
-                    <div class="shrink-0">
-                      <OFormSelect
-                        name="stream_type"
-                        :options="streamTypes"
-                        :label="t('alerts.streamType')"
-                        required
-                        class="no-case w-full mb-1"
-                        data-test="scheduled-pipeline-stream-type-select"
+              <!-- Left panel header with collapse button -->
+              <div
+                class="flex items-center justify-between shrink-0 px-2 py-1.5 border-b border-border-default bg-surface-panel"
+              >
+                <span class="font-semibold text-sm">{{ t("pipeline.buildQuery") }}</span>
+                <OButton
+                  variant="outline"
+                  size="icon-xs-sq"
+                  class="rotate-90"
+                  icon-left="unfold-less"
+                  :title="t('search.collapseFields')"
+                  data-test="scheduled-pipeline-collapse-btn"
+                  @click="collapseFieldList"
+                />
+              </div>
+              <div class="pl-2 flex flex-col flex-1 min-h-0">
+                <div class="flex-1 min-h-0 w-full overflow-y-auto">
+                  <!-- fieldlist section -->
+                  <div class="flex flex-col overflow-hidden">
+                    <span @click.stop="expandState.buildQuery = !expandState.buildQuery">
+                      <FullViewContainer
+                        name="query"
+                        v-model:is-expanded="expandState.buildQuery"
+                        :label="t('pipeline.buildQuery')"
                       />
+                    </span>
+                    <div v-show="expandState.buildQuery" class="flex flex-col pt-2">
+                      <div class="shrink-0">
+                        <OFormSelect
+                          name="stream_type"
+                          :options="streamTypes"
+                          :label="t('alerts.streamType')"
+                          required
+                          class="no-case w-full mb-1"
+                          data-test="scheduled-pipeline-stream-type-select"
+                        />
 
-                      <OFormSelect
-                        name="stream_name"
-                        :options="filteredStreams"
-                        labelKey="label"
-                        valueKey="value"
-                        :label="t('alerts.stream_name')"
-                        :placeholder="t('pipeline.selectStream')"
-                        :loading="streamsLoading"
-                        class="my-1 no-case w-full"
-                        data-test="scheduled-pipeline-stream-name-select"
-                        @open="getStreamList"
-                      />
-                    </div>
-
-                    <!-- FieldList scrolls within a capped height -->
-                    <div
-                      style="max-height: 40vh;"
-                      class="pipeline-field-list-wrapper overflow-y-auto"
-                    >
-                      <GroupedFieldList
-                        :fields="streamFields"
-                        :theme="store.state.theme"
-                        :show-pagination="false"
-                        :page-size="50"
-                        search-class="px-0!"
-                      >
-                        <template #field-row="{ row }">
-                          <FieldRow
-                            :field="row"
-                            :selected-fields="[]"
-                            :timestamp-column="store.state.zoConfig.timestamp_column"
-                            :theme="store.state.theme"
-                            :show-quick-mode="false"
-                            :show-visibility-toggle="false"
-                            :show-fts-field-values="showFtsFieldValues"
-                            @add-to-filter="addFieldSearchTerm(`${row.name}=''`)"
-                          >
-                            <template
-                              v-if="isFieldExpandable(row)"
-                              #expansion="{ field }"
-                            >
-                              <FieldExpansion
-                                :field="field"
-                                :field-values="fieldValues[field.name]"
-                                :expanded="expandedRows?.[field.name] ?? false"
-                                :theme="store.state.theme"
-                                :show-visibility-toggle="false"
-                                :show-filter-icon="false"
-                                :show-quick-mode="false"
-                                :default-values-count="defaultValuesCount"
-                                @add-to-filter="(val: string) => addFieldSearchTerm(val)"
-                                @add-search-term="handleAddSearchTerm"
-                                @add-multiple-search-terms="handleAddMultipleSearchTerms"
-                                @remove-field-filter="(fn: string) => handleSidebarEvent('remove-field', fn)"
-                                @search-field-values="handleSearchFieldValues"
-                                @load-more-values="handleLoadMoreValues"
-                                @before-show="(event: any, f: any) => openFilterCreator(f)"
-                                @before-hide="(f: any) => closeField(f.name)"
-                              >
-                                <!-- Duration percentiles for traces -->
-                                <template
-                                  v-if="field.name === 'duration' && selectedStreamType === 'traces'"
-                                  #body
-                                >
-                                  <div
-                                    v-if="durationPercentilesLoading"
-                                    class="flex justify-center py-2"
-                                  >
-                                    <OSpinner size="xs" />
-                                  </div>
-                                  <template v-else-if="hasDurationPercentiles">
-                                    <div
-                                      v-for="p in PERCENTILE_LABELS"
-                                      :key="p.key"
-                                      class="flex items-center justify-between py-[0.15rem] pl-2"
-                                    >
-                                      <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
-                                      <span class="text-2xs flex-1 text-right pr-1">
-                                        {{ formatPercentile(durationPercentiles[p.key]) }}
-                                      </span>
-                                      <div class="flex w-[2.7rem]">
-                                        <OButton
-                                          v-if="p.key !== 'max'"
-                                          variant="ghost"
-                                          size="icon-xs-circle"
-                                          :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration>='${formatPercentile(durationPercentiles[p.key])}'`)"
-                                          class="ml-0.5! border! border-card-glass-border!"
-                                        >
-                                          <OIcon name="arrow-forward-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
-                                        </OButton>
-                                        <OButton
-                                          variant="ghost"
-                                          size="icon-xs-circle"
-                                          :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
-                                          @click.stop="addFieldSearchTerm(`duration<='${formatPercentile(durationPercentiles[p.key])}'`)"
-                                          class="ml-auto! mr-2! border! border-card-glass-border!"
-                                        >
-                                          <OIcon name="arrow-back-ios" size="sm" class="h-[0.4rem]! w-[0.4rem]!" />
-                                        </OButton>
-                                      </div>
-                                    </div>
-                                  </template>
-                                  <div v-else class="pl-2 py-1 text-2xs text-text-secondary">
-                                    {{ durationPercentileErrMsg || "No values found" }}
-                                  </div>
-                                </template>
-                              </FieldExpansion>
-                            </template>
-                          </FieldRow>
-                        </template>
-                      </GroupedFieldList>
-                    </div>
-                  </div>
-                </div>
-                <span
-                  @click.stop="
-                    expandState.setVariables = !expandState.setVariables
-                  "
-                >
-                  <!-- set variables part -->
-                  <FullViewContainer
-                    name="query"
-                    v-model:is-expanded="expandState.setVariables"
-                    :label="t('pipeline.setVariables')"
-                    class="mt-1"
-                  />
-                </span>
-                <div
-                  v-show="expandState.setVariables"
-                  class="flex flex-col pt-2"
-                >
-                  <div class="flex flex-col gap-4 w-full">
-                    <div
-                      v-if="
-                        selectedStreamType === 'metrics' &&
-                        tab === 'promql' &&
-                        promqlCondition
-                      "
-                      class="flex items-center gap-2"
-                    >
-                      <div
-                        class="font-bold flex items-center gap-1 w-40 shrink-0"
-                      >
-                        <span>{{ t("pipeline.trigger") }}</span>
-                        <OIcon
-                          name="info"
-                          size="sm"
-                          class="cursor-pointer text-icon-color"
-                        >
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span class="text-sm">
-                                Based upon the condition of trigger the
-                                pipeline will get trigger <br />
-                                e.g. if the trigger value is &gt;100 and the query
-                                returns a value of 101 then the pipeline will
-                                trigger.
-                              </span>
-                            </template>
-                          </OTooltip>
-                        </OIcon>
-                      </div>
-                      <OFormSelect
-                        name="query_condition.promql_condition.operator"
-                        :options="triggerOperators"
-                        :searchable="false"
-                        width="xs"
-                        class="no-case"
-                        data-test="scheduled-pipeline-promlq-condition-operator-select"
-                      />
-                      <OFormInput
-                        name="query_condition.promql_condition.value"
-                        type="number"
-                        :min="0"
-                        :placeholder="t('pipeline.value')"
-                        width="xs"
-                        data-test="scheduled-pipeline-promlq-condition-value"
-                      />
-                    </div>
-                    <div
-                      v-if="tab === 'custom'"
-                      class="flex items-center gap-2 font-bold mb-4"
-                    >
-                      <div
-                        data-test="scheduled-pipeline-aggregation-title"
-                        class="w-43 shrink-0"
-                      >
-                        {{ t("pipeline.aggregation") }}
-                      </div>
-                      <OSwitch
-                        data-test="scheduled-pipeline-aggregation-toggle"
-                        v-model="_isAggregationEnabled"
-                        :disabled="tab === 'sql' || tab === 'promql'"
-                        @update:model-value="updateAggregation"
-                      />
-                    </div>
-                    <div
-                      v-if="_isAggregationEnabled && aggregationData"
-                      class="flex items-center flex-nowrap mr-2 mb-2"
-                    >
-                      <div
-                        data-test="scheduled-pipeline-group-by-title"
-                        class="font-bold"
-                        style="width: 190px"
-                      >
-                        {{ t("alerts.groupBy") }}
-                      </div>
-                      <div
-                        class="flex justify-start items-center flex-wrap"
-                        style="width: calc(100% - 190px)"
-                      >
-                        <template
-                          v-for="(group, index) in aggregationData.group_by"
-                          :key="index"
-                        >
-                          <div
-                            :data-test="`scheduled-pipeline-group-by-${Number(index) + 1}`"
-                            class="flex justify-start items-center flex-nowrap o2-input"
-                          >
-                            <div
-                              data-test="scheduled-pipeline-group-by-column-select"
-                            >
-                              <OFormSelect
-                                :name="`query_condition.aggregation.group_by[${index}]`"
-                                :options="filteredFields"
-                                labelKey="label"
-                                valueKey="value"
-                                :placeholder="t('pipeline.selectColumn')"
-                                style="width: 200px"
-                              />
-                            </div>
-                            <OButton
-                              data-test="scheduled-pipeline-group-by-delete-btn"
-                              variant="ghost-destructive"
-                              size="icon-xs-sq"
-                              class="mb-2 ml-1 mr-2"
-                              :title="t('alert_templates.delete')"
-                              @click="deleteGroupByColumn(Number(index))"
-                              icon-left="delete"
-                            />
-                          </div>
-                        </template>
-                        <OButton
-                          data-test="scheduled-pipeline-group-by-add-btn"
-                          variant="ghost"
-                          size="icon-xs-sq"
-                          class="mb-2 ml-1 mr-2"
-                          :title="t('common.add')"
-                          @click="addGroupByColumn()"
-                          icon-left="add"
+                        <OFormSelect
+                          name="stream_name"
+                          :options="filteredStreams"
+                          labelKey="label"
+                          valueKey="value"
+                          :label="t('alerts.stream_name')"
+                          :placeholder="t('pipeline.selectStream')"
+                          :loading="streamsLoading"
+                          class="my-1 no-case w-full"
+                          data-test="scheduled-pipeline-stream-name-select"
+                          @open="getStreamList"
                         />
                       </div>
-                    </div>
-                    <div
-                      v-if="!disableThreshold"
-                      class="flex justify-start items-center mb-1 flex-nowrap pb-3"
-                    >
-                      <div
-                        data-test="scheduled-pipeline-threshold-title"
-                        class="font-bold flex items-center"
-                        style="width: 190px"
-                      >
-                        {{ t("alerts.threshold") + " *" }}
 
-                        <OIcon
-                          name="info"
-                          size="sm"
-                          class="ml-1 cursor-pointer"
-                          :class="
-                            'text-text-secondary'
-                          "
-                        >
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span style="font-size: var(--text-sm)"
-                                >The threshold above/below which the alert will
-                                trigger. <br />
-                                e.g. if the threshold is >100 and the query
-                                returns a value of 101 then the alert will
-                                trigger.</span
-                              >
-                            </template>
-                          </OTooltip>
-                        </OIcon>
-                      </div>
+                      <!-- FieldList scrolls within a capped height -->
                       <div
-                        style="width: calc(100% - 190px)"
-                        class="position-relative"
+                        style="max-height: 40vh"
+                        class="pipeline-field-list-wrapper overflow-y-auto"
                       >
-                        <template
-                          v-if="_isAggregationEnabled && aggregationData"
+                        <GroupedFieldList
+                          :fields="streamFields"
+                          :theme="store.state.theme"
+                          :show-pagination="false"
+                          :page-size="50"
+                          search-class="px-0!"
                         >
-                          <div class="flex justify-start items-center">
-                            <div
-                              data-test="scheduled-pipeline-threshold-function-select"
-                              class="threshould-input mr-1 o2-input"
+                          <template #field-row="{ row }">
+                            <FieldRow
+                              :field="row"
+                              :selected-fields="[]"
+                              :timestamp-column="store.state.zoConfig.timestamp_column"
+                              :theme="store.state.theme"
+                              :show-quick-mode="false"
+                              :show-visibility-toggle="false"
+                              :show-fts-field-values="showFtsFieldValues"
+                              @add-to-filter="addFieldSearchTerm(`${row.name}=''`)"
                             >
-                              <OFormSelect
-                                name="query_condition.aggregation.function"
-                                :options="aggFunctions"
-                                style="width: 120px"
-                              />
-                            </div>
-                            <div
-                              class="threshould-input mr-1 o2-input"
-                              data-test="scheduled-pipeline-threshold-column-select"
-                            >
-                              <OFormSelect
-                                name="query_condition.aggregation.having.column"
-                                :options="filteredNumericColumns"
-                                labelKey="label"
-                                valueKey="value"
-                                style="width: 250px"
-                              />
-                            </div>
-                            <div
-                              data-test="scheduled-pipeline-threshold-operator-select"
-                              class="threshould-input mr-1 o2-input mt-2"
-                            >
-                              <OFormSelect
-                                name="query_condition.aggregation.having.operator"
-                                :options="triggerOperators"
-                                style="width: 120px"
-                              />
-                            </div>
-                            <div class="flex items-center mt-2">
-                              <div
-                                data-test="scheduled-pipeline-threshold-value-input"
-                                style="width: 250px; margin-left: 0 !important"
-                                class="silence-notification-input o2-input"
-                              >
-                                <OFormInput
-                                  name="query_condition.aggregation.having.value"
-                                  type="number"
-                                  :min="0"
-                                  :placeholder="t('pipeline.value')"
-                                />
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            data-test="scheduled-pipeline-threshold-error-text"
-                            v-if="
-                              !aggregationData.function ||
-                              !aggregationData.having.column ||
-                              !aggregationData.having.operator ||
-                              !aggregationData.having.value.toString().trim()
-                                .length
-                            "
-                            class="text-status-error-text pt-1 absolute"
-                            style="font-size: var(--text-2xs); line-height: 12px"
-                          >
-                            {{ t("pipeline.fieldRequired") }}
-                          </div>
-                        </template>
-                        <template v-else>
-                          <div class="flex justify-start items-center">
-                            <div
-                              class="threshould-input"
-                              data-test="scheduled-pipeline-threshold-operator-select"
-                            >
-                              <OFormSelect
-                                name="trigger_condition.operator"
-                                :options="triggerOperators"
-                                style="
-                                  width: 88px;
-                                  border: 1px solid var(--color-border-subtle);
-                                "
-                              />
-                            </div>
-                            <div
-                              class="flex items-center"
-                              style="
-                                border: 1px solid var(--color-border-subtle);
-                                border-left: none;
-                              "
-                            >
-                              <div
-                                style="width: 89px; margin-left: 0 !important"
-                                class="silence-notification-input"
-                                data-test="scheduled-pipeline-threshold-value-input"
-                              >
-                                <OFormInput
-                                  name="trigger_condition.threshold"
-                                  type="number"
-                                  :min="1"
-                                />
-                              </div>
-                              <div
-                                data-test="scheduled-pipeline-threshold-unit"
-                                style="
-                                  min-width: 90px;
-                                  margin-left: 0 !important;
-                                  height: 40px;
-                                "
-                                class="flex justify-center items-center bg-surface-subtle font-normal"
-                              >
-                                {{ t("alerts.times") }}
-                              </div>
-                            </div>
-                          </div>
-                          <div
-                            data-test="scheduled-pipeline-threshold-error-text"
-                            v-if="
-                              !triggerData.operator ||
-                              !Number(triggerData.threshold)
-                            "
-                            class="text-status-error-text pt-1 absolute"
-                            style="font-size: var(--text-2xs); line-height: 12px"
-                          >
-                            {{ t("pipeline.fieldRequired") }}
-                          </div>
-                        </template>
+                              <template v-if="isFieldExpandable(row)" #expansion="{ field }">
+                                <FieldExpansion
+                                  :field="field"
+                                  :field-values="fieldValues[field.name]"
+                                  :expanded="expandedRows?.[field.name] ?? false"
+                                  :theme="store.state.theme"
+                                  :show-visibility-toggle="false"
+                                  :show-filter-icon="false"
+                                  :show-quick-mode="false"
+                                  :default-values-count="defaultValuesCount"
+                                  @add-to-filter="(val: string) => addFieldSearchTerm(val)"
+                                  @add-search-term="handleAddSearchTerm"
+                                  @add-multiple-search-terms="handleAddMultipleSearchTerms"
+                                  @remove-field-filter="
+                                    (fn: string) => handleSidebarEvent('remove-field', fn)
+                                  "
+                                  @search-field-values="handleSearchFieldValues"
+                                  @load-more-values="handleLoadMoreValues"
+                                  @before-show="(event: any, f: any) => openFilterCreator(f)"
+                                  @before-hide="(f: any) => closeField(f.name)"
+                                >
+                                  <!-- Duration percentiles for traces -->
+                                  <template
+                                    v-if="
+                                      field.name === 'duration' && selectedStreamType === 'traces'
+                                    "
+                                    #body
+                                  >
+                                    <div
+                                      v-if="durationPercentilesLoading"
+                                      class="flex justify-center py-2"
+                                    >
+                                      <OSpinner size="xs" />
+                                    </div>
+                                    <template v-else-if="hasDurationPercentiles">
+                                      <div
+                                        v-for="p in PERCENTILE_LABELS"
+                                        :key="p.key"
+                                        class="flex items-center justify-between py-[0.15rem] pl-2"
+                                      >
+                                        <span class="text-2xs w-8 shrink-0">{{ p.label }}</span>
+                                        <span class="text-2xs flex-1 text-right pr-1">
+                                          {{ formatPercentile(durationPercentiles[p.key]) }}
+                                        </span>
+                                        <div class="flex w-[2.7rem]">
+                                          <OButton
+                                            v-if="p.key !== 'max'"
+                                            variant="ghost"
+                                            size="icon-xs-circle"
+                                            :title="`duration >= ${formatPercentile(durationPercentiles[p.key])}`"
+                                            @click.stop="
+                                              addFieldSearchTerm(
+                                                `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
+                                              )
+                                            "
+                                            class="ml-0.5! border! border-card-glass-border!"
+                                          >
+                                            <OIcon
+                                              name="arrow-forward-ios"
+                                              size="sm"
+                                              class="h-[0.4rem]! w-[0.4rem]!"
+                                            />
+                                          </OButton>
+                                          <OButton
+                                            variant="ghost"
+                                            size="icon-xs-circle"
+                                            :title="`duration <= ${formatPercentile(durationPercentiles[p.key])}`"
+                                            @click.stop="
+                                              addFieldSearchTerm(
+                                                `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
+                                              )
+                                            "
+                                            class="ml-auto! mr-2! border! border-card-glass-border!"
+                                          >
+                                            <OIcon
+                                              name="arrow-back-ios"
+                                              size="sm"
+                                              class="h-[0.4rem]! w-[0.4rem]!"
+                                            />
+                                          </OButton>
+                                        </div>
+                                      </div>
+                                    </template>
+                                    <div v-else class="pl-2 py-1 text-2xs text-text-secondary">
+                                      {{ durationPercentileErrMsg || "No values found" }}
+                                    </div>
+                                  </template>
+                                </FieldExpansion>
+                              </template>
+                            </FieldRow>
+                          </template>
+                        </GroupedFieldList>
                       </div>
                     </div>
-                    <div class="flex items-center gap-2">
+                  </div>
+                  <span @click.stop="expandState.setVariables = !expandState.setVariables">
+                    <!-- set variables part -->
+                    <FullViewContainer
+                      name="query"
+                      v-model:is-expanded="expandState.setVariables"
+                      :label="t('pipeline.setVariables')"
+                      class="mt-1"
+                    />
+                  </span>
+                  <div v-show="expandState.setVariables" class="flex flex-col pt-2">
+                    <div class="flex flex-col gap-4 w-full">
                       <div
-                        data-test="scheduled-pipeline-cron-toggle-title"
-                        class="font-bold flex items-center gap-1 w-40 shrink-0"
+                        v-if="
+                          selectedStreamType === 'metrics' && tab === 'promql' && promqlCondition
+                        "
+                        class="flex items-center gap-2"
                       >
-                        <span>{{ t("alerts.crontitle") + " *" }}</span>
-                        <OIcon
-                          name="info"
-                          size="sm"
-                          class="cursor-pointer text-icon-color"
-                        >
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span class="text-sm">
-                                Configure the option to enable a cron
-                                expression.
-                              </span>
-                            </template>
-                          </OTooltip>
-                        </OIcon>
-                      </div>
-                      <OSwitch
-                        data-test="scheduled-pipeline-cron-toggle-btn"
-                        v-model="isCronMode"
-                      />
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <div
-                        data-test="scheduled-pipeline-frequency-title"
-                        class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
-                      >
-                        <span>{{ t("alerts.frequency") + " *" }}</span>
-                        <OIcon
-                          name="info"
-                          size="sm"
-                          class="cursor-pointer text-icon-color"
-                        >
-                          <OTooltip side="right">
-                            <template #content>
-                              <span
-                                class="text-sm"
-                                v-if="triggerData.frequency_type == 'minutes'"
-                                >How often the task should be executed.<br />
-                                e.g., 2 minutes means that the task will run
-                                every 2 minutes and will be processed based on
-                                the other parameters provided.</span
-                              >
-                              <span class="text-sm" v-else>
-                                Pattern: * * * * * * means every second.
-                                <br />
-                                Format: [Second (optional) 0-59] [Minute 0-59]
-                                [Hour 0-23] [Day of Month 1-31, 'L'] [Month
-                                1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for
-                                Sunday].
-                                <br />
-                                Use '*' to represent any value, 'L' for the last
-                                day/weekday.
-                                <br />
-                                Example: 0 0 12 * * ? - Triggers at 12:00 PM
-                                daily. It specifies second, minute, hour, day of
-                                month, month, and day of week,
-                                respectively.</span
-                              >
-                            </template>
-                          </OTooltip>
-                        </OIcon>
-                        <template
-                          v-if="
-                            triggerData.frequency_type == 'cron' &&
-                            showTimezoneWarning
-                          "
-                        >
-                          <OIcon
-                            name="warning"
-                            size="sm"
-                            class="cursor-pointer text-status-warning-text"
-                          >
-                            <OTooltip
-                              side="right"
-                              content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
-                            />
+                        <div class="font-bold flex items-center gap-1 w-40 shrink-0">
+                          <span>{{ t("pipeline.trigger") }}</span>
+                          <OIcon name="info" size="sm" class="cursor-pointer text-icon-color">
+                            <OTooltip side="right" max-width="300px">
+                              <template #content>
+                                <span class="text-sm">
+                                  Based upon the condition of trigger the pipeline will get trigger
+                                  <br />
+                                  e.g. if the trigger value is &gt;100 and the query returns a value
+                                  of 101 then the pipeline will trigger.
+                                </span>
+                              </template>
+                            </OTooltip>
                           </OIcon>
-                        </template>
+                        </div>
+                        <OFormSelect
+                          name="query_condition.promql_condition.operator"
+                          :options="triggerOperators"
+                          :searchable="false"
+                          width="xs"
+                          class="no-case"
+                          data-test="scheduled-pipeline-promlq-condition-operator-select"
+                        />
+                        <OFormInput
+                          name="query_condition.promql_condition.value"
+                          type="number"
+                          :min="0"
+                          :placeholder="t('pipeline.value')"
+                          width="xs"
+                          data-test="scheduled-pipeline-promlq-condition-value"
+                        />
                       </div>
-                      <div class="flex flex-col gap-1">
-                        <template v-if="triggerData.frequency_type == 'minutes'">
-                          <!-- Composite "number + unit" field: the control sits
+                      <div v-if="tab === 'custom'" class="flex items-center gap-2 font-bold mb-4">
+                        <div data-test="scheduled-pipeline-aggregation-title" class="w-43 shrink-0">
+                          {{ t("pipeline.aggregation") }}
+                        </div>
+                        <OSwitch
+                          data-test="scheduled-pipeline-aggregation-toggle"
+                          v-model="_isAggregationEnabled"
+                          :disabled="tab === 'sql' || tab === 'promql'"
+                          @update:model-value="updateAggregation"
+                        />
+                      </div>
+                      <div
+                        v-if="_isAggregationEnabled && aggregationData"
+                        class="flex items-center flex-nowrap mr-2 mb-2"
+                      >
+                        <div
+                          data-test="scheduled-pipeline-group-by-title"
+                          class="font-bold"
+                          style="width: 190px"
+                        >
+                          {{ t("alerts.groupBy") }}
+                        </div>
+                        <div
+                          class="flex justify-start items-center flex-wrap"
+                          style="width: calc(100% - 190px)"
+                        >
+                          <template v-for="(group, index) in aggregationData.group_by" :key="index">
+                            <div
+                              :data-test="`scheduled-pipeline-group-by-${Number(index) + 1}`"
+                              class="flex justify-start items-center flex-nowrap o2-input"
+                            >
+                              <div data-test="scheduled-pipeline-group-by-column-select">
+                                <OFormSelect
+                                  :name="`query_condition.aggregation.group_by[${index}]`"
+                                  :options="filteredFields"
+                                  labelKey="label"
+                                  valueKey="value"
+                                  :placeholder="t('pipeline.selectColumn')"
+                                  style="width: 200px"
+                                />
+                              </div>
+                              <OButton
+                                data-test="scheduled-pipeline-group-by-delete-btn"
+                                variant="ghost-destructive"
+                                size="icon-xs-sq"
+                                class="mb-2 ml-1 mr-2"
+                                :title="t('alert_templates.delete')"
+                                @click="deleteGroupByColumn(Number(index))"
+                                icon-left="delete"
+                              />
+                            </div>
+                          </template>
+                          <OButton
+                            data-test="scheduled-pipeline-group-by-add-btn"
+                            variant="ghost"
+                            size="icon-xs-sq"
+                            class="mb-2 ml-1 mr-2"
+                            :title="t('common.add')"
+                            @click="addGroupByColumn()"
+                            icon-left="add"
+                          />
+                        </div>
+                      </div>
+                      <div
+                        v-if="!disableThreshold"
+                        class="flex justify-start items-center mb-1 flex-nowrap pb-3"
+                      >
+                        <div
+                          data-test="scheduled-pipeline-threshold-title"
+                          class="font-bold flex items-center"
+                          style="width: 190px"
+                        >
+                          {{ t("alerts.threshold") + " *" }}
+
+                          <OIcon
+                            name="info"
+                            size="sm"
+                            class="ml-1 cursor-pointer"
+                            :class="'text-text-secondary'"
+                          >
+                            <OTooltip side="right" max-width="300px">
+                              <template #content>
+                                <span style="font-size: var(--text-sm)"
+                                  >The threshold above/below which the alert will trigger. <br />
+                                  e.g. if the threshold is >100 and the query returns a value of 101
+                                  then the alert will trigger.</span
+                                >
+                              </template>
+                            </OTooltip>
+                          </OIcon>
+                        </div>
+                        <div style="width: calc(100% - 190px)" class="position-relative">
+                          <template v-if="_isAggregationEnabled && aggregationData">
+                            <div class="flex justify-start items-center">
+                              <div
+                                data-test="scheduled-pipeline-threshold-function-select"
+                                class="threshould-input mr-1 o2-input"
+                              >
+                                <OFormSelect
+                                  name="query_condition.aggregation.function"
+                                  :options="aggFunctions"
+                                  style="width: 120px"
+                                />
+                              </div>
+                              <div
+                                class="threshould-input mr-1 o2-input"
+                                data-test="scheduled-pipeline-threshold-column-select"
+                              >
+                                <OFormSelect
+                                  name="query_condition.aggregation.having.column"
+                                  :options="filteredNumericColumns"
+                                  labelKey="label"
+                                  valueKey="value"
+                                  style="width: 250px"
+                                />
+                              </div>
+                              <div
+                                data-test="scheduled-pipeline-threshold-operator-select"
+                                class="threshould-input mr-1 o2-input mt-2"
+                              >
+                                <OFormSelect
+                                  name="query_condition.aggregation.having.operator"
+                                  :options="triggerOperators"
+                                  style="width: 120px"
+                                />
+                              </div>
+                              <div class="flex items-center mt-2">
+                                <div
+                                  data-test="scheduled-pipeline-threshold-value-input"
+                                  style="width: 250px; margin-left: 0 !important"
+                                  class="silence-notification-input o2-input"
+                                >
+                                  <OFormInput
+                                    name="query_condition.aggregation.having.value"
+                                    type="number"
+                                    :min="0"
+                                    :placeholder="t('pipeline.value')"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              data-test="scheduled-pipeline-threshold-error-text"
+                              v-if="
+                                !aggregationData.function ||
+                                !aggregationData.having.column ||
+                                !aggregationData.having.operator ||
+                                !aggregationData.having.value.toString().trim().length
+                              "
+                              class="text-status-error-text pt-1 absolute"
+                              style="font-size: var(--text-2xs); line-height: 12px"
+                            >
+                              {{ t("pipeline.fieldRequired") }}
+                            </div>
+                          </template>
+                          <template v-else>
+                            <div class="flex justify-start items-center">
+                              <div
+                                class="threshould-input"
+                                data-test="scheduled-pipeline-threshold-operator-select"
+                              >
+                                <OFormSelect
+                                  name="trigger_condition.operator"
+                                  :options="triggerOperators"
+                                  style="width: 88px; border: 1px solid var(--color-border-subtle)"
+                                />
+                              </div>
+                              <div
+                                class="flex items-center"
+                                style="
+                                  border: 1px solid var(--color-border-subtle);
+                                  border-left: none;
+                                "
+                              >
+                                <div
+                                  style="width: 89px; margin-left: 0 !important"
+                                  class="silence-notification-input"
+                                  data-test="scheduled-pipeline-threshold-value-input"
+                                >
+                                  <OFormInput
+                                    name="trigger_condition.threshold"
+                                    type="number"
+                                    :min="1"
+                                  />
+                                </div>
+                                <div
+                                  data-test="scheduled-pipeline-threshold-unit"
+                                  style="min-width: 90px; margin-left: 0 !important; height: 40px"
+                                  class="flex justify-center items-center bg-surface-subtle font-normal"
+                                >
+                                  {{ t("alerts.times") }}
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              data-test="scheduled-pipeline-threshold-error-text"
+                              v-if="!triggerData.operator || !Number(triggerData.threshold)"
+                              class="text-status-error-text pt-1 absolute"
+                              style="font-size: var(--text-2xs); line-height: 12px"
+                            >
+                              {{ t("pipeline.fieldRequired") }}
+                            </div>
+                          </template>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <div
+                          data-test="scheduled-pipeline-cron-toggle-title"
+                          class="font-bold flex items-center gap-1 w-40 shrink-0"
+                        >
+                          <span>{{ t("alerts.crontitle") + " *" }}</span>
+                          <OIcon name="info" size="sm" class="cursor-pointer text-icon-color">
+                            <OTooltip side="right" max-width="300px">
+                              <template #content>
+                                <span class="text-sm">
+                                  Configure the option to enable a cron expression.
+                                </span>
+                              </template>
+                            </OTooltip>
+                          </OIcon>
+                        </div>
+                        <OSwitch
+                          data-test="scheduled-pipeline-cron-toggle-btn"
+                          v-model="isCronMode"
+                        />
+                      </div>
+                      <div class="flex items-start gap-2">
+                        <div
+                          data-test="scheduled-pipeline-frequency-title"
+                          class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
+                        >
+                          <span>{{ t("alerts.frequency") + " *" }}</span>
+                          <OIcon name="info" size="sm" class="cursor-pointer text-icon-color">
+                            <OTooltip side="right">
+                              <template #content>
+                                <span class="text-sm" v-if="triggerData.frequency_type == 'minutes'"
+                                  >How often the task should be executed.<br />
+                                  e.g., 2 minutes means that the task will run every 2 minutes and
+                                  will be processed based on the other parameters provided.</span
+                                >
+                                <span class="text-sm" v-else>
+                                  Pattern: * * * * * * means every second.
+                                  <br />
+                                  Format: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of
+                                  Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7
+                                  for Sunday].
+                                  <br />
+                                  Use '*' to represent any value, 'L' for the last day/weekday.
+                                  <br />
+                                  Example: 0 0 12 * * ? - Triggers at 12:00 PM daily. It specifies
+                                  second, minute, hour, day of month, month, and day of week,
+                                  respectively.</span
+                                >
+                              </template>
+                            </OTooltip>
+                          </OIcon>
+                          <template
+                            v-if="triggerData.frequency_type == 'cron' && showTimezoneWarning"
+                          >
+                            <OIcon
+                              name="warning"
+                              size="sm"
+                              class="cursor-pointer text-status-warning-text"
+                            >
+                              <OTooltip
+                                side="right"
+                                content="Warning: The displayed timezone is approximate. Verify and select the correct timezone manually."
+                              />
+                            </OIcon>
+                          </template>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <template v-if="triggerData.frequency_type == 'minutes'">
+                            <!-- Composite "number + unit" field: the control sits
                                inside a shared w-fit/overflow-hidden border, so
                                OFormInput's built-in message would render inside
                                the 7.5rem field and wrap/clip. The empty #error
                                slot keeps the field form-owned (name=) but
                                suppresses its inline message; the schema error is
                                surfaced in the full-width sibling below. -->
-                          <div
-                            class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
-                          >
-                            <OFormInput
-                              data-test="scheduled-pipeline-frequency-input-field"
-                              name="trigger_condition.frequency"
-                              type="number"
-                              :min="
-                                Math.ceil(
-                                  store.state?.zoConfig
-                                    ?.min_auto_refresh_interval / 60,
-                                ) || 1
-                              "
-                              width="xs"
-                            >
-                              <template #error />
-                            </OFormInput>
                             <div
-                              data-test="scheduled-pipeline-frequency-unit"
-                              class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
+                              class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                             >
-                              {{ t("alerts.minutes") }}
+                              <OFormInput
+                                data-test="scheduled-pipeline-frequency-input-field"
+                                name="trigger_condition.frequency"
+                                type="number"
+                                :min="
+                                  Math.ceil(
+                                    store.state?.zoConfig?.min_auto_refresh_interval / 60,
+                                  ) || 1
+                                "
+                                width="xs"
+                              >
+                                <template #error />
+                              </OFormInput>
+                              <div
+                                data-test="scheduled-pipeline-frequency-unit"
+                                class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
+                              >
+                                {{ t("alerts.minutes") }}
+                              </div>
                             </div>
-                          </div>
-                          <div
-                            v-if="frequencyError"
-                            data-test="scheduled-pipeline-frequency-error-text"
-                            class="text-status-error-text text-2xs leading-3"
-                          >
-                            {{ frequencyError }}
-                          </div>
-                        </template>
-                        <template v-else>
-                          <div class="flex items-start gap-2">
-                            <OFormInput
-                              data-test="scheduled-pipeline-cron-input-field"
-                              name="trigger_condition.cron"
-                              :placeholder="t('reports.cronExpression')"
-                              width="xs"
-                              required
-                            />
-                            <OFormSelect
-                              data-test="add-report-schedule-start-timezone-select"
-                              name="trigger_condition.timezone"
-                              :options="filteredTimezone"
-                              :placeholder="t('logStream.timezone') + ' *'"
-                              :title="triggerData.timezone"
-                              width="xs"
-                            />
-                          </div>
-                        </template>
+                            <div
+                              v-if="frequencyError"
+                              data-test="scheduled-pipeline-frequency-error-text"
+                              class="text-status-error-text text-2xs leading-3"
+                            >
+                              {{ frequencyError }}
+                            </div>
+                          </template>
+                          <template v-else>
+                            <div class="flex items-start gap-2">
+                              <OFormInput
+                                data-test="scheduled-pipeline-cron-input-field"
+                                name="trigger_condition.cron"
+                                :placeholder="t('reports.cronExpression')"
+                                width="xs"
+                                required
+                              />
+                              <OFormSelect
+                                data-test="add-report-schedule-start-timezone-select"
+                                name="trigger_condition.timezone"
+                                :options="filteredTimezone"
+                                :placeholder="t('logStream.timezone') + ' *'"
+                                :title="triggerData.timezone"
+                                width="xs"
+                              />
+                            </div>
+                          </template>
+                        </div>
                       </div>
-                    </div>
-                    <div class="flex items-start gap-2">
-                      <div
-                        data-test="scheduled-pipeline-period-title"
-                        class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
-                      >
-                        <span>{{ t("alerts.period") + " *" }}</span>
-                        <OIcon
-                          name="info"
-                          size="sm"
-                          class="cursor-pointer text-icon-color"
+                      <div class="flex items-start gap-2">
+                        <div
+                          data-test="scheduled-pipeline-period-title"
+                          class="font-bold flex items-center gap-1 w-40 shrink-0 pt-2"
                         >
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span class="text-sm">
-                                Period for which the query should run.<br />
-                                e.g. 10 minutes means that whenever the query
-                                will run it will use the last 10 minutes of
-                                data. If the query runs at 4:00 PM then it will
-                                use the data from 3:50 PM to 4:00 PM.
-                              </span>
-                            </template>
-                          </OTooltip>
-                        </OIcon>
-                      </div>
-                      <div class="flex flex-col gap-1">
-                        <!-- Composite "number + unit" field — same pattern as
+                          <span>{{ t("alerts.period") + " *" }}</span>
+                          <OIcon name="info" size="sm" class="cursor-pointer text-icon-color">
+                            <OTooltip side="right" max-width="300px">
+                              <template #content>
+                                <span class="text-sm">
+                                  Period for which the query should run.<br />
+                                  e.g. 10 minutes means that whenever the query will run it will use
+                                  the last 10 minutes of data. If the query runs at 4:00 PM then it
+                                  will use the data from 3:50 PM to 4:00 PM.
+                                </span>
+                              </template>
+                            </OTooltip>
+                          </OIcon>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <!-- Composite "number + unit" field — same pattern as
                              frequency: an empty #error slot on the form-owned
                              field suppresses its inline message, and the schema
                              error (period ≥ 1) is rendered as a full-width sibling
                              below the bordered control instead of inside the
                              7.5rem field, where it would wrap. -->
+                          <div
+                            class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
+                          >
+                            <OFormInput
+                              data-test="scheduled-pipeline-period-input"
+                              name="trigger_condition.period"
+                              type="number"
+                              :min="1"
+                              :readonly="triggerData.frequency_type == 'minutes'"
+                              :disabled="triggerData.frequency_type == 'minutes'"
+                              class="silence-notification-input"
+                              width="xs"
+                            >
+                              <template #error />
+                            </OFormInput>
+                            <div
+                              data-test="scheduled-pipeline-period-unit"
+                              class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
+                            >
+                              {{ t("alerts.minutes") }}
+                            </div>
+                          </div>
+                          <!-- The required rule lives in the schema (period ≥ 1);
+                             surfaced here after submit. Otherwise, once a
+                             period is set, show the informational note. -->
+                          <div
+                            v-if="periodError"
+                            data-test="scheduled-pipeline-period-error-text"
+                            class="text-status-error-text text-2xs leading-3"
+                          >
+                            {{ periodError }}
+                          </div>
+                          <div
+                            v-else-if="Number(triggerData.period)"
+                            data-test="scheduled-pipeline-period-warning-text"
+                            class="text-accent text-xs leading-3 py-0.5"
+                          >
+                            Note: The period should be the same as frequency.
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <div
+                          data-test="scheduled-pipeline-delay-title"
+                          class="font-bold flex items-center gap-1 w-40 shrink-0"
+                        >
+                          <span>{{ t("pipeline.delay") }}</span>
+                          <OIcon name="info" size="sm" class="cursor-pointer text-icon-color">
+                            <OTooltip side="right" max-width="300px">
+                              <template #content>
+                                <span class="text-sm"
+                                  >Delay for which the pipeline is scheduled to run.<br />
+                                  e.g. 10 minutes delay means that the pipeline will run 10 minutes
+                                  after its scheduled time.</span
+                                >
+                              </template>
+                            </OTooltip>
+                          </OIcon>
+                        </div>
                         <div
                           class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
                         >
                           <OFormInput
-                            data-test="scheduled-pipeline-period-input"
-                            name="trigger_condition.period"
+                            data-test="scheduled-pipeline-delay-input"
+                            name="delay"
                             type="number"
-                            :min="1"
-                            :readonly="triggerData.frequency_type == 'minutes'"
-                            :disabled="triggerData.frequency_type == 'minutes'"
-                            class="silence-notification-input" width="xs"
-                          >
-                            <template #error />
-                          </OFormInput>
+                            :min="0"
+                            width="xs"
+                          />
                           <div
-                            data-test="scheduled-pipeline-period-unit"
+                            data-test="scheduled-pipeline-delay-unit"
                             class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
                           >
                             {{ t("alerts.minutes") }}
                           </div>
                         </div>
-                        <!-- The required rule lives in the schema (period ≥ 1);
-                             surfaced here after submit. Otherwise, once a
-                             period is set, show the informational note. -->
-                        <div
-                          v-if="periodError"
-                          data-test="scheduled-pipeline-period-error-text"
-                          class="text-status-error-text text-2xs leading-3"
-                        >
-                          {{ periodError }}
-                        </div>
-                        <div
-                          v-else-if="Number(triggerData.period)"
-                          data-test="scheduled-pipeline-period-warning-text"
-                          class="text-accent text-xs leading-3 py-0.5"
-                        >
-                          Note: The period should be the same as frequency.
-                        </div>
                       </div>
                     </div>
-                    <div class="flex items-center gap-2">
-                      <div
-                        data-test="scheduled-pipeline-delay-title"
-                        class="font-bold flex items-center gap-1 w-40 shrink-0"
-                      >
-                        <span>{{ t("pipeline.delay") }}</span>
-                        <OIcon
-                          name="info"
-                          size="sm"
-                          class="cursor-pointer text-icon-color"
-                        >
-                          <OTooltip side="right" max-width="300px">
-                            <template #content>
-                              <span class="text-sm"
-                                >Delay for which the pipeline is scheduled to
-                                run.<br />
-                                e.g. 10 minutes delay means that the pipeline
-                                will run 10 minutes after its scheduled
-                                time.</span
-                              >
-                            </template>
-                          </OTooltip>
-                        </OIcon>
-                      </div>
-                      <div
-                        class="flex items-stretch border border-card-glass-border rounded-default w-fit overflow-hidden"
-                      >
-                        <OFormInput
-                          data-test="scheduled-pipeline-delay-input"
-                          name="delay"
-                          type="number"
-                          :min="0"
-                          width="xs"
-                        />
-                        <div
-                          data-test="scheduled-pipeline-delay-unit"
-                          class="flex justify-center items-center min-w-15 px-2 font-normal bg-surface-subtle"
-                        >
-                          {{ t("alerts.minutes") }}
-                        </div>
-                      </div>
-                    </div>
+
+                    <div></div>
+
+                    <div
+                      class="flex justify-start items-end mt-4 pb-4 w-full bg-surface-base"
+                    ></div>
                   </div>
-
-                  <div></div>
-
-                  <div
-                    class="flex justify-start items-end mt-4 pb-4 w-full bg-surface-base"
-                  ></div>
                 </div>
-            </div>
-            </div>
+              </div>
             </div>
           </template>
           <template #separator>
@@ -792,11 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <FullViewContainer
                       name="query"
                       v-model:is-expanded="expandState.query"
-                      :label="
-                        tab === 'sql'
-                          ? t('pipeline.sqlQuery')
-                          : t('pipeline.promqlQuery')
-                      "
+                      :label="tab === 'sql' ? t('pipeline.sqlQuery') : t('pipeline.promqlQuery')"
                     />
                   </span>
                   <div class="relative">
@@ -813,7 +743,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :disable-ai-reason="t('search.selectStreamForAI')"
                       @update:query="updateQueryValue"
                       @run-query="runQuery"
-                      @focus="() => { queryEditorPlaceholderFlag = false; _sqlOnFocus(); }"
+                      @focus="
+                        () => {
+                          queryEditorPlaceholderFlag = false;
+                          _sqlOnFocus();
+                        }
+                      "
                       @blur="onBlurQueryEditor"
                       editor-height="calc(100vh - 190px)"
                     />
@@ -821,87 +756,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="!query && queryEditorPlaceholderFlag && expandState.query"
                       class="query-editor-placeholder-overlay absolute inset-0 flex items-start pt-0.75 pl-[2.15rem] pr-2 pointer-events-none z-1 select-none"
                     >
-                      <span class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis">{{ editorPlaceholder }}</span>
+                      <span
+                        class="query-editor-placeholder-typewriter font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden text-ellipsis"
+                        >{{ editorPlaceholder }}</span
+                      >
                     </div>
                   </div>
 
                   <div>
-                  <span @click.stop="expandState.output = !expandState.output">
-                    <FullViewContainer
-                      name="output"
-                      v-model:is-expanded="expandState.output"
-                      :label="t('pipeline.output')"
-                      class="mt-1"
-                    />
-                  </span>
-                  <div
-                    v-if="loading && expandState.output && tab == 'sql'"
-                    style="height: calc(100vh - 190px) !important"
-                    class="flex justify-center items-center"
-                  >
-                    <OSpinner size="md" />
-                  </div>
-
-                  <TenstackTable
-                    v-else-if="
-                      expandState.output && rows.length > 0 && tab == 'sql'
-                    "
-                    style="height: calc(100vh - 190px) !important"
-                    ref="searchTableRef"
-                    :columns="getColumns"
-                    :rows="rows"
-                    :jsonpreviewStreamName="selectedStreamName"
-                    :expandedRows="expandedLogs"
-                    @expand-row="expandLog"
-                    @copy="copyLogToClipboard"
-                    @sendToAiChat="sendToAiChat"
-                  />
-
-                  <div
-                    v-else-if="
-                      rows.length == 0 && expandState.output && tab == 'sql'
-                    "
-                    style="height: calc(100vh - 236px) !important"
-                  >
-                    <h6
-                      v-if="selectedStreamName == ''"
-                      data-test="logs-search-no-stream-selected-text"
-                      class="text-center w-5/6 mx-0"
-                    >
-                      <OIcon
-                        name="info"
-                        size="md"
-                        class="align-middle mr-1"
+                    <span @click.stop="expandState.output = !expandState.output">
+                      <FullViewContainer
+                        name="output"
+                        v-model:is-expanded="expandState.output"
+                        :label="t('pipeline.output')"
+                        class="mt-1"
                       />
-                      {{ t("search.noStreamSelectedMessage") }}
-                    </h6>
-                    <h6
-                      v-else-if="notificationMsgValue != ''"
-                      data-test="logs-search-no-stream-selected-text"
-                      class="text-center w-5/6 mx-0"
+                    </span>
+                    <div
+                      v-if="loading && expandState.output && tab == 'sql'"
+                      style="height: calc(100vh - 190px) !important"
+                      class="flex justify-center items-center"
                     >
-                      {{ notificationMsgValue }}
-                    </h6>
-                    <h6
-                      v-else
-                      data-test="logs-search-no-stream-selected-text"
-                      class="text-center w-5/6 mx-0"
-                    >
-                      <OIcon name="info" size="md" />
-                      {{ t("search.applySearch") }}
-                    </h6>
-                  </div>
+                      <OSpinner size="md" />
+                    </div>
 
-                  <div v-else-if="tab == 'promql' && expandState.output">
-                    <PreviewPromqlQuery
-                      ref="previewPromqlQueryRef"
-                      :query="query"
-                      :stream_name="selectedStreamName"
-                      :stream_type="selectedStreamType"
-                      :dateTime="dateTime"
+                    <TenstackTable
+                      v-else-if="expandState.output && rows.length > 0 && tab == 'sql'"
+                      style="height: calc(100vh - 190px) !important"
+                      ref="searchTableRef"
+                      :columns="getColumns"
+                      :rows="rows"
+                      :jsonpreviewStreamName="selectedStreamName"
+                      :expandedRows="expandedLogs"
+                      @expand-row="expandLog"
+                      @copy="copyLogToClipboard"
+                      @sendToAiChat="sendToAiChat"
                     />
+
+                    <div
+                      v-else-if="rows.length == 0 && expandState.output && tab == 'sql'"
+                      style="height: calc(100vh - 236px) !important"
+                    >
+                      <h6
+                        v-if="selectedStreamName == ''"
+                        data-test="logs-search-no-stream-selected-text"
+                        class="text-center w-5/6 mx-0"
+                      >
+                        <OIcon name="info" size="md" class="align-middle mr-1" />
+                        {{ t("search.noStreamSelectedMessage") }}
+                      </h6>
+                      <h6
+                        v-else-if="notificationMsgValue != ''"
+                        data-test="logs-search-no-stream-selected-text"
+                        class="text-center w-5/6 mx-0"
+                      >
+                        {{ notificationMsgValue }}
+                      </h6>
+                      <h6
+                        v-else
+                        data-test="logs-search-no-stream-selected-text"
+                        class="text-center w-5/6 mx-0"
+                      >
+                        <OIcon name="info" size="md" />
+                        {{ t("search.applySearch") }}
+                      </h6>
+                    </div>
+
+                    <div v-else-if="tab == 'promql' && expandState.output">
+                      <PreviewPromqlQuery
+                        ref="previewPromqlQueryRef"
+                        :query="query"
+                        :stream_name="selectedStreamName"
+                        :stream_type="selectedStreamType"
+                        :dateTime="dateTime"
+                      />
+                    </div>
                   </div>
-                </div>
                 </div>
               </div>
 
@@ -940,9 +870,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click.prevent="$emit('submit:form')"
                   >
                     {{
-                      validatingSqlQuery
-                        ? t("pipeline.validating")
-                        : t("pipeline.validateAndClose")
+                      validatingSqlQuery ? t("pipeline.validating") : t("pipeline.validateAndClose")
                     }}
                   </OButton>
                 </div>
@@ -957,10 +885,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="ml-2 w-1/4 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="
-          min-width: 75px;
-          height: calc(100vh - 70px) !important;
-        "
+        style="min-width: 75px; height: calc(100vh - 70px) !important"
       >
         <O2AIChat
           style="height: calc(100vh - 70px) !important"
@@ -1020,11 +945,7 @@ import FieldRow from "@/components/common/FieldRow.vue";
 import useStreams from "@/composables/useStreams";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
-import {
-  applyFieldGrouping,
-  buildSemanticIndex,
-  type FieldObj,
-} from "@/utils/fieldCategories";
+import { applyFieldGrouping, buildSemanticIndex, type FieldObj } from "@/utils/fieldCategories";
 import {
   useServiceCorrelation,
   type KeyFieldsConfig,
@@ -1053,12 +974,8 @@ import {
   replaceExistingFieldCondition,
 } from "@/plugins/logs/filterUtils";
 
-const UnifiedQueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
-);
-const FieldExpansion = defineAsyncComponent(
-  () => import("@/components/common/FieldExpansion.vue"),
-);
+const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
+const FieldExpansion = defineAsyncComponent(() => import("@/components/common/FieldExpansion.vue"));
 
 const props = defineProps([
   "columns",
@@ -1115,8 +1032,7 @@ const {
   searchObj?: { data?: { stream?: { pipelineQueryStream?: string[] } } };
 } = useLogs();
 const { getStream, getStreams } = useStreams();
-const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
-  useServiceCorrelation();
+const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const { registerAiChatHandler, removeAiChatHandler } = useAiChat();
 let parser: any;
 
@@ -1183,12 +1099,8 @@ const form: any = inject(FORM_CONTEXT_KEY);
 
 // Reactive VIEWS of the form-owned slices (the single source of truth). These are
 // reads only; every write goes through setTrigger/setAggregation/form.setFieldValue.
-const triggerData = form.useStore(
-  (s: any) => s.values.trigger_condition ?? {},
-);
-const aggregationData = form.useStore(
-  (s: any) => s.values.query_condition?.aggregation ?? null,
-);
+const triggerData = form.useStore((s: any) => s.values.trigger_condition ?? {});
+const aggregationData = form.useStore((s: any) => s.values.query_condition?.aggregation ?? null);
 const delayCondition = form.useStore((s: any) => s.values.delay);
 
 // The frequency (minutes) and period controls are composite "number + unit"
@@ -1226,9 +1138,7 @@ const setAggregation = (value: any) => {
 const selectedStreamType = form.useStore(
   (s: any) => s.values.stream_type ?? props.streamType ?? "logs",
 );
-const selectedStreamName = form.useStore(
-  (s: any) => s.values.stream_name ?? "",
-);
+const selectedStreamName = form.useStore((s: any) => s.values.stream_name ?? "");
 
 // Initial query/tab/stream-type come from the form-owned values (single source
 // of truth) seeded by Query's defaultValues / edit-node reset — with prop
@@ -1239,14 +1149,10 @@ const initialQueryType = initialQc.type ?? props.query_type ?? "custom";
 const tab = ref(initialQueryType);
 
 const query = ref(
-  initialQueryType === "promql"
-    ? (initialQc.promql ?? props.promql)
-    : (initialQc.sql ?? props.sql),
+  initialQueryType === "promql" ? (initialQc.promql ?? props.promql) : (initialQc.sql ?? props.sql),
 );
 
 const collapseFields = ref(false);
-
-
 
 const store = useStore();
 const { isDark } = useTheme();
@@ -1261,13 +1167,16 @@ const sqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
   ref<SqlErrorRange[]>([]),
 );
 
-const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
-  useSqlEditorDiagnostics({
-    queryEditorRef: pipelineEditorRef,
-    sqlMode: computed(() => tab.value === "sql"),
-    query: computed(() => query.value ?? ""),
-    externalErrors: sqlErrorRanges,
-  });
+const {
+  onFocus: _sqlOnFocus,
+  onBlur: _sqlOnBlur,
+  onQueryChange: _sqlOnQueryChange,
+} = useSqlEditorDiagnostics({
+  queryEditorRef: pipelineEditorRef,
+  sqlMode: computed(() => tab.value === "sql"),
+  query: computed(() => query.value ?? ""),
+  externalErrors: sqlErrorRanges,
+});
 const expandedLogs = ref<any[]>([]);
 const cursorPosition = ref(-1);
 const splitterModel = ref(30);
@@ -1352,24 +1261,17 @@ const hasDurationPercentiles = computed(() =>
 
 // Percentile values are `number | null`; formatTimeWithSuffix already renders
 // null as "0us", so `?? 0` preserves runtime output while satisfying its `number` param.
-const formatPercentile = (value: number | null) =>
-  formatTimeWithSuffix(value ?? 0);
+const formatPercentile = (value: number | null) => formatTimeWithSuffix(value ?? 0);
 
 const expandedRows: Ref<Record<string, boolean>> = ref({});
 const expandedIds = ref<string[]>([]);
 const currentSizePerField: Ref<Record<string, number>> = ref({});
 const currentKeyword: Ref<Record<string, string>> = ref({});
-const fieldValuesTimeRange: Ref<
-  Record<string, { start_time: number; end_time: number }>
-> = ref({});
+const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: number }>> = ref({});
 
-const defaultValuesCount = computed(
-  () => store.state.zoConfig?.query_values_default_num || 10,
-);
+const defaultValuesCount = computed(() => store.state.zoConfig?.query_values_default_num || 10);
 
-const showFtsFieldValues = computed(
-  () => store.state.zoConfig?.showFtsFieldValues ?? false,
-);
+const showFtsFieldValues = computed(() => store.state.zoConfig?.showFtsFieldValues ?? false);
 
 const tabOptions = computed(() => [
   {
@@ -1382,10 +1284,7 @@ const tabOptions = computed(() => [
     value: "promql",
     icon: "bar-chart",
     disabled: selectedStreamType.value !== "metrics",
-    tooltipLabel:
-      selectedStreamType.value !== "metrics"
-        ? t("pipeline.promqlOnlyForMetrics")
-        : "",
+    tooltipLabel: selectedStreamType.value !== "metrics" ? t("pipeline.promqlOnlyForMetrics") : "",
   },
 ]);
 
@@ -1485,9 +1384,7 @@ watch(
       const periodValue = convertCronToMinutes(triggerData.value.cron);
       setTrigger(
         "period",
-        periodValue > 0
-          ? periodValue
-          : Number(triggerData.value.frequency) || 15,
+        periodValue > 0 ? periodValue : Number(triggerData.value.frequency) || 15,
       );
     }
   },
@@ -1693,9 +1590,7 @@ const aggFunctions = computed(() =>
 // Aggregation toggle. Initialised from the form-owned aggregation presence so an
 // edit-node with an existing aggregation comes back enabled. Writing the toggle
 // goes through updateAggregation (which sets/clears the form's aggregation).
-const _isAggregationEnabled = ref(
-  tab.value === "custom" && !!aggregationData.value,
-);
+const _isAggregationEnabled = ref(tab.value === "custom" && !!aggregationData.value);
 
 // promql_condition is form-owned (query_condition.promql_condition); read it as a
 // reactive view and write nested keys via form.setFieldValue (single SoT).
@@ -1715,8 +1610,7 @@ const groupByErrors = form.useStore((s: any) => {
     const errs = meta[key]?.errors ?? [];
     if (errs.length) {
       const e = errs[0];
-      out[index] =
-        typeof e === "string" ? e : (e?.message ?? String(e));
+      out[index] = typeof e === "string" ? e : (e?.message ?? String(e));
     }
   });
   return out;
@@ -1750,8 +1644,7 @@ let timezoneOptions = Intl.supportedValuesOf("timeZone").map((tz: any) => {
   return tz;
 });
 
-const browserTime =
-  "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
 // Add the UTC option
 timezoneOptions.unshift("UTC");
@@ -1792,8 +1685,7 @@ const updateQueryValue = (value: string) => {
 
   // Feed auto-suggest with the current query and context
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex =
-    pipelineEditorRef.value?.getCursorIndex() ?? -1;
+  autoCompleteData.value.cursorIndex = pipelineEditorRef.value?.getCursorIndex() ?? -1;
   autoCompleteData.value.popup.open = pipelineEditorRef.value?.triggerAutoComplete;
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStreamType.value;
@@ -1916,8 +1808,7 @@ const updateQuery = () => {
   }
 
   // sql is form-owned (query_condition.sql) — restore the editor text from it.
-  if (tab.value === "sql")
-    query.value = form.state.values?.query_condition?.sql ?? props.sql ?? "";
+  if (tab.value === "sql") query.value = form.state.values?.query_condition?.sql ?? props.sql ?? "";
 };
 
 // group_by[] is a form-owned array: each row renders as an indexed
@@ -1958,10 +1849,8 @@ const updateAggregation = () => {
   }
 };
 
-
 const updateAggregationToggle = () => {
-  _isAggregationEnabled.value =
-    tab.value === "custom" && !!aggregationData.value;
+  _isAggregationEnabled.value = tab.value === "custom" && !!aggregationData.value;
 };
 
 const onBlurQueryEditor = debounce(async () => {
@@ -2000,30 +1889,23 @@ const getStreamFields = () => {
 
         // Apply field grouping (same as logs/traces)
         try {
-          const isEnterprise =
-            config.isEnterprise === "true" || config.isCloud === "true";
-          const [semanticAliases, keyFieldsConfig, fieldGrouping] =
-            await Promise.all([
-              isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
-              loadKeyFields(),
-              loadFieldGrouping(),
-            ]);
+          const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
+          const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
+            isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+            loadKeyFields(),
+            loadFieldGrouping(),
+          ]);
           const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
             ? (fieldGrouping as FieldGroupingConfig)
             : null;
           const semanticIndex =
-            semanticAliases.length > 0
-              ? buildSemanticIndex(semanticAliases, grouping)
-              : null;
-          const keySpec = (keyFieldsConfig as KeyFieldsConfig)[
-            selectedStreamType.value
-          ] ?? { fields: [], groups: [] };
-          const keyFieldSet = new Set(
-            keySpec.fields.map((f: string) => f.toLowerCase()),
-          );
-          const keyGroupSet = new Set(
-            keySpec.groups.map((g: string) => g.toLowerCase()),
-          );
+            semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
+          const keySpec = (keyFieldsConfig as KeyFieldsConfig)[selectedStreamType.value] ?? {
+            fields: [],
+            groups: [],
+          };
+          const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
+          const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
 
           streamFields.value = applyFieldGrouping(
             streamFields.value as FieldObj[],
@@ -2032,10 +1914,7 @@ const getStreamFields = () => {
             keyGroupSet,
           );
         } catch (groupErr) {
-          console.warn(
-            "Field grouping failed for pipeline, using flat list",
-            groupErr,
-          );
+          console.warn("Field grouping failed for pipeline, using flat list", groupErr);
         }
       })
       .finally(() => {
@@ -2051,9 +1930,8 @@ const getStreamFields = () => {
 // ─── Field value helpers (moved from sidebar/FieldList) ──────────────
 
 const buildSql = (streamName: string, whereClause?: string) =>
-  b64EncodeUnicode(
-    `SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`,
-  ) || "";
+  b64EncodeUnicode(`SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`) ||
+  "";
 
 function isFieldExpandable(row: any) {
   if (row.isGroup || row.label) return false;
@@ -2067,7 +1945,7 @@ function isFieldExpandable(row: any) {
 const getEffectiveTimeRange = () => {
   const now = Date.now() * 1000;
   return {
-    start_time: dateTime.value.startTime ?? (now - 900_000_000),
+    start_time: dateTime.value.startTime ?? now - 900_000_000,
     end_time: dateTime.value.endTime ?? now,
   };
 };
@@ -2130,9 +2008,7 @@ function closeField(fieldName: string) {
 }
 
 const handleSearchFieldValues = (fieldName: string, term: string) => {
-  const row: any = (streamFields.value as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
+  const row: any = (streamFields.value as any[]).find((f: any) => f.name === fieldName);
   const resolvedStream = row?.stream_name || selectedStreamName.value;
   currentKeyword.value[fieldName] = term;
   currentSizePerField.value[fieldName] = defaultValuesCount.value;
@@ -2159,18 +2035,13 @@ const handleSearchFieldValues = (fieldName: string, term: string) => {
 };
 
 const handleLoadMoreValues = (fieldName: string) => {
-  const row: any = (streamFields.value as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
+  const row: any = (streamFields.value as any[]).find((f: any) => f.name === fieldName);
   const resolvedStream = row?.stream_name || selectedStreamName.value;
   const newSize =
-    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) +
-    defaultValuesCount.value;
+    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) + defaultValuesCount.value;
   currentSizePerField.value[fieldName] = newSize;
   fieldValuesCurrentSize.value[fieldName] = newSize;
-  fieldValuesFinalizedValues.value[fieldName] = [
-    ...(fieldValues.value[fieldName]?.values || []),
-  ];
+  fieldValuesFinalizedValues.value[fieldName] = [...(fieldValues.value[fieldName]?.values || [])];
 
   const pinnedTime = fieldValuesTimeRange.value[fieldName];
   const effective2 = getEffectiveTimeRange();
@@ -2201,19 +2072,11 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName}='${v}'`
       : `${fieldName}!='${v}'`;
 
-const handleAddSearchTerm = (
-  fieldName: string,
-  value: string,
-  action: string,
-) => {
+const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   handleSidebarEvent("add-field", buildExpression(fieldName, value, action));
 };
 
-const handleAddMultipleSearchTerms = (
-  fieldName: string,
-  values: string[],
-  action: string,
-) => {
+const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
   const joinOp = action === "include" ? " or " : " and ";
   const expressions = values.map((v) => buildExpression(fieldName, v, action));
   handleSidebarEvent(
@@ -2235,10 +2098,7 @@ const filterStreams = (val: string, update: any) => {
         value: stream.name,
       }));
       // Only fetch if we haven't loaded this stream type yet
-      if (
-        !loadedStreamTypes.value.has(selectedStreamType.value) &&
-        !streamsLoading.value
-      ) {
+      if (!loadedStreamTypes.value.has(selectedStreamType.value) && !streamsLoading.value) {
         getStreamList();
       }
     } else {
@@ -2292,12 +2152,7 @@ watch(
   },
 );
 
-const SQL_FILTER_TERMINATING_CLAUSES = [
-  "group by",
-  "having",
-  "order by",
-  "limit",
-];
+const SQL_FILTER_TERMINATING_CLAUSES = ["group by", "having", "order by", "limit"];
 
 const getFirstSqlTerminatingClause = (sql: string): string | null => {
   const lowerSql = sql.toLowerCase();
@@ -2377,13 +2232,9 @@ const removeSqlFieldFilter = (sql: string, fieldName: string) => {
   }
 
   const nextWhereClause = removeFieldCondition(whereClause, fieldName).trim();
-  const nextSql = nextWhereClause
-    ? `${beforeWhere} WHERE ${nextWhereClause}`
-    : beforeWhere;
+  const nextSql = nextWhereClause ? `${beforeWhere} WHERE ${nextWhereClause}` : beforeWhere;
 
-  return trailingClause.trim()
-    ? `${nextSql} ${trailingClause.trim()}`
-    : nextSql;
+  return trailingClause.trim() ? `${nextSql} ${trailingClause.trim()}` : nextSql;
 };
 
 const handleSidebarEvent = (event: string, value: any) => {
@@ -2412,9 +2263,7 @@ const handleSidebarEvent = (event: string, value: any) => {
     }
 
     // For bare field names (add button) or non-SQL modes: insert at cursor.
-    const insertValue = value.endsWith("=''")
-      ? value.split("=")[0].trim()
-      : value;
+    const insertValue = value.endsWith("=''") ? value.split("=")[0].trim() : value;
     const valueToInsert = ` ${insertValue} `;
     let cursorIndex = pipelineEditorRef.value?.getCursorIndex();
     if (cursorIndex != -1) {
@@ -2454,13 +2303,11 @@ const runQuery = async () => {
   //check if datetime is present or not
   //else show the error message
   if (!dateTime.value.startTime) {
-    notificationMsgValue.value =
-      "The selected start time is  invalid. Please choose a valid time.";
+    notificationMsgValue.value = "The selected start time is  invalid. Please choose a valid time.";
     return null;
   }
   if (!dateTime.value.endTime) {
-    notificationMsgValue.value =
-      "The selected end time is  invalid. Please choose a valid time.";
+    notificationMsgValue.value = "The selected end time is  invalid. Please choose a valid time.";
     return null;
   }
   if (tab.value == "sql") {
@@ -2492,8 +2339,7 @@ const runQuery = async () => {
       })
       .catch((err: any) => {
         if (err.response?.data) {
-          notificationMsgValue.value =
-            err.response?.data?.message || err.response?.data;
+          notificationMsgValue.value = err.response?.data?.message || err.response?.data;
         } else {
           notificationMsgValue.value = t("pipeline.errorGettingResults");
         }
@@ -2575,51 +2421,50 @@ const registerAiContextHandler = () => {
 };
 
 const getContext = async () => {
-    try {
-      const payload: any = {};
+  try {
+    const payload: any = {};
 
-      if (!selectedStreamType.value || !selectedStreamName.value) {
-        return "";
-      }
-
-      const schema = streamFields.value.map((field: any) => {
-        return {
-          name: field.name,
-          type: field.type,
-        };
-      });
-
-      //if uds is enabled we need to push the timestamp and all fields name in the schema
-      const hasTimestampColumn = userDefinedFields.value.some(
-        (field: any) => field.name === store.state.zoConfig.timestamp_column,
-      );
-      const hasAllFieldsName = userDefinedFields.value.some(
-        (field: any) => field.name === store.state.zoConfig.all_fields_name,
-      );
-      if (userDefinedFields.value.length > 0) {
-        if (!hasTimestampColumn) {
-          userDefinedFields.value.push({
-            name: store.state.zoConfig.timestamp_column,
-            type: "Int64",
-          });
-        }
-        if (!hasAllFieldsName) {
-          userDefinedFields.value.push({
-            name: store.state.zoConfig.all_fields_name,
-            type: "Utf8",
-          });
-        }
-      }
-
-      payload["stream_name"] = selectedStreamName.value;
-      payload["schema_"] =
-        userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
-
-      return payload;
-    } catch (error) {
-      console.error("Error in getContext for logs page", error);
+    if (!selectedStreamType.value || !selectedStreamName.value) {
       return "";
     }
+
+    const schema = streamFields.value.map((field: any) => {
+      return {
+        name: field.name,
+        type: field.type,
+      };
+    });
+
+    //if uds is enabled we need to push the timestamp and all fields name in the schema
+    const hasTimestampColumn = userDefinedFields.value.some(
+      (field: any) => field.name === store.state.zoConfig.timestamp_column,
+    );
+    const hasAllFieldsName = userDefinedFields.value.some(
+      (field: any) => field.name === store.state.zoConfig.all_fields_name,
+    );
+    if (userDefinedFields.value.length > 0) {
+      if (!hasTimestampColumn) {
+        userDefinedFields.value.push({
+          name: store.state.zoConfig.timestamp_column,
+          type: "Int64",
+        });
+      }
+      if (!hasAllFieldsName) {
+        userDefinedFields.value.push({
+          name: store.state.zoConfig.all_fields_name,
+          type: "Utf8",
+        });
+      }
+    }
+
+    payload["stream_name"] = selectedStreamName.value;
+    payload["schema_"] = userDefinedFields.value.length > 0 ? userDefinedFields.value : schema;
+
+    return payload;
+  } catch (error) {
+    console.error("Error in getContext for logs page", error);
+    return "";
+  }
 };
 
 const removeAiContextHandler = () => {

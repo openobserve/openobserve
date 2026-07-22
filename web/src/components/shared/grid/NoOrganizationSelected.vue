@@ -15,31 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div
-      class="w-full flex flex-col items-center justify-center gap-2 text-2xl"
-    >
-      <img class="size-50 mt-[20vh]"
-        data-test="no-organization-selected-image"
-        :src="getImageURL('images/common/selectOrganization.svg')"
-        alt=""
-      />
-      <div data-test="no-organization-selected-title" class="m-0 text-lg font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
-      <div data-test="no-organization-selected-message" class="m-0 text-sm font-normal leading-5 text-text-secondary">{{ t("ticket.selectOrganizationForQuota") }}</div>
+  <div class="w-full flex flex-col items-center justify-center gap-2 text-2xl">
+    <img
+      class="size-50 mt-[20vh]"
+      data-test="no-organization-selected-image"
+      :src="getImageURL('images/common/selectOrganization.svg')"
+      alt=""
+    />
+    <div data-test="no-organization-selected-title" class="m-0 text-lg font-semibold">
+      {{ t("ticket.noOrganizationSelected") }}
     </div>
-  </template>
-  
-  <script lang="ts">
-  import { defineComponent } from "vue";
-  import { useI18n } from "vue-i18n";
-  import { getImageURL } from "../../../utils/zincutils";
-  
-  export default defineComponent({
-    name: "QTableNoData",
-    setup() {
-      const { t } = useI18n();
-  
-      return { t, getImageURL };
-    },
-  });
-  </script>
-  
+    <div
+      data-test="no-organization-selected-message"
+      class="m-0 text-sm font-normal leading-5 text-text-secondary"
+    >
+      {{ t("ticket.selectOrganizationForQuota") }}
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent } from "vue";
+import { useI18n } from "vue-i18n";
+import { getImageURL } from "../../../utils/zincutils";
+
+export default defineComponent({
+  name: "QTableNoData",
+  setup() {
+    const { t } = useI18n();
+
+    return { t, getImageURL };
+  },
+});
+</script>

@@ -210,25 +210,14 @@ describe("SourceMaps.vue", () => {
     it("populates filter options from API response", async () => {
       wrapper = await mountComponent();
 
-      expect((wrapper.vm as any).filteredVersionOptions).toEqual([
-        "1.0.0",
-        "2.0.0",
-      ]);
-      expect((wrapper.vm as any).filteredServiceOptions).toEqual([
-        "svc-a",
-        "svc-b",
-      ]);
-      expect((wrapper.vm as any).filteredEnvironmentOptions).toEqual([
-        "prod",
-        "dev",
-      ]);
+      expect((wrapper.vm as any).filteredVersionOptions).toEqual(["1.0.0", "2.0.0"]);
+      expect((wrapper.vm as any).filteredServiceOptions).toEqual(["svc-a", "svc-b"]);
+      expect((wrapper.vm as any).filteredEnvironmentOptions).toEqual(["prod", "dev"]);
     });
 
     it("handles getSourceMapsValues failure by leaving filter options empty", async () => {
       getSourceMapsValuesMock.mockRejectedValueOnce(new Error("boom"));
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       wrapper = await mountComponent();
 
@@ -240,9 +229,7 @@ describe("SourceMaps.vue", () => {
 
     it("handles listSourceMaps failure by clearing source maps", async () => {
       listSourceMapsMock.mockRejectedValueOnce(new Error("network"));
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       wrapper = await mountComponent();
 
@@ -262,24 +249,18 @@ describe("SourceMaps.vue", () => {
       const grouped = (wrapper.vm as any).groupedSourceMaps;
       expect(grouped).toHaveLength(2);
 
-      const groupA = grouped.find(
-        (g: any) => g.service === "svc-a" && g.version === "1.0.0",
-      );
+      const groupA = grouped.find((g: any) => g.service === "svc-a" && g.version === "1.0.0");
       expect(groupA.fileCount).toBe(2);
       expect(groupA.files).toHaveLength(2);
 
-      const groupB = grouped.find(
-        (g: any) => g.service === "svc-b" && g.version === "2.0.0",
-      );
+      const groupB = grouped.find((g: any) => g.service === "svc-b" && g.version === "2.0.0");
       expect(groupB.fileCount).toBe(1);
     });
 
     it("retains the most recent created_at as uploaded_at for a group", async () => {
       wrapper = await mountComponent();
 
-      const groupA = (wrapper.vm as any).groupedSourceMaps.find(
-        (g: any) => g.service === "svc-a",
-      );
+      const groupA = (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a");
       expect(groupA.uploaded_at).toBe(1700000001000000);
     });
 
@@ -398,9 +379,7 @@ describe("SourceMaps.vue", () => {
     it("grouped rows have composite id field used as row key", async () => {
       wrapper = await mountComponent();
 
-      const groupA = (wrapper.vm as any).groupedSourceMaps.find(
-        (g: any) => g.service === "svc-a",
-      );
+      const groupA = (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a");
       expect(groupA.id).toBe("svc-a-1.0.0-prod");
     });
 
@@ -529,9 +508,7 @@ describe("SourceMaps.vue", () => {
 
       expect((wrapper.vm as any).groupedSourceMaps).toHaveLength(2);
 
-      const target = (wrapper.vm as any).groupedSourceMaps.find(
-        (g: any) => g.service === "svc-a",
-      );
+      const target = (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a");
       (wrapper.vm as any).confirmDeleteSourceMap(target);
       await nextTick();
 
@@ -540,9 +517,7 @@ describe("SourceMaps.vue", () => {
 
       expect((wrapper.vm as any).groupedSourceMaps).toHaveLength(1);
       expect(
-        (wrapper.vm as any).groupedSourceMaps.find(
-          (g: any) => g.service === "svc-a",
-        ),
+        (wrapper.vm as any).groupedSourceMaps.find((g: any) => g.service === "svc-a"),
       ).toBeUndefined();
     });
 
@@ -556,9 +531,7 @@ describe("SourceMaps.vue", () => {
       await (wrapper.vm as any).deleteSourceMap();
       await flushPromises();
 
-      expect(toastMock).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("fires an error toast with server message on delete failure", async () => {
@@ -567,9 +540,7 @@ describe("SourceMaps.vue", () => {
       deleteSourceMapsMock.mockRejectedValueOnce({
         response: { data: { message: "Server rejected" } },
       });
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const target = (wrapper.vm as any).groupedSourceMaps[0];
       (wrapper.vm as any).confirmDeleteSourceMap(target);
@@ -591,9 +562,7 @@ describe("SourceMaps.vue", () => {
       wrapper = await mountComponent();
 
       deleteSourceMapsMock.mockRejectedValueOnce(new Error("plain failure"));
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const target = (wrapper.vm as any).groupedSourceMaps[0];
       (wrapper.vm as any).confirmDeleteSourceMap(target);
@@ -616,9 +585,7 @@ describe("SourceMaps.vue", () => {
 
       // Reject with an object that has neither response nor message
       deleteSourceMapsMock.mockRejectedValueOnce({});
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const target = (wrapper.vm as any).groupedSourceMaps[0];
       (wrapper.vm as any).confirmDeleteSourceMap(target);

@@ -86,7 +86,7 @@ describe("colorizeQuery", () => {
     });
 
     it("should colorize valid VRL query", async () => {
-      const query = ".level = \"error\"";
+      const query = '.level = "error"';
       const result = await colorizeQuery(query, "vrl");
 
       expect(mockColorize).toHaveBeenCalledWith(query, "vrl", {});
@@ -356,15 +356,9 @@ describe("colorizeQuery", () => {
 
   describe("Performance and Caching", () => {
     it("should handle multiple concurrent colorization requests", async () => {
-      const queries = [
-        "SELECT * FROM logs",
-        "SELECT * FROM metrics",
-        "SELECT * FROM traces",
-      ];
+      const queries = ["SELECT * FROM logs", "SELECT * FROM metrics", "SELECT * FROM traces"];
 
-      const results = await Promise.all(
-        queries.map((q) => colorizeQuery(q, "sql"))
-      );
+      const results = await Promise.all(queries.map((q) => colorizeQuery(q, "sql")));
 
       expect(results).toHaveLength(3);
       results.forEach((result) => {
@@ -396,12 +390,12 @@ describe("colorizeQuery", () => {
     it("should handle switching between different languages", async () => {
       await colorizeQuery("SELECT * FROM logs", "sql");
       await colorizeQuery("rate(http_requests[5m])", "promql");
-      await colorizeQuery(".level = \"error\"", "vrl");
+      await colorizeQuery('.level = "error"', "vrl");
 
       expect(mockColorize).toHaveBeenCalledTimes(3);
       expect(mockColorize).toHaveBeenNthCalledWith(1, "SELECT * FROM logs", "sql", {});
       expect(mockColorize).toHaveBeenNthCalledWith(2, "rate(http_requests[5m])", "promql", {});
-      expect(mockColorize).toHaveBeenNthCalledWith(3, ".level = \"error\"", "vrl", {});
+      expect(mockColorize).toHaveBeenNthCalledWith(3, '.level = "error"', "vrl", {});
     });
 
     it("should preserve HTML entities in colorized output", async () => {

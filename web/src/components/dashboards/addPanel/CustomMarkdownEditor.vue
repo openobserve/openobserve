@@ -19,9 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-custom-markdown-editor-container"
     class="bg-card-glass-bg w-full h-full overflow-hidden"
   >
-    <div class="w-full h-full"
-      data-test="dashboard-custom-markdown-editor-inner"
-    >
+    <div class="w-full h-full" data-test="dashboard-custom-markdown-editor-inner">
       <OSplitter
         v-model="splitterModel"
         class="w-full h-full!"
@@ -29,11 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div
-            data-test="dashboard-custom-markdown-editor-flex-col"
-            class="flex flex-col h-full"
-          >
-            <CodeQueryEditor class="h-full flex-1"
+          <div data-test="dashboard-custom-markdown-editor-flex-col" class="flex flex-col h-full">
+            <CodeQueryEditor
+              class="h-full flex-1"
               language="markdown"
               v-model:query="markdownContent"
               :debounceTime="500"
@@ -68,9 +64,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   components: {
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     MarkdownRenderer,
     OSplitter,
   },

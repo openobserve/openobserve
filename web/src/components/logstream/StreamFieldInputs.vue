@@ -1,7 +1,10 @@
 <template>
   <div data-test="add-stream-fields-section">
-    <div v-if="showHeader" data-test="alert-conditions-text" class="o-input-label text-compact font-medium leading-tight text-input-label-text">
-
+    <div
+      v-if="showHeader"
+      data-test="alert-conditions-text"
+      class="o-input-label text-compact font-medium leading-tight text-input-label-text"
+    >
       {{ t("logStream.fields") }}
     </div>
     <template v-if="!formRows.length">
@@ -53,10 +56,7 @@
             clearable
           />
         </div>
-        <div
-          v-if="visibleInputs.data_type"
-          class="min-w-25"
-        >
+        <div v-if="visibleInputs.data_type" class="min-w-25">
           <OFormSelect
             data-test="add-stream-field-data-type-select"
             :name="`${formFieldName}[${index}].type`"
@@ -78,7 +78,8 @@
             v-if="index === 0"
             aria-hidden="true"
             class="text-sm font-semibold leading-tight select-none invisible"
-          >&nbsp;</span>
+            >&nbsp;</span
+          >
           <div class="flex items-center gap-1">
             <OButton
               data-test="add-stream-add-field-btn"
@@ -112,9 +113,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
-import {
-  makeStreamFieldRow,
-} from "./StreamFieldInputs.schema";
+import { makeStreamFieldRow } from "./StreamFieldInputs.schema";
 
 // FORM-ONLY. The rows are owned by the parent's TanStack form: this component
 // `inject`s that form, reads the array reactively via form.useStore, renders
@@ -152,13 +151,10 @@ const { t } = useI18n();
 // delete re-render immediately (a form.state.values read inside a computed would
 // not track).
 const form = inject(FORM_CONTEXT_KEY, null) as any;
-const formRows = form.useStore(
-  (s: any) => (s.values?.[props.formFieldName] as any[]) ?? [],
-);
+const formRows = form.useStore((s: any) => (s.values?.[props.formFieldName] as any[]) ?? []);
 
 const addRow = () => form.pushFieldValue(props.formFieldName, makeStreamFieldRow());
-const removeRow = (index: number) =>
-  form.removeFieldValue(props.formFieldName, index);
+const removeRow = (index: number) => form.removeFieldValue(props.formFieldName, index);
 
 const streamIndexType = [
   { label: "Full text search", value: "fullTextSearchKey" },
@@ -199,16 +195,10 @@ const disableOptions = (schema: any, option: any) => {
     }
     selectedIndices += schema.index_type[i];
   }
-  if (
-    selectedIndices.includes("prefixPartition") &&
-    option.value.includes("keyPartition")
-  ) {
+  if (selectedIndices.includes("prefixPartition") && option.value.includes("keyPartition")) {
     return true;
   }
-  if (
-    selectedIndices.includes("keyPartition") &&
-    option.value.includes("prefixPartition")
-  ) {
+  if (selectedIndices.includes("keyPartition") && option.value.includes("prefixPartition")) {
     return true;
   }
   if (
@@ -220,8 +210,7 @@ const disableOptions = (schema: any, option: any) => {
   )
     return true;
   if (
-    (selectedIndices.includes("keyPartition") ||
-      selectedIndices.includes("prefixPartition")) &&
+    (selectedIndices.includes("keyPartition") || selectedIndices.includes("prefixPartition")) &&
     option.value.includes("hashPartition")
   )
     return true;

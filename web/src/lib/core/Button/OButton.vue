@@ -231,16 +231,14 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // inputs in toolbars/headers. (radius 8 = rounded-default.)
   sm: "h-[2.125rem] ps-3 pe-3 text-sm gap-2 rounded-default",
   // 30px labeled — matches icon-toolbar height for labeled outline buttons in toolbars
-  "sm-toolbar":
-    "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
+  "sm-toolbar": "h-[1.875rem] ps-2 pe-2 text-xs gap-1.5 rounded-default",
   // Compact labeled size for inline field chips (axis items) — ~28px, matches the dense button size
   // Extra-compact chip size — 24px height for axis field chips in query builder
   chip: "h-6 ps-2 pe-1.5 text-xs gap-1 rounded-default leading-none",
   // Same as chip but with fixed 12px font — for dashboard query builder axis field chips
   // (needed because the html font-size is 14px, making text-xs = 10.5px instead of 12px)
   "chip-12": "h-6 ps-2 pe-1.5 !text-xs gap-1 rounded-default leading-none",
-  "sm-action":
-    "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
+  "sm-action": "h-[2.125rem] ps-3 pe-3 min-w-20 text-sm gap-2 rounded-default",
   md: "h-10 ps-4 pe-4 text-sm gap-2 rounded-default",
   lg: "h-12 ps-6 pe-6 text-base gap-3 rounded-default",
   icon: "size-6 p-0 rounded-default gap-x-0",
@@ -261,8 +259,7 @@ const sizeClasses: Record<NonNullable<ButtonProps["size"]>, string> = {
   // 26px rounded-default — compact modern icon button for panel header collapse/expand
   "icon-panel": "size-[1.625rem] p-0 rounded-default gap-x-0",
   // Tall narrow vertical rectangle — 32px × 20px for splitter collapse/expand buttons
-  "sidebar-button":
-    "h-8 w-3 p-0 rounded-default overflow-hidden gap-x-0",
+  "sidebar-button": "h-8 w-3 p-0 rounded-default overflow-hidden gap-x-0",
 };
 
 const activeClasses = [

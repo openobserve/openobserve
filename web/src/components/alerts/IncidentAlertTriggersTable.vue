@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="alert-triggers-table" class="alert-triggers-table flex flex-col h-full overflow-hidden">
+  <div
+    data-test="alert-triggers-table"
+    class="alert-triggers-table flex flex-col h-full overflow-hidden"
+  >
     <OTable
       data-test="triggers-qtable"
       :data="triggers"
@@ -34,9 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #empty>
         <div data-test="no-triggers-message" class="text-center py-8">
-          <span class="text-sm text-text-secondary">
-            No triggers loaded
-          </span>
+          <span class="text-sm text-text-secondary"> No triggers loaded </span>
         </div>
       </template>
 
@@ -102,7 +103,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['row-click'],
+  emits: ["row-click"],
   setup(props, { emit }) {
     const { t } = useI18n();
 
@@ -161,7 +162,7 @@ export default defineComponent({
     };
 
     const onRowClick = (row: IncidentAlert) => {
-      emit('row-click', row.alert_name);
+      emit("row-click", row.alert_name);
     };
 
     return {

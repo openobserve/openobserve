@@ -66,4 +66,3 @@ BasicAuthPass = "[PASSCODE]"`;
   },
 });
 </script>
-

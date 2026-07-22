@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="min-h-100 flex flex-col h-full">
-
     <!-- Loading -->
     <div v-if="loading" class="flex justify-center items-center py-12">
       <OSpinner variant="dots" size="md" />
@@ -41,188 +40,197 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-circle-sm"
           @click="scrollToTop"
           data-test="incident-timeline-scroll-top"
-        ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip content="Scroll to top" /></OButton>
+          ><OIcon name="keyboard-arrow-up" size="sm" /><OTooltip content="Scroll to top"
+        /></OButton>
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
           @click="scrollToBottom"
           data-test="incident-timeline-scroll-bottom"
-        ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip content="Scroll to bottom" /></OButton>
+          ><OIcon name="keyboard-arrow-down" size="sm" /><OTooltip content="Scroll to bottom"
+        /></OButton>
       </div>
 
       <div ref="timelineContainer" class="flex-1 min-h-0 overflow-y-auto px-3 pt-2 pb-4">
         <div class="relative">
-        <!-- Vertical Timeline Line -->
-        <div
-          class="absolute left-3 top-0 bottom-0 w-0.5 bg-border-default my-3"
-        ></div>
+          <!-- Vertical Timeline Line -->
+          <div class="absolute left-3 top-0 bottom-0 w-0.5 bg-border-default my-3"></div>
 
-        <!-- Events -->
-        <div class="relative space-y-4">
-          <div
-            v-for="(event, index) in events"
-            :key="index"
-            class="relative"
-          >
-            <!-- INLINE EVENTS (Status/Label Changes) -->
-            <template v-if="!isCommentEvent(event)">
-              <div class="flex items-center gap-3">
-                <!-- Avatar for user events or Icon for system events -->
-                <div class="flex-shrink-0">
-                  <!-- User Avatar -->
-                  <div
-                    v-if="getUserId(event) !== 'System'"
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
-                  >
-                    <OIcon
-                      name="person"
-                      size="xs"
-                      :style="{ color: getAvatarColor(getUserId(event)) }"
-                    />
-                  </div>
-                  <!-- System Event Icon -->
-                  <div
-                    v-else
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-subtle border border-border-default"
-                  >
-                    <OIcon
-                      :name="getEventIcon(event)"
-                      size="sm"
-                      :style="{ color: getEventBadgeColor(event) }"
-                    />
-                  </div>
-                </div>
-
-                <!-- Event Description -->
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <!-- For User Events: username, badge, text -->
-                    <template v-if="getUserId(event) !== 'System'">
-                      <span
-                        class="font-semibold text-sm"
-                        :class="'text-text-body'"
-                      >
-                        {{ getUserId(event) }}
-                      </span>
-                      <span
-                        v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                        class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
-                        :style="badgeStyle(getEventBadgeColor(event))"
-                      >
-                        {{ getEventBadgeText(event) }}
-                      </span>
-                      <span class="text-sm"
-                        :class="'text-text-body'"
-                        v-html="DOMPurify.sanitize(getInlineEventText(event))"
-                      ></span>
-                    </template>
-                    <!-- For System Events: text, badge -->
-                    <template v-else>
-                      <!-- AI events: "AI SRE" badge first, then message text -->
-                      <template v-if="event.type === 'ai_analysis_begin' || event.type === 'ai_analysis_complete' || event.type === 'ai_analysis_failed'">
-                        <span
-                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
-                          :style="badgeStyle(getEventBadgeColor(event))"
-                        >
-                          AI SRE
-                          <OTooltip v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)" :delay="300" side="bottom" align="start" :max-width="'24rem'" :content="getFailureTooltip(event)" />
-                        </span>
-                        <span class="text-sm"
-                          :class="'text-text-body'"
-                          v-html="DOMPurify.sanitize(getInlineEventText(event))"
-                        ></span>
-                      </template>
-                      <!-- For Alert events, show badge first -->
-                      <template v-else-if="event.type === 'Alert'">
-                        <span
-                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
-                          :style="badgeStyle(getEventBadgeColor(event))"
-                        >
-                          {{ getEventBadgeText(event) }}
-                        </span>
-                        <span class="text-sm"
-                          :class="'text-text-body'"
-                          v-html="DOMPurify.sanitize(getInlineEventText(event))"
-                        ></span>
-                      </template>
-                      <!-- All other system events: text then badge (except severity changes) -->
-                      <template v-else>
-                        <span class="text-sm"
-                          :class="'text-text-body'"
-                          v-html="getInlineEventText(event)"
-                        ></span>
-                        <span
-                          v-if="event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'"
-                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
-                          :style="badgeStyle(getEventBadgeColor(event))"
-                        >
-                          {{ getEventBadgeText(event) }}
-                        </span>
-                      </template>
-                    </template>
-                    <span class="text-xs"
-                      :class="'text-text-secondary'"
-                    >
-                      {{ formatRelativeTime(event.timestamp) }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </template>
-
-            <!-- COMMENT EVENTS (Card Style) -->
-            <template v-else>
-              <div class="flex gap-3">
-                <!-- Avatar -->
-                <div class="flex-shrink-0">
-                  <div
-                    class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
-                  >
-                    <OIcon
-                      name="person"
-                      size="xs"
-                      :style="{ color: getAvatarColor(getUserId(event)) }"
-                    />
-                  </div>
-                </div>
-
-                <!-- Comment Card -->
-                <div class="flex-1 min-w-0">
-                  <!-- Comment Box -->
-                  <div
-                    class="rounded-default overflow-hidden hover:shadow-md transition-shadow bg-surface-base border border-border-default"
-                  >
-                    <!-- Header -->
+          <!-- Events -->
+          <div class="relative space-y-4">
+            <div v-for="(event, index) in events" :key="index" class="relative">
+              <!-- INLINE EVENTS (Status/Label Changes) -->
+              <template v-if="!isCommentEvent(event)">
+                <div class="flex items-center gap-3">
+                  <!-- Avatar for user events or Icon for system events -->
+                  <div class="flex-shrink-0">
+                    <!-- User Avatar -->
                     <div
-                      class="px-4 py-2 flex items-center gap-2 border-b bg-surface-subtle border-b-border-default"
+                      v-if="getUserId(event) !== 'System'"
+                      class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
                     >
-                      <span class="font-semibold text-sm"
-                        :class="'text-text-body'"
-                      >
-                        {{ getUserId(event) }}
-                      </span>
-                      <span class="text-xs"
-                        :class="'text-text-secondary'"
-                      >
-                        commented {{ formatRelativeTime(event.timestamp) }}
+                      <OIcon
+                        name="person"
+                        size="xs"
+                        :style="{ color: getAvatarColor(getUserId(event)) }"
+                      />
+                    </div>
+                    <!-- System Event Icon -->
+                    <div
+                      v-else
+                      class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-subtle border border-border-default"
+                    >
+                      <OIcon
+                        :name="getEventIcon(event)"
+                        size="sm"
+                        :style="{ color: getEventBadgeColor(event) }"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Event Description -->
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <!-- For User Events: username, badge, text -->
+                      <template v-if="getUserId(event) !== 'System'">
+                        <span class="font-semibold text-sm" :class="'text-text-body'">
+                          {{ getUserId(event) }}
+                        </span>
+                        <span
+                          v-if="
+                            event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'
+                          "
+                          class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                          :style="badgeStyle(getEventBadgeColor(event))"
+                        >
+                          {{ getEventBadgeText(event) }}
+                        </span>
+                        <span
+                          class="text-sm"
+                          :class="'text-text-body'"
+                          v-html="DOMPurify.sanitize(getInlineEventText(event))"
+                        ></span>
+                      </template>
+                      <!-- For System Events: text, badge -->
+                      <template v-else>
+                        <!-- AI events: "AI SRE" badge first, then message text -->
+                        <template
+                          v-if="
+                            event.type === 'ai_analysis_begin' ||
+                            event.type === 'ai_analysis_complete' ||
+                            event.type === 'ai_analysis_failed'
+                          "
+                        >
+                          <span
+                            class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                            :style="badgeStyle(getEventBadgeColor(event))"
+                          >
+                            AI SRE
+                            <OTooltip
+                              v-if="event.type === 'ai_analysis_failed' && getFailureTooltip(event)"
+                              :delay="300"
+                              side="bottom"
+                              align="start"
+                              :max-width="'24rem'"
+                              :content="getFailureTooltip(event)"
+                            />
+                          </span>
+                          <span
+                            class="text-sm"
+                            :class="'text-text-body'"
+                            v-html="DOMPurify.sanitize(getInlineEventText(event))"
+                          ></span>
+                        </template>
+                        <!-- For Alert events, show badge first -->
+                        <template v-else-if="event.type === 'Alert'">
+                          <span
+                            class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                            :style="badgeStyle(getEventBadgeColor(event))"
+                          >
+                            {{ getEventBadgeText(event) }}
+                          </span>
+                          <span
+                            class="text-sm"
+                            :class="'text-text-body'"
+                            v-html="DOMPurify.sanitize(getInlineEventText(event))"
+                          ></span>
+                        </template>
+                        <!-- All other system events: text then badge (except severity changes) -->
+                        <template v-else>
+                          <span
+                            class="text-sm"
+                            :class="'text-text-body'"
+                            v-html="getInlineEventText(event)"
+                          ></span>
+                          <span
+                            v-if="
+                              event.type !== 'SeverityUpgrade' && event.type !== 'SeverityOverride'
+                            "
+                            class="inline-flex items-center px-2 py-0.5 rounded-default text-xs font-semibold"
+                            :style="badgeStyle(getEventBadgeColor(event))"
+                          >
+                            {{ getEventBadgeText(event) }}
+                          </span>
+                        </template>
+                      </template>
+                      <span class="text-xs" :class="'text-text-secondary'">
+                        {{ formatRelativeTime(event.timestamp) }}
                       </span>
                     </div>
+                  </div>
+                </div>
+              </template>
 
-                    <!-- Comment Body -->
-                    <div class="px-4 py-3">
-                      <div class="text-sm whitespace-pre-wrap break-words leading-relaxed"
-                        :class="'text-text-body'"
+              <!-- COMMENT EVENTS (Card Style) -->
+              <template v-else>
+                <div class="flex gap-3">
+                  <!-- Avatar -->
+                  <div class="flex-shrink-0">
+                    <div
+                      class="w-6 h-6 rounded-full flex items-center justify-center z-10 relative bg-surface-base border border-border-default"
+                    >
+                      <OIcon
+                        name="person"
+                        size="xs"
+                        :style="{ color: getAvatarColor(getUserId(event)) }"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- Comment Card -->
+                  <div class="flex-1 min-w-0">
+                    <!-- Comment Box -->
+                    <div
+                      class="rounded-default overflow-hidden hover:shadow-md transition-shadow bg-surface-base border border-border-default"
+                    >
+                      <!-- Header -->
+                      <div
+                        class="px-4 py-2 flex items-center gap-2 border-b bg-surface-subtle border-b-border-default"
                       >
-                        {{ event.data?.comment || '' }}
+                        <span class="font-semibold text-sm" :class="'text-text-body'">
+                          {{ getUserId(event) }}
+                        </span>
+                        <span class="text-xs" :class="'text-text-secondary'">
+                          commented {{ formatRelativeTime(event.timestamp) }}
+                        </span>
+                      </div>
+
+                      <!-- Comment Body -->
+                      <div class="px-4 py-3">
+                        <div
+                          class="text-sm whitespace-pre-wrap break-words leading-relaxed"
+                          :class="'text-text-body'"
+                        >
+                          {{ event.data?.comment || "" }}
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </template>
+              </template>
+            </div>
           </div>
         </div>
-      </div>
       </div>
     </div>
 
@@ -234,11 +242,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="w-6 h-6 rounded-full flex items-center justify-center bg-surface-base border border-border-default"
           >
-            <OIcon
-              name="person"
-              size="xs"
-              :style="{ color: getAvatarColor(getCurrentUserId()) }"
-            />
+            <OIcon name="person" size="xs" :style="{ color: getAvatarColor(getCurrentUserId()) }" />
           </div>
         </div>
 
@@ -263,7 +267,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="submitting"
               @click="submitComment"
               data-test="incident-timeline-comment-send"
-            ><OIcon name="send" size="sm" /><OTooltip content="Send comment" /></OButton>
+              ><OIcon name="send" size="sm" /><OTooltip content="Send comment"
+            /></OButton>
           </div>
         </div>
       </div>
@@ -354,7 +359,6 @@ const isCommentEvent = (event: any): boolean => {
   return event.type === "Comment";
 };
 
-
 // Get user ID from event
 const getUserId = (event: any): string => {
   return event.data?.user_id || "System";
@@ -370,10 +374,10 @@ const getAvatarColor = (username: string): string => {
   const colors = [
     "var(--color-error-500)", // red
     "var(--color-amber-500)", // amber
-        "var(--color-ai-accent)", // purple
+    "var(--color-ai-accent)", // purple
 
     "var(--color-blue-500)", // blue
-        "var(--color-success-500)", // green
+    "var(--color-success-500)", // green
     "var(--color-purple-500)", // pink
     "var(--color-cyan-500)", // cyan
     "var(--color-orange-500)", // orange
@@ -390,20 +394,33 @@ const getAvatarColor = (username: string): string => {
 // Get event icon
 const getEventIcon = (event: any): string => {
   switch (event.type) {
-    case "Created": return "add-circle";
-    case "Alert": return "notifications";
+    case "Created":
+      return "add-circle";
+    case "Alert":
+      return "notifications";
     case "SeverityUpgrade":
-    case "SeverityOverride": return "warning";
-    case "Acknowledged": return "check-circle";
-    case "Resolved": return "check";
-    case "Reopened": return "replay";
-    case "DimensionsUpgraded": return "arrow-upward";
-    case "TitleChanged": return "edit";
-    case "AssignmentChanged": return "person";
-    case "ai_analysis_begin": return "psychology";
-    case "ai_analysis_complete": return "check";
-    case "ai_analysis_failed": return "error-outline";
-    default: return "circle";
+    case "SeverityOverride":
+      return "warning";
+    case "Acknowledged":
+      return "check-circle";
+    case "Resolved":
+      return "check";
+    case "Reopened":
+      return "replay";
+    case "DimensionsUpgraded":
+      return "arrow-upward";
+    case "TitleChanged":
+      return "edit";
+    case "AssignmentChanged":
+      return "person";
+    case "ai_analysis_begin":
+      return "psychology";
+    case "ai_analysis_complete":
+      return "check";
+    case "ai_analysis_failed":
+      return "error-outline";
+    default:
+      return "circle";
   }
 };
 
@@ -412,20 +429,32 @@ const getEventIcon = (event: any): string => {
 // dimension events use the shared AI accent; the rest use categorical hues.
 const getEventBadgeColor = (event: any): string => {
   switch (event.type) {
-    case "Created": return "var(--color-indigo-500)";
-    case "Alert": return "var(--color-amber-500)";
+    case "Created":
+      return "var(--color-indigo-500)";
+    case "Alert":
+      return "var(--color-amber-500)";
     case "SeverityUpgrade":
-    case "SeverityOverride": return "var(--color-error-500)";
-    case "Acknowledged": return "var(--color-blue-500)";
-    case "Resolved": return "var(--color-success-600)";
-    case "Reopened": return "var(--color-orange-500)";
-    case "DimensionsUpgraded": return "var(--color-ai-accent)";
-    case "TitleChanged": return "var(--color-indigo-500)";
-    case "AssignmentChanged": return "var(--color-cyan-500)";
+    case "SeverityOverride":
+      return "var(--color-error-500)";
+    case "Acknowledged":
+      return "var(--color-blue-500)";
+    case "Resolved":
+      return "var(--color-success-600)";
+    case "Reopened":
+      return "var(--color-orange-500)";
+    case "DimensionsUpgraded":
+      return "var(--color-ai-accent)";
+    case "TitleChanged":
+      return "var(--color-indigo-500)";
+    case "AssignmentChanged":
+      return "var(--color-cyan-500)";
     case "ai_analysis_begin":
-    case "ai_analysis_complete": return "var(--color-ai-accent)";
-    case "ai_analysis_failed": return "var(--color-error-500)";
-    default: return "var(--color-grey-500)";
+    case "ai_analysis_complete":
+      return "var(--color-ai-accent)";
+    case "ai_analysis_failed":
+      return "var(--color-error-500)";
+    default:
+      return "var(--color-grey-500)";
   }
 };
 
@@ -443,32 +472,52 @@ const badgeStyle = (c: string) => {
 // Get event badge text
 const getEventBadgeText = (event: any): string => {
   switch (event.type) {
-    case "Created": return "Created";
-    case "Alert": return "Alert";
-    case "SeverityUpgrade": return "Severity Upgraded";
-    case "SeverityOverride": return "Severity Changed";
-    case "Acknowledged": return "Acknowledged";
-    case "Resolved": return "Resolved";
-    case "Reopened": return "Reopened";
-    case "DimensionsUpgraded": return "Dimensions Upgraded";
-    case "TitleChanged": return "Title Changed";
-    case "AssignmentChanged": return "Assignment";
-    case "ai_analysis_begin": return "AI Analysis";
-    case "ai_analysis_complete": return "AI Complete";
-    case "ai_analysis_failed": return "AI Failed";
-    default: return event.type;
+    case "Created":
+      return "Created";
+    case "Alert":
+      return "Alert";
+    case "SeverityUpgrade":
+      return "Severity Upgraded";
+    case "SeverityOverride":
+      return "Severity Changed";
+    case "Acknowledged":
+      return "Acknowledged";
+    case "Resolved":
+      return "Resolved";
+    case "Reopened":
+      return "Reopened";
+    case "DimensionsUpgraded":
+      return "Dimensions Upgraded";
+    case "TitleChanged":
+      return "Title Changed";
+    case "AssignmentChanged":
+      return "Assignment";
+    case "ai_analysis_begin":
+      return "AI Analysis";
+    case "ai_analysis_complete":
+      return "AI Complete";
+    case "ai_analysis_failed":
+      return "AI Failed";
+    default:
+      return event.type;
   }
 };
 
 // Get severity color based on priority level
 const getSeverityColor = (severity: string): string => {
   switch (severity) {
-    case "P1": return "var(--color-error-500)"; // red
-    case "P2": return "var(--color-orange-500)"; // orange
-    case "P3": return "var(--color-amber-500)"; // amber
-    case "P4": return "var(--color-blue-500)"; // blue
-    case "P5": return "var(--color-grey-500)"; // gray
-    default: return "var(--color-grey-500)"; // gray
+    case "P1":
+      return "var(--color-error-500)"; // red
+    case "P2":
+      return "var(--color-orange-500)"; // orange
+    case "P3":
+      return "var(--color-amber-500)"; // amber
+    case "P4":
+      return "var(--color-blue-500)"; // blue
+    case "P5":
+      return "var(--color-grey-500)"; // gray
+    default:
+      return "var(--color-grey-500)"; // gray
   }
 };
 
@@ -476,17 +525,20 @@ const getSeverityColor = (severity: string): string => {
 const getInlineEventText = (event: any): string => {
   const data = event.data;
   const eventColor = getEventBadgeColor(event);
-  const opacity = isDark.value ? '50' : '40';
+  const opacity = isDark.value ? "50" : "40";
   // Escape user-controlled strings before embedding in HTML (XSS prevention)
-  const esc = (s: string) => String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-  const bold = (text: string) => `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
-  const severityBadge = (severity: string) => `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? '31%' : '25%'}, transparent); color: ${isDark.value ? 'var(--color-grey-0)' : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? '38%' : '25%'}, transparent);">${esc(severity)}</span>`;
-  const isSystemEvent = getUserId(event) === 'System';
+  const esc = (s: string) =>
+    String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  const bold = (text: string) =>
+    `<span style="font-weight: 600; color: ${eventColor};">${esc(text)}</span>`;
+  const severityBadge = (severity: string) =>
+    `<span style="display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 4px; font-size: var(--text-2xs); font-weight: 600; background-color: color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "31%" : "25%"}, transparent); color: ${isDark.value ? "var(--color-grey-0)" : getSeverityColor(severity)}; border: 1px solid color-mix(in srgb, ${getSeverityColor(severity)} ${isDark.value ? "38%" : "25%"}, transparent);">${esc(severity)}</span>`;
+  const isSystemEvent = getUserId(event) === "System";
 
   switch (event.type) {
     case "Created":
@@ -508,8 +560,10 @@ const getInlineEventText = (event: any): string => {
 
     case "SeverityUpgrade":
       return isSystemEvent
-        ? `Severity upgraded from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${esc(data.reason)}` : '')
-        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}` + (data.reason ? ` - ${esc(data.reason)}` : '');
+        ? `Severity upgraded from ${severityBadge(data.from)} to ${severityBadge(data.to)}` +
+            (data.reason ? ` - ${esc(data.reason)}` : "")
+        : `changed the severity from ${severityBadge(data.from)} to ${severityBadge(data.to)}` +
+            (data.reason ? ` - ${esc(data.reason)}` : "");
 
     case "SeverityOverride":
       return isSystemEvent
@@ -520,9 +574,7 @@ const getInlineEventText = (event: any): string => {
       return `renamed from ${bold(data.from)} to ${bold(data.to)}`;
 
     case "AssignmentChanged":
-      return data.to
-        ? `Assigned to ${bold(data.to)}`
-        : "Assignment removed";
+      return data.to ? `Assigned to ${bold(data.to)}` : "Assignment removed";
 
     case "DimensionsUpgraded":
       return "Correlation key was upgraded";
@@ -554,33 +606,39 @@ const formatRelativeTime = (timestamp: number): string => {
   if (diff < 60000) return "just now";
 
   const minutes = Math.floor(diff / 60000);
-  if (diff < 3600000) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  if (diff < 3600000) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
 
   const hours = Math.floor(diff / 3600000);
-  if (diff < 86400000) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  if (diff < 86400000) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
 
   const days = Math.floor(diff / 86400000);
-  if (diff < 604800000) return `${days} day${days === 1 ? '' : 's'} ago`;
+  if (diff < 604800000) return `${days} day${days === 1 ? "" : "s"} ago`;
 
   return formatToDateOnly(timestamp);
 };
 
-watch(() => props.visible, async (visible) => {
-  if (visible && props.incidentId) {
-    await fetchEvents();
-    await nextTick();
-    scrollToBottom();
-  }
-});
+watch(
+  () => props.visible,
+  async (visible) => {
+    if (visible && props.incidentId) {
+      await fetchEvents();
+      await nextTick();
+      scrollToBottom();
+    }
+  },
+);
 
 // Watch for refresh trigger from parent component
-watch(() => props.refreshTrigger, async (newVal, oldVal) => {
-  if (newVal !== oldVal && props.visible && props.incidentId) {
-    await fetchEvents();
-    await nextTick();
-    scrollToBottom();
-  }
-});
+watch(
+  () => props.refreshTrigger,
+  async (newVal, oldVal) => {
+    if (newVal !== oldVal && props.visible && props.incidentId) {
+      await fetchEvents();
+      await nextTick();
+      scrollToBottom();
+    }
+  },
+);
 
 onMounted(async () => {
   if (props.visible && props.incidentId) {
@@ -592,6 +650,6 @@ onMounted(async () => {
 
 // Expose fetchEvents method so parent component can call it
 defineExpose({
-  fetchEvents
+  fetchEvents,
 });
 </script>

@@ -31,12 +31,7 @@ export function jobMappingVariablesForScorer(
   scorer: Scorer,
   existingMapping: Record<string, string> | undefined,
 ) {
-  return [
-    ...new Set([
-      ...scorerTemplateVariables(scorer),
-      ...Object.keys(existingMapping || {}),
-    ]),
-  ];
+  return [...new Set([...scorerTemplateVariables(scorer), ...Object.keys(existingMapping || {})])];
 }
 
 export function buildJobInputMappingPayload(
@@ -74,14 +69,8 @@ export function normalizeJobInputMappings(value: any, selectedScorerIds: string[
   if (hasPerScorerShape) {
     return Object.fromEntries(
       entries
-        .filter(
-          ([, mapping]) =>
-            mapping && typeof mapping === "object" && !Array.isArray(mapping),
-        )
-        .map(([scorerId, mapping]) => [
-          scorerId,
-          { ...(mapping as Record<string, string>) },
-        ]),
+        .filter(([, mapping]) => mapping && typeof mapping === "object" && !Array.isArray(mapping))
+        .map(([scorerId, mapping]) => [scorerId, { ...(mapping as Record<string, string>) }]),
     );
   }
 
@@ -89,9 +78,7 @@ export function normalizeJobInputMappings(value: any, selectedScorerIds: string[
     entries.filter(([, mappingValue]) => typeof mappingValue === "string"),
   ) as Record<string, string>;
 
-  return Object.fromEntries(
-    selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]),
-  );
+  return Object.fromEntries(selectedScorerIds.map((scorerId) => [scorerId, { ...flatMapping }]));
 }
 
 export function syncJobInputMappings(

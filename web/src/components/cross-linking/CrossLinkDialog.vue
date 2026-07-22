@@ -1,5 +1,10 @@
 <template>
-  <ODialog data-test="cross-link-dialog" v-model:open="dialogVisible" persistent size="md" :show-close="false"
+  <ODialog
+    data-test="cross-link-dialog"
+    v-model:open="dialogVisible"
+    persistent
+    size="md"
+    :show-close="false"
     form-id="cross-link-form"
     :title="isEditing ? t('crossLinks.editCrossLink') : t('crossLinks.addCrossLink')"
     :secondary-button-label="t('common.cancel')"
@@ -9,65 +14,64 @@
     <template #header-right>
       <CrossLinkUserGuide />
     </template>
-        <OForm id="cross-link-form" :form="form">
-          <!-- Name -->
-          <div class="mb-3">
-            <OFormInput
-              name="name"
-              :label="t('crossLinks.name')"
-              required
-              :placeholder="t('crossLinks.namePlaceholder')"
-              data-test="cross-link-name-input"
-            />
-          </div>
+    <OForm id="cross-link-form" :form="form">
+      <!-- Name -->
+      <div class="mb-3">
+        <OFormInput
+          name="name"
+          :label="t('crossLinks.name')"
+          required
+          :placeholder="t('crossLinks.namePlaceholder')"
+          data-test="cross-link-name-input"
+        />
+      </div>
 
-          <!-- URL Template -->
-          <div class="mb-3">
-            <OFormInput
-              name="url"
-              :label="t('crossLinks.urlTemplate')"
-              required
-              :placeholder="t('crossLinks.urlPlaceholder')"
-              data-test="cross-link-url-input"
-            />
-            <div class="text-xs mt-1 text-text-muted">
-              {{ t("crossLinks.urlHint") }}
-            </div>
-          </div>
+      <!-- URL Template -->
+      <div class="mb-3">
+        <OFormInput
+          name="url"
+          :label="t('crossLinks.urlTemplate')"
+          required
+          :placeholder="t('crossLinks.urlPlaceholder')"
+          data-test="cross-link-url-input"
+        />
+        <div class="text-xs mt-1 text-text-muted">
+          {{ t("crossLinks.urlHint") }}
+        </div>
+      </div>
 
-          <!-- Fields -->
-          <div class="mb-2">
-            <label class="block text-sm font-semibold mb-1 text-text-heading">{{ t("crossLinks.fields") }}</label>
-            <div class="text-xs mb-2 text-text-muted">
-              {{ t("crossLinks.fieldsHint") }}
-            </div>
-            <div v-if="formFields.length > 0" class="flex flex-wrap gap-1 mb-2">
-              <OTag
-                v-for="(field, idx) in formFields"
-                :key="idx"
-                type="selectionChip"
-                class="max-w-62.5"
-                :data-test="`cross-link-field-chip-${idx}`"
+      <!-- Fields -->
+      <div class="mb-2">
+        <label class="block text-sm font-semibold mb-1 text-text-heading">{{
+          t("crossLinks.fields")
+        }}</label>
+        <div class="text-xs mb-2 text-text-muted">
+          {{ t("crossLinks.fieldsHint") }}
+        </div>
+        <div v-if="formFields.length > 0" class="flex flex-wrap gap-1 mb-2">
+          <OTag
+            v-for="(field, idx) in formFields"
+            :key="idx"
+            type="selectionChip"
+            class="max-w-62.5"
+            :data-test="`cross-link-field-chip-${idx}`"
+          >
+            <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
+            <template #trailing>
+              <button
+                type="button"
+                :aria-label="`Remove ${field.name}`"
+                :data-test="`cross-link-field-chip-remove-${idx}`"
+                class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
+                @click="removeField(idx)"
               >
-                <span class="truncate text-xs" :title="field.name">{{ field.name }}</span>
-                <template #trailing>
-                  <button
-                    type="button"
-                    :aria-label="`Remove ${field.name}`"
-                    :data-test="`cross-link-field-chip-remove-${idx}`"
-                    class="inline-flex items-center justify-center cursor-pointer hover:opacity-70"
-                    @click="removeField(idx)"
-                  >
-                    <OIcon name="close" size="xs" />
-                  </button>
-                </template>
-              </OTag>
-            </div>
-            <div
-              class="flex gap-2 items-center"
-              @keydown="onFieldKeydown"
-            >
-              <!--
+                <OIcon name="close" size="xs" />
+              </button>
+            </template>
+          </OTag>
+        </div>
+        <div class="flex gap-2 items-center" @keydown="onFieldKeydown">
+          <!--
                 Chip-builder scratch input — now a form-owned `newFieldName`
                 field (R1-strict: no bare control inside the OForm). The
                 committed chips live in the form-owned `fields` array (bridged
@@ -75,33 +79,33 @@
                 `availableFields` while still allowing custom (free-text) names;
                 the OFormInput is the fallback when no suggestions exist.
               -->
-              <OFormCombobox
-                v-if="availableFields.length > 0"
-                ref="fieldComboboxRef"
-                name="newFieldName"
-                class="flex-1"
-                :items="availableFieldOptions"
-                :placeholder="t('crossLinks.fieldInputPlaceholder')"
-                @select="onFieldSelect"
-                data-test="cross-link-field-input"
-              />
-              <OFormInput
-                v-else
-                name="newFieldName"
-                class="flex-1"
-                :placeholder="t('crossLinks.fieldInputPlaceholder')"
-                data-test="cross-link-field-input"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="add"
-                @click="addField"
-                data-test="cross-link-add-field-btn"
-              />
-            </div>
-          </div>
-        </OForm>
+          <OFormCombobox
+            v-if="availableFields.length > 0"
+            ref="fieldComboboxRef"
+            name="newFieldName"
+            class="flex-1"
+            :items="availableFieldOptions"
+            :placeholder="t('crossLinks.fieldInputPlaceholder')"
+            @select="onFieldSelect"
+            data-test="cross-link-field-input"
+          />
+          <OFormInput
+            v-else
+            name="newFieldName"
+            class="flex-1"
+            :placeholder="t('crossLinks.fieldInputPlaceholder')"
+            data-test="cross-link-field-input"
+          />
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            icon-left="add"
+            @click="addField"
+            data-test="cross-link-add-field-btn"
+          />
+        </div>
+      </div>
+    </OForm>
   </ODialog>
 </template>
 
@@ -110,7 +114,7 @@ import { defineComponent, ref, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkUserGuide from "./CrossLinkUserGuide.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -118,10 +122,7 @@ import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
-import {
-  makeCrossLinkDialogSchema,
-  type CrossLinkDialogForm,
-} from "./CrossLinkDialog.schema";
+import { makeCrossLinkDialogSchema, type CrossLinkDialogForm } from "./CrossLinkDialog.schema";
 
 export interface CrossLink {
   name: string;
@@ -131,7 +132,16 @@ export interface CrossLink {
 
 export default defineComponent({
   name: "CrossLinkDialog",
-  components: { CrossLinkUserGuide, OTag, OButton, OFormCombobox, ODialog, OForm, OFormInput, OIcon },
+  components: {
+    CrossLinkUserGuide,
+    OTag,
+    OButton,
+    OFormCombobox,
+    ODialog,
+    OForm,
+    OFormInput,
+    OIcon,
+  },
   props: {
     modelValue: {
       type: Boolean,
@@ -165,14 +175,14 @@ export default defineComponent({
     // Dynamic (edit-prefill) defaults → a typed component computed. Seeds
     // name/url/fields/newFieldName from the current `link`; re-applied on open
     // via form.reset (the form is created here, so it persists across opens).
-    const crossLinkDefaults = computed((): CrossLinkDialogForm => ({
-      name: props.link?.name ?? "",
-      url: props.link?.url ?? "",
-      fields: props.link?.fields
-        ? props.link.fields.map((f) => ({ name: f.name }))
-        : [],
-      newFieldName: "",
-    }));
+    const crossLinkDefaults = computed(
+      (): CrossLinkDialogForm => ({
+        name: props.link?.name ?? "",
+        url: props.link?.url ?? "",
+        fields: props.link?.fields ? props.link.fields.map((f) => ({ name: f.name })) : [],
+        newFieldName: "",
+      }),
+    );
 
     // Owner-pattern form (Rule ③): CrossLinkDialog OWNS the <OForm> and its
     // template renders the chip list from the form-owned `fields` array. We
@@ -196,8 +206,7 @@ export default defineComponent({
     const currentFields = (): Array<{ name: string }> =>
       (form.state.values.fields as Array<{ name: string }> | undefined) ?? [];
 
-    const currentNewFieldName = (): string =>
-      (form.state.values?.newFieldName ?? "") as string;
+    const currentNewFieldName = (): string => (form.state.values?.newFieldName ?? "") as string;
 
     function clearFieldInput() {
       // OFormCombobox path: clear() resets reka-ui's internal search text AND

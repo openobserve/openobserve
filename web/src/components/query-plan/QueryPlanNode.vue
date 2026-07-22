@@ -17,21 +17,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="plan-node" data-test="query-plan-node">
     <!-- Node content -->
-    <div
-      class="node-line flex items-center gap-0 py-0.5 whitespace-pre"
-    >
+    <div class="node-line flex items-center gap-0 py-0.5 whitespace-pre">
       <!-- Parent prefix indentation -->
       <span
         v-if="parentPrefix"
         data-test="query-plan-node-tree-indent"
         class="text-text-muted font-bold select-none whitespace-pre"
-      >{{ parentPrefix }}</span>
+        >{{ parentPrefix }}</span
+      >
 
       <!-- Tree connector -->
       <span
         data-test="query-plan-node-tree-connector"
         class="text-text-muted font-bold select-none pr-1"
-      >{{ connector }}</span>
+        >{{ connector }}</span
+      >
 
       <!-- Expand/collapse icon for nodes with children -->
       <span
@@ -40,19 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >
-        {{ childrenExpanded ? '▼' : '▶' }}
+        {{ childrenExpanded ? "▼" : "▶" }}
       </span>
-      <span
-        v-else
-        data-test="query-plan-node-expand-icon-spacer"
-        class="w-4 inline-block"
-      ></span>
+      <span v-else data-test="query-plan-node-expand-icon-spacer" class="w-4 inline-block"></span>
 
       <!-- Operator name -->
       <span
         data-test="query-plan-node-operator-name"
         class="font-semibold text-text-heading pl-1"
-      >{{ node.name }}</span>
+        >{{ node.name }}</span
+      >
 
       <!-- Inline details (clickable to expand if truncated) -->
       <span
@@ -60,7 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="inline-details text-text-secondary font-normal text-xs italic"
         :class="{
           'cursor-pointer hover:text-text-body': hasLongDetails,
-          'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-150 truncated': !detailsExpanded && hasLongDetails,
+          'whitespace-nowrap overflow-hidden [text-overflow:ellipsis] max-w-150 truncated':
+            !detailsExpanded && hasLongDetails,
         }"
         data-test="query-plan-node-inline-details"
         @click="hasLongDetails ? toggleDetailsExpanded() : null"
@@ -70,10 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Separator between details and metrics -->
       <span
-        v-if="inlineDetails && (isAnalyze && hasMetrics)"
+        v-if="inlineDetails && isAnalyze && hasMetrics"
         data-test="query-plan-node-separator"
         class="text-text-muted px-2 font-normal select-none"
-      >·</span>
+        >·</span
+      >
 
       <!-- Metrics (for ANALYZE mode) -->
       <span
@@ -106,9 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="query-plan-node-details"
       class="pt-0.5 pb-0.5 text-text-secondary text-xs italic whitespace-pre-wrap break-words"
     >
-      <span
-        class="text-text-muted font-bold select-none whitespace-pre"
-      >{{ childPrefix }}  </span>
+      <span class="text-text-muted font-bold select-none whitespace-pre">{{ childPrefix }} </span>
       <span>{{ inlineDetails }}</span>
     </div>
 
@@ -155,7 +152,7 @@ export default defineComponent({
     },
     parentPrefix: {
       type: String,
-      default: '',
+      default: "",
     },
   },
   setup(props) {
@@ -163,18 +160,19 @@ export default defineComponent({
     const detailsExpanded = ref(false);
 
     const connector = computed(() => {
-      return props.isLast ? '└─' : '├─';
+      return props.isLast ? "└─" : "├─";
     });
 
     const childPrefix = computed(() => {
-      const addition = props.isLast ? '  ' : '│ ';
+      const addition = props.isLast ? "  " : "│ ";
       return props.parentPrefix + addition;
     });
 
     const hasMetrics = computed(() => {
-      return props.isAnalyze && (
-        props.node.metrics.output_rows !== undefined ||
-        props.node.metrics.elapsed_compute !== undefined
+      return (
+        props.isAnalyze &&
+        (props.node.metrics.output_rows !== undefined ||
+          props.node.metrics.elapsed_compute !== undefined)
       );
     });
 
@@ -182,14 +180,14 @@ export default defineComponent({
      * Get inline details - everything after the colon, excluding metrics
      */
     const parseInlineDetails = (fullText: string): string => {
-      const colonIndex = fullText.indexOf(':');
-      if (colonIndex === -1) return '';
+      const colonIndex = fullText.indexOf(":");
+      if (colonIndex === -1) return "";
 
       let details = fullText.substring(colonIndex + 1).trim();
 
       // Remove metrics section if in analyze mode (we show them separately)
-      if (props.isAnalyze && details.includes('metrics=')) {
-        const metricsIndex = details.indexOf(', metrics=');
+      if (props.isAnalyze && details.includes("metrics=")) {
+        const metricsIndex = details.indexOf(", metrics=");
         if (metricsIndex !== -1) {
           details = details.substring(0, metricsIndex).trim();
         }
@@ -216,7 +214,7 @@ export default defineComponent({
     };
 
     const formatNumber = (num: number): string => {
-      return num.toLocaleString('en-US');
+      return num.toLocaleString("en-US");
     };
 
     return {

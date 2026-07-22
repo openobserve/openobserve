@@ -18,9 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="open"
     @update:open="$emit('update:open', $event)"
-    :title="isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')"
+    :title="
+      isEdit ? t('regex_patterns.edit_regex_pattern') : t('regex_patterns.create_regex_pattern')
+    "
     :width="isFullScreen ? 100 : store.state.isAiChatEnabled ? 70 : 40"
-    :primary-button-label="isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')"
+    :primary-button-label="
+      isEdit ? t('regex_patterns.update_close') : t('regex_patterns.create_close')
+    "
     :secondary-button-label="t('regex_patterns.cancel')"
     form-id="add-regex-pattern-form"
     @click:secondary="handleClose"
@@ -39,7 +43,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @mouseenter="isHovered = true"
           @mouseleave="isHovered = false"
         >
-          <img :src="getBtnLogo" class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" />
+          <img
+            :src="getBtnLogo"
+            class="header-icon [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+          />
         </OButton>
         <OButton
           data-test="add-regex-pattern-fullscreen-btn"
@@ -47,11 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           @click="toggleFullScreen"
         >
-          <OIcon
-            name="fullscreen"
-            size="xs"
-            :class="isFullScreen ? 'text-accent' : ''"
-          />
+          <OIcon name="fullscreen" size="xs" :class="isFullScreen ? 'text-accent' : ''" />
         </OButton>
       </div>
     </template>
@@ -59,11 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex w-full h-full">
       <div
         :class="
-          store.state.isAiChatEnabled
-            ? isFullScreen
-              ? 'w-[75%] pl-2'
-              : 'w-[65%] pl-2'
-            : 'w-full'
+          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] pl-2' : 'w-[65%] pl-2') : 'w-full'
         "
       >
         <OForm
@@ -93,62 +92,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="add-regex-pattern-description-input"
               :placeholder="t('settings.addRegexPattern.descriptionPlaceholder')"
             />
-            <OBanner
-              variant="info"
-              icon="info"
-              dense
-              data-test="add-regex-pattern-lookaround-note"
-            >
+            <OBanner variant="info" icon="info" dense data-test="add-regex-pattern-lookaround-note">
               <div class="text-xs font-normal leading-4.5">
                 {{ t("regex_patterns.unsupported_lookaround_note") }}
                 {{ t("regex_patterns.unsupported_lookaround_example") }}
-                <code
-                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
+                <code class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
                   >(?=openobserve)\w+</code
                 >
-                <OIcon
-                  name="arrow-right-alt"
-                  size="xs"
-                  class="inline-block align-middle mx-1"
-                />
-                <code
-                  class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
+                <OIcon name="arrow-right-alt" size="xs" class="inline-block align-middle mx-1" />
+                <code class="font-mono text-xs px-1 py-px rounded-default bg-banner-info-border"
                   >openobserve\w*</code
                 >
               </div>
             </OBanner>
             <div class="regex-pattern-input-container">
               <div class="flex items-center justify-between">
-                <span class="text-sm font-bold leading-5.25">{{ t('settings.addRegexPattern.regexPatternLabel') }}</span>
+                <span class="text-sm font-bold leading-5.25">{{
+                  t("settings.addRegexPattern.regexPatternLabel")
+                }}</span>
                 <OButton
-                  v-if="
-                    config.isEnterprise == 'true' &&
-                    store.state.zoConfig.ai_enabled
-                  "
+                  v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
                   variant="ghost"
                   size="sm"
                   @click="toggleAIChat"
                 >
-                  <img
-                    :src="goToAILogo"
-                    class="w-5 h-5 mr-1"
-                  />
-                  <span
-                    class="text-brand-indigo text-sm flex items-center gap-1"
-                  >
-                    {{ t('settings.addRegexPattern.tryAiAssistant') }}
+                  <img :src="goToAILogo" class="w-5 h-5 mr-1" />
+                  <span class="text-brand-indigo text-sm flex items-center gap-1">
+                    {{ t("settings.addRegexPattern.tryAiAssistant") }}
                   </span>
-                  <OIcon
-                    size="sm"
-                    name="arrow-right-alt"
-                    class="text-brand-indigo w-5 h-5 ml-1"
-                  />
+                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo w-5 h-5 ml-1" />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
                 <div class="py-0.5 h-6 bg-surface-subtle">
                   <div class="text-xs font-[500] px-2 text-text-secondary">
-                    {{ t('settings.addRegexPattern.writePattern') }}
+                    {{ t("settings.addRegexPattern.writePattern") }}
                   </div>
                 </div>
                 <OFormTextarea
@@ -166,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>
               <div class="flex items-center justify-between">
                 <span class="text-sm font-bold leading-5.25">
-                  {{ t('settings.addRegexPattern.testRegexPattern') }}
+                  {{ t("settings.addRegexPattern.testRegexPattern") }}
                 </span>
                 <OButton
                   variant="primary"
@@ -174,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="!patternValue"
                   @click="testStringOutput"
                 >
-                  {{ t('settings.addRegexPattern.testInput') }}
+                  {{ t("settings.addRegexPattern.testInput") }}
                 </OButton>
               </div>
             </div>
@@ -188,10 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #right> </template>
               </FullViewContainer>
-              <div
-                v-if="expandState.regexTestString"
-                class="regex-pattern-input"
-              >
+              <div v-if="expandState.regexTestString" class="regex-pattern-input">
                 <OFormTextarea
                   name="testString"
                   data-test="add-regex-test-string-input"
@@ -229,21 +204,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="flex flex-col items-center justify-center h-27.75 rounded-default border border-input-border bg-input-bg"
                 >
                   <div v-if="!testLoading && outputStringValue.length === 0">
-                    <OIcon
-                      name="lightbulb"
-                      size="md"
-                      class="text-icon-color"
-                    />
-                    <span
-                      class="text-xs font-[400] text-center text-text-secondary"
-                    >
-                      {{ t('settings.addRegexPattern.clickTestInputHint') }}
+                    <OIcon name="lightbulb" size="md" class="text-icon-color" />
+                    <span class="text-xs font-[400] text-center text-text-secondary">
+                      {{ t("settings.addRegexPattern.clickTestInputHint") }}
                     </span>
                   </div>
                   <div v-else-if="testLoading">
-                    <span
-                      class="flex items-center justify-center h-27.75"
-                    >
+                    <span class="flex items-center justify-center h-27.75">
                       <OSpinner size="sm" />
                     </span>
                   </div>
@@ -256,11 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="ml-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="
-          width: 35%;
-          min-width: 75px;
-          height: calc(100vh - 90px) !important;
-        "
+        style="width: 35%; min-width: 75px; height: calc(100vh - 90px) !important"
       >
         <O2AIChat
           :aiChatInputContext="inputContext"
@@ -274,11 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  watch,
-} from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { computed } from "vue";
@@ -297,12 +256,9 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
-import {
-  makeAddRegexPatternSchema,
-  type AddRegexPatternForm,
-} from "./AddRegexPattern.schema";
+import { makeAddRegexPatternSchema, type AddRegexPatternForm } from "./AddRegexPattern.schema";
 
 export default defineComponent({
   name: "AddRegexPattern",
@@ -341,7 +297,6 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
 
-
     const isHovered = ref(false);
 
     const isFullScreen = ref(false);
@@ -374,7 +329,7 @@ export default defineComponent({
       const testString =
         store.state.organizationData.regexPatternPrompt &&
         router.currentRoute.value.query.from === "logs"
-          ? store.state.organizationData.regexPatternTestValue ?? ""
+          ? (store.state.organizationData.regexPatternTestValue ?? "")
           : "";
       return props.isEdit
         ? {
@@ -394,9 +349,7 @@ export default defineComponent({
     const patternValue = ref<string>(addRegexPatternDefaults.value.pattern);
     // Live test-feature values, read ONE-WAY from the form store (the form owns
     // testString/outputString). Used by the Test button + highlight + output display.
-    const testStringValue = ref<string>(
-      addRegexPatternDefaults.value.testString ?? "",
-    );
+    const testStringValue = ref<string>(addRegexPatternDefaults.value.testString ?? "");
     const outputStringValue = ref<string>("");
     watch(
       () => addRegexPatternForm.value,
@@ -404,11 +357,29 @@ export default defineComponent({
         const f = formRef?.form;
         if (!f) return;
         const livePattern = f.useStore((s: any) => s.values.pattern ?? "");
-        watch(livePattern, (v: string) => { patternValue.value = v; }, { immediate: true });
+        watch(
+          livePattern,
+          (v: string) => {
+            patternValue.value = v;
+          },
+          { immediate: true },
+        );
         const liveTestString = f.useStore((s: any) => s.values.testString ?? "");
-        watch(liveTestString, (v: string) => { testStringValue.value = v; }, { immediate: true });
+        watch(
+          liveTestString,
+          (v: string) => {
+            testStringValue.value = v;
+          },
+          { immediate: true },
+        );
         const liveOutput = f.useStore((s: any) => s.values.outputString ?? "");
-        watch(liveOutput, (v: string) => { outputStringValue.value = v; }, { immediate: true });
+        watch(
+          liveOutput,
+          (v: string) => {
+            outputStringValue.value = v;
+          },
+          { immediate: true },
+        );
       },
       { immediate: true },
     );
@@ -479,10 +450,7 @@ export default defineComponent({
               props.data.id,
               payload,
             )
-          : await regexPatternService.create(
-              store.state.selectedOrganization.identifier,
-              payload,
-            );
+          : await regexPatternService.create(store.state.selectedOrganization.identifier, payload);
         if (response.status == 200) {
           toast({
             message: props.isEdit
@@ -523,10 +491,7 @@ export default defineComponent({
           patternValue.value,
           [testStringValue.value],
         );
-        addRegexPatternForm.value?.form?.setFieldValue(
-          "outputString",
-          response.data.results[0],
-        );
+        addRegexPatternForm.value?.form?.setFieldValue("outputString", response.data.results[0]);
       } catch (error) {
         const e = error as { response?: { data?: { message?: string } } };
         toast({
@@ -590,4 +555,3 @@ export default defineComponent({
   border-top-right-radius: 0 !important;
 }
 </style>
-

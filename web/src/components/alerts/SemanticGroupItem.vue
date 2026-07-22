@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-group-item p-3 mb-2 rounded-default transition-all duration-200 w-full max-w-full bg-card-glass-bg border border-card-glass-border">
+  <div
+    class="semantic-group-item p-3 mb-2 rounded-default transition-all duration-200 w-full max-w-full bg-card-glass-bg border border-card-glass-border"
+  >
     <OForm :form="form">
       <div class="grid grid-cols-[200px_1fr_auto] gap-4 items-start w-full overflow-hidden">
         <!-- Left Column: Display Name only (ID is internal/read-only) -->
@@ -46,13 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Column: Field Names spanning both rows -->
         <div class="flex flex-col h-full min-w-0 overflow-hidden">
           <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-            <OFormTagInput
-              name="fields"
-              :placeholder="t('correlation.fieldNamePlaceholder')"
-            />
+            <OFormTagInput name="fields" :placeholder="t('correlation.fieldNamePlaceholder')" />
           </div>
         </div>
-
 
         <!-- Actions Column: Delete -->
         <div class="flex flex-col justify-between min-h-full">
@@ -66,7 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="!isProtected && emit('delete')"
             >
               <OIcon name="delete" size="sm" />
-              <OTooltip :content="isProtected ? t('correlation.serviceGroupProtected') : t('correlation.removeSemanticGroup')" />
+              <OTooltip
+                :content="
+                  isProtected
+                    ? t('correlation.serviceGroupProtected')
+                    : t('correlation.removeSemanticGroup')
+                "
+              />
             </OButton>
           </div>
         </div>
@@ -118,7 +122,13 @@ const isProtected = computed(() => props.group.id === "service");
 const currentId = ref<string>(props.group.id);
 
 const slugify = (s: string): string =>
-  s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
 // Generate ID as "{category-slug}-{display-slug}" for new groups
 const generateIdFromDisplay = (display: string): string => {

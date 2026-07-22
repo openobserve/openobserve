@@ -1,9 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  clearServiceColorRegistry,
-  getOrSetServiceColor,
-} from "./serviceColorRegistry";
+import { clearServiceColorRegistry, getOrSetServiceColor } from "./serviceColorRegistry";
 
 describe("serviceColorRegistry", () => {
   afterEach(() => {

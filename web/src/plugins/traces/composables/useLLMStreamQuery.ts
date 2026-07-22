@@ -46,8 +46,7 @@ import { useStore } from "vuex";
  */
 export function useLLMStreamQuery() {
   const store = useStore();
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const activeTraceIds = new Set<string>();
 

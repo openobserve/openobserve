@@ -38,11 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ summaryLine }}
       </p>
-      <small
-        v-if="traceId"
-        class="text-text-secondary"
-        data-test="error-detail-trace-id"
-      >
+      <small v-if="traceId" class="text-text-secondary" data-test="error-detail-trace-id">
         <span class="font-medium">{{ t("queryError.traceId") }}</span>
         {{ traceId }}
       </small>
@@ -57,10 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="error-detail-toggle-btn"
           @click="emit('toggle-detail')"
         >
-          <OIcon
-            :name="showDetail ? 'expand-less' : 'expand-more'"
-            size="xs"
-          />
+          <OIcon :name="showDetail ? 'expand-less' : 'expand-more'" size="xs" />
           {{ showDetail ? t("queryError.hideDetail") : t("queryError.showDetail") }}
         </button>
       </div>
@@ -71,9 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="border-t border-border-default px-4 py-3 max-h-52 overflow-y-auto"
         data-test="error-detail-body"
       >
-        <p
-          class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all"
-        >
+        <p class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all">
           {{ detailBody }}
         </p>
       </div>

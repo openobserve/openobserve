@@ -13,10 +13,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="dashboard-color-palette-root">
-    <div
-      data-test="dashboard-color-palette-flex-container"
-      class="flex items-center"
-    >
+    <div data-test="dashboard-color-palette-flex-container" class="flex items-center">
       <!-- dropdown to select color palette type/mode -->
       <OSelect
         data-test="dashboard-color-palette-select"
@@ -42,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </span>
             <span
               class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-sm text-text-body"
-            >{{ selectedOptionLabel }}</span
+              >{{ selectedOptionLabel }}</span
             >
           </div>
         </template>
@@ -68,10 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :style="{ background: c }"
                 />
               </span>
-              <span
-                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-              >{{ opt.label }}</span
-              >
+              <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                opt.label
+              }}</span>
             </div>
           </OSelectItem>
 
@@ -94,10 +90,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 aria-hidden="true"
                 :style="{ background: `linear-gradient(to right, ${opt.colorPalette.join(', ')})` }"
               />
-              <span
-                class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
-              >{{ opt.label }}</span
-              >
+              <span class="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{{
+                opt.label
+              }}</span>
             </div>
           </OSelectItem>
         </OSelectGroup>
@@ -130,10 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- color by button group -->
-    <div
-      class="pt-3"
-      v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')"
-    >
+    <div class="pt-3" v-if="dashboardPanelData.data.config.color.mode.startsWith('continuous')">
       {{ t("dashboard.colorSeriesBy") }}
       <div>
         <OToggleGroup v-model="dashboardPanelData.data.config.color.seriesBy">
@@ -174,13 +166,8 @@ export default defineComponent({
   setup() {
     const { t } = useI18n();
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData, promqlMode } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData, promqlMode } = useDashboardPanelData(dashboardPanelDataPageKey);
     onBeforeMount(() => {
       // on before mount need to check whether color object is there or not else use palette-classic-by-series as a default
       if (!dashboardPanelData?.data?.config?.color) {
@@ -274,18 +261,19 @@ export default defineComponent({
       const selectedOption = colorOptions.find(
         (option) =>
           option.value ===
-          (dashboardPanelData?.data?.config?.color?.mode ??
-            "palette-classic-by-series"),
+          (dashboardPanelData?.data?.config?.color?.mode ?? "palette-classic-by-series"),
       );
-      return selectedOption
-        ? selectedOption.label
-        : t("dashboard.colorPaletteClassicBySeries");
+      return selectedOption ? selectedOption.label : t("dashboard.colorPaletteClassicBySeries");
     });
 
     const colorOptionsByGroup = computed(() => ({
       bySeries: colorOptions.filter(
         (o): o is SelectableColorOption =>
-          !o.header && !!o.value && !o.value.startsWith("continuous") && o.value !== "fixed" && o.value !== "shades",
+          !o.header &&
+          !!o.value &&
+          !o.value.startsWith("continuous") &&
+          o.value !== "fixed" &&
+          o.value !== "shades",
       ),
       byValue: colorOptions.filter(
         (o): o is SelectableColorOption => !!o.value && o.value.startsWith("continuous"),
@@ -310,9 +298,7 @@ export default defineComponent({
       if (["fixed", "shades"].includes(value)) {
         dashboardPanelData.data.config.color.fixedColor = ["#53ca53"];
         dashboardPanelData.data.config.color.seriesBy = "last";
-      } else if (
-        ["palette-classic-by-series", "palette-classic"].includes(value)
-      ) {
+      } else if (["palette-classic-by-series", "palette-classic"].includes(value)) {
         // do not store fixedcolor in config for palette-classic-by-series and palette-classic
         dashboardPanelData.data.config.color.fixedColor = [];
       } else {

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :select-all="variableItem.multiSelect"
       @update:model-value="emit('update:modelValue', $event)"
     >
-      <template #empty>{{ t('dashboard.variableCustomValueSelector.noDataFound') }}</template>
+      <template #empty>{{ t("dashboard.variableCustomValueSelector.noDataFound") }}</template>
     </OSelect>
   </div>
 </template>

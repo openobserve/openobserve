@@ -143,16 +143,12 @@ describe("cleanFilterGroup", () => {
         {
           filterType: "group",
           logicalOperator: "OR",
-          conditions: [
-            { filterType: "condition", column: "x", operator: "=", value: "1" },
-          ],
+          conditions: [{ filterType: "condition", column: "x", operator: "=", value: "1" }],
         },
         {
           filterType: "group",
           logicalOperator: "OR",
-          conditions: [
-            { filterType: "condition", column: "", operator: "=", value: "1" },
-          ],
+          conditions: [{ filterType: "condition", column: "", operator: "=", value: "1" }],
         },
       ],
     });
@@ -193,9 +189,7 @@ describe("buildJobFilterConditionPayload", () => {
     const payload = buildJobFilterConditionPayload({
       filterType: "group",
       logicalOperator: "AND",
-      conditions: [
-        { filterType: "condition", column: "", operator: "=", value: "x" },
-      ],
+      conditions: [{ filterType: "condition", column: "", operator: "=", value: "x" }],
     } as any);
     expect(payload).toEqual({ type: "all" });
   });
@@ -204,9 +198,7 @@ describe("buildJobFilterConditionPayload", () => {
     const payload = buildJobFilterConditionPayload({
       filterType: "group",
       logicalOperator: "AND",
-      conditions: [
-        { filterType: "condition", column: "span_name", operator: "=", value: "chat" },
-      ],
+      conditions: [{ filterType: "condition", column: "span_name", operator: "=", value: "chat" }],
     } as any);
     expect(payload).toMatchObject({
       version: 2,

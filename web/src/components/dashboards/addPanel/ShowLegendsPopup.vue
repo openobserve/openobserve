@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     :open="open"
     @update:open="$emit('update:open', $event)"
-    :title=" t('dashboard.legendsOfCharts') "
+    :title="t('dashboard.legendsOfCharts')"
     size="lg"
     data-test="dashboard-show-legends-dialog"
   >
@@ -33,7 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="copyAllLegends"
           data-test="dashboard-show-legends-copy-all"
         >
-          <template #icon-left><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
+          <template #icon-left
+            ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
           /></template>
           {{ isAllCopied ? "Copied" : "Copy all" }}
         </OButton>
@@ -41,11 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- Legends List -->
-    <div
-      data-test="dashboard-show-legends-popup"
-    >
+    <div data-test="dashboard-show-legends-popup">
       <div class="scroll max-h-100 overflow-y-auto py-0.75">
-        <div v-if="legends.length === 0" class="p-3 text-center min-h-25 flex items-center justify-center">
+        <div
+          v-if="legends.length === 0"
+          class="p-3 text-center min-h-25 flex items-center justify-center"
+        >
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
         <div v-else class="flex flex-col">
@@ -60,7 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="w-5 h-3 rounded-default mr-2.5 shrink-0"
                 :style="{ backgroundColor: legend.color || DEFAULT_LEGEND_COLOR }"
               ></div>
-              <div class="break-all overflow-wrap-anywhere whitespace-normal leading-[1.4] text-xs" data-test="dashboard-legend-item-text">
+              <div
+                class="break-all overflow-wrap-anywhere whitespace-normal leading-[1.4] text-xs"
+                data-test="dashboard-legend-item-text"
+              >
                 {{ legend.name }}
               </div>
               <OButton
@@ -71,8 +76,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
                 @click.stop="copyLegend(legend.name, Number(index))"
               >
-                <template #icon-left><OIcon
-                    :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'" size="sm"
+                <template #icon-left
+                  ><OIcon
+                    :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'"
+                    size="sm"
                 /></template>
                 <OTooltip :content="isLegendCopied(Number(index)) ? 'Copied!' : 'Copy legend'" />
               </OButton>
@@ -89,10 +96,7 @@ import { defineComponent, computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useTheme } from "@/composables/useTheme";
-import {
-  getSeriesColor,
-  getColorPalette,
-} from "@/utils/dashboard/colorPalette";
+import { getSeriesColor, getColorPalette } from "@/utils/dashboard/colorPalette";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 
@@ -183,11 +187,7 @@ export default defineComponent({
           const colorConfig = props.panelData.config.color;
 
           // If mode is palette-classic (or not set), use the palette loop
-          if (
-            !colorConfig ||
-            !colorConfig.mode ||
-            colorConfig.mode === "palette-classic"
-          ) {
+          if (!colorConfig || !colorConfig.mode || colorConfig.mode === "palette-classic") {
             return colorPalette[index % colorPalette.length];
           }
 
@@ -215,10 +215,7 @@ export default defineComponent({
       if (firstSeries && firstSeries.data && Array.isArray(firstSeries.data)) {
         const firstSeriesData = firstSeries.data;
         // Check if it's pie/donut format (data has name property)
-        if (
-          firstSeriesData.length > 0 &&
-          firstSeriesData[0].name !== undefined
-        ) {
+        if (firstSeriesData.length > 0 && firstSeriesData[0].name !== undefined) {
           return firstSeriesData
             .filter((item: any) => item && item.name)
             .map((item: any, index: number) => ({
@@ -277,4 +274,3 @@ export default defineComponent({
   },
 });
 </script>
-

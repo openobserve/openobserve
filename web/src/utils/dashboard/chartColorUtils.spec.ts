@@ -21,13 +21,7 @@ import {
 } from "@/utils/dashboard/chartColorUtils";
 
 vi.mock("@/utils/dashboard/colorPalette", () => ({
-  getColorPalette: vi.fn(() => [
-    "#FF5733",
-    "#33FF57",
-    "#3357FF",
-    "#F333FF",
-    "#33F3FF",
-  ]),
+  getColorPalette: vi.fn(() => ["#FF5733", "#33FF57", "#3357FF", "#F333FF", "#33F3FF"]),
 }));
 
 describe("chartColorUtils", () => {
@@ -134,9 +128,7 @@ describe("chartColorUtils", () => {
     });
 
     it("enforces configured colors for mapped series (itemStyle.color)", () => {
-      const series = [
-        { name: "A", itemStyle: { color: "#OLD111" } },
-      ];
+      const series = [{ name: "A", itemStyle: { color: "#OLD111" } }];
       const colorBySeries = [{ value: "A", color: "#FF0000" }];
       applySeriesColorMappings(series, colorBySeries, "light");
       expect(series[0].itemStyle.color).toBe("#FF0000");
@@ -200,7 +192,7 @@ describe("chartColorUtils", () => {
     });
 
     it("uses HSL fallback when palette is exhausted", async () => {
-      const { getColorPalette } = await import("@/utils/dashboard/colorPalette") as any;
+      const { getColorPalette } = (await import("@/utils/dashboard/colorPalette")) as any;
       getColorPalette.mockReturnValueOnce([]); // empty palette to force HSL fallback
 
       const series = [

@@ -18,7 +18,10 @@
           :disabled="availableStreams.length === 0"
           @update:model-value="onStreamFilterChange"
         />
-        <OTooltip v-if="availableStreams.length === 0" :content="t('traces.serviceGraph.noStreamsDetected')" />
+        <OTooltip
+          v-if="availableStreams.length === 0"
+          :content="t('traces.serviceGraph.noStreamsDetected')"
+        />
       </div>
       <!-- Search input -->
       <div data-test="service-graph-search-input">
@@ -38,16 +41,13 @@
         data-test="service-graph-legends"
         class="flex flex-row items-center gap-3 p-[0.325rem] rounded-default border border-card-glass-border!"
       >
-        <div
-          data-test="sg-legend"
-          class="flex flex-row items-center gap-3 min-w-0"
-        >
+        <div data-test="sg-legend" class="flex flex-row items-center gap-3 min-w-0">
           <!-- Border Color -->
-          <div
-            class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs"
-          >
+          <div class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs">
             {{ t("traces.serviceGraph.borderColor") }}
-            <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.borderColorMetric") }}</span>
+            <span class="font-normal opacity-55"
+              >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
+            >
           </div>
           <div class="flex! flex-row gap-2">
             <div
@@ -97,17 +97,13 @@
                 :data-test="`service-graph-distribution-${row.key}`"
               >
                 {{ row.label }}
-                <span class="ms-auto ps-4 tabular-nums opacity-70">{{
-                  row.count
-                }}</span>
+                <span class="ms-auto ps-4 tabular-nums opacity-70">{{ row.count }}</span>
               </ODropdownItem>
             </ODropdownGroup>
             <ODropdownSeparator />
             <ODropdownItem data-test="service-graph-distribution-total">
               <span class="font-semibold">{{ t("traces.serviceGraph.total") }}</span>
-              <span class="ms-auto ps-4 tabular-nums font-semibold">{{
-                totalEntities
-              }}</span>
+              <span class="ms-auto ps-4 tabular-nums font-semibold">{{ totalEntities }}</span>
             </ODropdownItem>
           </div>
         </ODropdown>
@@ -138,10 +134,7 @@
               />
             </OButton>
           </template>
-          <div
-            class="p-2 flex flex-col gap-2 min-w-52"
-            data-test="service-graph-collapse-mode"
-          >
+          <div class="p-2 flex flex-col gap-2 min-w-52" data-test="service-graph-collapse-mode">
             <div class="text-3xs font-bold uppercase opacity-60">
               {{ t("traces.serviceGraph.layout") }}
             </div>
@@ -151,7 +144,7 @@
               @update:model-value="(v) => setCollapseMode(v as 'auto' | 'expanded' | 'collapsed')"
             >
               <OToggleGroupItem
-                v-for="m in (['auto', 'expanded', 'collapsed'] as const)"
+                v-for="m in ['auto', 'expanded', 'collapsed'] as const"
                 :key="m"
                 :value="m"
                 size="xs"
@@ -170,7 +163,11 @@
             <div
               v-for="row in kindRows"
               :key="row.key"
-              :data-test="row.toggleable ? `service-graph-kind-toggle-${row.key}` : `service-graph-kind-count-${row.key}`"
+              :data-test="
+                row.toggleable
+                  ? `service-graph-kind-toggle-${row.key}`
+                  : `service-graph-kind-count-${row.key}`
+              "
               class="flex items-center gap-2 text-xs"
             >
               <OCheckbox
@@ -197,21 +194,29 @@
           class="flex flex-row items-center gap-2 min-w-0"
         >
           <!-- Node Size — Graph View only (Tree View uses fixed sizes) -->
-          <div
-            class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs"
-          >
+          <div class="mb-0! whitespace-nowrap text-text-label! font-bold text-xs">
             {{ t("traces.serviceGraph.nodeSize") }}
-            <span class="font-normal opacity-55">| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span>
+            <span class="font-normal opacity-55"
+              >| {{ t("traces.serviceGraph.nodeSizeMetric") }}</span
+            >
           </div>
           <div class="flex items-center gap-1 py-0!">
             <div class="flex flex-row items-center gap-1.5">
-              <span class="w-4 h-4 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
-              <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeLow") }}</span>
+              <span
+                class="w-4 h-4 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0"
+              />
+              <span class="text-xs text-text-secondary!">{{
+                t("traces.serviceGraph.sizeLow")
+              }}</span>
             </div>
             <div class="opacity-35 text-base tracking-[0.125rem] mb-0">···</div>
             <div class="flex flex-row items-center gap-1.5">
-              <span class="w-7 h-7 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0" />
-              <span class="text-xs text-text-secondary!">{{ t("traces.serviceGraph.sizeHigh") }}</span>
+              <span
+                class="w-7 h-7 rounded-full border-2 border-service-health-healthy bg-transparent shrink-0"
+              />
+              <span class="text-xs text-text-secondary!">{{
+                t("traces.serviceGraph.sizeHigh")
+              }}</span>
             </div>
           </div>
         </div>
@@ -235,12 +240,9 @@
                 </div>
               </div>
             </div>
-            <div
-              v-else-if="error"
-              class="flex h-full items-center justify-center p-[0.675rem]"
-            >
+            <div v-else-if="error" class="flex h-full items-center justify-center p-[0.675rem]">
               <div>
-                <OIcon name="error-outline" style="width: 4em; height: 4em;" />
+                <OIcon name="error-outline" style="width: 4em; height: 4em" />
                 <div class="text-xl font-semibold mt-3 text-text-heading">
                   {{ error }}
                 </div>
@@ -260,16 +262,10 @@
               class="flex h-full items-center justify-center"
             >
               <ServiceGraphNoDataState
-                @jump-to-stream-data="
-                  (from, to) => $emit('jump-to-stream-data', from, to)
-                "
+                @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
               />
             </div>
-            <div
-              v-else
-              ref="graphContainerRef"
-              class="h-full relative overflow-hidden"
-            >
+            <div v-else ref="graphContainerRef" class="h-full relative overflow-hidden">
               <ChartRenderer
                 ref="chartRendererRef"
                 data-test="service-graph-chart"
@@ -340,7 +336,8 @@
   </OCard>
 
   <!-- Settings Dialog -->
-  <ODialog data-test="service-graph-settings-dialog"
+  <ODialog
+    data-test="service-graph-settings-dialog"
     v-model:open="showSettings"
     size="sm"
     :title="t('traces.serviceGraph.settingsTitle')"
@@ -359,15 +356,7 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  computed,
-  watch,
-  nextTick,
-} from "vue";
+import { defineComponent, ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -379,10 +368,7 @@ import {
   convertServiceGraphToTree,
   convertServiceGraphToNetwork,
 } from "@/utils/traces/convertTraceData";
-import {
-  applyGraphCollapse,
-  GROUP_PREFIX,
-} from "@/utils/traces/applyGraphCollapse";
+import { applyGraphCollapse, GROUP_PREFIX } from "@/utils/traces/applyGraphCollapse";
 import {
   pointToBezierDistance,
   generateNodeTooltipContent,
@@ -399,7 +385,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -488,12 +474,8 @@ export default defineComponent({
     // Stream filter — an external `streamFilter` prop (Agent Graph page) wins;
     // otherwise sync from the traces page selected stream / localStorage.
     const tracesStream = searchObj.data.stream?.selectedStream?.value || "";
-    const storedStreamFilter = localStorage.getItem(
-      "serviceGraph_streamFilter",
-    );
-    const streamFilter = ref(
-      props.streamFilter || tracesStream || storedStreamFilter || "default",
-    );
+    const storedStreamFilter = localStorage.getItem("serviceGraph_streamFilter");
+    const streamFilter = ref(props.streamFilter || tracesStream || storedStreamFilter || "default");
     // Keep the internal ref in sync when the parent drives the stream (e.g. the
     // Agent Graph page selecting by agent → its source_stream) AND reload the
     // graph. The built-in dropdown delegates reload to its parent via
@@ -570,17 +552,13 @@ export default defineComponent({
     const zoomBy = (factor: number) => {
       const chart = chartRendererRef.value?.chart;
       if (!chart) return;
-      const next = Math.min(
-        ZOOM_MAX,
-        Math.max(ZOOM_MIN, currentZoom(chart) * factor),
-      );
+      const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, currentZoom(chart) * factor));
       // Merge only the zoom so positions/data stay put.
       chart.setOption({ series: [{ zoom: next }] }, { lazyUpdate: true });
     };
 
     const zoomIn = () => zoomBy(1.25);
     const zoomOut = () => zoomBy(1 / 1.25);
-
 
     // Fit-to-screen: recreate the chart (keyed on chartKey) so ECharts re-fits
     // the full graph bounding box into the panel at zoom 1, re-centered — the
@@ -645,21 +623,77 @@ export default defineComponent({
     // range + the CSS class carrying its color token. Data-driven so the legend
     // markup is one v-for.
     const healthLevels = computed(() => [
-      { key: "healthy", label: t("traces.serviceGraph.status.healthy"), range: t("traces.serviceGraph.range.healthy") },
-      { key: "degraded", label: t("traces.serviceGraph.status.degraded"), range: t("traces.serviceGraph.range.degraded") },
-      { key: "warning", label: t("traces.serviceGraph.status.warning"), range: t("traces.serviceGraph.range.warning") },
-      { key: "critical", label: t("traces.serviceGraph.status.critical"), range: t("traces.serviceGraph.range.critical") },
+      {
+        key: "healthy",
+        label: t("traces.serviceGraph.status.healthy"),
+        range: t("traces.serviceGraph.range.healthy"),
+      },
+      {
+        key: "degraded",
+        label: t("traces.serviceGraph.status.degraded"),
+        range: t("traces.serviceGraph.range.degraded"),
+      },
+      {
+        key: "warning",
+        label: t("traces.serviceGraph.status.warning"),
+        range: t("traces.serviceGraph.range.warning"),
+      },
+      {
+        key: "critical",
+        label: t("traces.serviceGraph.status.critical"),
+        range: t("traces.serviceGraph.range.critical"),
+      },
     ]);
 
     const kindRows = computed(() => [
-      { key: "service", label: t("traces.serviceGraph.kind.service"), count: kindCounts.value.service, toggleable: false },
-      { key: "database", label: t("traces.serviceGraph.kind.database"), count: kindCounts.value.database, toggleable: true },
-      { key: "queue", label: t("traces.serviceGraph.kind.queue"), count: kindCounts.value.queue, toggleable: true },
-      { key: "external", label: t("traces.serviceGraph.kind.external"), count: kindCounts.value.external, toggleable: true },
-      { key: "rpc", label: t("traces.serviceGraph.kind.rpc"), count: kindCounts.value.rpc, toggleable: true },
-      { key: "agent", label: t("traces.serviceGraph.kind.agent"), count: kindCounts.value.agent, toggleable: true },
-      { key: "tool", label: t("traces.serviceGraph.kind.tool"), count: kindCounts.value.tool, toggleable: true },
-      { key: "model", label: t("traces.serviceGraph.kind.model"), count: kindCounts.value.model, toggleable: true },
+      {
+        key: "service",
+        label: t("traces.serviceGraph.kind.service"),
+        count: kindCounts.value.service,
+        toggleable: false,
+      },
+      {
+        key: "database",
+        label: t("traces.serviceGraph.kind.database"),
+        count: kindCounts.value.database,
+        toggleable: true,
+      },
+      {
+        key: "queue",
+        label: t("traces.serviceGraph.kind.queue"),
+        count: kindCounts.value.queue,
+        toggleable: true,
+      },
+      {
+        key: "external",
+        label: t("traces.serviceGraph.kind.external"),
+        count: kindCounts.value.external,
+        toggleable: true,
+      },
+      {
+        key: "rpc",
+        label: t("traces.serviceGraph.kind.rpc"),
+        count: kindCounts.value.rpc,
+        toggleable: true,
+      },
+      {
+        key: "agent",
+        label: t("traces.serviceGraph.kind.agent"),
+        count: kindCounts.value.agent,
+        toggleable: true,
+      },
+      {
+        key: "tool",
+        label: t("traces.serviceGraph.kind.tool"),
+        count: kindCounts.value.tool,
+        toggleable: true,
+      },
+      {
+        key: "model",
+        label: t("traces.serviceGraph.kind.model"),
+        count: kindCounts.value.model,
+        toggleable: true,
+      },
     ]);
 
     // How many entity types the user has hidden. Non-zero means the graph is
@@ -682,8 +716,7 @@ export default defineComponent({
         dataZoomSelectActive: false,
       });
     };
-    const boundCursorClear = () =>
-      disablePanBlockingCursor(chartRendererRef.value?.chart);
+    const boundCursorClear = () => disablePanBlockingCursor(chartRendererRef.value?.chart);
     watch(
       [chartKey, () => chartRendererRef.value?.chart],
       () => {
@@ -899,8 +932,7 @@ export default defineComponent({
 
       const updatedLinks = Array.from(edgeMap.values()).map((edge: any) => {
         const isAdj =
-          hoveredNodeId !== null &&
-          (edge.from === hoveredNodeId || edge.to === hoveredNodeId);
+          hoveredNodeId !== null && (edge.from === hoveredNodeId || edge.to === hoveredNodeId);
         return {
           source: edge.from,
           target: edge.to,
@@ -984,8 +1016,7 @@ export default defineComponent({
       const getChildren = (group: any): any[] => {
         if (typeof group.children === "function") return group.children();
         if (Array.isArray(group._children)) return group._children;
-        const count =
-          typeof group.childCount === "function" ? group.childCount() : 0;
+        const count = typeof group.childCount === "function" ? group.childCount() : 0;
         const result: any[] = [];
         for (let i = 0; i < count; i++) {
           const c = group.childAt?.(i);
@@ -1138,10 +1169,8 @@ export default defineComponent({
         let left = mouseX + 15;
         let top = mouseY + 15;
         tooltipEl.style.display = "block";
-        if (left + tooltipEl.offsetWidth > cw)
-          left = mouseX - tooltipEl.offsetWidth - 10;
-        if (top + tooltipEl.offsetHeight > ch)
-          top = mouseY - tooltipEl.offsetHeight - 10;
+        if (left + tooltipEl.offsetWidth > cw) left = mouseX - tooltipEl.offsetWidth - 10;
+        if (top + tooltipEl.offsetHeight > ch) top = mouseY - tooltipEl.offsetHeight - 10;
         tooltipEl.style.left = left + "px";
         tooltipEl.style.top = top + "px";
       };
@@ -1153,13 +1182,10 @@ export default defineComponent({
         tooltipEl.style.padding = "9px 13px";
         tooltipEl.style.fontSize = "12px";
         tooltipEl.style.lineHeight = "1.5";
-        tooltipEl.style.fontFamily =
-          '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
+        tooltipEl.style.fontFamily = '-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         tooltipEl.style.letterSpacing = "0.01em";
         tooltipEl.style.whiteSpace = "nowrap";
-        tooltipEl.style.color = isDark.value
-          ? "rgba(255,255,255,0.88)"
-          : "rgba(0,0,0,0.82)";
+        tooltipEl.style.color = isDark.value ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.82)";
       };
 
       const showNodeTooltip = (
@@ -1180,19 +1206,11 @@ export default defineComponent({
 
         // Use direction-aware value from tree node when available (matches the
         // label), else fall back to the backend's node-level aggregate.
-        const requests =
-          requestsOverride !== undefined
-            ? requestsOverride
-            : (node.requests || 0);
+        const requests = requestsOverride !== undefined ? requestsOverride : node.requests || 0;
         const errors = node.errors || 0;
         const errRate =
           node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
-        tooltipEl.innerHTML = generateNodeTooltipContent(
-          nodeName,
-          requests,
-          errors,
-          errRate,
-        );
+        tooltipEl.innerHTML = generateNodeTooltipContent(nodeName, requests, errors, errRate);
         positionTooltip(mouseX, mouseY);
       };
 
@@ -1213,8 +1231,7 @@ export default defineComponent({
 
         const total = edge.total_requests || 0;
         const failed = edge.failed_requests || 0;
-        const errRate =
-          edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
+        const errRate = edge.error_rate ?? (total > 0 ? (failed / total) * 100 : 0);
         tooltipEl.innerHTML = generateEdgeTooltipContent(
           total,
           failed,
@@ -1248,10 +1265,7 @@ export default defineComponent({
         if (!edgesGroupEl.transformCoordToLocal) return;
 
         // Convert mouse pixel coords → edges group local coords
-        const [mx, my] = edgesGroupEl.transformCoordToLocal(
-          e.offsetX,
-          e.offsetY,
-        );
+        const [mx, my] = edgesGroupEl.transformCoordToLocal(e.offsetX, e.offsetY);
 
         // Compute pixel-to-layout scale so hit area is consistent across zoom levels
         const [ox] = edgesGroupEl.transformCoordToLocal(0, 0);
@@ -1302,12 +1316,7 @@ export default defineComponent({
           const edge = bezierEdges[bestIdx];
           const key = `edge:${edge.parentName}->${edge.childName}`;
           activeKey = key;
-          showEdgeTooltip(
-            e.offsetX,
-            e.offsetY,
-            edge.parentName,
-            edge.childName,
-          );
+          showEdgeTooltip(e.offsetX, e.offsetY, edge.parentName, edge.childName);
         } else if (activeKey) {
           if (!hideTimer) {
             hideTimer = setTimeout(() => {
@@ -1501,9 +1510,7 @@ export default defineComponent({
           throw new Error(t("traces.serviceGraph.noOrganizationSelected"));
         }
 
-        const { startTime, endTime } = getEffectiveTimeRange(
-          searchObj.data.datetime,
-        );
+        const { startTime, endTime } = getEffectiveTimeRange(searchObj.data.datetime);
 
         // Topology, node kinds, edges and latency all come from the
         // pre-aggregated _o2_service_graph stream via /topology/current. The
@@ -1513,9 +1520,7 @@ export default defineComponent({
         // is a cheap small-stream read that scales to TB-level trace volumes
         // (we do NOT re-scan raw traces per load). The UI is a thin renderer.
         const streamName =
-          streamFilter.value && streamFilter.value !== "all"
-            ? streamFilter.value
-            : undefined;
+          streamFilter.value && streamFilter.value !== "all" ? streamFilter.value : undefined;
         const response = await serviceGraphService.getCurrentTopology(orgId, {
           streamName,
           startTime,
@@ -1532,10 +1537,7 @@ export default defineComponent({
           service_type: n.service_type ?? undefined,
         }));
         const edges = (raw.edges ?? [])
-          .filter(
-            (e: any) =>
-              e.to && nodeIds.has(e.to) && (e.from == null || nodeIds.has(e.from)),
-          )
+          .filter((e: any) => e.to && nodeIds.has(e.to) && (e.from == null || nodeIds.has(e.from)))
           .map((e: any) => ({
             from: e.from ?? null,
             to: e.to,
@@ -1579,8 +1581,7 @@ export default defineComponent({
           connections: graphData.value.edges.length,
           totalRequests,
           totalErrors,
-          errorRate:
-            totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0,
+          errorRate: totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0,
         };
 
         lastUpdated.value = new Date().toLocaleTimeString();
@@ -1603,9 +1604,7 @@ export default defineComponent({
           error.value = t("traces.serviceGraph.errorNetwork");
         } else {
           error.value =
-            err.response?.data?.message ||
-            err.message ||
-            t("traces.serviceGraph.errorLoadFailed");
+            err.response?.data?.message || err.message || t("traces.serviceGraph.errorLoadFailed");
         }
       } finally {
         loading.value = false;
@@ -1626,19 +1625,12 @@ export default defineComponent({
       if (trimmedSearch) {
         const search = trimmedSearch.toLowerCase();
         const matchingNodeIds = new Set(
-          nodes
-            .filter((n) => n.label.toLowerCase().includes(search))
-            .map((n) => n.id),
+          nodes.filter((n) => n.label.toLowerCase().includes(search)).map((n) => n.id),
         );
 
-        edges = edges.filter(
-          (e) => matchingNodeIds.has(e.from) || matchingNodeIds.has(e.to),
-        );
+        edges = edges.filter((e) => matchingNodeIds.has(e.from) || matchingNodeIds.has(e.to));
 
-        const usedNodeIds = new Set([
-          ...edges.map((e) => e.from),
-          ...edges.map((e) => e.to),
-        ]);
+        const usedNodeIds = new Set([...edges.map((e) => e.from), ...edges.map((e) => e.to)]);
         nodes = nodes.filter((n) => usedNodeIds.has(n.id));
       }
 
@@ -1748,11 +1740,7 @@ export default defineComponent({
         }
       }
       // For tree visualization, check if it's a tree node
-      else if (
-        params.componentType === "series" &&
-        params.data &&
-        params.data.name
-      ) {
+      else if (params.componentType === "series" && params.data && params.data.name) {
         // Find the actual node data from graphData
         const nodeData = graphData.value.nodes.find(
           (n: any) => n.label === params.data.name || n.id === params.data.name,
@@ -1768,10 +1756,7 @@ export default defineComponent({
             showSidePanel.value = true;
           }
         } else {
-          console.warn(
-            "[ServiceGraph] Could not find node data for:",
-            params.data.name,
-          );
+          console.warn("[ServiceGraph] Could not find node data for:", params.data.name);
         }
       }
     };

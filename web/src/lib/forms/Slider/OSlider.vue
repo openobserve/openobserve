@@ -38,9 +38,7 @@ const currentValue = computed(() => {
   return props.min;
 });
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 const fillPercent = computed(() => {
@@ -112,21 +110,20 @@ const resolvedSize = computed(() => props.size ?? "md");
           'font-medium text-slider-label leading-none flex items-center gap-1',
         ]"
       >
-        <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+        <slot name="label">{{ label }}</slot
+        ><span v-if="required" aria-hidden="true" class="select-none">*</span>
         <OIcon
           v-if="$slots.tooltip"
           name="info-outline"
           size="sm"
           :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
           class="cursor-help text-slider-label"
-        ><slot name="tooltip" /></OIcon>
+          ><slot name="tooltip"
+        /></OIcon>
       </label>
       <span
         v-if="showValue"
-        :class="[
-          labelSize[resolvedSize],
-          'tabular-nums text-slider-value leading-none',
-        ]"
+        :class="[labelSize[resolvedSize], 'tabular-nums text-slider-value leading-none']"
       >
         {{ displayValue }}
       </span>
@@ -150,9 +147,7 @@ const resolvedSize = computed(() => props.size ?? "md");
         :class="[
           'absolute left-0 rounded-full',
           trackHeight[resolvedSize],
-          disabled
-            ? 'bg-slider-disabled-track-fill'
-            : 'bg-slider-track-fill',
+          disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
         ]"
         :style="{ width: fillPercent + '%' }"
         aria-hidden="true"
@@ -195,10 +190,7 @@ const resolvedSize = computed(() => props.size ?? "md");
       />
     </div>
 
-    <div
-      v-if="effectiveError || helpText"
-      class="flex items-center justify-between gap-2"
-    >
+    <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
         class="text-xs text-slider-error-text leading-none"
@@ -206,10 +198,7 @@ const resolvedSize = computed(() => props.size ?? "md");
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-slider-value leading-none"
-      >
+      <span v-else-if="helpText" class="text-xs text-slider-value leading-none">
         {{ helpText }}
       </span>
     </div>

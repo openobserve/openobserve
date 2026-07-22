@@ -66,57 +66,57 @@ import settingsService from "@/services/settings";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
-Object.defineProperty(Element.prototype, 'removeAttribute', {
+Object.defineProperty(Element.prototype, "removeAttribute", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'setAttribute', {
+Object.defineProperty(Element.prototype, "setAttribute", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'getAttribute', {
+Object.defineProperty(Element.prototype, "getAttribute", {
   writable: true,
-  value: vi.fn().mockReturnValue(''),
+  value: vi.fn().mockReturnValue(""),
 });
 
-Object.defineProperty(Element.prototype, 'insertBefore', {
-  writable: true,
-  value: vi.fn(),
-});
-
-Object.defineProperty(Element.prototype, 'appendChild', {
+Object.defineProperty(Element.prototype, "insertBefore", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'removeChild', {
+Object.defineProperty(Element.prototype, "appendChild", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'addEventListener', {
+Object.defineProperty(Element.prototype, "removeChild", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Element.prototype, 'removeEventListener', {
+Object.defineProperty(Element.prototype, "addEventListener", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Node.prototype, 'insertBefore', {
+Object.defineProperty(Element.prototype, "removeEventListener", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Node.prototype, 'appendChild', {
+Object.defineProperty(Node.prototype, "insertBefore", {
   writable: true,
   value: vi.fn(),
 });
 
-Object.defineProperty(Node.prototype, 'removeChild', {
+Object.defineProperty(Node.prototype, "appendChild", {
+  writable: true,
+  value: vi.fn(),
+});
+
+Object.defineProperty(Node.prototype, "removeChild", {
   writable: true,
   value: vi.fn(),
 });
@@ -204,7 +204,12 @@ const createMockI18n = () => {
 };
 
 // Shared stub configuration used across the suite.
-const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any = { folder: "default" }) => ({
+const buildGlobalConfig = (
+  store: any,
+  router: any,
+  i18n: any,
+  routeQuery: any = { folder: "default" },
+) => ({
   plugins: [store, router, i18n],
   mocks: {
     $route: { query: routeQuery },
@@ -213,7 +218,8 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
   stubs: {
     OPageLayout: {
       name: "OPageLayout",
-      template: '<div data-test-stub="page-layout"><slot name="header" /><slot /><slot name="footer" /></div>',
+      template:
+        '<div data-test-stub="page-layout"><slot name="header" /><slot /><slot name="footer" /></div>',
     },
     OPageHeader: {
       name: "OPageHeader",
@@ -222,35 +228,67 @@ const buildGlobalConfig = (store: any, router: any, i18n: any, routeQuery: any =
     FolderList: true,
     OTable: {
       name: "OTable",
-      template: '<div data-test-stub="o-table"><slot name="toolbar" /><slot name="toolbar-trailing" /><slot name="empty" /><slot name="bottom" /></div>',
+      template:
+        '<div data-test-stub="o-table"><slot name="toolbar" /><slot name="toolbar-trailing" /><slot name="empty" /><slot name="bottom" /></div>',
     },
     OEmptyState: true,
     OInput: true,
     ODropdown: true,
     ODropdownItem: true,
     AddDashboardFromGitHub: true,
-    "OIcon": true,
+    OIcon: true,
     // Migrated overlay primitives — preserve props/emits for assertion
     ODrawer: {
       name: "ODrawer",
-      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel", "primaryButtonVariant", "secondaryButtonVariant", "neutralButtonVariant", "primaryButtonDisabled", "secondaryButtonDisabled", "primaryButtonLoading"],
+      props: [
+        "open",
+        "width",
+        "title",
+        "subTitle",
+        "showClose",
+        "persistent",
+        "size",
+        "primaryButtonLabel",
+        "secondaryButtonLabel",
+        "neutralButtonLabel",
+        "primaryButtonVariant",
+        "secondaryButtonVariant",
+        "neutralButtonVariant",
+        "primaryButtonDisabled",
+        "secondaryButtonDisabled",
+        "primaryButtonLoading",
+      ],
       emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-      template: '<div data-test-stub="o-drawer" :data-open="open" :data-title="title"><slot /></div>',
+      template:
+        '<div data-test-stub="o-drawer" :data-open="open" :data-title="title"><slot /></div>',
     },
     ODialog: {
       name: "ODialog",
-      props: ["open", "width", "title", "subTitle", "showClose", "persistent", "size", "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel", "formId"],
+      props: [
+        "open",
+        "width",
+        "title",
+        "subTitle",
+        "showClose",
+        "persistent",
+        "size",
+        "primaryButtonLabel",
+        "secondaryButtonLabel",
+        "neutralButtonLabel",
+        "formId",
+      ],
       emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-      template: '<div data-test-stub="o-dialog" :data-open="open" :data-title="title"><slot /></div>',
+      template:
+        '<div data-test-stub="o-dialog" :data-open="open" :data-title="title"><slot /></div>',
     },
     AddDashboard: {
       name: "AddDashboard",
-      template: "<div data-test-stub=\"add-dashboard\"></div>",
+      template: '<div data-test-stub="add-dashboard"></div>',
       methods: { submit: vi.fn() },
     },
     AddFolder: {
       name: "AddFolder",
-      template: "<div data-test-stub=\"add-folder\"></div>",
+      template: '<div data-test-stub="add-folder"></div>',
       methods: { submit: vi.fn() },
     },
     MoveDashboardToAnotherFolder: {
@@ -280,7 +318,7 @@ describe("Dashboards.vue", () => {
     const mockElement = {
       setAttribute: vi.fn(),
       removeAttribute: vi.fn(),
-      getAttribute: vi.fn().mockReturnValue(''),
+      getAttribute: vi.fn().mockReturnValue(""),
       insertBefore: vi.fn(),
       appendChild: vi.fn(),
       removeChild: vi.fn(),
@@ -296,14 +334,14 @@ describe("Dashboards.vue", () => {
       parentNode: null,
       childNodes: [],
     };
-    
+
     document.createElement = vi.fn().mockReturnValue(mockElement);
     document.body.appendChild = vi.fn();
     document.body.insertBefore = vi.fn();
     document.body.removeChild = vi.fn();
 
     // Mock AbortController
-    global.AbortController = vi.fn(function() {
+    global.AbortController = vi.fn(function () {
       return {
         abort: vi.fn(),
         signal: {},
@@ -311,9 +349,9 @@ describe("Dashboards.vue", () => {
     }) as any;
 
     // Mock window methods
-    Object.defineProperty(window, 'getComputedStyle', {
+    Object.defineProperty(window, "getComputedStyle", {
       value: vi.fn().mockReturnValue({
-        getPropertyValue: vi.fn().mockReturnValue(''),
+        getPropertyValue: vi.fn().mockReturnValue(""),
       }),
     });
   });
@@ -413,9 +451,21 @@ describe("Dashboards.vue", () => {
       const testStore = createMockStore();
       testStore.state.organizationData.allDashboardList = {
         default: [
-          { dashboardId: "dash1", title: "Dashboard 1", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
-          { dashboardId: "dash2", title: "Dashboard 2", description: "", owner: "", created: "2023-01-01T00:00:00Z" }
-        ]
+          {
+            dashboardId: "dash1",
+            title: "Dashboard 1",
+            description: "",
+            owner: "",
+            created: "2023-01-01T00:00:00Z",
+          },
+          {
+            dashboardId: "dash2",
+            title: "Dashboard 2",
+            description: "",
+            owner: "",
+            created: "2023-01-01T00:00:00Z",
+          },
+        ],
       };
 
       wrapper = shallowMount(Dashboards, {
@@ -434,10 +484,28 @@ describe("Dashboards.vue", () => {
       const testStore = createMockStore();
       testStore.state.organizationData.allDashboardList = {
         default: [
-          { dashboardId: "dash1", title: "Dashboard 1", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
-          { dashboardId: "dash2", title: "Dashboard 2", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
-          { dashboardId: "dash3", title: "Dashboard 3", description: "", owner: "", created: "2023-01-01T00:00:00Z" }
-        ]
+          {
+            dashboardId: "dash1",
+            title: "Dashboard 1",
+            description: "",
+            owner: "",
+            created: "2023-01-01T00:00:00Z",
+          },
+          {
+            dashboardId: "dash2",
+            title: "Dashboard 2",
+            description: "",
+            owner: "",
+            created: "2023-01-01T00:00:00Z",
+          },
+          {
+            dashboardId: "dash3",
+            title: "Dashboard 3",
+            description: "",
+            owner: "",
+            created: "2023-01-01T00:00:00Z",
+          },
+        ],
       };
 
       wrapper = shallowMount(Dashboards, {
@@ -456,8 +524,20 @@ describe("Dashboards.vue", () => {
       const testStore = createMockStore();
       testStore.state.organizationData.allDashboardList = {
         default: [
-          { dashboardId: "dash1", title: "Dashboard 1", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
-          { dashboardId: "dash2", title: "Dashboard 2", description: "", owner: "", created: "2023-01-01T00:00:00Z" },
+          {
+            dashboardId: "dash1",
+            title: "Dashboard 1",
+            description: "",
+            owner: "",
+            created: "2023-01-01T00:00:00Z",
+          },
+          {
+            dashboardId: "dash2",
+            title: "Dashboard 2",
+            description: "",
+            owner: "",
+            created: "2023-01-01T00:00:00Z",
+          },
         ],
       };
       return testStore;
@@ -728,7 +808,7 @@ describe("Dashboards.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showDeleteDialogFn).toBeDefined();
-      expect(typeof wrapper.vm.showDeleteDialogFn).toBe('function');
+      expect(typeof wrapper.vm.showDeleteDialogFn).toBe("function");
     });
 
     it("should handle editFolder method", async () => {

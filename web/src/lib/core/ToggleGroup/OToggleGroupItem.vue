@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import type {
-  ToggleGroupItemProps,
-  ToggleGroupItemSlots,
-} from "./OToggleGroup.types";
+import type { ToggleGroupItemProps, ToggleGroupItemSlots } from "./OToggleGroup.types";
 import { ToggleGroupAnimatedKey } from "./OToggleGroup.types";
 import { ToggleGroupItem } from "reka-ui";
 import { computed, inject } from "vue";
@@ -29,10 +26,7 @@ const sizeClasses: Record<NonNullable<ToggleGroupItemProps["size"]>, string> = {
 };
 
 // Icon size mirrors the toggle size
-const iconSize: Record<
-  NonNullable<ToggleGroupItemProps["size"]>,
-  "xs" | "sm" | "md"
-> = {
+const iconSize: Record<NonNullable<ToggleGroupItemProps["size"]>, "xs" | "sm" | "md"> = {
   md: "md",
   sm: "sm",
   xs: "xs",

@@ -224,7 +224,7 @@ describe("useSearchHistogramManager", () => {
         "trace-123",
         response,
         {},
-        refreshPagination
+        refreshPagination,
       );
 
       expect(mockState.searchObj.loading).toBe(false);
@@ -256,13 +256,7 @@ describe("useSearchHistogramManager", () => {
         },
       };
 
-      histogramManager.handleHistogramResponse(
-        queryReq,
-        "trace-123",
-        response,
-        {},
-        vi.fn()
-      );
+      histogramManager.handleHistogramResponse(queryReq, "trace-123", response, {}, vi.fn());
 
       expect(Array.isArray(mockState.searchObj.data.queryResults.aggs)).toBe(true);
     });
@@ -297,7 +291,7 @@ describe("useSearchHistogramManager", () => {
         "trace-123",
         response,
         { isHistogramOnly: true },
-        refreshPagination
+        refreshPagination,
       );
 
       // The refreshPagination call happens in an async IIFE, so we need to wait
@@ -320,7 +314,7 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.processHistogramRequest(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(buildWebSocketPayload).not.toHaveBeenCalled();
@@ -344,12 +338,12 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.processHistogramRequest(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(mockHistogramFunctions.resetHistogramWithError).toHaveBeenCalledWith(
         "Histogram is not available for multi-stream SQL mode search.",
-        0
+        0,
       );
     });
 
@@ -385,7 +379,7 @@ describe("useSearchHistogramManager", () => {
         queryReq,
         buildWebSocketPayload,
         initializeSearchConnection,
-        callbacks
+        callbacks,
       );
 
       expect(mockHistogramFunctions.generateHistogramSkeleton).toHaveBeenCalled();
@@ -406,7 +400,7 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.getPageCountThroughSocket(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(buildWebSocketPayload).not.toHaveBeenCalled();
@@ -431,7 +425,7 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.getPageCountThroughSocket(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(queryReq.query.size).toBe(0);
@@ -469,7 +463,7 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.getPageCountThroughSocket(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(queryReq.query.start_time).toBe(1000);

@@ -23,94 +23,85 @@
     bleed
     :scroll="false"
   >
-      <template #actions>
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="dateState.valueType"
-          :default-absolute-time="{
-            startTime: dateState.startTime ?? 0,
-            endTime: dateState.endTime ?? 0,
-          }"
-          :default-relative-time="dateState.relativeTimePeriod ?? ''"
-          data-test="ai-agent-behavior-date-time"
-          class="h-8"
-          @on:date-change="onDateChange"
-        />
-        <!-- Last-refresh + refresh control, consistent with LLM Insights /
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="dateState.valueType"
+        :default-absolute-time="{
+          startTime: dateState.startTime ?? 0,
+          endTime: dateState.endTime ?? 0,
+        }"
+        :default-relative-time="dateState.relativeTimePeriod ?? ''"
+        data-test="ai-agent-behavior-date-time"
+        class="h-8"
+        @on:date-change="onDateChange"
+      />
+      <!-- Last-refresh + refresh control, consistent with LLM Insights /
              Sessions page headers. -->
-        <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
-        >
-          <ORefreshButton
-            :last-run-at="behaviorLastRunAt"
-            :loading="isLoading"
-            :disabled="isLoading"
-            data-test="ai-agent-behavior-refresh-btn"
-            @click="refresh"
-          />
-        </div>
-      </template>
+      <div
+        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+      >
+        <ORefreshButton
+          :last-run-at="behaviorLastRunAt"
+          :loading="isLoading"
+          :disabled="isLoading"
+          data-test="ai-agent-behavior-refresh-btn"
+          @click="refresh"
+        />
+      </div>
+    </template>
 
     <!-- Scope control — same Stream/Agent pattern as Agent Graph, so the AI
          pages read as one product. Stream tab shows every agent's signals for
          the stream; Agent tab narrows to one discovered agent (and follows its
          source_stream). Lives in OPageLayout's #subnav (full-bleed divider). -->
     <template #subnav>
-    <div class="flex items-center gap-3 px-page-edge py-2">
-      <OToggleGroup
-        :model-value="filterMode"
-        type="single"
-        data-test="agent-behavior-filter-mode"
-        @update:model-value="onFilterModeChange"
-      >
-        <OToggleGroupItem value="agent" size="sm">{{
-          t("aiObservability.agentGraph.agent")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{
-          t("aiObservability.agentGraph.stream")
-        }}</OToggleGroupItem>
-      </OToggleGroup>
+      <div class="flex items-center gap-3 px-page-edge py-2">
+        <OToggleGroup
+          :model-value="filterMode"
+          type="single"
+          data-test="agent-behavior-filter-mode"
+          @update:model-value="onFilterModeChange"
+        >
+          <OToggleGroupItem value="agent" size="sm">{{
+            t("aiObservability.agentGraph.agent")
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="stream" size="sm">{{
+            t("aiObservability.agentGraph.stream")
+          }}</OToggleGroupItem>
+        </OToggleGroup>
 
-      <div
-        v-if="filterMode === 'agent'"
-        data-test="agent-behavior-agent-selector"
-        class="w-56 flex-shrink-0"
-      >
-        <SkeletonBox
-          v-if="!agentsLoaded"
-          width="100%"
-          height="2.125rem"
-          :rounded="true"
-        />
-        <OSelect
-          v-else
-          v-model="activeAgentKey"
-          :label="t('aiObservability.agentGraph.agent')"
-          label-position="inside"
-          :options="agentSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          class="w-full rounded-default"
-        />
+        <div
+          v-if="filterMode === 'agent'"
+          data-test="agent-behavior-agent-selector"
+          class="w-56 flex-shrink-0"
+        >
+          <SkeletonBox v-if="!agentsLoaded" width="100%" height="2.125rem" :rounded="true" />
+          <OSelect
+            v-else
+            v-model="activeAgentKey"
+            :label="t('aiObservability.agentGraph.agent')"
+            label-position="inside"
+            :options="agentSelectOptions"
+            labelKey="label"
+            valueKey="value"
+            class="w-full rounded-default"
+          />
+        </div>
+        <div v-else data-test="agent-behavior-stream-selector" class="w-56 flex-shrink-0">
+          <OSelect
+            v-model="activeStream"
+            :label="t('aiObservability.agentGraph.stream')"
+            label-position="inside"
+            :options="availableStreams.map((s) => ({ label: s, value: s }))"
+            labelKey="label"
+            valueKey="value"
+            class="w-full rounded-default"
+          />
+        </div>
       </div>
-      <div
-        v-else
-        data-test="agent-behavior-stream-selector"
-        class="w-56 flex-shrink-0"
-      >
-        <OSelect
-          v-model="activeStream"
-          :label="t('aiObservability.agentGraph.stream')"
-          label-position="inside"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
-          labelKey="label"
-          valueKey="value"
-          class="w-full rounded-default"
-        />
-      </div>
-    </div>
     </template>
 
     <!-- Full-height column: the panel splits the available height between its
@@ -146,10 +137,7 @@ import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
 import { getConsumableRelativeTime } from "@/utils/date";
-import {
-  useAiDateRange,
-  resolveAiDateWindow,
-} from "@/enterprise/composables/useAiDateRange";
+import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 
 defineOptions({ name: "AgentBehaviorPage" });
 
@@ -226,12 +214,8 @@ async function loadAgents() {
 
 // Last-refresh + loading for the header's ORefreshButton — the panel stamps
 // `lastRunAt` when its fetch settles and exposes its own `loading`.
-const behaviorLastRunAt = computed<number | null>(
-  () => panelRef.value?.lastRunAt ?? null,
-);
-const isLoading = computed(
-  () => isRefreshing.value || panelRef.value?.loading || false,
-);
+const behaviorLastRunAt = computed<number | null>(() => panelRef.value?.lastRunAt ?? null);
+const isLoading = computed(() => isRefreshing.value || panelRef.value?.loading || false);
 
 function applyRelative(period: string) {
   const range = getConsumableRelativeTime(period);

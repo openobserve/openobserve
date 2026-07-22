@@ -23,11 +23,7 @@ import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 
 const $t = (key: string) => key;
 
-const {
-  mockFetchAll,
-  mockRun,
-  mockSyntheticsServiceGetLocations,
-} = vi.hoisted(() => ({
+const { mockFetchAll, mockRun, mockSyntheticsServiceGetLocations } = vi.hoisted(() => ({
   mockFetchAll: vi.fn().mockResolvedValue(undefined),
   mockRun: vi.fn().mockResolvedValue({}),
   mockSyntheticsServiceGetLocations: vi.fn().mockResolvedValue({ data: { locations: [] } }),
@@ -133,7 +129,11 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 vi.mock("@/composables/synthetics/syntheticResultsSchema", () => {
   const deviceIconName = vi.fn((v: string) => {
-    const map: Record<string, string> = { Desktop: "computer", Tablet: "tablet", Mobile: "phone_iphone" };
+    const map: Record<string, string> = {
+      Desktop: "computer",
+      Tablet: "tablet",
+      Mobile: "phone_iphone",
+    };
     return map[v] || "devices";
   });
   const deviceLabel = vi.fn((v: string) => {
@@ -151,65 +151,61 @@ import MonitorRuns from "./MonitorRuns.vue";
 // ── Stubs for every child component ─────────────────────────────────────
 const baseStubs = {
   OTabs: {
-    template:
-      '<div data-test="monitor-runs-tabs"><slot /></div>',
+    template: '<div data-test="monitor-runs-tabs"><slot /></div>',
     props: ["modelValue", "class"],
   },
   OTab: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']"><slot /></button>',
+    template: "<button :data-test=\"$attrs['data-test']\"><slot /></button>",
     props: ["name"],
     inheritAttrs: true,
   },
   OTabPanels: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue", "grow", "scroll", "class"],
   },
   OTabPanel: {
-    template: '<div v-if="$attrs[\'data-test\'] === \'monitor-runs-tabpanel-overview\' || true"><slot /></div>',
+    template:
+      "<div v-if=\"$attrs['data-test'] === 'monitor-runs-tabpanel-overview' || true\"><slot /></div>",
     props: ["name"],
     inheritAttrs: true,
   },
   OCard: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["class", "key"],
   },
   OCardSection: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: [],
   },
   OSeparator: {
-    template: '<hr />',
+    template: "<hr />",
     props: ["orientation", "class"],
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class"],
   },
   OTimeCell: {
-    template: '<span />',
+    template: "<span />",
     props: ["value", "unit", "mode", "emptyLabel"],
   },
   OBadge: {
-    template: '<span :data-test="$attrs[\'data-test\']"><slot /></span>',
+    template: "<span :data-test=\"$attrs['data-test']\"><slot /></span>",
     props: ["variant", "size", "dot", "class"],
     inheritAttrs: true,
   },
   OEmptyState: {
-    template:
-      '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
+    template: '<div :data-test="$attrs[\'data-test\']"><slot name="actions" /></div>',
     props: ["size", "illustration", "title", "description", "preset"],
     inheritAttrs: true,
   },
   EmptyStateActionCard: {
-    template:
-      '<div :data-test="$attrs[\'data-test\']"><slot /></div>',
+    template: "<div :data-test=\"$attrs['data-test']\"><slot /></div>",
     props: ["icon", "label", "sublabel"],
     inheritAttrs: true,
   },
   OTable: {
-    template:
-      '<table data-test="monitor-runs-runs-table" />',
+    template: '<table data-test="monitor-runs-runs-table" />',
     props: [
       "columns",
       "data",
@@ -224,7 +220,7 @@ const baseStubs = {
     ],
   },
   OToggleGroup: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue", "variant"],
   },
   OToggleGroupItem: {
@@ -232,18 +228,17 @@ const baseStubs = {
     props: ["value", "size"],
   },
   OSelect: {
-    template: '<select :data-test="$attrs[\'data-test\']" />',
+    template: "<select :data-test=\"$attrs['data-test']\" />",
     props: ["modelValue", "options", "iconKey", "size", "class"],
     inheritAttrs: true,
   },
   OInput: {
-    template: '<input :data-test="$attrs[\'data-test\']" />',
+    template: "<input :data-test=\"$attrs['data-test']\" />",
     props: ["modelValue", "size", "placeholder", "class"],
     inheritAttrs: true,
   },
   OButton: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']"><slot /></button>',
+    template: "<button :data-test=\"$attrs['data-test']\"><slot /></button>",
     props: ["variant", "size", "class", "loading"],
     inheritAttrs: true,
   },
@@ -256,11 +251,11 @@ const baseStubs = {
     props: ["data", "height"],
   },
   SkeletonBox: {
-    template: '<div />',
+    template: "<div />",
     props: ["width", "height", "rounded", "customRadius"],
   },
   Teleport: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
   },
 };
 
@@ -268,10 +263,12 @@ const baseStubs = {
 // The above stub shows all panels — we can use a keyed approach.
 // But the simplest way is to just show all content.
 
-function mountRuns(props: { monitorId: string; monitorName: string; monitorStatus?: string } = {
-  monitorId: "mon-1",
-  monitorName: "Test Monitor",
-}) {
+function mountRuns(
+  props: { monitorId: string; monitorName: string; monitorStatus?: string } = {
+    monitorId: "mon-1",
+    monitorName: "Test Monitor",
+  },
+) {
   return mount(MonitorRuns, {
     props,
     global: {
@@ -295,39 +292,25 @@ describe("MonitorRuns", () => {
     it("should render the runs dashboard shell", () => {
       wrapper = mountRuns();
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-monitor-runs"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-monitor-runs"]').exists()).toBe(true);
     });
 
     it("should render the tab switcher with Overview and Steps tabs", () => {
       wrapper = mountRuns();
-      expect(
-        wrapper.find('[data-test="monitor-runs-tab-overview"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-runs-tab-steps"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-tab-overview"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-tab-steps"]').exists()).toBe(true);
     });
 
     it("should render filter controls for browser, device, and location", () => {
       wrapper = mountRuns();
-      expect(
-        wrapper.find('[data-test="monitor-runs-filter-browser"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-runs-filter-device"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="monitor-runs-filter-location"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-browser"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-device"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-filter-location"]').exists()).toBe(true);
     });
 
     it("should render the runs table", () => {
       wrapper = mountRuns();
-      expect(
-        wrapper.find('[data-test="monitor-runs-runs-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-runs-runs-table"]').exists()).toBe(true);
     });
   });
 

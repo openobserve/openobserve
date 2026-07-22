@@ -18,67 +18,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="bg-surface-base"
     :title="t('logs.searchJobInspector.title')"
-    :back="{ label: t('logs.searchJobInspector.title'), onClick: goBack, dataTest: 'inspector-close-button' }"
+    :back="{
+      label: t('logs.searchJobInspector.title'),
+      onClick: goBack,
+      dataTest: 'inspector-close-button',
+    }"
     bleed
   >
-      <template #title>
-        <span data-test="inspector-title">{{ t('logs.searchJobInspector.title') }}</span>
-      </template>
-      <template #actions>
-        <div
-          v-if="profileData && !hasNoData"
-          class="flex items-center gap-1.5 px-2 py-1 rounded-default border bg-surface-panel border-border-default"
+    <template #title>
+      <span data-test="inspector-title">{{ t("logs.searchJobInspector.title") }}</span>
+    </template>
+    <template #actions>
+      <div
+        v-if="profileData && !hasNoData"
+        class="flex items-center gap-1.5 px-2 py-1 rounded-default border bg-surface-panel border-border-default"
+      >
+        <svg
+          class="w-3.5 h-3.5 opacity-70 text-icon-color"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
         >
-          <svg class="w-3.5 h-3.5 opacity-70 text-icon-color" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2"/>
-            <path d="M3 10h18M8 3v4M16 3v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <div class="flex items-center gap-1.5">
-            <span
-              class="text-3xs font-small px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
-            >
-              {{ store.state.timezone || 'UTC' }}
-            </span>
-            <div
-              class="text-xs font-semibold text-text-body"
-            >
-              {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
-            </div>
+          <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2" />
+          <path
+            d="M3 10h18M8 3v4M16 3v4"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        <div class="flex items-center gap-1.5">
+          <span
+            class="text-3xs font-small px-1.5 py-0.5 rounded-default text-text-secondary bg-surface-subtle"
+          >
+            {{ store.state.timezone || "UTC" }}
+          </span>
+          <div class="text-xs font-semibold text-text-body">
+            {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
           </div>
         </div>
-      </template>
+      </div>
+    </template>
     <div class="w-full flex flex-col flex-1 min-h-0 overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
       <div v-if="!loading" class="mb-2.5 mx-2.5 shrink-0">
-        <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
+        <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr">
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
               class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
-                <div
-                  class="text-base font-small text-text-label"
-                >
-                  {{ t('logs.searchJobInspector.results') }}
+                <div class="text-base font-small text-text-label">
+                  {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-default flex items-center justify-center border"
-                  style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
+                  style="
+                    background: rgba(57, 126, 246, 0.2);
+                    border-color: rgba(57, 126, 246, 0.35);
+                  "
                 >
-                  <img src="@/assets/images/home/records.svg" :alt="t('logs.searchJobInspector.resultsIconAlt')" class="h-6 w-6" />
+                  <img
+                    src="@/assets/images/home/records.svg"
+                    :alt="t('logs.searchJobInspector.resultsIconAlt')"
+                    class="h-6 w-6"
+                  />
                 </div>
               </div>
               <div class="flex flex-col gap-1">
-                <div
-                  class="text-2xl font-bold text-text-body"
-                >
-                  {{ hasNoData ? 'NA' : (profileData?.data_records || 0).toLocaleString() }}
+                <div class="text-2xl font-bold text-text-body">
+                  {{ hasNoData ? "NA" : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
-                <div
-                  class="text-3xs text-text-secondary"
-                >
-                  {{ t('logs.searchJobInspector.returnedFromQuery') }}
+                <div class="text-3xs text-text-secondary">
+                  {{ t("logs.searchJobInspector.returnedFromQuery") }}
                 </div>
               </div>
             </div>
@@ -90,28 +103,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
-                <div
-                  class="text-base font-small text-text-label"
-                >
-                  {{ t('logs.searchJobInspector.scannedEvents') }}
+                <div class="text-base font-small text-text-label">
+                  {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-default flex items-center justify-center border"
-                  style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
+                  style="
+                    background: rgba(57, 126, 246, 0.2);
+                    border-color: rgba(57, 126, 246, 0.35);
+                  "
                 >
-                  <img src="@/assets/images/home/streams.svg" :alt="t('logs.searchJobInspector.eventsIconAlt')" class="h-6 w-6" />
+                  <img
+                    src="@/assets/images/home/streams.svg"
+                    :alt="t('logs.searchJobInspector.eventsIconAlt')"
+                    class="h-6 w-6"
+                  />
                 </div>
               </div>
               <div class="flex flex-col gap-1">
-                <div
-                  class="text-2xl font-bold text-text-body"
-                >
-                  {{ hasNoData ? 'NA' : (profileData?.scan_records || 0).toLocaleString() }}
+                <div class="text-2xl font-bold text-text-body">
+                  {{ hasNoData ? "NA" : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
-                <div
-                  class="text-3xs text-text-secondary"
-                >
-                  {{ t('logs.searchJobInspector.scannedEventsForQuery') }}
+                <div class="text-3xs text-text-secondary">
+                  {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
                 </div>
               </div>
             </div>
@@ -123,32 +137,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
-                <div
-                  class="text-base font-small text-text-label"
-                >
-                  {{ t('logs.searchJobInspector.timeTaken') }}
+                <div class="text-base font-small text-text-label">
+                  {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-default flex items-center justify-center border"
-                  style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35);"
+                  style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35)"
                 >
-                  <svg class="h-6 w-6 text-status-positive" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/>
-                    <path d="M12 6v6l4 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <svg
+                    class="h-6 w-6 text-status-positive"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+                    <path
+                      d="M12 6v6l4 2"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
                   </svg>
                 </div>
               </div>
               <div class="flex flex-col gap-1">
-                <div
-                  class="text-2xl font-bold text-text-body"
-                >
-                  {{ hasNoData ? 'NA' : formatDuration(profileData?.time_taken || profileData?.total_duration) }}
+                <div class="text-2xl font-bold text-text-body">
+                  {{
+                    hasNoData
+                      ? "NA"
+                      : formatDuration(profileData?.time_taken || profileData?.total_duration)
+                  }}
                 </div>
                 <div
                   class="text-3xs"
-                  :class="hasNoData ? 'text-text-secondary' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
+                  :class="
+                    hasNoData
+                      ? 'text-text-secondary'
+                      : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration)
+                          .colorClass
+                  "
                 >
-                  {{ hasNoData ? t('logs.searchJobInspector.noData') : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).text }}
+                  {{
+                    hasNoData
+                      ? t("logs.searchJobInspector.noData")
+                      : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration)
+                          .text
+                  }}
                 </div>
               </div>
             </div>
@@ -160,18 +194,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default p-3 border h-28 flex flex-col justify-between bg-surface-base border-border-default"
             >
               <div class="flex justify-between items-start">
-                <div
-                  class="text-base font-small text-text-label"
-                >
-                  {{ t('logs.searchJobInspector.traceId') }}
+                <div class="text-base font-small text-text-label">
+                  {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div
                   class="w-10 h-10 rounded-default flex items-center justify-center border"
-                  style="background: rgba(242, 220, 245, 0.25); border-color: rgba(242, 220, 245, 0.45);"
+                  style="
+                    background: rgba(242, 220, 245, 0.25);
+                    border-color: rgba(242, 220, 245, 0.45);
+                  "
                 >
-                  <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7 8h10M7 12h10M7 16h6" :stroke="isDark ? '#E9D5FD' : '#A855F7'" stroke-width="2" stroke-linecap="round"/>
-                    <rect x="3" y="4" width="18" height="16" rx="2" :stroke="isDark ? '#E9D5FD' : '#A855F7'" stroke-width="2"/>
+                  <svg
+                    class="h-6 w-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7 8h10M7 12h10M7 16h6"
+                      :stroke="isDark ? '#E9D5FD' : '#A855F7'"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                    <rect
+                      x="3"
+                      y="4"
+                      width="18"
+                      height="16"
+                      rx="2"
+                      :stroke="isDark ? '#E9D5FD' : '#A855F7'"
+                      stroke-width="2"
+                    />
                   </svg>
                 </div>
               </div>
@@ -180,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-sm font-mono truncate font-semibold leading-tight overflow-hidden"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
-                  {{ hasNoData ? 'NA' : traceId }}
+                  {{ hasNoData ? "NA" : traceId }}
                   <OTooltip v-if="!hasNoData" :content="traceId" />
                 </div>
               </div>
@@ -191,21 +244,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="stat-tile">
             <div
               class="rounded-default p-3 border h-28 flex flex-col items-center justify-center transition-all bg-surface-base border-border-default"
-              :class="hasNoData ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-primary hover:shadow-lg'"
+              :class="
+                hasNoData
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-primary hover:shadow-lg'
+              "
               @click="!hasNoData && (showSqlDialog = true)"
             >
               <div
                 class="w-12 h-12 rounded-default flex items-center justify-center border mb-2"
-                style="background: rgba(245, 235, 147, 0.25); border-color: rgba(245, 235, 147, 0.45);"
+                style="
+                  background: rgba(245, 235, 147, 0.25);
+                  border-color: rgba(245, 235, 147, 0.45);
+                "
               >
-                <svg class="h-7 w-7 text-status-warning-text" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg
+                  class="h-7 w-7 text-status-warning-text"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
                 </svg>
               </div>
-              <div
-                class="text-sm font-semibold text-text-link"
-              >
-                {{ t('logs.searchJobInspector.viewQuery') }}
+              <div class="text-sm font-semibold text-text-link">
+                {{ t("logs.searchJobInspector.viewQuery") }}
               </div>
             </div>
           </div>
@@ -223,7 +292,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- Profile Data Table (OTable handles loading skeleton) -->
-      <div v-if="loading || (profileData && profileData.events)" class="w-full flex-1 min-h-0 overflow-hidden">
+      <div
+        v-if="loading || (profileData && profileData.events)"
+        class="w-full flex-1 min-h-0 overflow-hidden"
+      >
         <div class="bg-card-glass-bg h-full">
           <OTable
             :data="hierarchicalEvents"
@@ -254,7 +326,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     backgroundColor: getDurationColor(row.duration),
                   }"
                 ></div>
-                <span class="text-compact whitespace-nowrap min-w-12.5">{{ formatDuration(row.duration) }}</span>
+                <span class="text-compact whitespace-nowrap min-w-12.5">{{
+                  formatDuration(row.duration)
+                }}</span>
               </div>
             </template>
 
@@ -263,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-desc="{ row }">
-              <span class="text-xs" :title="row.desc || '-'">{{ row.desc || '-' }}</span>
+              <span class="text-xs" :title="row.desc || '-'">{{ row.desc || "-" }}</span>
             </template>
 
             <template #empty>
@@ -275,45 +349,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <ODrawer data-test="search-job-inspector-sql-drawer" bleed v-model:open="showSqlDialog" size="lg" :title="t('logs.searchJobInspector.sqlQuery')">
+    <ODrawer
+      data-test="search-job-inspector-sql-drawer"
+      bleed
+      v-model:open="showSqlDialog"
+      size="lg"
+      :title="t('logs.searchJobInspector.sqlQuery')"
+    >
       <template #header-right>
         <OButton
           v-if="profileData?.sql"
           variant="ghost"
           size="icon-sm"
           :class="[
-                'border',
-                copiedSql ? 'text-status-positive border-status-positive' : 'border-border-default'
-              ]"
+            'border',
+            copiedSql ? 'text-status-positive border-status-positive' : 'border-border-default',
+          ]"
           @click="copySql"
           data-test="inspector-copy-sql-btn"
         >
           <OIcon name="content-copy" size="sm" v-if="!copiedSql" />
-              <OIcon name="check" size="sm" v-else />
-          <OTooltip :content="copiedSql ? t('logs.searchJobInspector.copied') : t('logs.searchJobInspector.sql')" />
+          <OIcon name="check" size="sm" v-else />
+          <OTooltip
+            :content="
+              copiedSql ? t('logs.searchJobInspector.copied') : t('logs.searchJobInspector.sql')
+            "
+          />
         </OButton>
       </template>
-      <div
-        class="rounded-default p-4 max-h-[calc(100vh-150px)] overflow-auto bg-surface-subtle"
-      >
+      <div class="rounded-default p-4 max-h-[calc(100vh-150px)] overflow-auto bg-surface-subtle">
         <pre
           class="font-mono text-compact leading-[1.6] m-0 whitespace-pre-wrap break-words"
           data-test="inspector-sql-query-content"
-        >{{ profileData?.sql || t('logs.searchJobInspector.noSqlAvailable') }}</pre>
+          >{{ profileData?.sql || t("logs.searchJobInspector.noSqlAvailable") }}</pre
+        >
       </div>
     </ODrawer>
 
     <!-- Trace ID Dialog -->
-    <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" :title="t('logs.searchJobInspector.fullTraceId')">
+    <ODialog
+      data-test="search-job-inspector-trace-id-dialog"
+      v-model:open="showTraceIdDialog"
+      size="sm"
+      :title="t('logs.searchJobInspector.fullTraceId')"
+    >
       <div class="flex items-center gap-3">
-        <div class="flex-1 font-mono text-sm break-all p-3 rounded-default border bg-surface-panel border-border-default text-text-link">
+        <div
+          class="flex-1 font-mono text-sm break-all p-3 rounded-default border bg-surface-panel border-border-default text-text-link"
+        >
           {{ traceId }}
         </div>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="copyTraceId"
-        ><OIcon name="content-copy" size="sm"  class="mr-1" /></OButton>
+        <OButton variant="primary" size="sm-action" @click="copyTraceId"
+          ><OIcon name="content-copy" size="sm" class="mr-1"
+        /></OButton>
       </div>
     </ODialog>
   </OPageLayout>
@@ -384,7 +472,7 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OTable,
-},
+  },
   setup() {
     const router = useRouter();
     const route = useRoute();
@@ -401,10 +489,14 @@ export default defineComponent({
 
     const traceId = computed(() => route.query.trace_id as string);
     const orgIdentifier = computed(
-      () => route.query.org_identifier as string || store.state.selectedOrganization?.identifier
+      () => (route.query.org_identifier as string) || store.state.selectedOrganization?.identifier,
     );
-    const startTime = computed(() => route.query.start_time ? parseInt(route.query.start_time as string) : undefined);
-    const endTime = computed(() => route.query.end_time ? parseInt(route.query.end_time as string) : undefined);
+    const startTime = computed(() =>
+      route.query.start_time ? parseInt(route.query.start_time as string) : undefined,
+    );
+    const endTime = computed(() =>
+      route.query.end_time ? parseInt(route.query.end_time as string) : undefined,
+    );
 
     const columns = computed<OTableColumnDef[]>(() => [
       {
@@ -465,7 +557,7 @@ export default defineComponent({
           orgIdentifier.value,
           traceId.value,
           startTime.value,
-          endTime.value
+          endTime.value,
         );
         profileData.value = response.data;
       } catch (error: any) {
@@ -488,7 +580,7 @@ export default defineComponent({
         event: ProfileEvent,
         parentIndex: string,
         level: number,
-        isLast: boolean = false
+        isLast: boolean = false,
       ): HierarchicalEvent => {
         const hierarchicalEvent: HierarchicalEvent = {
           ...event,
@@ -580,11 +672,11 @@ export default defineComponent({
     const formatTimeRange = (start: string, end: string) => {
       if (!start || !end) return "-";
       try {
-        const timeZone = store.state.timezone || 'UTC';
+        const timeZone = store.state.timezone || "UTC";
         const startMs = parseInt(start) / 1000; // Convert microseconds to milliseconds
         const endMs = parseInt(end) / 1000;
-        const startDate = new Date(startMs).toLocaleString('en-US', { timeZone });
-        const endDate = new Date(endMs).toLocaleString('en-US', { timeZone });
+        const startDate = new Date(startMs).toLocaleString("en-US", { timeZone });
+        const endDate = new Date(endMs).toLocaleString("en-US", { timeZone });
         return `${startDate} - ${endDate}`;
       } catch {
         return "-";
@@ -592,38 +684,41 @@ export default defineComponent({
     };
 
     const getResponseTimeLabel = (ms: number | undefined) => {
-      if (!ms) return { text: t("logs.searchJobInspector.noData"), colorClass: "text-text-secondary" };
+      if (!ms)
+        return { text: t("logs.searchJobInspector.noData"), colorClass: "text-text-secondary" };
 
       if (ms < 50) {
         return {
           text: t("logs.searchJobInspector.ultraFastResponse"),
-          colorClass: "text-status-positive"
+          colorClass: "text-status-positive",
         };
       } else if (ms < 200) {
         return {
           text: t("logs.searchJobInspector.fastResponse"),
-          colorClass: "text-status-positive"
+          colorClass: "text-status-positive",
         };
       } else if (ms < 500) {
         return {
           text: t("logs.searchJobInspector.goodResponse"),
-          colorClass: "text-text-link"
+          colorClass: "text-text-link",
         };
       } else if (ms < 1000) {
         return {
           text: t("logs.searchJobInspector.moderateResponse"),
-          colorClass: "text-status-warning-text"
+          colorClass: "text-status-warning-text",
         };
       } else {
         return {
           text: t("logs.searchJobInspector.slowResponse"),
-          colorClass: "text-status-error-text"
+          colorClass: "text-status-error-text",
         };
       }
     };
 
     const hasNoData = computed(() => {
-      return !profileData.value || !profileData.value.events || profileData.value.events.length === 0;
+      return (
+        !profileData.value || !profileData.value.events || profileData.value.events.length === 0
+      );
     });
 
     watch(
@@ -645,7 +740,7 @@ export default defineComponent({
 
     const copyTraceId = () => {
       copyToClipboard(traceId.value, {
-        errorMessage: t('logs.searchJobInspector.failedToCopyTraceId'),
+        errorMessage: t("logs.searchJobInspector.failedToCopyTraceId"),
       }).then((success) => {
         if (success) {
           copiedTraceId.value = true;
@@ -659,7 +754,7 @@ export default defineComponent({
     const copiedSql = ref(false);
     const copySql = () => {
       copyToClipboard(profileData.value?.sql || "", {
-        errorMessage: t('logs.searchJobInspector.failedToCopySql'),
+        errorMessage: t("logs.searchJobInspector.failedToCopySql"),
       }).then((success) => {
         if (success) {
           copiedSql.value = true;

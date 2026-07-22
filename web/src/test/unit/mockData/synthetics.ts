@@ -82,8 +82,19 @@ export const mockMonitorBrowser: BrowserCheck = {
   folder: "folder-1",
   tags: ["critical", "e2e"],
   journey: [
-    { id: "step-1", action: "navigate", value: "https://app.example.com/login", code: "await page.goto('...')" },
-    { id: "step-2", action: "type", selector: "#username", value: "testuser", code: "await page.fill('#username', '...')" },
+    {
+      id: "step-1",
+      action: "navigate",
+      value: "https://app.example.com/login",
+      code: "await page.goto('...')",
+    },
+    {
+      id: "step-2",
+      action: "type",
+      selector: "#username",
+      value: "testuser",
+      code: "await page.fill('#username', '...')",
+    },
   ],
   schedule: { type: "interval", intervalValue: 15, intervalUnit: "minutes" },
   locations: ["us-east-1", "eu-west-1", "ap-southeast-1"],
@@ -206,14 +217,19 @@ export const mockRunFailed = {
   failedStep: "step-2",
   recordedSteps: [
     { id: "step-1", action: "navigate", name: "Go to page", passed: true, durationMs: 1200 },
-    { id: "step-2", action: "click", name: "Click submit", passed: false, durationMs: 28140, error: "Timeout" },
+    {
+      id: "step-2",
+      action: "click",
+      name: "Click submit",
+      passed: false,
+      durationMs: 28140,
+      error: "Timeout",
+    },
   ],
   lastAttemptSteps: [
     { id: "step-1", action: "navigate", name: "Go to page", passed: true, durationMs: 1100 },
   ],
-  retryHistory: [
-    { attempt: 1, status: "failed", durationMs: 29340, error: "TimeoutError" },
-  ],
+  retryHistory: [{ attempt: 1, status: "failed", durationMs: 29340, error: "TimeoutError" }],
   network: null,
   webVitals: null,
   traceKey: "synthetics/org-1/mon-http-1/2026/03/run-002/trace.json",
@@ -232,7 +248,12 @@ export const mockRunDetail = {
 export const mockLocations: SyntheticsLocation[] = [
   { id: "us-east-1", name: "US East (N. Virginia)", region: "us-east-1", provider: "aws" },
   { id: "eu-west-1", name: "EU (Ireland)", region: "eu-west-1", provider: "aws" },
-  { id: "ap-southeast-1", name: "Asia Pacific (Singapore)", region: "ap-southeast-1", provider: "aws" },
+  {
+    id: "ap-southeast-1",
+    name: "Asia Pacific (Singapore)",
+    region: "ap-southeast-1",
+    provider: "aws",
+  },
 ];
 
 // ── Capabilities / device fixtures ──────────────────────────────────────────

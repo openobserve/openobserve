@@ -35,13 +35,8 @@ export default defineComponent({
   components: { OSelect },
   setup() {
     // Destructure props and emit if needed
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
     const { t } = useI18n();
 
     const colorModeOptions = [

@@ -20,11 +20,7 @@
       </template>
       <!-- Scorer-type badge sits inline, immediately after the title. -->
       <template #title-trail>
-        <OTag
-          type="scorerType"
-          :value="formValues.scorerType"
-          data-test="scorer-form-type-badge"
-        />
+        <OTag type="scorerType" :value="formValues.scorerType" data-test="scorer-form-type-badge" />
       </template>
       <template #actions>
         <OButton
@@ -39,636 +35,712 @@
         />
       </template>
 
-    <div class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:grid-cols-1 gap-2.5">
-      <div class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-surface-base rounded-default border border-border-default">
-        <!-- Section 01: Identity -->
-        <section class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">01</span>
-            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.identitySection") }}</h3>
-          </div>
+      <div
+        class="flex-1 min-h-0 overflow-hidden grid grid-cols-[minmax(0,1.6fr)_minmax(320px,0.9fr)] max-[1100px]:grid-cols-1 gap-2.5"
+      >
+        <div
+          class="scorer-form__main min-w-0 overflow-auto p-[18px_24px_24px] bg-surface-base rounded-default border border-border-default"
+        >
+          <!-- Section 01: Identity -->
+          <section class="mb-6">
+            <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+              <span
+                class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+                >01</span
+              >
+              <h3 class="m-0 text-sm font-semibold text-text-heading">
+                {{ t("onlineEvals.scorer.identitySection") }}
+              </h3>
+            </div>
 
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.nameLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
-            </label>
-            <OFormInput
-              name="name"
-              :placeholder="t('onlineEvals.scorer.namePlaceholder')"
-              size="sm"
-              :disabled="mode === 'edit'"
-              data-test="scorer-form-name-input"
-            />
-          </div>
+            <div class="mb-3">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.scorer.nameLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+                <OIcon
+                  v-if="mode === 'edit'"
+                  name="lock"
+                  size="xs"
+                  class="ml-1.5 text-text-secondary"
+                />
+              </label>
+              <OFormInput
+                name="name"
+                :placeholder="t('onlineEvals.scorer.namePlaceholder')"
+                size="sm"
+                :disabled="mode === 'edit'"
+                data-test="scorer-form-name-input"
+              />
+            </div>
 
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.descriptionLabel") }}
-            </label>
-            <OFormTextarea
-              name="description"
-              :placeholder="t('onlineEvals.scorer.descriptionPlaceholder')"
-              size="sm"
-              :rows="3"
-              data-test="scorer-form-description-input"
-            />
-          </div>
+            <div class="mb-3">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.scorer.descriptionLabel") }}
+              </label>
+              <OFormTextarea
+                name="description"
+                :placeholder="t('onlineEvals.scorer.descriptionPlaceholder')"
+                size="sm"
+                :rows="3"
+                data-test="scorer-form-description-input"
+              />
+            </div>
 
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
-            </label>
-            <OFormSelect
-              name="producesScoreConfigId"
-              :options="scoreConfigOptions"
-              :placeholder="t('onlineEvals.scorer.producesScoreConfigNone')"
-              size="md"
-              :disabled="mode === 'edit'"
-              data-test="scorer-form-score-config-select"
-              @update:modelValue="handleScoreConfigSelection"
-            />
-            <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.scorer.producesScoreHelp") }}</div>
+            <div class="mb-3">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.scorer.producesScoreConfigLabel") }}
+                <OIcon
+                  v-if="mode === 'edit'"
+                  name="lock"
+                  size="xs"
+                  class="ml-1.5 text-text-secondary"
+                />
+              </label>
+              <OFormSelect
+                name="producesScoreConfigId"
+                :options="scoreConfigOptions"
+                :placeholder="t('onlineEvals.scorer.producesScoreConfigNone')"
+                size="md"
+                :disabled="mode === 'edit'"
+                data-test="scorer-form-score-config-select"
+                @update:modelValue="handleScoreConfigSelection"
+              />
+              <div class="text-2xs text-text-secondary mt-1">
+                {{ t("onlineEvals.scorer.producesScoreHelp") }}
+              </div>
 
-            <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body">
-              <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
-              <span class="font-medium">
-                {{ t("onlineEvals.scorer.selectedPrefix") }}
-                <strong class="font-mono">{{ selectedScoreConfig.name }}</strong>
-              </span>
-              <span class="text-text-secondary">·</span>
-              <span class="text-text-secondary">
-                {{ t("onlineEvals.scorer.typeLabel") }}
-                <span class="font-mono">{{ dataTypeOf(selectedScoreConfig) }}</span>
-              </span>
-              <template v-if="selectedRange">
+              <div
+                v-if="selectedScoreConfig"
+                class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body"
+              >
+                <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
+                <span class="font-medium">
+                  {{ t("onlineEvals.scorer.selectedPrefix") }}
+                  <strong class="font-mono">{{ selectedScoreConfig.name }}</strong>
+                </span>
                 <span class="text-text-secondary">·</span>
                 <span class="text-text-secondary">
-                  {{ t("onlineEvals.scorer.rangeLabel") }}
-                  <span class="font-mono">{{ selectedRange }}</span>
+                  {{ t("onlineEvals.scorer.typeLabel") }}
+                  <span class="font-mono">{{ dataTypeOf(selectedScoreConfig) }}</span>
                 </span>
-              </template>
-              <span class="text-text-secondary">·</span>
-              <span class="text-text-secondary">
-                {{ t("onlineEvals.scorer.healthyLabel") }}
-                <span class="font-mono">{{ selectedHealthy }}</span>
-              </span>
-            </div>
-          </div>
-        </section>
-
-        <!-- Section 02: LLM Judge configuration -->
-        <section v-if="formValues.scorerType === 'llm_judge'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
-            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.judgeSection") }}</h3>
-          </div>
-
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.providerLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-            </label>
-            <div class="flex items-center gap-2">
-              <OFormSelect
-                name="providerId"
-                :options="providerOptions"
-                :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
-                size="md"
-                class="flex-1 min-w-0"
-                data-test="scorer-form-provider-select"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-md"
-                icon-left="refresh"
-                :loading="isRefreshingProviders"
-                :title="t('onlineEvals.scorer.refreshProviders')"
-                data-test="scorer-form-provider-refresh-btn"
-                @click="$emit('refresh-providers')"
-              />
-            </div>
-
-            <div v-if="selectedProvider" class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body">
-              <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
-              <span class="text-text-secondary">
-                {{ t("onlineEvals.scorer.endpointLabel") }}
-                <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
-              </span>
-              <span class="text-text-secondary">·</span>
-              <span class="text-text-secondary">
-                {{ t("onlineEvals.scorer.defaultModelPreviewLabel") }}
-                <span class="font-mono">{{ defaultModelOf(selectedProvider) || "—" }}</span>
-              </span>
-              <span class="text-text-secondary">·</span>
-              <span class="text-text-secondary">
-                {{ t("onlineEvals.scorer.authLabel") }}
-                <span class="font-mono">{{ t("onlineEvals.scorer.authConfigured") }}</span>
-              </span>
-            </div>
-
-            <div class="text-2xs text-text-secondary mt-1">
-              <i18n-t keypath="onlineEvals.scorer.providerHelp" tag="span">
-                <template #settingsLink>
-                  <router-link
-                    :to="{ name: 'llmProviders' }"
-                    class="scorer-field__help-link text-primary-600 font-semibold no-underline hover:underline"
-                    target="_blank"
-                  >
-                    {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
-                  </router-link>
+                <template v-if="selectedRange">
+                  <span class="text-text-secondary">·</span>
+                  <span class="text-text-secondary">
+                    {{ t("onlineEvals.scorer.rangeLabel") }}
+                    <span class="font-mono">{{ selectedRange }}</span>
+                  </span>
                 </template>
-              </i18n-t>
+                <span class="text-text-secondary">·</span>
+                <span class="text-text-secondary">
+                  {{ t("onlineEvals.scorer.healthyLabel") }}
+                  <span class="font-mono">{{ selectedHealthy }}</span>
+                </span>
+              </div>
             </div>
-          </div>
+          </section>
 
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.scorer.modelLabel") }}</label>
-            <OFormInput
-              name="model"
-              :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
-              size="sm"
-              data-test="scorer-form-model-input"
-            />
-          </div>
-
-          <div class="mb-3 flex flex-col gap-3.5">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.promptLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-            </label>
-            <OFormTextarea
-              name="template"
-              size="sm"
-              :rows="8"
-              data-test="scorer-form-prompt-input"
-            />
-            <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
-              <span class="text-text-secondary">
-                {{ t("onlineEvals.scorer.promptVariablesLabel") }}
-              </span>
+          <!-- Section 02: LLM Judge configuration -->
+          <section v-if="formValues.scorerType === 'llm_judge'" class="mb-6">
+            <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
               <span
-                v-for="v in promptVariables"
-                :key="v"
-                class="py-px px-1.5 rounded-default text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-body"
-              >{{ formatTemplateVariable(v) }}</span>
-            </div>
-            <div class="text-2xs text-text-secondary mt-1">
-              {{
-                t("onlineEvals.scorer.promptHelp", {
-                  inputVar: formatTemplateVariable("input"),
-                  outputVar: formatTemplateVariable("output"),
-                })
-              }}
-            </div>
-          </div>
-
-          <div class="mb-3 flex flex-col gap-3.5">
-            <OFormCheckbox
-              name="includeReasoning"
-              class="scorer-extras__toggle"
-              data-test="scorer-form-include-reasoning"
-            >
-              <template #label>
-                <span>
-                  <strong class="block text-xs text-text-heading">{{ t("onlineEvals.scorer.includeReasoningLabel") }}</strong>
-                  <small class="block text-2xs text-text-secondary">{{ t("onlineEvals.scorer.includeReasoningHint") }}</small>
-                </span>
-              </template>
-            </OFormCheckbox>
-
-            <div class="flex justify-between items-baseline gap-3">
-              <div class="flex flex-col gap-0.5">
-                <strong class="text-xs font-semibold">{{ t("onlineEvals.scorer.extraFieldsLabel") }}</strong>
-                <span class="text-3xs font-semibold text-text-muted uppercase tracking-[0.04em]">
-                  {{ t("onlineEvals.scorer.extraFieldsOptional") }}
-                </span>
-                <small class="block text-2xs text-text-secondary">{{ t("onlineEvals.scorer.extraFieldsHint") }}</small>
-              </div>
-            </div>
-
-            <div
-              v-if="formValues.extraMetadataFields.length"
-              class="flex flex-col gap-1.5 border border-border-default rounded-default p-[8px_10px] bg-card-bg"
-              data-test="scorer-form-extra-fields"
-            >
-              <div class="grid grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] gap-2 items-center text-3xs font-semibold uppercase tracking-[0.04em]">
-                <span>{{ t("onlineEvals.scorer.extraFields.colName") }}</span>
-                <span>{{ t("onlineEvals.scorer.extraFields.colType") }}</span>
-                <span>{{ t("onlineEvals.scorer.extraFields.colDescription") }}</span>
-                <span aria-hidden="true" />
-              </div>
-              <div
-                v-for="(field, idx) in formValues.extraMetadataFields"
-                :key="idx"
-                class="grid grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] gap-2 items-center"
+                class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+                >02</span
               >
-                <OFormInput
-                  :name="`extraMetadataFields[${idx}].name`"
-                  size="sm"
-                  :placeholder="t('onlineEvals.scorer.extraFields.namePlaceholder')"
-                  :class="{ 'has-error': field.name && extraFieldNameDuplicates.has(field.name) }"
-                  :data-test="`scorer-form-extra-field-name-${idx}`"
-                />
+              <h3 class="m-0 text-sm font-semibold text-text-heading">
+                {{ t("onlineEvals.scorer.judgeSection") }}
+              </h3>
+            </div>
+
+            <div class="mb-3">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.scorer.providerLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+              </label>
+              <div class="flex items-center gap-2">
                 <OFormSelect
-                  :name="`extraMetadataFields[${idx}].type`"
+                  name="providerId"
+                  :options="providerOptions"
+                  :placeholder="t('onlineEvals.scorer.providerPlaceholder')"
                   size="md"
-                  :options="extraFieldTypeOptions"
-                  :data-test="`scorer-form-extra-field-type-${idx}`"
+                  class="flex-1 min-w-0"
+                  data-test="scorer-form-provider-select"
                 />
-                <OFormInput
-                  :name="`extraMetadataFields[${idx}].description`"
-                  size="sm"
-                  :placeholder="t('onlineEvals.scorer.extraFields.descriptionPlaceholder')"
-                  :data-test="`scorer-form-extra-field-description-${idx}`"
+                <OButton
+                  variant="ghost"
+                  size="icon-md"
+                  icon-left="refresh"
+                  :loading="isRefreshingProviders"
+                  :title="t('onlineEvals.scorer.refreshProviders')"
+                  data-test="scorer-form-provider-refresh-btn"
+                  @click="$emit('refresh-providers')"
                 />
+              </div>
+
+              <div
+                v-if="selectedProvider"
+                class="flex items-center flex-wrap gap-[6px_10px] p-[8px_12px] mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body"
+              >
+                <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
+                <span class="text-text-secondary">
+                  {{ t("onlineEvals.scorer.endpointLabel") }}
+                  <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                </span>
+                <span class="text-text-secondary">·</span>
+                <span class="text-text-secondary">
+                  {{ t("onlineEvals.scorer.defaultModelPreviewLabel") }}
+                  <span class="font-mono">{{ defaultModelOf(selectedProvider) || "—" }}</span>
+                </span>
+                <span class="text-text-secondary">·</span>
+                <span class="text-text-secondary">
+                  {{ t("onlineEvals.scorer.authLabel") }}
+                  <span class="font-mono">{{ t("onlineEvals.scorer.authConfigured") }}</span>
+                </span>
+              </div>
+
+              <div class="text-2xs text-text-secondary mt-1">
+                <i18n-t keypath="onlineEvals.scorer.providerHelp" tag="span">
+                  <template #settingsLink>
+                    <router-link
+                      :to="{ name: 'llmProviders' }"
+                      class="scorer-field__help-link text-primary-600 font-semibold no-underline hover:underline"
+                      target="_blank"
+                    >
+                      {{ t("onlineEvals.scorer.providerHelpSettingsLink") }}
+                    </router-link>
+                  </template>
+                </i18n-t>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">{{
+                t("onlineEvals.scorer.modelLabel")
+              }}</label>
+              <OFormInput
+                name="model"
+                :placeholder="t('onlineEvals.scorer.modelPlaceholder')"
+                size="sm"
+                data-test="scorer-form-model-input"
+              />
+            </div>
+
+            <div class="mb-3 flex flex-col gap-3.5">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.scorer.promptLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+              </label>
+              <OFormTextarea
+                name="template"
+                size="sm"
+                :rows="8"
+                data-test="scorer-form-prompt-input"
+              />
+              <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
+                <span class="text-text-secondary">
+                  {{ t("onlineEvals.scorer.promptVariablesLabel") }}
+                </span>
+                <span
+                  v-for="v in promptVariables"
+                  :key="v"
+                  class="py-px px-1.5 rounded-default text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-body"
+                  >{{ formatTemplateVariable(v) }}</span
+                >
+              </div>
+              <div class="text-2xs text-text-secondary mt-1">
+                {{
+                  t("onlineEvals.scorer.promptHelp", {
+                    inputVar: formatTemplateVariable("input"),
+                    outputVar: formatTemplateVariable("output"),
+                  })
+                }}
+              </div>
+            </div>
+
+            <div class="mb-3 flex flex-col gap-3.5">
+              <OFormCheckbox
+                name="includeReasoning"
+                class="scorer-extras__toggle"
+                data-test="scorer-form-include-reasoning"
+              >
+                <template #label>
+                  <span>
+                    <strong class="block text-xs text-text-heading">{{
+                      t("onlineEvals.scorer.includeReasoningLabel")
+                    }}</strong>
+                    <small class="block text-2xs text-text-secondary">{{
+                      t("onlineEvals.scorer.includeReasoningHint")
+                    }}</small>
+                  </span>
+                </template>
+              </OFormCheckbox>
+
+              <div class="flex justify-between items-baseline gap-3">
+                <div class="flex flex-col gap-0.5">
+                  <strong class="text-xs font-semibold">{{
+                    t("onlineEvals.scorer.extraFieldsLabel")
+                  }}</strong>
+                  <span class="text-3xs font-semibold text-text-muted uppercase tracking-[0.04em]">
+                    {{ t("onlineEvals.scorer.extraFieldsOptional") }}
+                  </span>
+                  <small class="block text-2xs text-text-secondary">{{
+                    t("onlineEvals.scorer.extraFieldsHint")
+                  }}</small>
+                </div>
+              </div>
+
+              <div
+                v-if="formValues.extraMetadataFields.length"
+                class="flex flex-col gap-1.5 border border-border-default rounded-default p-[8px_10px] bg-card-bg"
+                data-test="scorer-form-extra-fields"
+              >
+                <div
+                  class="grid grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] gap-2 items-center text-3xs font-semibold uppercase tracking-[0.04em]"
+                >
+                  <span>{{ t("onlineEvals.scorer.extraFields.colName") }}</span>
+                  <span>{{ t("onlineEvals.scorer.extraFields.colType") }}</span>
+                  <span>{{ t("onlineEvals.scorer.extraFields.colDescription") }}</span>
+                  <span aria-hidden="true" />
+                </div>
+                <div
+                  v-for="(field, idx) in formValues.extraMetadataFields"
+                  :key="idx"
+                  class="grid grid-cols-[minmax(120px,1fr)_110px_minmax(140px,2fr)_28px] gap-2 items-center"
+                >
+                  <OFormInput
+                    :name="`extraMetadataFields[${idx}].name`"
+                    size="sm"
+                    :placeholder="t('onlineEvals.scorer.extraFields.namePlaceholder')"
+                    :class="{ 'has-error': field.name && extraFieldNameDuplicates.has(field.name) }"
+                    :data-test="`scorer-form-extra-field-name-${idx}`"
+                  />
+                  <OFormSelect
+                    :name="`extraMetadataFields[${idx}].type`"
+                    size="md"
+                    :options="extraFieldTypeOptions"
+                    :data-test="`scorer-form-extra-field-type-${idx}`"
+                  />
+                  <OFormInput
+                    :name="`extraMetadataFields[${idx}].description`"
+                    size="sm"
+                    :placeholder="t('onlineEvals.scorer.extraFields.descriptionPlaceholder')"
+                    :data-test="`scorer-form-extra-field-description-${idx}`"
+                  />
+                  <button
+                    type="button"
+                    class="w-6 h-6 border-0 bg-transparent text-text-secondary text-base cursor-pointer rounded-default hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-status-error-text"
+                    :aria-label="t('onlineEvals.buttons.remove')"
+                    :data-test="`scorer-form-extra-field-remove-${idx}`"
+                    @click="removeExtraField(idx)"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex justify-between gap-3">
                 <button
                   type="button"
-                  class="w-6 h-6 border-0 bg-transparent text-text-secondary text-base cursor-pointer rounded-default hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-status-error-text"
-                  :aria-label="t('onlineEvals.buttons.remove')"
-                  :data-test="`scorer-form-extra-field-remove-${idx}`"
-                  @click="removeExtraField(idx)"
+                  class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer disabled:text-text-muted disabled:cursor-not-allowed"
+                  :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
+                  data-test="scorer-form-extra-field-add"
+                  @click="addExtraField"
                 >
-                  ×
+                  {{ t("onlineEvals.scorer.extraFields.addButton") }}
+                  <span class="font-normal text-text-secondary ml-1">
+                    ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
+                  data-test="scorer-form-preview-schema"
+                  @click="previewOutputSchema"
+                >
+                  {{ t("onlineEvals.scorer.extraFields.previewSchema") }}
                 </button>
               </div>
             </div>
+          </section>
 
-            <div class="flex justify-between gap-3">
-              <button
-                type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer disabled:text-text-muted disabled:cursor-not-allowed"
-                :disabled="formValues.extraMetadataFields.length >= MAX_EXTRA_FIELDS"
-                data-test="scorer-form-extra-field-add"
-                @click="addExtraField"
+          <!-- Section 02: Endpoint -->
+          <section v-else class="mb-6">
+            <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+              <span
+                class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+                >02</span
               >
-                {{ t("onlineEvals.scorer.extraFields.addButton") }}
-                <span class="font-normal text-text-secondary ml-1">
-                  ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
-                </span>
-              </button>
+              <h3 class="m-0 text-sm font-semibold text-text-heading">
+                {{ t("onlineEvals.scorer.endpointSection") }}
+              </h3>
+            </div>
 
-              <button
-                type="button"
-                class="scorer-extras__preview border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
-                data-test="scorer-form-preview-schema"
-                @click="previewOutputSchema"
+            <div class="mb-3">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.scorer.remoteUrlLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+              </label>
+              <div class="scorer-url-bar grid grid-cols-[104px_minmax(0,1fr)] gap-0">
+                <OFormSelect
+                  name="httpMethod"
+                  size="md"
+                  :options="httpMethodOptions"
+                  :searchable="false"
+                  data-test="scorer-form-remote-method-select"
+                />
+                <OFormInput
+                  name="remoteEndpoint"
+                  :placeholder="t('onlineEvals.scorer.remoteEndpointPlaceholder')"
+                  size="sm"
+                  data-test="scorer-form-remote-endpoint-input"
+                />
+              </div>
+            </div>
+
+            <div class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                  {{ t("onlineEvals.scorer.remoteTimeoutLabel") }}
+                </label>
+                <OFormInput
+                  name="timeoutMs"
+                  type="number"
+                  size="sm"
+                  :min="0"
+                  data-test="scorer-form-remote-timeout"
+                />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                  {{ t("onlineEvals.scorer.remoteRetriesLabel") }}
+                </label>
+                <OFormInput
+                  name="maxRetries"
+                  type="number"
+                  size="sm"
+                  :min="0"
+                  data-test="scorer-form-remote-retries"
+                />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                  {{ t("onlineEvals.scorer.remoteBackoffLabel") }}
+                </label>
+                <OFormSelect
+                  name="backoffStrategy"
+                  size="md"
+                  :options="backoffOptions"
+                  :searchable="false"
+                  data-test="scorer-form-remote-backoff"
+                />
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 03: Authentication -->
+          <section v-if="formValues.scorerType === 'remote'" class="mb-6">
+            <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+              <span
+                class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+                >03</span
               >
-                {{ t("onlineEvals.scorer.extraFields.previewSchema") }}
-              </button>
+              <h3 class="m-0 text-sm font-semibold text-text-heading">
+                {{ t("onlineEvals.scorer.authSection") }}
+              </h3>
             </div>
 
-          </div>
-        </section>
-
-        <!-- Section 02: Endpoint -->
-        <section v-else class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
-            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.endpointSection") }}</h3>
-          </div>
-
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.remoteUrlLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-            </label>
-            <div class="scorer-url-bar grid grid-cols-[104px_minmax(0,1fr)] gap-0">
-              <OFormSelect
-                name="httpMethod"
-                size="md"
-                :options="httpMethodOptions"
-                :searchable="false"
-                data-test="scorer-form-remote-method-select"
-              />
-              <OFormInput
-                name="remoteEndpoint"
-                :placeholder="t('onlineEvals.scorer.remoteEndpointPlaceholder')"
-                size="sm"
-                data-test="scorer-form-remote-endpoint-input"
-              />
-            </div>
-          </div>
-
-          <div class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3">
-            <div class="flex flex-col gap-1.5">
+            <div class="mb-3">
               <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-                {{ t("onlineEvals.scorer.remoteTimeoutLabel") }}
+                {{ t("onlineEvals.scorer.remoteAuthLabel") }}
               </label>
-              <OFormInput
-                name="timeoutMs"
-                type="number"
-                size="sm"
-                :min="0"
-                data-test="scorer-form-remote-timeout"
-              />
-            </div>
-            <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-                {{ t("onlineEvals.scorer.remoteRetriesLabel") }}
-              </label>
-              <OFormInput
-                name="maxRetries"
-                type="number"
-                size="sm"
-                :min="0"
-                data-test="scorer-form-remote-retries"
-              />
-            </div>
-            <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-                {{ t("onlineEvals.scorer.remoteBackoffLabel") }}
-              </label>
-              <OFormSelect
-                name="backoffStrategy"
-                size="md"
-                :options="backoffOptions"
-                :searchable="false"
-                data-test="scorer-form-remote-backoff"
-              />
-            </div>
-          </div>
-        </section>
-
-        <!-- Section 03: Authentication -->
-        <section v-if="formValues.scorerType === 'remote'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">03</span>
-            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.authSection") }}</h3>
-          </div>
-
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.remoteAuthLabel") }}
-            </label>
-            <!-- Clearable so a user can return to "no auth": the auth-type
+              <!-- Clearable so a user can return to "no auth": the auth-type
                  options list only bearer/basic/api_key (a "" option can't be
                  selected — OSelect treats "" as unselected), and each of those
                  makes its token fields required. Without the ✕, picking a type
                  by accident (or wanting to remove auth on edit) would be a trap
                  with no way back to the empty/no-auth state. -->
-            <OFormSelect
-              name="authType"
-              size="md"
-              :options="authTypeOptions"
-              :searchable="false"
-              :clearable="true"
-              :placeholder="t('onlineEvals.scorer.remoteAuth.placeholder')"
-              data-test="scorer-form-remote-auth-type"
-            />
-          </div>
-
-          <div v-if="formValues.authType === 'bearer'" class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-            </label>
-            <OFormInput
-              name="authBearerToken"
-              :placeholder="t('onlineEvals.scorer.remoteAuth.bearerTokenPlaceholder')"
-              size="sm"
-              type="password"
-              data-test="scorer-form-remote-auth-bearer-token"
-            />
-            <div class="text-2xs text-text-secondary mt-1">
-              {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
-            </div>
-          </div>
-
-          <div v-if="formValues.authType === 'basic'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-            <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-                {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-              </label>
-              <OFormInput
-                name="authBasicUsername"
-                :placeholder="t('onlineEvals.scorer.remoteAuth.basicUsernamePlaceholder')"
-                size="sm"
-                data-test="scorer-form-remote-auth-basic-username"
+              <OFormSelect
+                name="authType"
+                size="md"
+                :options="authTypeOptions"
+                :searchable="false"
+                :clearable="true"
+                :placeholder="t('onlineEvals.scorer.remoteAuth.placeholder')"
+                data-test="scorer-form-remote-auth-type"
               />
             </div>
-            <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-                {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-              </label>
-              <OFormInput
-                name="authBasicPassword"
-                :placeholder="t('onlineEvals.scorer.remoteAuth.basicPasswordPlaceholder')"
-                size="sm"
-                type="password"
-                data-test="scorer-form-remote-auth-basic-password"
-              />
-              <div class="text-2xs text-text-secondary mt-1">
-                {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
-              </div>
-            </div>
-          </div>
 
-          <div v-if="formValues.authType === 'api_key'" class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3">
-            <div class="flex flex-col gap-1.5">
-              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-                {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
-                <span class="text-status-error-text ml-0.5">*</span>
-              </label>
-              <OFormInput
-                name="authApiKeyHeaderName"
-                :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyHeaderPlaceholder')"
-                size="sm"
-                data-test="scorer-form-remote-auth-apikey-header"
-              />
-            </div>
-            <div class="flex flex-col gap-1.5">
+            <div v-if="formValues.authType === 'bearer'" class="mb-3">
               <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
                 {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
                 <span class="text-status-error-text ml-0.5">*</span>
               </label>
               <OFormInput
-                name="authApiKeyToken"
-                :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyTokenPlaceholder')"
+                name="authBearerToken"
+                :placeholder="t('onlineEvals.scorer.remoteAuth.bearerTokenPlaceholder')"
                 size="sm"
                 type="password"
-                data-test="scorer-form-remote-auth-apikey-token"
+                data-test="scorer-form-remote-auth-bearer-token"
               />
               <div class="text-2xs text-text-secondary mt-1">
                 {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
               </div>
             </div>
-          </div>
-        </section>
 
-        <!-- Section 04: Custom headers -->
-        <section v-if="formValues.scorerType === 'remote'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">04</span>
-            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.headersSection") }}</h3>
-            <span class="ml-auto text-2xs text-text-secondary italic">
-              {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
-            </span>
-          </div>
-
-          <div class="mb-3">
             <div
-              v-if="formValues.customHeaders.length"
-              class="flex flex-col gap-1.5 border border-border-default rounded-default p-[8px_10px] bg-card-bg"
-              data-test="scorer-form-remote-headers"
+              v-if="formValues.authType === 'basic'"
+              class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3"
             >
-              <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-1.5 items-center text-3xs font-semibold uppercase tracking-[0.04em]">
-                <span>{{ t("onlineEvals.scorer.remoteHeaders.colName") }}</span>
-                <span>{{ t("onlineEvals.scorer.remoteHeaders.colValue") }}</span>
-                <span aria-hidden="true" />
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                  {{ t("onlineEvals.scorer.remoteAuth.usernameLabel") }}
+                  <span class="text-status-error-text ml-0.5">*</span>
+                </label>
+                <OFormInput
+                  name="authBasicUsername"
+                  :placeholder="t('onlineEvals.scorer.remoteAuth.basicUsernamePlaceholder')"
+                  size="sm"
+                  data-test="scorer-form-remote-auth-basic-username"
+                />
               </div>
-              <div
-                v-for="(header, idx) in formValues.customHeaders"
-                :key="idx"
-                class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-1.5 items-center"
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                  {{ t("onlineEvals.scorer.remoteAuth.passwordLabel") }}
+                  <span class="text-status-error-text ml-0.5">*</span>
+                </label>
+                <OFormInput
+                  name="authBasicPassword"
+                  :placeholder="t('onlineEvals.scorer.remoteAuth.basicPasswordPlaceholder')"
+                  size="sm"
+                  type="password"
+                  data-test="scorer-form-remote-auth-basic-password"
+                />
+                <div class="text-2xs text-text-secondary mt-1">
+                  {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-if="formValues.authType === 'api_key'"
+              class="mb-3 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3"
+            >
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                  {{ t("onlineEvals.scorer.remoteAuth.headerNameLabel") }}
+                  <span class="text-status-error-text ml-0.5">*</span>
+                </label>
+                <OFormInput
+                  name="authApiKeyHeaderName"
+                  :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyHeaderPlaceholder')"
+                  size="sm"
+                  data-test="scorer-form-remote-auth-apikey-header"
+                />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                  {{ t("onlineEvals.scorer.remoteAuth.tokenLabel") }}
+                  <span class="text-status-error-text ml-0.5">*</span>
+                </label>
+                <OFormInput
+                  name="authApiKeyToken"
+                  :placeholder="t('onlineEvals.scorer.remoteAuth.apiKeyTokenPlaceholder')"
+                  size="sm"
+                  type="password"
+                  data-test="scorer-form-remote-auth-apikey-token"
+                />
+                <div class="text-2xs text-text-secondary mt-1">
+                  {{ t("onlineEvals.scorer.remoteAuth.encryptedHint") }}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Section 04: Custom headers -->
+          <section v-if="formValues.scorerType === 'remote'" class="mb-6">
+            <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+              <span
+                class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+                >04</span
               >
-                <OFormInput
-                  :name="`customHeaders[${idx}].key`"
-                  size="sm"
-                  :placeholder="t('onlineEvals.scorer.remoteHeaders.keyPlaceholder')"
-                  :data-test="`scorer-form-remote-header-key-${idx}`"
-                />
-                <OFormInput
-                  :name="`customHeaders[${idx}].value`"
-                  size="sm"
-                  :placeholder="t('onlineEvals.scorer.remoteHeaders.valuePlaceholder')"
-                  :data-test="`scorer-form-remote-header-value-${idx}`"
-                />
+              <h3 class="m-0 text-sm font-semibold text-text-heading">
+                {{ t("onlineEvals.scorer.headersSection") }}
+              </h3>
+              <span class="ml-auto text-2xs text-text-secondary italic">
+                {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
+              </span>
+            </div>
+
+            <div class="mb-3">
+              <div
+                v-if="formValues.customHeaders.length"
+                class="flex flex-col gap-1.5 border border-border-default rounded-default p-[8px_10px] bg-card-bg"
+                data-test="scorer-form-remote-headers"
+              >
+                <div
+                  class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-1.5 items-center text-3xs font-semibold uppercase tracking-[0.04em]"
+                >
+                  <span>{{ t("onlineEvals.scorer.remoteHeaders.colName") }}</span>
+                  <span>{{ t("onlineEvals.scorer.remoteHeaders.colValue") }}</span>
+                  <span aria-hidden="true" />
+                </div>
+                <div
+                  v-for="(header, idx) in formValues.customHeaders"
+                  :key="idx"
+                  class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-1.5 items-center"
+                >
+                  <OFormInput
+                    :name="`customHeaders[${idx}].key`"
+                    size="sm"
+                    :placeholder="t('onlineEvals.scorer.remoteHeaders.keyPlaceholder')"
+                    :data-test="`scorer-form-remote-header-key-${idx}`"
+                  />
+                  <OFormInput
+                    :name="`customHeaders[${idx}].value`"
+                    size="sm"
+                    :placeholder="t('onlineEvals.scorer.remoteHeaders.valuePlaceholder')"
+                    :data-test="`scorer-form-remote-header-value-${idx}`"
+                  />
+                  <button
+                    type="button"
+                    class="w-6 h-6 border-0 bg-transparent text-text-secondary text-base cursor-pointer rounded-default hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-status-error-text"
+                    :aria-label="t('onlineEvals.buttons.remove')"
+                    :data-test="`scorer-form-remote-header-remove-${idx}`"
+                    @click="removeCustomHeader(idx)"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex justify-between gap-3">
                 <button
                   type="button"
-                  class="w-6 h-6 border-0 bg-transparent text-text-secondary text-base cursor-pointer rounded-default hover:bg-[color-mix(in_srgb,var(--color-status-error-text)_12%,transparent)] hover:text-status-error-text"
-                  :aria-label="t('onlineEvals.buttons.remove')"
-                  :data-test="`scorer-form-remote-header-remove-${idx}`"
-                  @click="removeCustomHeader(idx)"
+                  class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
+                  data-test="scorer-form-remote-header-add"
+                  @click="addCustomHeader"
                 >
-                  ×
+                  {{ t("onlineEvals.scorer.remoteHeaders.addButton") }}
                 </button>
               </div>
             </div>
+          </section>
 
-            <div class="flex justify-between gap-3">
-              <button
-                type="button"
-                class="border-0 bg-transparent py-1 px-0 text-xs font-semibold text-primary-600 cursor-pointer"
-                data-test="scorer-form-remote-header-add"
-                @click="addCustomHeader"
-              >
-                {{ t("onlineEvals.scorer.remoteHeaders.addButton") }}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <!-- Section 05: Request body template -->
-        <section v-if="formValues.scorerType === 'remote'" class="mb-6">
-          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-            <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">05</span>
-            <h3 class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.scorer.requestBodySection") }}</h3>
-          </div>
-
-          <div class="mb-3">
-            <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.scorer.requestBodyLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-            </label>
-            <OFormTextarea
-              name="template"
-              size="sm"
-              :rows="10"
-              data-test="scorer-form-request-body-input"
-            />
-            <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
-              <span class="text-text-secondary">
-                {{ t("onlineEvals.scorer.promptVariablesLabel") }}
-              </span>
+          <!-- Section 05: Request body template -->
+          <section v-if="formValues.scorerType === 'remote'" class="mb-6">
+            <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
               <span
-                v-for="v in promptVariables"
-                :key="v"
-                class="py-px px-1.5 rounded-default text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-body"
-              >{{ formatTemplateVariable(v) }}</span>
+                class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+                >05</span
+              >
+              <h3 class="m-0 text-sm font-semibold text-text-heading">
+                {{ t("onlineEvals.scorer.requestBodySection") }}
+              </h3>
             </div>
-          </div>
-        </section>
+
+            <div class="mb-3">
+              <label class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.scorer.requestBodyLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+              </label>
+              <OFormTextarea
+                name="template"
+                size="sm"
+                :rows="10"
+                data-test="scorer-form-request-body-input"
+              />
+              <div class="flex items-center flex-wrap gap-1.5 mt-1.5 text-2xs">
+                <span class="text-text-secondary">
+                  {{ t("onlineEvals.scorer.promptVariablesLabel") }}
+                </span>
+                <span
+                  v-for="v in promptVariables"
+                  :key="v"
+                  class="py-px px-1.5 rounded-default text-2xs font-mono bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-body"
+                  >{{ formatTemplateVariable(v) }}</span
+                >
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <ScorerTestPanel
+          :variables="scorerTestVariables"
+          :inputs="scorerTestInputs"
+          :state="scorerTestState"
+          :result="scorerTestResult"
+          :error-message="scorerTestError"
+          :can-run="canRunScorerTest"
+          @run="onRunScorerTest"
+          @update:inputs="scorerTestInputs = $event"
+        />
       </div>
 
-      <ScorerTestPanel
-        :variables="scorerTestVariables"
-        :inputs="scorerTestInputs"
-        :state="scorerTestState"
-        :result="scorerTestResult"
-        :error-message="scorerTestError"
-        :can-run="canRunScorerTest"
-        @run="onRunScorerTest"
-        @update:inputs="scorerTestInputs = $event"
-      />
-    </div>
-
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1">
-      <OButton
-        data-test="scorer-form-cancel-btn"
-        type="button"
-        variant="outline"
-        size="sm-action"
-        :disabled="isSubmitting"
-        @click="$emit('cancel')"
+      <footer
+        class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1"
       >
-        {{ t("onlineEvals.buttons.cancel") }}
-      </OButton>
-      <OButton
-        data-test="scorer-form-save-btn"
-        type="submit"
-        variant="primary"
-        size="sm-action"
-        :loading="isSubmitting"
-      >
-        {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
-      </OButton>
-    </footer>
+        <OButton
+          data-test="scorer-form-cancel-btn"
+          type="button"
+          variant="outline"
+          size="sm-action"
+          :disabled="isSubmitting"
+          @click="$emit('cancel')"
+        >
+          {{ t("onlineEvals.buttons.cancel") }}
+        </OButton>
+        <OButton
+          data-test="scorer-form-save-btn"
+          type="submit"
+          variant="primary"
+          size="sm-action"
+          :loading="isSubmitting"
+        >
+          {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+        </OButton>
+      </footer>
 
-    <ODialog
-      v-model:open="schemaPreviewOpen"
-      data-test="scorer-form-schema-preview-dialog"
-      size="md"
-      :title="t('onlineEvals.scorer.extraFields.schemaTitle')"
-    >
-      <p v-if="isLoadingSchemaPreview" class="m-0 p-3 text-xs text-text-secondary">
-        {{ t("onlineEvals.scorer.extraFields.schemaLoading") }}
-      </p>
-      <p
-        v-else-if="schemaPreviewError"
-        class="m-0 p-3 text-xs text-status-error-text"
+      <ODialog
+        v-model:open="schemaPreviewOpen"
+        data-test="scorer-form-schema-preview-dialog"
+        size="md"
+        :title="t('onlineEvals.scorer.extraFields.schemaTitle')"
       >
-        {{ schemaPreviewError }}
-      </p>
-      <pre class="m-0 max-h-[60vh] overflow-auto p-3 rounded-default bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-text-body whitespace-pre [tab-size:2]" v-else>{{ schemaPreview }}</pre>
+        <p v-if="isLoadingSchemaPreview" class="m-0 p-3 text-xs text-text-secondary">
+          {{ t("onlineEvals.scorer.extraFields.schemaLoading") }}
+        </p>
+        <p v-else-if="schemaPreviewError" class="m-0 p-3 text-xs text-status-error-text">
+          {{ schemaPreviewError }}
+        </p>
+        <pre
+          class="m-0 max-h-[60vh] overflow-auto p-3 rounded-default bg-card-bg border border-border-default font-normal text-xs font-(family-name:--font-mono) text-text-body whitespace-pre [tab-size:2]"
+          v-else
+          >{{ schemaPreview }}</pre
+        >
 
-      <template #footer>
-        <div class="flex items-center justify-between gap-2 w-full">
-          <OButton
-            data-test="scorer-form-schema-copy-btn"
-            variant="outline"
-            size="sm-action"
-            :icon-left="schemaJustCopied ? 'check' : 'content-copy'"
-            :disabled="!schemaPreview || isLoadingSchemaPreview"
-            @click="copySchemaToClipboard"
-          >
-            {{ copyButtonLabel }}
-          </OButton>
-          <OButton
-            data-test="scorer-form-schema-close-btn"
-            variant="primary"
-            size="sm-action"
-            @click="schemaPreviewOpen = false"
-          >
-            {{ t("onlineEvals.buttons.close") }}
-          </OButton>
-        </div>
-      </template>
-    </ODialog>
+        <template #footer>
+          <div class="flex items-center justify-between gap-2 w-full">
+            <OButton
+              data-test="scorer-form-schema-copy-btn"
+              variant="outline"
+              size="sm-action"
+              :icon-left="schemaJustCopied ? 'check' : 'content-copy'"
+              :disabled="!schemaPreview || isLoadingSchemaPreview"
+              @click="copySchemaToClipboard"
+            >
+              {{ copyButtonLabel }}
+            </OButton>
+            <OButton
+              data-test="scorer-form-schema-close-btn"
+              variant="primary"
+              size="sm-action"
+              @click="schemaPreviewOpen = false"
+            >
+              {{ t("onlineEvals.buttons.close") }}
+            </OButton>
+          </div>
+        </template>
+      </ODialog>
     </OPageLayout>
   </OForm>
 </template>
@@ -695,23 +767,11 @@ import onlineEvalsService, {
   type Scorer,
   type ScorerType,
 } from "@/services/online-evals.service";
-import {
-  dataTypeOf,
-  defaultModelOf,
-  entityId,
-  valueOf,
-} from "../utils/evalEntity";
-import {
-  extractTemplateVariables,
-  formatTemplateVariable,
-  showError,
-} from "../utils/evalFormat";
+import { dataTypeOf, defaultModelOf, entityId, valueOf } from "../utils/evalEntity";
+import { extractTemplateVariables, formatTemplateVariable, showError } from "../utils/evalFormat";
 import { useScorerTest } from "../composables/useScorerTest";
 import ScorerTestPanel from "./scorer/ScorerTestPanel.vue";
-import {
-  makeScorerFormSchema,
-  type ScorerForm,
-} from "./ScorerFormPage.schema";
+import { makeScorerFormSchema, type ScorerForm } from "./ScorerFormPage.schema";
 
 const props = defineProps<{
   orgId: string;
@@ -771,8 +831,8 @@ const canRunScorerTest = computed(() => {
     if (!formValues.value.remoteEndpoint?.trim()) return false;
   }
   if (scorerTestVariables.value.length === 0) return false;
-  return scorerTestVariables.value.every((variable) =>
-    String(scorerTestInputs.value[variable] ?? "").trim().length > 0,
+  return scorerTestVariables.value.every(
+    (variable) => String(scorerTestInputs.value[variable] ?? "").trim().length > 0,
   );
 });
 
@@ -781,10 +841,7 @@ function buildScorerTestPayload() {
   const scoreConfigRef: Record<string, any> = {};
   if (formValues.value.producesScoreConfigId) {
     scoreConfigRef.producesScoreConfigId = formValues.value.producesScoreConfigId;
-    if (
-      formValues.value.pinScoreConfigVersion &&
-      formValues.value.producesScoreConfigVersion
-    ) {
+    if (formValues.value.pinScoreConfigVersion && formValues.value.producesScoreConfigVersion) {
       scoreConfigRef.producesScoreConfigVersion = Number(
         formValues.value.producesScoreConfigVersion,
       );
@@ -1007,19 +1064,16 @@ async function previewOutputSchema() {
   schemaPreviewError.value = null;
   schemaPreview.value = "";
   try {
-    const data = await onlineEvalsService.scorers.previewLlmJudgeOutputSchema(
-      props.orgId,
-      {
-        ...(formValues.value.producesScoreConfigId
-          ? { producesScoreConfigId: formValues.value.producesScoreConfigId }
-          : {}),
-        ...(formValues.value.pinScoreConfigVersion && formValues.value.producesScoreConfigVersion
-          ? { producesScoreConfigVersion: Number(formValues.value.producesScoreConfigVersion) }
-          : {}),
-        includeReasoning: formValues.value.includeReasoning,
-        extraMetadataFields: cleanedExtraFields.value,
-      },
-    );
+    const data = await onlineEvalsService.scorers.previewLlmJudgeOutputSchema(props.orgId, {
+      ...(formValues.value.producesScoreConfigId
+        ? { producesScoreConfigId: formValues.value.producesScoreConfigId }
+        : {}),
+      ...(formValues.value.pinScoreConfigVersion && formValues.value.producesScoreConfigVersion
+        ? { producesScoreConfigVersion: Number(formValues.value.producesScoreConfigVersion) }
+        : {}),
+      includeReasoning: formValues.value.includeReasoning,
+      extraMetadataFields: cleanedExtraFields.value,
+    });
     const schema = (data as any)?.outputSchema ?? (data as any)?.output_schema ?? data;
     schemaPreview.value = JSON.stringify(schema, null, 2);
   } catch (err: any) {
@@ -1038,9 +1092,7 @@ const titleText = computed(() => {
       ? t("onlineEvals.scorer.createTitleRemote")
       : t("onlineEvals.scorer.createTitleLlm");
   }
-  return isRemote
-    ? t("onlineEvals.scorer.editTitleRemote")
-    : t("onlineEvals.scorer.editTitleLlm");
+  return isRemote ? t("onlineEvals.scorer.editTitleRemote") : t("onlineEvals.scorer.editTitleLlm");
 });
 
 const scoreConfigOptions = computed(() =>
@@ -1057,8 +1109,9 @@ const providerOptions = computed(() =>
   })),
 );
 
-const selectedScoreConfig = computed(() =>
-  props.scoreConfigs.find((c) => entityId(c) === formValues.value.producesScoreConfigId) || null,
+const selectedScoreConfig = computed(
+  () =>
+    props.scoreConfigs.find((c) => entityId(c) === formValues.value.producesScoreConfigId) || null,
 );
 
 const selectedRange = computed(() => {
@@ -1198,7 +1251,9 @@ function initForm(row: Scorer | null, scorerType: ScorerType): ScorerForm {
     };
   }
   const rowScorerType = (valueOf(row, "scorerType", "scorer_type") || "llm_judge") as ScorerType;
-  const rawExtras = (row.params?.extra_metadata_fields ?? row.params?.extraMetadataFields ?? []) as any[];
+  const rawExtras = (row.params?.extra_metadata_fields ??
+    row.params?.extraMetadataFields ??
+    []) as any[];
   const auth = readAuth(row.params?.auth);
   return {
     name: row.name,
@@ -1304,9 +1359,7 @@ async function save(value: ScorerForm) {
             provider_id: value.providerId,
             ...(value.model.trim() ? { model: value.model.trim() } : {}),
             include_reasoning: value.includeReasoning,
-            ...(extraFields.length
-              ? { extra_metadata_fields: extraFields }
-              : {}),
+            ...(extraFields.length ? { extra_metadata_fields: extraFields } : {}),
           },
         }
       : {

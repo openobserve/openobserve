@@ -44,6 +44,5 @@ const tooltips: Record<string, string> = {
   error_tap: "Tap triggered a JavaScript error",
 };
 
-const getTooltipText = (type: string) =>
-  tooltips[type] || `Frustration signal: ${type}`;
+const getTooltipText = (type: string) => tooltips[type] || `Frustration signal: ${type}`;
 </script>

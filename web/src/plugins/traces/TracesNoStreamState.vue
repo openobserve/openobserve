@@ -57,7 +57,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon="account-tree"
           :data-test="`traces-no-stream-recent-${recentStream}`"
           @click="emit('pick-stream', recentStream)"
-        ><span class="truncate max-w-40">{{ recentStream }}</span></EmptyStateIngestionChip>
+          ><span class="truncate max-w-40">{{ recentStream }}</span></EmptyStateIngestionChip
+        >
       </div>
     </template>
   </OEmptyState>
@@ -91,6 +92,10 @@ const recentStream = computed<string>(() => {
 const description = computed(() => t("traces.noStream.description"));
 
 const openGuide = () => {
-  window.open("https://openobserve.ai/docs/features/distributed-tracing/#overview", "_blank", "noopener,noreferrer");
+  window.open(
+    "https://openobserve.ai/docs/features/distributed-tracing/#overview",
+    "_blank",
+    "noopener,noreferrer",
+  );
 };
 </script>

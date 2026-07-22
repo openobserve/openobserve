@@ -27,11 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="w-full! justify-start! px-3! py-1.5! h-auto! rounded-default! gap-2! font-normal!"
         >
           <template #icon-left>
-            <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+            <span
+              class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+            >
               <OIcon name="help" size="sm" />
             </span>
           </template>
-          {{ t('search.syntaxGuideLabel') }}
+          {{ t("search.syntaxGuideLabel") }}
         </OButton>
         <!-- Toolbar style: outline button matching sibling toolbar buttons (e.g. Reset) -->
         <OButton
@@ -54,7 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="[
             noBorder ? 'display-none!' : 'ml-1',
             sqlmode ? 'sql-mode' : 'normal-mode',
-            noBorder ? 'border-0! bg-transparent! p-0! m-0! w-full justify-start hover:bg-transparent!' : '',
+            noBorder
+              ? 'border-0! bg-transparent! p-0! m-0! w-full justify-start hover:bg-transparent!'
+              : '',
           ]"
           class="h-4.5!"
         >
@@ -102,9 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </li>
                 <li>
                   For column search of value 'error' use
-                  <span class="bg-highlight-bg px-1.25"
-                    >str_match(<b>fieldname</b>, 'error')</span
-                  >
+                  <span class="bg-highlight-bg px-1.25">str_match(<b>fieldname</b>, 'error')</span>
                 </li>
                 <li>
                   For case-insensitive column search of value 'error' use
@@ -160,32 +162,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   For phrase prefix search use
                   <span class="bg-highlight-bg px-1.25"
-                    >SELECT * FROM <b>stream</b> WHERE match_all('error
-                    code*')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
                   >
                   to find phrases starting with 'error code'.
                 </li>
                 <li>
                   For case sensitive search use
                   <span class="bg-highlight-bg px-1.25"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all('traceHits')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('traceHits')</span
                   >
                   with exact case matching.
                 </li>
                 <li>
                   For postfix search use
                   <span class="bg-highlight-bg px-1.25"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    match_all('*failed')</span
+                    >SELECT * FROM <b>stream</b> WHERE match_all('*failed')</span
                   >
                   to find all terms ending with 'failed'.
                 </li>
                 <li>
                   For column search of value 'error' use
                   <span class="bg-highlight-bg px-1.25"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    str_match(<b>fieldname</b>, 'error')</span
+                    >SELECT * FROM <b>stream</b> WHERE str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
@@ -201,11 +199,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
+                  To search and use query function <i>extract_ip</i> on column log use
                   <span class="bg-highlight-bg px-1.25"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
+                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>

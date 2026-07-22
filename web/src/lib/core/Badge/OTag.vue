@@ -89,9 +89,7 @@ const hasManualContent = computed(
     props.variant !== undefined,
 );
 // The "—" dash is for a SEMANTIC badge whose value is missing.
-const isEmpty = computed(
-  () => !hasManualContent.value && normalizeKey(props.value) === "",
-);
+const isEmpty = computed(() => !hasManualContent.value && normalizeKey(props.value) === "");
 
 const variant = computed<BadgeVariant>(() => {
   if (props.variant) return props.variant;
@@ -101,13 +99,9 @@ const variant = computed<BadgeVariant>(() => {
   return resolved.value.variant;
 });
 // Size precedence: prop → registry → "sm".
-const size = computed<BadgeSize>(
-  () => props.size ?? resolved.value.size ?? "sm",
-);
+const size = computed<BadgeSize>(() => props.size ?? resolved.value.size ?? "sm");
 // Shape precedence: prop → registry group → "pill".
-const shape = computed<BadgeShape>(
-  () => props.shape ?? resolved.value.shape ?? "pill",
-);
+const shape = computed<BadgeShape>(() => props.shape ?? resolved.value.shape ?? "pill");
 // Label precedence: prop → labelKey (i18n) → registry label → humanised value.
 const label = computed(() => {
   if (props.label !== undefined) return props.label;
@@ -120,9 +114,7 @@ const icon = computed(() =>
 // Dot precedence: explicit prop → registry dot for a TYPED group → false.
 // Manual badges (no `type`) must NOT inherit the generic fallback's dot, or
 // every passthrough chip (counts, metric chips) would sprout a leading dot.
-const dot = computed(() =>
-  props.dot ?? (props.type ? resolved.value.dot : false),
-);
+const dot = computed(() => props.dot ?? (props.type ? resolved.value.dot : false));
 </script>
 
 <template>

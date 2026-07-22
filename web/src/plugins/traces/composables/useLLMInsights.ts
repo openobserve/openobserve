@@ -70,8 +70,7 @@ const EMPTY_KPI: LLMKPI = {
  */
 export function useLLMInsights() {
   const store = useStore();
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const kpi = ref<LLMKPI>({ ...EMPTY_KPI });
   const sparklines = ref<LLMSparklineSeries>({
@@ -290,9 +289,7 @@ export function useLLMInsights() {
           series.traces.push(traceCount);
           series.p95Micros.push(Number(row.p95_duration) || 0);
           series.cost.push(cost);
-          series.errorRate.push(
-            traceCount > 0 ? (errorCount / traceCount) * 100 : 0,
-          );
+          series.errorRate.push(traceCount > 0 ? (errorCount / traceCount) * 100 : 0);
 
           totals.requestCount += requestCount;
           totals.traceCount += traceCount;

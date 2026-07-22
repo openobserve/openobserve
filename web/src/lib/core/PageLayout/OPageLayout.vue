@@ -57,10 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Just a shrink-0 slot: OPageHeader draws its OWN border-b (so the header
          is a consistent 60px). Don't add a border here — it would double the
          divider and add 1px. -->
-    <div
-      v-if="hasHeader"
-      :class="headerClass ?? 'shrink-0'"
-    >
+    <div v-if="hasHeader" :class="headerClass ?? 'shrink-0'">
       <slot name="header">
         <OPageHeader
           :title="title"
@@ -71,8 +68,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :tabs-below="tabsBelow"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
-          <template v-if="!!slots['title-prefix']" #title-prefix><slot name="title-prefix" /></template>
-          <template v-if="!!slots['title-trail']" #title-trail><slot name="title-trail" /></template>
+          <template v-if="!!slots['title-prefix']" #title-prefix
+            ><slot name="title-prefix"
+          /></template>
+          <template v-if="!!slots['title-trail']" #title-trail
+            ><slot name="title-trail"
+          /></template>
           <template v-if="!!slots.subtitle" #subtitle><slot name="subtitle" /></template>
           <template v-if="!!slots.actions" #actions><slot name="actions" /></template>
           <template v-if="!!slots['header-tabs']" #tabs><slot name="header-tabs" /></template>
@@ -110,43 +111,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </slot>
       </template>
       <template #after>
-        <OContent
-          :bleed="bleed"
-          :y="padY"
-          class="w-full h-full flex flex-col overflow-hidden"
-        >
+        <OContent :bleed="bleed" :y="padY" class="w-full h-full flex flex-col overflow-hidden">
           <slot />
         </OContent>
       </template>
     </OSplitter>
 
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
-    <div
-      v-else-if="!!slots.sidebar"
-      class="flex-1 flex min-h-0"
-    >
+    <div v-else-if="!!slots.sidebar" class="flex-1 flex min-h-0">
       <aside
         class="shrink-0 h-full flex flex-col overflow-hidden border-r border-border-default"
         :style="{ width: (sidebarWidth ?? 200) + 'px' }"
       >
         <slot name="sidebar" />
       </aside>
-      <OContent
-        as="section"
-        :bleed="bleed"
-        :y="padY"
-        class="flex-1 min-w-0 h-full overflow-hidden"
-      >
+      <OContent as="section" :bleed="bleed" :y="padY" class="flex-1 min-w-0 h-full overflow-hidden">
         <slot />
       </OContent>
     </div>
 
     <!-- ── Body: constrained reading column (no sidebar) ────────── -->
-    <ConstrainedPage
-      v-else-if="constrained"
-      :size="contentSize"
-      class="flex-1 min-h-0"
-    >
+    <ConstrainedPage v-else-if="constrained" :size="contentSize" class="flex-1 min-h-0">
       <slot />
     </ConstrainedPage>
 
@@ -155,7 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else
       :bleed="bleed"
       :y="padY"
-      :class="scroll ? 'flex-1 min-h-0 overflow-auto' : 'flex-1 min-h-0 flex flex-col overflow-hidden'"
+      :class="
+        scroll ? 'flex-1 min-h-0 overflow-auto' : 'flex-1 min-h-0 flex flex-col overflow-hidden'
+      "
     >
       <slot />
     </OContent>

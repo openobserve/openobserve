@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="event-detail-drawer"
+  <ODrawer
+    data-test="event-detail-drawer"
     bleed
     :open="open"
     size="xl"
@@ -24,12 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template #header>
       <div class="px-1 py-2.5 w-full">
         <div class="flex items-center flex-nowrap w-full">
-        <div class="flex flex-col w-full">
-          <!-- Event Header -->
-          <div class="flex items-center justify-between mb-2.5">
-              <div
-                class="flex items-center w-full"
-              >
+          <div class="flex flex-col w-full">
+            <!-- Event Header -->
+            <div class="flex items-center justify-between mb-2.5">
+              <div class="flex items-center w-full">
                 <div
                   class="px-1.5 py-0.5 rounded-default text-3xs font-semibold uppercase mr-1.5"
                   :class="getEventTypeClass(event.type)"
@@ -37,12 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ event.type }}
                 </div>
 
-                <template
-                  v-if="
-                    event.frustration_types &&
-                    event.frustration_types.length > 0
-                  "
-                >
+                <template v-if="event.frustration_types && event.frustration_types.length > 0">
                   <FrustrationEventBadge
                     :frustration-types="event.frustration_types"
                     class="mr-1 inline"
@@ -55,8 +49,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ event.name }}
                 </div>
               </div>
-          </div>
-          <div
+            </div>
+            <div
               data-test="event-session-meta-data"
               class="flex items-center flex-wrap gap-x-3 gap-y-1 event-metadata"
             >
@@ -87,9 +81,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="schedule" size="sm" class="pr-1" />
                 {{ sessionDetails.date }}
               </div>
+            </div>
           </div>
         </div>
-      </div>
       </div>
     </template>
 
@@ -97,21 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex pt-2 px-page-edge">
       <div class="w-full">
         <OTabs v-model="activeTab" align="left" dense>
-          <OTab
-            data-test="event-detail-overview-tab"
-            name="overview"
-            label="Overview"
-          />
-          <OTab
-            data-test="event-detail-network-tab"
-            name="network"
-            label="Network"
-          />
-          <OTab
-            data-test="event-detail-attributes-tab"
-            name="attributes"
-            label="Attributes"
-          />
+          <OTab data-test="event-detail-overview-tab" name="overview" label="Overview" />
+          <OTab data-test="event-detail-network-tab" name="network" label="Network" />
+          <OTab data-test="event-detail-attributes-tab" name="attributes" label="Attributes" />
         </OTabs>
       </div>
     </div>
@@ -129,22 +111,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabPanel name="overview" padding="sm" data-test="overview-tab">
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
-          <div
-            v-if="event.type === 'error'"
-            class="mb-3"
-            data-test="error-details"
-          >
+          <div v-if="event.type === 'error'" class="mb-3" data-test="error-details">
             <div class="font-bold mb-1 text-sm">Error Details</div>
             <div>
               <div
                 v-if="rawEvent?.error_type"
                 class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
-                <div
-                  class="w-25 font-medium text-text-secondary shrink-0"
-                >
-                  Error Type:
-                </div>
+                <div class="w-25 font-medium text-text-secondary shrink-0">Error Type:</div>
                 <div class="flex-1 break-words">
                   {{ rawEvent.error_type }}
                 </div>
@@ -153,11 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="rawEvent?.error_message"
                 class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
-                <div
-                  class="w-25 font-medium text-text-secondary shrink-0"
-                >
-                  Message:
-                </div>
+                <div class="w-25 font-medium text-text-secondary shrink-0">Message:</div>
                 <div class="flex-1 break-words">
                   {{ rawEvent.error_message }}
                 </div>
@@ -166,11 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="rawEvent?.error_handling"
                 class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
-                <div
-                  class="w-25 font-medium text-text-secondary shrink-0"
-                >
-                  Handling:
-                </div>
+                <div class="w-25 font-medium text-text-secondary shrink-0">Handling:</div>
                 <div class="flex-1 break-words">
                   <span
                     class="px-1 py-0.5 rounded-default text-3xs"
@@ -184,19 +150,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
               </div>
-              <div
-                v-if="rawEvent?.error_id"
-                class="flex py-1 px-1.5 text-xs"
-              >
-                <div
-                  class="w-25 font-medium text-text-secondary shrink-0"
-                >
-                  Error ID:
-                </div>
+              <div v-if="rawEvent?.error_id" class="flex py-1 px-1.5 text-xs">
+                <div class="w-25 font-medium text-text-secondary shrink-0">Error ID:</div>
                 <div class="flex-1 break-words">
-                  <code
-                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default"
-                  >
+                  <code class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default">
                     {{ formatId(rawEvent.error_id) }}
                   </code>
                 </div>
@@ -205,22 +162,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- View Details -->
-          <div
-            v-if="event.type === 'view'"
-            class="mb-3"
-            data-test="view-details"
-          >
+          <div v-if="event.type === 'view'" class="mb-3" data-test="view-details">
             <div class="font-bold mb-1 text-sm">View Details</div>
             <div>
               <div
                 v-if="rawEvent?.view_loading_type"
                 class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
-                <div
-                  class="w-25 font-medium text-text-secondary shrink-0"
-                >
-                  Loading Type:
-                </div>
+                <div class="w-25 font-medium text-text-secondary shrink-0">Loading Type:</div>
                 <div class="flex-1 capitalize break-words">
                   {{ rawEvent.view_loading_type.replace("_", " ") }}
                 </div>
@@ -229,11 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="rawEvent?.view_url"
                 class="flex py-1 px-1.5 border-b border-solid border-card-glass-border text-xs"
               >
-                <div
-                  class="w-25 font-medium text-text-secondary shrink-0"
-                >
-                  URL:
-                </div>
+                <div class="w-25 font-medium text-text-secondary shrink-0">URL:</div>
                 <div
                   class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
                   :title="rawEvent.view_url"
@@ -241,19 +186,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ rawEvent.view_url }}
                 </div>
               </div>
-              <div
-                v-if="rawEvent?.view_id"
-                class="flex py-1 px-1.5 text-xs"
-              >
-                <div
-                  class="w-25 font-medium text-text-secondary shrink-0"
-                >
-                  View ID:
-                </div>
+              <div v-if="rawEvent?.view_id" class="flex py-1 px-1.5 text-xs">
+                <div class="w-25 font-medium text-text-secondary shrink-0">View ID:</div>
                 <div class="flex-1 break-words">
-                  <code
-                    class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default"
-                  >
+                  <code class="font-mono text-3xs px-1 py-0.5 bg-surface-accent rounded-default">
                     {{ formatId(rawEvent.view_id) }}
                   </code>
                 </div>
@@ -275,9 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template v-if="isLoadingRelatedResources">
               <div class="mt-2 p-2 text-center">
                 <OSpinner size="xs" />
-                <div class="mt-1 text-text-secondary text-xs">
-                  Loading related events...
-                </div>
+                <div class="mt-1 text-text-secondary text-xs">Loading related events...</div>
               </div>
             </template>
             <template v-else-if="relatedResources.length > 0">
@@ -303,50 +237,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
-                      <span
-                        class="mr-1 font-bold text-3xs text-button-primary"
-                      >
+                      <span class="mr-1 font-bold text-3xs text-button-primary">
                         {{ item.resource_method || "GET" }}
                       </span>
-                      <span
-                        class="overflow-hidden text-ellipsis whitespace-nowrap text-xs"
-                      >
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-xs">
                         {{ item.resource_url }}
                       </span>
                     </template>
 
                     <!-- Error -->
                     <template v-else-if="item.type === 'error'">
-                      <span
-                        class="overflow-hidden text-ellipsis whitespace-nowrap text-xs"
-                      >
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-xs">
                         {{ item.error_message || item.error_type }}
                       </span>
                     </template>
 
                     <!-- View -->
                     <template v-else-if="item.type === 'view'">
-                      <span
-                        class="overflow-hidden text-ellipsis whitespace-nowrap text-xs"
-                      >
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-xs">
                         {{ item.view_url }}
                       </span>
                     </template>
 
                     <!-- Action -->
                     <template v-else-if="item.type === 'action'">
-                      <span
-                        class="overflow-hidden text-ellipsis whitespace-nowrap text-xs"
-                      >
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-xs">
                         {{ item.action_type }} on {{ item.action_target_name }}
                       </span>
                     </template>
 
                     <!-- Other -->
                     <template v-else>
-                      <span
-                        class="overflow-hidden text-ellipsis whitespace-nowrap text-xs"
-                      >
+                      <span class="overflow-hidden text-ellipsis whitespace-nowrap text-xs">
                         {{ item.type }} event
                       </span>
                     </template>
@@ -355,17 +277,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Event Details Row -->
                   <div class="flex items-center text-text-secondary text-3xs">
                     <OIcon name="schedule" size="xs" class="mr-1" />
-                    <span class="mr-2">{{
-                      formatTimestamp(item.date)
-                    }}</span>
+                    <span class="mr-2">{{ formatTimestamp(item.date) }}</span>
 
                     <!-- Resource-specific details -->
                     <template v-if="item.type === 'resource'">
-                      <OIcon
-                        name="access-time"
-                        size="xs"
-                        class="mr-0.5"
-                      />
+                      <OIcon name="access-time" size="xs" class="mr-0.5" />
                       <span class="mr-2">{{
                         formatDuration(item.resource_duration / 1000000)
                       }}</span>
@@ -401,9 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Network Tab -->
       <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
-          <div class="font-bold mb-2 text-sm">
-            Network Requests ({{ networkResources.length }})
-          </div>
+          <div class="font-bold mb-2 text-sm">Network Requests ({{ networkResources.length }})</div>
           <div>
             <div
               v-for="resource in networkResources"
@@ -421,9 +335,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resource.resource_url }}
                 </span>
               </div>
-              <div
-                class="flex items-center gap-x-3 text-3xs text-text-secondary"
-              >
+              <div class="flex items-center gap-x-3 text-3xs text-text-secondary">
                 <div class="flex items-center">
                   <OIcon name="access-time" size="xs" class="mr-1" />
                   {{ formatDuration(resource.resource_duration / 1000000) }}
@@ -455,20 +367,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Console Tab -->
       <OTabPanel name="console" padding="sm" data-test="console-tab">
-        <div class="text-center py-8 text-text-muted text-sm">
-          Console logs coming soon
-        </div>
+        <div class="text-center py-8 text-text-muted text-sm">Console logs coming soon</div>
       </OTabPanel>
 
       <!-- Performance Tab -->
-      <OTabPanel
-        name="performance"
-        padding="sm"
-        data-test="performance-tab"
-      >
-        <div class="text-center py-8 text-text-muted text-sm">
-          Performance metrics coming soon
-        </div>
+      <OTabPanel name="performance" padding="sm" data-test="performance-tab">
+        <div class="text-center py-8 text-text-muted text-sm">Performance metrics coming soon</div>
       </OTabPanel>
 
       <!-- Attributes Tab -->
@@ -481,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="attributes-copy-btn"
             @click="copyAttributesToClipboard"
           >
-            {{ t('common.copyToClipboard') }}
+            {{ t("common.copyToClipboard") }}
           </OButton>
         </div>
         <div
@@ -490,11 +394,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div>
             {
-            <div
-              v-for="(key, index) in Object.keys(rawEvent)"
-              :key="key"
-              class="ml-4"
-            >
+            <div v-for="(key, index) in Object.keys(rawEvent)" :key="key" class="ml-4">
               <span>
                 <LogsHighLighting
                   :data="{ [key]: rawEvent[key] }"
@@ -512,10 +412,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -527,8 +427,8 @@ import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import EventDetailsSection from "./common/EventDetailsSection.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -573,13 +473,8 @@ const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);
 const activeTab = ref("overview");
 
-const {
-  formatTimestamp,
-  formatId,
-  getStatusIcon,
-  getStatusColorClass,
-  getEventTypeClass,
-} = useEventFormatters();
+const { formatTimestamp, formatId, getStatusIcon, getStatusColorClass, getEventTypeClass } =
+  useEventFormatters();
 
 const copyAttributesToClipboard = () => {
   copyToClipboard(JSON.stringify(props.rawEvent, null, 2), {
@@ -646,9 +541,7 @@ const fetchRelatedResources = async () => {
     relatedResources.value = res.data.hits || [];
 
     // Auto-select first resource with trace_id for trace correlation
-    const resourceWithTrace = relatedResources.value.find(
-      (r: any) => r._oo_trace_id,
-    );
+    const resourceWithTrace = relatedResources.value.find((r: any) => r._oo_trace_id);
     if (resourceWithTrace) {
       selectedResourceWithTrace.value = resourceWithTrace;
     }
@@ -688,9 +581,7 @@ const navigateToSpecificTrace = (traceId: string) => {
   if (!traceId) return;
 
   // Find the resource with this trace_id to get timing information
-  const resource = relatedResources.value.find(
-    (r: any) => r._oo_trace_id === traceId,
-  );
+  const resource = relatedResources.value.find((r: any) => r._oo_trace_id === traceId);
 
   // Use resource timing if available, otherwise use event timing
   const startTime = resource?.date
@@ -720,4 +611,3 @@ defineExpose({
   outlinedAccountTree: "account-tree",
 });
 </script>
-

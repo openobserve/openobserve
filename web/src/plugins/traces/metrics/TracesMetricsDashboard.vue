@@ -22,7 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="show"
         class="charts-wrapper py-0! min-h-[8.5rem] h-40 overflow-hidden will-change-[transform,opacity]"
       >
-        <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]">
+        <div
+          class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-[0_2px_8px_rgba(255,255,255,0.08)]"
+        >
           <RenderDashboardCharts
             v-if="show"
             ref="dashboardChartsRef"
@@ -69,14 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import {
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  computed,
-  defineAsyncComponent,
-  nextTick,
-} from "vue";
+import { ref, onMounted, onBeforeUnmount, computed, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import useNotifications from "@/composables/useNotifications";
@@ -95,9 +90,7 @@ const TracesMetricsContextMenu = defineAsyncComponent(
   () => import("./TracesMetricsContextMenu.vue"),
 );
 
-const TracesAnalysisDashboard = defineAsyncComponent(
-  () => import("./TracesAnalysisDashboard.vue"),
-);
+const TracesAnalysisDashboard = defineAsyncComponent(() => import("./TracesAnalysisDashboard.vue"));
 
 export interface TimeRange {
   startTime: number;
@@ -119,7 +112,6 @@ const { showErrorNotification } = useNotifications();
 useStore();
 const { searchObj, tracesParser } = useTraces();
 useI18n();
-
 
 // Read filter and timeRange directly from the shared composable rather than via props.
 // The props go stale during synchronous call chains (e.g., auto_query_enabled
@@ -229,9 +221,7 @@ const getBaseFilters = () => {
   rangeFilters.value.forEach((rangeFilter) => {
     if (rangeFilter.panelTitle === "Duration") {
       if (rangeFilter.start !== null && rangeFilter.end !== null) {
-        baseFilters.push(
-          `duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`,
-        );
+        baseFilters.push(`duration >= ${rangeFilter.start} and duration <= ${rangeFilter.end}`);
       } else {
         baseFilters.push(
           `duration ${rangeFilter.start ? ">=" : "<="} ${rangeFilter.start || rangeFilter.end}`,
@@ -277,73 +267,68 @@ const loadDashboard = async () => {
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const baseFilters: string[] = getBaseFilters();
-    convertedDashboard.tabs[0].panels.forEach((panel: { title?: string; queries: { query: string }[] }, index: number) => {
-      // Build WHERE clause based on filters
-      let whereClause = "";
+    convertedDashboard.tabs[0].panels.forEach(
+      (panel: { title?: string; queries: { query: string }[] }, index: number) => {
+        // Build WHERE clause based on filters
+        let whereClause = "";
 
-      // Special handling for "Errors" panel - always filter by error status
-      if (panel.title === "Errors") {
-        const errorFilters = ["span_status = 'ERROR'"];
-        if (effectiveFilter.value?.trim().length) {
-          // Parse human-readable duration values back to raw µs for SQL,
-          // and span_kind labels back to numeric OTEL keys.
-          const parsedFilter = parseDurationWhereClause(
-            effectiveFilter.value.trim(),
-            tracesParser.value,
-            searchObj.data.stream.selectedStream.value,
-          );
-          errorFilters.push(
-            parseSpanKindWhereClause(
-              typeof parsedFilter === "string"
-                ? parsedFilter
-                : effectiveFilter.value.trim(),
+        // Special handling for "Errors" panel - always filter by error status
+        if (panel.title === "Errors") {
+          const errorFilters = ["span_status = 'ERROR'"];
+          if (effectiveFilter.value?.trim().length) {
+            // Parse human-readable duration values back to raw µs for SQL,
+            // and span_kind labels back to numeric OTEL keys.
+            const parsedFilter = parseDurationWhereClause(
+              effectiveFilter.value.trim(),
               tracesParser.value,
               searchObj.data.stream.selectedStream.value,
-            ),
-          );
+            );
+            errorFilters.push(
+              parseSpanKindWhereClause(
+                typeof parsedFilter === "string" ? parsedFilter : effectiveFilter.value.trim(),
+                tracesParser.value,
+                searchObj.data.stream.selectedStream.value,
+              ),
+            );
+          }
+
+          if (baseFilters.length) {
+            errorFilters.push(...baseFilters);
+          }
+
+          whereClause = errorFilters.length ? "WHERE " + errorFilters.join(" AND ") : "";
+        } else if (panel.title === "Duration" && !isSpansMode) {
+          // Traces mode: restrict Duration percentiles to root spans only so that
+          // each trace contributes exactly one duration value. Root spans are
+          // identified by an absent reference_parent_span_id (NULL or empty string).
+          const durationFilters = [...baseFilters];
+          if (durationFilters.length) whereClause = "WHERE " + durationFilters.join(" AND ");
+        } else {
+          // Spans mode Duration, and Rate panel for both modes: apply combined filters
+          whereClause = baseFilters.length ? "WHERE " + baseFilters.join(" AND ") : "";
         }
 
-        if (baseFilters.length) {
-          errorFilters.push(...baseFilters);
+        const streamName = searchObj.data.stream.selectedStream.value;
+
+        // Build the final query: substitute placeholders then apply mode transforms
+        let query = panel["queries"][0].query
+          .replace("[STREAM_NAME]", () => `"${streamName}"`)
+          .replace("[WHERE_CLAUSE]", () => whereClause);
+
+        // Spans mode: replace trace-level distinct counts with span-level counts
+        // in the Rate and Errors panels.
+        if (isSpansMode && (panel.title === "Rate" || panel.title === "Errors")) {
+          query = query
+            .replace(
+              /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/gi,
+              "count(*) FILTER (WHERE span_status = 'ERROR')",
+            )
+            .replace(/approx_distinct\(trace_id\)/gi, "count(*)");
         }
 
-        whereClause = errorFilters.length
-          ? "WHERE " + errorFilters.join(" AND ")
-          : "";
-      } else if (panel.title === "Duration" && !isSpansMode) {
-        // Traces mode: restrict Duration percentiles to root spans only so that
-        // each trace contributes exactly one duration value. Root spans are
-        // identified by an absent reference_parent_span_id (NULL or empty string).
-        const durationFilters = [...baseFilters];
-        if (durationFilters.length)
-          whereClause = "WHERE " + durationFilters.join(" AND ");
-      } else {
-        // Spans mode Duration, and Rate panel for both modes: apply combined filters
-        whereClause = baseFilters.length
-          ? "WHERE " + baseFilters.join(" AND ")
-          : "";
-      }
-
-      const streamName = searchObj.data.stream.selectedStream.value;
-
-      // Build the final query: substitute placeholders then apply mode transforms
-      let query = panel["queries"][0].query
-        .replace("[STREAM_NAME]", () => `"${streamName}"`)
-        .replace("[WHERE_CLAUSE]", () => whereClause);
-
-      // Spans mode: replace trace-level distinct counts with span-level counts
-      // in the Rate and Errors panels.
-      if (isSpansMode && (panel.title === "Rate" || panel.title === "Errors")) {
-        query = query
-          .replace(
-            /approx_distinct\(trace_id\)\s+filter\s*\(where\s+span_status\s*=\s*'ERROR'\)/gi,
-            "count(*) FILTER (WHERE span_status = 'ERROR')",
-          )
-          .replace(/approx_distinct\(trace_id\)/gi, "count(*)");
-      }
-
-      convertedDashboard.tabs[0].panels[index]["queries"][0].query = query;
-    });
+        convertedDashboard.tabs[0].panels[index]["queries"][0].query = query;
+      },
+    );
 
     dashboardData.value = convertedDashboard;
 
@@ -377,22 +362,14 @@ const createRangeFilter = (
   const panelTitle = data?.title || "Chart";
 
   // Support Duration, Rate, and Errors panels
-  if (
-    panelId &&
-    (panelTitle === "Duration" ||
-      panelTitle === "Rate" ||
-      panelTitle === "Errors")
-  ) {
-    (searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>).set(
-      panelId,
-      {
-        panelTitle,
-        start: start ? Math.floor(start) : null,
-        end: end ? Math.floor(end) : null,
-        timeStart: timeStart ? Math.floor(timeStart) : null,
-        timeEnd: timeEnd ? Math.floor(timeEnd) : null,
-      },
-    );
+  if (panelId && (panelTitle === "Duration" || panelTitle === "Rate" || panelTitle === "Errors")) {
+    (searchObj.meta.metricsRangeFilters as Map<string, MetricsRangeFilter>).set(panelId, {
+      panelTitle,
+      start: start ? Math.floor(start) : null,
+      end: end ? Math.floor(end) : null,
+      timeStart: timeStart ? Math.floor(timeStart) : null,
+      timeEnd: timeEnd ? Math.floor(timeEnd) : null,
+    });
     // Increment version to trigger reactivity
     rangeFiltersVersion.value++;
 
@@ -414,9 +391,7 @@ const emitFiltersToQueryEditor = () => {
           `duration >= '${formatTimeWithSuffix(rangeFilter.start)}' and duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`,
         );
       } else if (rangeFilter.start !== null) {
-        filters.push(
-          `duration >= '${formatTimeWithSuffix(rangeFilter.start)}'`,
-        );
+        filters.push(`duration >= '${formatTimeWithSuffix(rangeFilter.start)}'`);
       } else if (rangeFilter.end !== null) {
         filters.push(`duration <= '${formatTimeWithSuffix(rangeFilter.end)}'`);
       }

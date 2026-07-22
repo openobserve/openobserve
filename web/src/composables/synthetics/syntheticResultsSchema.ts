@@ -55,10 +55,7 @@ export const STATUS_VALUES = {
  * Canonical set of known device IDs and their display properties.
  * When the backend adds new devices, add them here only.
  */
-export const KNOWN_DEVICES: Record<
-  string,
-  { label: string; icon: string }
-> = {
+export const KNOWN_DEVICES: Record<string, { label: string; icon: string }> = {
   laptop_large: { label: "Desktop", icon: "computer" },
   tablet: { label: "Tablet", icon: "tablet" },
   mobile_small: { label: "Mobile", icon: "smartphone" },
@@ -572,8 +569,8 @@ export function buildRunDetailSql(
 ): string {
   const id = escapeSqlLiteral(monitorId);
   const has = (f: string) => schemaFields === null || schemaFields.has(f);
-  const select = RUN_DETAIL_COLUMNS.map(({ field, alias, fallback }) =>
-    `${has(field) ? field : fallback} as ${alias}`,
+  const select = RUN_DETAIL_COLUMNS.map(
+    ({ field, alias, fallback }) => `${has(field) ? field : fallback} as ${alias}`,
   ).join(", ");
   const orderBy = has(F.location) ? `\nORDER BY ${F.location} ASC` : "";
   return `SELECT ${select}
@@ -638,9 +635,7 @@ export function mapRun(rawHit: Record<string, unknown>): SyntheticRun {
   };
 }
 
-export function mapRunDetail(
-  rawHit: Record<string, unknown>,
-): SyntheticRunDetail | null {
+export function mapRunDetail(rawHit: Record<string, unknown>): SyntheticRunDetail | null {
   if (!rawHit) return null;
   const base = mapRun({
     ts: rawHit.ts ?? rawHit._timestamp,
@@ -667,14 +662,13 @@ export function mapRunDetail(
     attempts: num(rawHit.attempt),
     failedStep: rawHit.failed_step
       ? str(rawHit.failed_step)
-      : (rawStepsArr.find((s: any) => s.status === "fail" || s.status === "failed")?.step_id ?? null),
-    recordedSteps: Array.isArray(rawRecordedSteps)
-      ? (rawRecordedSteps as RecordedStep[])
-      : [],
+      : (rawStepsArr.find((s: any) => s.status === "fail" || s.status === "failed")?.step_id ??
+        null),
+    recordedSteps: Array.isArray(rawRecordedSteps) ? (rawRecordedSteps as RecordedStep[]) : [],
     lastAttemptSteps: rawStepsArr.map((s: any) => ({
-        ...s,
-        status: s.status === "ok" || s.status === "passed" ? "ok" : "fail" as const,
-      })),
+      ...s,
+      status: s.status === "ok" || s.status === "passed" ? "ok" : ("fail" as const),
+    })),
     retryHistory: [],
     network: null,
     webVitals: null,
@@ -682,9 +676,7 @@ export function mapRunDetail(
   };
 }
 
-export function mapProtocolRunDetail(
-  rawHit: Record<string, unknown>,
-): ProtocolRunDetail | null {
+export function mapProtocolRunDetail(rawHit: Record<string, unknown>): ProtocolRunDetail | null {
   if (!rawHit) return null;
 
   const timings: ProtocolTiming[] = [];
@@ -701,8 +693,7 @@ export function mapProtocolRunDetail(
     status: str(rawHit.status),
     error: str(rawHit.error),
     errorClass: str(rawHit.error_class),
-    assertionsPassed:
-      rawHit.assertions_passed == null ? null : Boolean(rawHit.assertions_passed),
+    assertionsPassed: rawHit.assertions_passed == null ? null : Boolean(rawHit.assertions_passed),
     statusCode: rawHit.status_code == null ? null : num(rawHit.status_code),
     responseTimeMs: num(rawHit.response_time_ms),
     responseBytes: rawHit.response_bytes == null ? null : num(rawHit.response_bytes),
@@ -723,9 +714,7 @@ export function mapProtocolRunDetail(
   };
 }
 
-export function mapRunLocationResult(
-  rawHit: Record<string, unknown>,
-): RunLocationResult {
+export function mapRunLocationResult(rawHit: Record<string, unknown>): RunLocationResult {
   return {
     timestampMs: num(rawHit.ts) / 1000,
     status: toRunStatus(rawHit.status),
@@ -834,9 +823,7 @@ export function aggregateStepStats(
   const bucketMs = intervalSeconds(interval) * 1000;
 
   // Process runs oldest-first so sparklines reflect chronological order
-  const sorted = [...rawHits].sort(
-    (a, b) => num(a.ts) - num(b.ts),
-  );
+  const sorted = [...rawHits].sort((a, b) => num(a.ts) - num(b.ts));
 
   for (const hit of sorted) {
     const runTimestamp = num(hit.ts);
@@ -924,14 +911,20 @@ export function aggregateStepStats(
 
       // Browser dimension
       let bStats = acc.browserMap.get(engine);
-      if (!bStats) { bStats = { total: 0, failures: 0, flaky: 0 }; acc.browserMap.set(engine, bStats); }
+      if (!bStats) {
+        bStats = { total: 0, failures: 0, flaky: 0 };
+        acc.browserMap.set(engine, bStats);
+      }
       bStats.total++;
       if (!isOk) bStats.failures++;
       if (isFlaky) bStats.flaky++;
 
       // Location dimension
       let lStats = acc.locationMap.get(location);
-      if (!lStats) { lStats = { total: 0, failures: 0, flaky: 0 }; acc.locationMap.set(location, lStats); }
+      if (!lStats) {
+        lStats = { total: 0, failures: 0, flaky: 0 };
+        acc.locationMap.set(location, lStats);
+      }
       lStats.total++;
       if (!isOk) lStats.failures++;
       if (isFlaky) lStats.flaky++;
@@ -943,7 +936,10 @@ export function aggregateStepStats(
         trendAcc.set(stepName, tAcc);
       }
       let bEntry = tAcc.bucketMap.get(bucketKey);
-      if (!bEntry) { bEntry = { sum: 0, count: 0 }; tAcc.bucketMap.set(bucketKey, bEntry); }
+      if (!bEntry) {
+        bEntry = { sum: 0, count: 0 };
+        tAcc.bucketMap.set(bucketKey, bEntry);
+      }
       bEntry.sum += stepDuration;
       bEntry.count++;
 
@@ -997,31 +993,26 @@ export function aggregateStepStats(
     // ── Update recent-run statuses for sparklines ───────────────────
     for (const acc of stepAcc.values()) {
       // Determine this run's status for this step
-      const processedInRun = lastAttemptSteps.some(
-        (s: any) => {
-          const sid = str(s.step_id ?? s.id);
-          const def = stepDefs.get(sid);
-          return (def?.name ?? sid) === acc.name;
-        },
-      );
+      const processedInRun = lastAttemptSteps.some((s: any) => {
+        const sid = str(s.step_id ?? s.id);
+        const def = stepDefs.get(sid);
+        return (def?.name ?? sid) === acc.name;
+      });
 
       if (processedInRun) {
         if (acc.recentRunStatuses.length >= MAX_SPARKLINE_POINTS) {
           acc.recentRunStatuses.shift();
         }
-        const stepFromRun = (lastAttemptSteps as any[]).find(
-          (s: any) => {
-            const sid = str(s.step_id ?? s.id);
-            const def = stepDefs.get(sid);
-            return (def?.name ?? sid) === acc.name;
-          },
-        );
+        const stepFromRun = (lastAttemptSteps as any[]).find((s: any) => {
+          const sid = str(s.step_id ?? s.id);
+          const def = stepDefs.get(sid);
+          return (def?.name ?? sid) === acc.name;
+        });
         if (stepFromRun) {
           const runStepStatus = str(stepFromRun.status);
           const isRunOk = runStepStatus === "ok" || runStepStatus === "passed";
-          const priorFailedForStep = priorStatuses.get(
-            str(stepFromRun.step_id ?? stepFromRun.id),
-          ) === "fail";
+          const priorFailedForStep =
+            priorStatuses.get(str(stepFromRun.step_id ?? stepFromRun.id)) === "fail";
           if (!isRunOk) {
             acc.recentRunStatuses.push("fail");
           } else if (priorFailedForStep && attempts > 1) {
@@ -1042,29 +1033,23 @@ export function aggregateStepStats(
   const flakySteps: FlakyStep[] = [];
 
   for (const [name, acc] of stepAcc) {
-    const failRate = acc.totalExecutions > 0
-      ? Math.round((acc.failures / acc.totalExecutions) * 1000) / 10
-      : 0;
-    const flakyRate = acc.totalExecutions > 0
-      ? Math.round((acc.flakyCount / acc.totalExecutions) * 1000) / 10
-      : 0;
-    const avgDurationMs = acc.totalExecutions > 0
-      ? Math.round(acc.durationSum / acc.totalExecutions)
-      : 0;
-    const failRateFull = acc.totalExecutions > 0
-      ? acc.failures / acc.totalExecutions
-      : 0;
+    const failRate =
+      acc.totalExecutions > 0 ? Math.round((acc.failures / acc.totalExecutions) * 1000) / 10 : 0;
+    const flakyRate =
+      acc.totalExecutions > 0 ? Math.round((acc.flakyCount / acc.totalExecutions) * 1000) / 10 : 0;
+    const avgDurationMs =
+      acc.totalExecutions > 0 ? Math.round(acc.durationSum / acc.totalExecutions) : 0;
+    const failRateFull = acc.totalExecutions > 0 ? acc.failures / acc.totalExecutions : 0;
 
     // p95: sort all collected durations and take the 95th-percentile value
-    const p95DurationMs = acc.durationValues.length > 0
-      ? acc.durationValues.slice().sort((a, b) => a - b)[
-          Math.ceil(acc.durationValues.length * 0.95) - 1
-        ] ?? 0
-      : 0;
+    const p95DurationMs =
+      acc.durationValues.length > 0
+        ? (acc.durationValues.slice().sort((a, b) => a - b)[
+            Math.ceil(acc.durationValues.length * 0.95) - 1
+          ] ?? 0)
+        : 0;
 
-    const recentRates = acc.recentRunStatuses.map((s) =>
-      s === "fail" || s === "flaky" ? 1 : 0,
-    );
+    const recentRates = acc.recentRunStatuses.map((s) => (s === "fail" || s === "flaky" ? 1 : 0));
 
     stepGroups.push({
       key: `step-${name}`,
@@ -1129,9 +1114,7 @@ export function aggregateStepStats(
 
   // Build trend buckets (top N steps, aggregated per time bucket)
   const topSteps = stepDurations.slice(0, TOP_TREND_STEPS).map((s) => s.stepName);
-  const otherStepNames = new Set(
-    stepDurations.slice(TOP_TREND_STEPS).map((s) => s.stepName),
-  );
+  const otherStepNames = new Set(stepDurations.slice(TOP_TREND_STEPS).map((s) => s.stepName));
 
   // Merge "others" into a single series
   let othersAcc: InternalTrendAccumulator | null = null;

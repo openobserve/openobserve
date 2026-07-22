@@ -14,7 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <ODialog data-test="add-group-dialog"
+  <ODialog
+    data-test="add-group-dialog"
     :open="open"
     size="sm"
     :title="t('iam.addGroup')"
@@ -84,9 +85,11 @@ const addGroupSchema = makeAddGroupSchema(t);
 // The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
 // on open, so this typed computed re-seeds `:default-values` each open (the
 // optional `group` prop prefills it, otherwise blank). No local model / watch.
-const addGroupDefaults = computed((): AddGroupForm => ({
-  name: props.group?.name ?? "",
-}));
+const addGroupDefaults = computed(
+  (): AddGroupForm => ({
+    name: props.group?.name ?? "",
+  }),
+);
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name (so surrounding whitespace doesn't trip
@@ -95,21 +98,18 @@ const addGroupDefaults = computed((): AddGroupForm => ({
 const saveGroup = async (value: AddGroupForm) => {
   const name = value.name.trim();
   try {
-    const res = await createGroup(
-      name,
-      store.state.selectedOrganization.identifier,
-    );
+    const res = await createGroup(name, store.state.selectedOrganization.identifier);
     emits("added:group", { group_name: name, data: res.data });
     emits("update:open", false);
 
     toast({
-      message: t('iam.addGroupPage.createdSuccessfully', { name }),
+      message: t("iam.addGroupPage.createdSuccessfully", { name }),
       variant: "success",
     });
   } catch (err: any) {
     if (err.response?.status != 403) {
       toast({
-        message: t('iam.addGroupPage.errorCreating'),
+        message: t("iam.addGroupPage.errorCreating"),
         variant: "error",
       });
     }

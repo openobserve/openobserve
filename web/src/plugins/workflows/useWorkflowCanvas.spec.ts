@@ -44,12 +44,8 @@ import useWorkflowCanvas, {
   executeTestRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
-const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<
-  typeof vi.fn
->;
-const mockTest = workflowService.testWorkflow as unknown as ReturnType<
-  typeof vi.fn
->;
+const mockRun = workflowService.getWorkflowRun as unknown as ReturnType<typeof vi.fn>;
+const mockTest = workflowService.testWorkflow as unknown as ReturnType<typeof vi.fn>;
 
 describe("loadWorkflowRun — history run response mapping", () => {
   beforeEach(() => {
@@ -136,9 +132,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r1" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "deleted-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["deleted-node"]);
     });
 
     it("also flags a ghost referenced only by node_map (no error)", async () => {
@@ -149,9 +143,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r2" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "old-node",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["old-node"]);
     });
 
     it("is empty when the graph still matches the run", async () => {
@@ -173,9 +165,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
         },
       });
       await loadWorkflowRun({ orgId: "o", workflowId: "wf1", runId: "r4" });
-      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual([
-        "zombie",
-      ]);
+      expect((workflowObj.testRun.result as any).ghostNodeIds).toEqual(["zombie"]);
     });
   });
 

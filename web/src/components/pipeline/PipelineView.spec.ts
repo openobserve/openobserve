@@ -19,7 +19,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import PipelineView from "@/components/pipeline/PipelineView.vue";
 
-
 // --------------------------------------------------------------------------
 // Module mocks
 // --------------------------------------------------------------------------
@@ -287,9 +286,7 @@ describe("PipelineView.vue", () => {
       expect(wrapper.vm.lockedNodes).toHaveLength(3);
       await wrapper.setProps({
         pipeline: {
-          nodes: [
-            { id: "x1", io_type: "input", position: { x: 0, y: 0 }, data: {} },
-          ],
+          nodes: [{ id: "x1", io_type: "input", position: { x: 0, y: 0 }, data: {} }],
           edges: [],
         },
       });

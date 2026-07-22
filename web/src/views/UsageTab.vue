@@ -57,7 +57,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="arrow-forward" size="sm" />
           <router-link
             exact
-            :to="{ name: 'logstreams', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+            :to="{
+              name: 'logstreams',
+              query: { org_identifier: store.state.selectedOrganization?.identifier },
+            }"
             class="absolute inset-0"
             :aria-label="t('home.viewButton')"
           ></router-link>
@@ -77,7 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
               aria-live="polite"
               data-test="home-usage-tab-streams-count"
-            >{{ animatedStreamsCount || summary.streams_count }}</span>
+              >{{ animatedStreamsCount || summary.streams_count }}</span
+            >
           </template>
         </KpiCard>
 
@@ -94,7 +98,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
               aria-live="polite"
               data-test="home-usage-tab-events-count"
-            >{{ formattedAnimatedEventsCount }}</span>
+              >{{ formattedAnimatedEventsCount }}</span
+            >
           </template>
         </KpiCard>
 
@@ -111,7 +116,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
               aria-live="polite"
               data-test="home-usage-tab-ingested-size"
-            >{{ formattedAnimatedIngestedSize }}</span>
+              >{{ formattedAnimatedIngestedSize }}</span
+            >
           </template>
         </KpiCard>
 
@@ -129,7 +135,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
               aria-live="polite"
               data-test="home-usage-tab-compressed-size"
-            >{{ formattedAnimatedCompressedSize }}</span>
+              >{{ formattedAnimatedCompressedSize }}</span
+            >
           </template>
         </KpiCard>
 
@@ -147,7 +154,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="text-2xl font-semibold text-text-heading tabular-nums leading-tight"
               aria-live="polite"
               data-test="home-usage-tab-index-size"
-            >{{ formattedAnimatedIndexSize }}</span>
+              >{{ formattedAnimatedIndexSize }}</span
+            >
           </template>
         </KpiCard>
       </KpiCardRow>
@@ -155,7 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Main region — a filled resources rail beside the two status charts, so
            Functions/Dashboards live somewhere purposeful and the vertical space
            is actually used. Rail carries counts + one-click access to every area. -->
-      <div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)] gap-3 flex-1 min-h-0">
+      <div
+        class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)] gap-3 flex-1 min-h-0"
+      >
         <!-- Resources rail -->
         <aside
           class="rounded-default p-4 bg-card-glass-bg border border-card-glass-border flex flex-col min-h-0 overflow-y-auto"
@@ -164,114 +174,226 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Resources — owned assets with live counts. Each row is gated to the
                same route the left nav uses, so it hides when access is missing. -->
           <template v-if="showResources">
-            <div class="text-sm font-semibold text-text-heading mb-1">{{ t("home.resources") }}</div>
+            <div class="text-sm font-semibold text-text-heading mb-1">
+              {{ t("home.resources") }}
+            </div>
             <nav class="flex flex-col">
               <router-link
                 v-if="canView('functionList')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'functionList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'functionList',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-functions-card"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="function" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("home.functionTitle") }}</span>
-                <span class="text-sm font-semibold text-text-heading tabular-nums" data-test="home-usage-tab-functions-count">{{ animatedFunctionCount || summary.function_count }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("home.functionTitle")
+                }}</span>
+                <span
+                  class="text-sm font-semibold text-text-heading tabular-nums"
+                  data-test="home-usage-tab-functions-count"
+                  >{{ animatedFunctionCount || summary.function_count }}</span
+                >
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
               <router-link
                 v-if="canView('dashboards')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'dashboards', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'dashboards',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-dashboards-card"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="dashboard" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("home.dashboardTitle") }}</span>
-                <span class="text-sm font-semibold text-text-heading tabular-nums" data-test="home-usage-tab-dashboards-count">{{ animatedDashboardCount || summary.dashboard_count }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("home.dashboardTitle")
+                }}</span>
+                <span
+                  class="text-sm font-semibold text-text-heading tabular-nums"
+                  data-test="home-usage-tab-dashboards-count"
+                  >{{ animatedDashboardCount || summary.dashboard_count }}</span
+                >
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
             </nav>
           </template>
 
-          <div v-if="showResources && showExplore" class="h-px bg-border-default my-3" role="separator"></div>
+          <div
+            v-if="showResources && showExplore"
+            class="h-px bg-border-default my-3"
+            role="separator"
+          ></div>
 
           <!-- Explore — data surfaces. Same per-route gating as above. -->
           <template v-if="showExplore">
-            <div class="text-xs font-semibold text-text-secondary mb-1">{{ t("home.explore") }}</div>
+            <div class="text-xs font-semibold text-text-secondary mb-1">
+              {{ t("home.explore") }}
+            </div>
             <nav class="flex flex-col">
               <router-link
                 v-if="canView('logs')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'logs', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'logs',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-explore-logs"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="search" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.search") }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("menu.search")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
               <router-link
                 v-if="canView('traces')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'traces', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'traces',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-explore-traces"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="account-tree" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.traces") }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("menu.traces")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
               <router-link
                 v-if="canView('metrics')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'metrics', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'metrics',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-explore-metrics"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-success-bg text-icon-chip-success-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="bar-chart" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.metrics") }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("menu.metrics")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
               <router-link
                 v-if="canView('RUM')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'RUM', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'RUM',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-explore-rum"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="devices" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.rum") }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("menu.rum")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
               <router-link
                 v-if="canView('incidentList')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'incidentList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'incidentList',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-explore-incidents"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="notifications-active" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.incidents") }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("menu.incidents")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
               <router-link
                 v-if="canView('reports')"
                 class="group flex items-center gap-2.5 rounded-default -mx-2 px-2 py-2 no-underline text-inherit transition-colors hover:bg-table-row-hover-bg"
-                :to="{ name: 'reports', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'reports',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 data-test="home-usage-tab-explore-reports"
               >
-                <span class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+                <span
+                  class="inline-flex items-center justify-center shrink-0 w-8 h-8 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                  aria-hidden="true"
+                >
                   <OIcon name="description" size="sm" />
                 </span>
-                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{ t("menu.report") }}</span>
-                <OIcon name="chevron-right" size="sm" class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary" />
+                <span class="flex-1 min-w-0 text-sm font-medium text-text-body truncate">{{
+                  t("menu.report")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="shrink-0 text-text-disabled transition-transform group-hover:translate-x-0.5 group-hover:text-text-secondary"
+                />
               </router-link>
             </nav>
           </template>
@@ -284,7 +406,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex justify-between items-center gap-2">
             <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
-              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text" aria-hidden="true">
+              <span
+                class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text"
+                aria-hidden="true"
+              >
                 <OIcon name="shield-alert-outline" size="md" />
               </span>
               {{ t("home.alertTitle") }}
@@ -301,7 +426,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="arrow-forward" size="sm" />
               <router-link
                 exact
-                :to="{ name: 'alertList', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'alertList',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 class="absolute inset-0"
                 :aria-label="t('home.viewButton')"
               ></router-link>
@@ -314,7 +442,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
                 aria-live="polite"
                 data-test="home-usage-tab-scheduled-alerts-count"
-              >{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span>
+                >{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span
+              >
             </div>
             <OSeparator :vertical="true" />
             <div class="flex flex-col gap-0.5">
@@ -323,7 +452,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
                 aria-live="polite"
                 data-test="home-usage-tab-rt-alerts-count"
-              >{{ animatedRtAlerts || summary.rt_alerts }}</span>
+                >{{ animatedRtAlerts || summary.rt_alerts }}</span
+              >
             </div>
           </div>
           <div class="flex-1 min-h-50 w-full mt-3">
@@ -342,7 +472,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div class="flex justify-between items-center gap-2">
             <span class="text-sm font-semibold text-text-heading flex items-center gap-2">
-              <span class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text" aria-hidden="true">
+              <span
+                class="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text"
+                aria-hidden="true"
+              >
                 <OIcon name="lan" size="md" />
               </span>
               {{ t("home.pipelineTitle") }}
@@ -359,7 +492,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="arrow-forward" size="sm" />
               <router-link
                 exact
-                :to="{ name: 'pipelines', query: { org_identifier: store.state.selectedOrganization?.identifier } }"
+                :to="{
+                  name: 'pipelines',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
                 class="absolute inset-0"
                 :aria-label="t('home.viewButton')"
               ></router-link>
@@ -372,7 +508,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
                 aria-live="polite"
                 data-test="home-usage-tab-scheduled-pipelines-count"
-              >{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span>
+                >{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span
+              >
             </div>
             <OSeparator :vertical="true" />
             <div class="flex flex-col gap-0.5">
@@ -381,7 +518,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="text-lg font-semibold text-text-heading tabular-nums leading-tight"
                 aria-live="polite"
                 data-test="home-usage-tab-rt-pipelines-count"
-              >{{ animatedRtPipelines || summary.rt_pipelines }}</span>
+                >{{ animatedRtPipelines || summary.rt_pipelines }}</span
+              >
             </div>
           </div>
           <div class="flex-1 min-h-50 w-full mt-3">
@@ -464,12 +602,7 @@ const animatedRtPipelines = ref(0);
 const themeVersion = ref(0);
 
 // Count-up animation using requestAnimationFrame
-const animateValue = (
-  targetRef: any,
-  start: number,
-  end: number,
-  duration: number,
-) => {
+const animateValue = (targetRef: any, start: number, end: number, duration: number) => {
   if (start === end) {
     targetRef.value = end;
     return;
@@ -513,8 +646,8 @@ const getSummary = (org_id: any) => {
   const dismiss = toast({
     variant: "loading",
     message: "Please wait while loading summary...",
-      timeout: 0,
-});
+    timeout: 0,
+  });
   orgService
     .get_organization_summary(org_id)
     .then((res) => {
@@ -534,8 +667,7 @@ const getSummary = (org_id: any) => {
       }
 
       const rawDocCount = res.data.streams?.total_records ?? 0;
-      const rawCompressedSize =
-        res.data.streams?.total_compressed_size ?? 0;
+      const rawCompressedSize = res.data.streams?.total_compressed_size ?? 0;
       const rawIngestedSize = res.data.streams?.total_storage_size ?? 0;
       const rawIndexSize = res.data.streams?.total_index_size ?? 0;
 
@@ -564,56 +696,16 @@ const getSummary = (org_id: any) => {
       };
 
       // Animate counters
-      animateValue(
-        animatedStreamsCount,
-        0,
-        summary.value.streams_count,
-        500,
-      );
-      animateValue(
-        animatedEventsCount,
-        0,
-        summary.value.doc_count_raw,
-        500,
-      );
-      animateValue(
-        animatedCompressedSize,
-        0,
-        summary.value.compressed_size_raw,
-        500,
-      );
-      animateValue(
-        animatedIngestedSize,
-        0,
-        summary.value.ingested_size_raw,
-        500,
-      );
+      animateValue(animatedStreamsCount, 0, summary.value.streams_count, 500);
+      animateValue(animatedEventsCount, 0, summary.value.doc_count_raw, 500);
+      animateValue(animatedCompressedSize, 0, summary.value.compressed_size_raw, 500);
+      animateValue(animatedIngestedSize, 0, summary.value.ingested_size_raw, 500);
       animateValue(animatedIndexSize, 0, summary.value.index_size_raw, 500);
-      animateValue(
-        animatedFunctionCount,
-        0,
-        summary.value.function_count,
-        500,
-      );
-      animateValue(
-        animatedDashboardCount,
-        0,
-        summary.value.dashboard_count,
-        500,
-      );
-      animateValue(
-        animatedScheduledAlerts,
-        0,
-        summary.value.scheduled_alerts,
-        500,
-      );
+      animateValue(animatedFunctionCount, 0, summary.value.function_count, 500);
+      animateValue(animatedDashboardCount, 0, summary.value.dashboard_count, 500);
+      animateValue(animatedScheduledAlerts, 0, summary.value.scheduled_alerts, 500);
       animateValue(animatedRtAlerts, 0, summary.value.rt_alerts, 500);
-      animateValue(
-        animatedScheduledPipelines,
-        0,
-        summary.value.scheduled_pipelines,
-        500,
-      );
+      animateValue(animatedScheduledPipelines, 0, summary.value.scheduled_pipelines, 500);
       animateValue(animatedRtPipelines, 0, summary.value.rt_pipelines, 500);
 
       no_data_ingest.value = false;
@@ -634,11 +726,7 @@ const getSummary = (org_id: any) => {
 
 // Show usage report banner when last_usage_report_ts > 0 and elapsed > 1 hour
 const showUsageReportBanner = computed(() => {
-  if (
-    !store.state.zoConfig ||
-    !("last_usage_report_ts" in store.state.zoConfig)
-  )
-    return false;
+  if (!store.state.zoConfig || !("last_usage_report_ts" in store.state.zoConfig)) return false;
   const ts = store.state.zoConfig.last_usage_report_ts;
   if (!ts || ts === 0) return false;
   const reportedAtMs = ts / 1000;
@@ -717,14 +805,12 @@ const alertsPanelData = computed(() => {
           {
             value: healthyAlerts,
             name: "Success Alerts",
-            itemStyle: {
-            },
+            itemStyle: {},
           },
           {
             value: failedAlerts,
             name: "Failed Alerts",
-            itemStyle: {
-            },
+            itemStyle: {},
           },
         ],
       },
@@ -776,10 +862,7 @@ const pipelinesPanelData = computed(() => {
     yAxis: {
       type: "value",
       min: 0,
-      max:
-        Math.ceil(
-          (healthyPipelines + failedPipelines + warningPipelines) / 3 / 10,
-        ) * 10 || 10,
+      max: Math.ceil((healthyPipelines + failedPipelines + warningPipelines) / 3 / 10) * 10 || 10,
       interval: 10,
       name: "Number of Pipelines",
       nameLocation: "middle",
@@ -824,15 +907,6 @@ const pipelinesPanelData = computed(() => {
   };
 });
 
-
-
-
-
-
-
-
-
-
 const goToLicensePage = () => {
   router.push({ name: "license" });
 };
@@ -868,23 +942,18 @@ const orgId = computed(() => store.state.selectedOrganization?.identifier);
 // signal the nav flyout filters its children by (see navGroups.ts). This keeps
 // the rail from ever offering a page the user has no way to reach.
 const canView = (name: string) => router.hasRoute(name);
-const showResources = computed(
-  () => canView("functionList") || canView("dashboards"),
-);
+const showResources = computed(() => canView("functionList") || canView("dashboards"));
 const showExplore = computed(() =>
-  ["logs", "traces", "metrics", "RUM", "incidentList", "reports"].some((n) =>
-    canView(n),
-  ),
+  ["logs", "traces", "metrics", "RUM", "incidentList", "reports"].some((n) => canView(n)),
 );
 
 // Initial load
-const onThemeColorChanged = () => { themeVersion.value++; };
+const onThemeColorChanged = () => {
+  themeVersion.value++;
+};
 
 onMounted(() => {
-  if (
-    Object.keys(store.state.selectedOrganization).length > 0 &&
-    orgId.value != undefined
-  ) {
+  if (Object.keys(store.state.selectedOrganization).length > 0 && orgId.value != undefined) {
     getSummary(orgId.value);
   }
   // Refresh config so the UsageReportBanner reflects the latest

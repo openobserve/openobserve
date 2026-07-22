@@ -32,14 +32,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Left Pane: SQL Query -->
         <template #before>
           <section class="flex flex-col overflow-hidden bg-surface-base h-full">
-            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-card-glass-bg border-b border-solid border-card-glass-border">
+            <header
+              class="shrink-0 flex items-center gap-2 h-11 px-4 bg-card-glass-bg border-b border-solid border-card-glass-border"
+            >
               <div class="flex items-center gap-2">
                 <OIcon name="code" size="sm" class="text-text-secondary" />
-                <h3 class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]">SQL Query</h3>
+                <h3
+                  class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]"
+                >
+                  SQL Query
+                </h3>
               </div>
             </header>
             <div class="flex-1 overflow-y-auto p-4">
-              <pre class="sql-query-text [font-family:var(--font-mono)] text-compact leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-code-bg border border-solid border-card-glass-border rounded-default text-text-code min-h-full box-border"><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
+              <pre
+                class="sql-query-text [font-family:var(--font-mono)] text-compact leading-[1.6] m-0 py-3.5 px-4 whitespace-pre-wrap wrap-break-word bg-code-bg border border-solid border-card-glass-border rounded-default text-text-code min-h-full box-border"
+              ><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
             </div>
           </section>
         </template>
@@ -47,13 +55,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Pane: Explain/Analyze Results -->
         <template #after>
           <section class="flex flex-col overflow-hidden bg-surface-base h-full">
-            <header class="shrink-0 flex items-center gap-2 h-11 px-4 bg-card-glass-bg border-b border-solid border-card-glass-border">
-              <h3 class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]">
-                {{
-                  showAnalyzeResults
-                    ? t("search.analyzeResults")
-                    : t("search.explainResults")
-                }}
+            <header
+              class="shrink-0 flex items-center gap-2 h-11 px-4 bg-card-glass-bg border-b border-solid border-card-glass-border"
+            >
+              <h3
+                class="text-(length:--text-sm) font-(--font-semibold) text-text-heading m-0 tracking-[0.01em]"
+              >
+                {{ showAnalyzeResults ? t("search.analyzeResults") : t("search.explainResults") }}
               </h3>
               <div class="flex-1" />
               <OButton
@@ -72,11 +80,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-center">
                 <OSpinner variant="dots" size="lg" />
                 <div class="mt-3 text-text-secondary text-(length:--text-sm)">
-                  {{
-                    isAnalyzing
-                      ? t("search.runningAnalyze")
-                      : t("search.loadingPlan")
-                  }}
+                  {{ isAnalyzing ? t("search.runningAnalyze") : t("search.loadingPlan") }}
                 </div>
               </div>
             </div>
@@ -86,23 +90,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- EXPLAIN ANALYZE view -->
-            <div v-else-if="showAnalyzeResults" class="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
-              <MetricsSummaryCard
-                v-if="summaryMetrics"
-                :metrics="summaryMetrics"
-                class="mb-3"
-              />
+            <div
+              v-else-if="showAnalyzeResults"
+              class="flex-1 overflow-y-auto flex flex-col p-4 gap-3"
+            >
+              <MetricsSummaryCard v-if="summaryMetrics" :metrics="summaryMetrics" class="mb-3" />
 
-              <div class="plan-surface flex-1 flex flex-col bg-card-glass-bg border border-solid border-card-glass-border rounded-default overflow-hidden">
-                <div class="px-4 py-2.5 border-b border-solid border-card-glass-border bg-surface-base">
-                  <span class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-text-label">{{ t("search.executionPlan") }}</span>
+              <div
+                class="plan-surface flex-1 flex flex-col bg-card-glass-bg border border-solid border-card-glass-border rounded-default overflow-hidden"
+              >
+                <div
+                  class="px-4 py-2.5 border-b border-solid border-card-glass-border bg-surface-base"
+                >
+                  <span
+                    class="text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase text-text-label"
+                    >{{ t("search.executionPlan") }}</span
+                  >
                 </div>
                 <div class="flex-1 overflow-y-auto py-3 px-4">
-                  <QueryPlanTree
-                    v-if="planTree"
-                    :tree="planTree"
-                    :is-analyze="true"
-                  />
+                  <QueryPlanTree v-if="planTree" :tree="planTree" :is-analyze="true" />
                   <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted">
                     {{ t("search.noAnalyzePlanFound") }}
                   </div>
@@ -112,7 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- EXPLAIN view (tabs for logical/physical) -->
             <div v-else class="flex-1 overflow-y-auto flex flex-col p-4 gap-3">
-              <div class="plan-surface flex-1 flex flex-col bg-card-glass-bg border border-solid border-card-glass-border rounded-default overflow-hidden">
+              <div
+                class="plan-surface flex-1 flex flex-col bg-card-glass-bg border border-solid border-card-glass-border rounded-default overflow-hidden"
+              >
                 <div class="border-b border-solid border-card-glass-border px-2">
                   <OTabs v-model="activeTab" dense align="left">
                     <OTab name="logical" :label="t('search.logicalPlan')" />
@@ -128,7 +136,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="logicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted">
+                      <div
+                        v-else
+                        class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted"
+                      >
                         {{ t("search.noLogicalPlan") }}
                       </div>
                     </div>
@@ -141,7 +152,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :tree="physicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted">
+                      <div
+                        v-else
+                        class="py-6 px-4 text-center text-(length:--text-sm) text-text-muted"
+                      >
                         {{ t("search.noPhysicalPlan") }}
                       </div>
                     </div>
@@ -287,12 +301,8 @@ export default defineComponent({
         // We need to nest Phase 1+ plans as children of Phase 0 RemoteExec
 
         // Separate phases
-        const phase0Hits = responseData.hits.filter(
-          (hit: any) => hit.phase === 0,
-        );
-        const phase1Hits = responseData.hits.filter(
-          (hit: any) => hit.phase === 1,
-        );
+        const phase0Hits = responseData.hits.filter((hit: any) => hit.phase === 0);
+        const phase1Hits = responseData.hits.filter((hit: any) => hit.phase === 1);
 
         if (phase0Hits.length > 0 && phase1Hits.length > 0) {
           // Parse phase 0
@@ -360,19 +370,13 @@ export default defineComponent({
         });
 
         // Fallback: if no plan_type, try to parse from combined text
-        if (
-          !logicalPlan.value &&
-          !physicalPlan.value &&
-          responseData.hits.length > 0
-        ) {
+        if (!logicalPlan.value && !physicalPlan.value && responseData.hits.length > 0) {
           const combined = responseData.hits
             .map((h: any) => h.plan || JSON.stringify(h))
             .join("\n");
 
           // Try to split by plan_type markers
-          const logicalMatch = combined.match(
-            /logical_plan[:\s]+(.+?)(?=physical_plan|$)/is,
-          );
+          const logicalMatch = combined.match(/logical_plan[:\s]+(.+?)(?=physical_plan|$)/is);
           const physicalMatch = combined.match(/physical_plan[:\s]+(.+?)$/is);
 
           if (logicalMatch) {
@@ -409,10 +413,7 @@ export default defineComponent({
             try {
               const parsed = JSON.parse(dataContent);
               // Look for actual search results with hits
-              if (
-                parsed &&
-                (parsed.hits !== undefined || parsed.total !== undefined)
-              ) {
+              if (parsed && (parsed.hits !== undefined || parsed.total !== undefined)) {
                 result = parsed;
               }
             } catch (e) {
@@ -482,10 +483,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error fetching explain plan:", err);
-        error.value =
-          err.response?.data?.message ||
-          err.message ||
-          t("search.errorFetchingPlan");
+        error.value = err.response?.data?.message || err.message || t("search.errorFetchingPlan");
       } finally {
         loading.value = false;
       }
@@ -545,10 +543,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error running analyze:", err);
-        error.value =
-          err.response?.data?.message ||
-          err.message ||
-          t("search.errorRunningAnalyze");
+        error.value = err.response?.data?.message || err.message || t("search.errorRunningAnalyze");
       } finally {
         loading.value = false;
         isAnalyzing.value = false;

@@ -16,20 +16,13 @@
             <div
               class="flex items-center justify-center w-8 h-8 rounded-default shrink-0 bg-[color-mix(in_srgb,var(--color-accent)_12%,transparent)]"
             >
-              <OIcon
-                name="key"
-                class="text-accent w-4 h-4"
-              />
+              <OIcon name="key" class="text-accent w-4 h-4" />
             </div>
             <div>
-              <div
-                class="text-sm font-semibold leading-tight text-text-heading"
-              >
+              <div class="text-sm font-semibold leading-tight text-text-heading">
                 {{ t("shortcuts.title") }}
               </div>
-              <div
-                class="text-2xs text-text-secondary mt-0.5"
-              >
+              <div class="text-2xs text-text-secondary mt-0.5">
                 {{ t("shortcuts.subtitle") }}
               </div>
             </div>
@@ -99,16 +92,10 @@
             <!-- Module header (partition line above the title) -->
             <div
               class="pb-1.5"
-              :class="
-                idx === 0
-                  ? 'pt-1'
-                  : 'mt-2 pt-3 border-t border-border-default'
-              "
+              :class="idx === 0 ? 'pt-1' : 'mt-2 pt-3 border-t border-border-default'"
               data-test="shortcut-cheatsheet-module"
             >
-              <span
-                class="text-xs font-semibold tracking-wide text-accent"
-              >
+              <span class="text-xs font-semibold tracking-wide text-accent">
                 {{ m.title }}
               </span>
             </div>
@@ -129,20 +116,12 @@
                   class="flex justify-between items-center py-1.5 px-2 rounded-default transition-colors duration-100 hover:bg-surface-base"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <span
-                    class="text-compact text-text-body truncate leading-snug"
-                    >{{ entry.label }}</span
-                  >
-                  <div
-                    class="flex items-center gap-1 shrink-0 ml-4"
-                  >
-                    <template
-                      v-for="(part, idx) in formatKey(entry.display)"
-                      :key="idx"
-                    >
-                      <span
-                        v-if="part === 'then'"
-                        class="text-3xs text-text-secondary mx-0.5"
+                  <span class="text-compact text-text-body truncate leading-snug">{{
+                    entry.label
+                  }}</span>
+                  <div class="flex items-center gap-1 shrink-0 ml-4">
+                    <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
                         >then</span
                       >
                       <kbd
@@ -159,9 +138,7 @@
         </div>
 
         <!-- Right column -->
-        <div
-          class="flex flex-col border-l border-border-default pl-8"
-        >
+        <div class="flex flex-col border-l border-border-default pl-8">
           <div
             v-for="(m, idx) in filteredColumns[1]"
             :key="m.title"
@@ -172,16 +149,10 @@
             <!-- Module header (partition line above the title) -->
             <div
               class="pb-1.5"
-              :class="
-                idx === 0
-                  ? 'pt-1'
-                  : 'mt-2 pt-3 border-t border-border-default'
-              "
+              :class="idx === 0 ? 'pt-1' : 'mt-2 pt-3 border-t border-border-default'"
               data-test="shortcut-cheatsheet-module"
             >
-              <span
-                class="text-xs font-semibold tracking-wide text-accent"
-              >
+              <span class="text-xs font-semibold tracking-wide text-accent">
                 {{ m.title }}
               </span>
             </div>
@@ -202,20 +173,12 @@
                   class="flex justify-between items-center py-1.5 px-2 rounded-default transition-colors duration-100 hover:bg-surface-base"
                   :data-test="`shortcut-cheatsheet-row-${entry.id}`"
                 >
-                  <span
-                    class="text-compact text-text-body truncate leading-snug"
-                    >{{ entry.label }}</span
-                  >
-                  <div
-                    class="flex items-center gap-1 shrink-0 ml-4"
-                  >
-                    <template
-                      v-for="(part, idx) in formatKey(entry.display)"
-                      :key="idx"
-                    >
-                      <span
-                        v-if="part === 'then'"
-                        class="text-3xs text-text-secondary mx-0.5"
+                  <span class="text-compact text-text-body truncate leading-snug">{{
+                    entry.label
+                  }}</span>
+                  <div class="flex items-center gap-1 shrink-0 ml-4">
+                    <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
+                      <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5"
                         >then</span
                       >
                       <kbd
@@ -235,9 +198,7 @@
 
     <!-- ── Sticky footer ── -->
     <template #footer>
-      <div
-        class="flex justify-between items-center text-2xs text-text-secondary"
-      >
+      <div class="flex justify-between items-center text-2xs text-text-secondary">
         <div class="flex items-center gap-1.5 flex-wrap">
           <kbd
             class="inline-flex items-center justify-center h-5 px-1.5 bg-surface-base border border-border-default rounded-default font-mono text-2xs shadow-[0_1px_0_0_var(--color-border-default)]"
@@ -345,9 +306,7 @@ const filteredModules = computed<DisplayModule[]>(() => {
   return allModules.value.flatMap((m) => {
     const sections = m.sections.flatMap((sec) => {
       const entries = sec.entries.filter(
-        (e) =>
-          e.label.toLowerCase().includes(q) ||
-          e.display.toLowerCase().includes(q),
+        (e) => e.label.toLowerCase().includes(q) || e.display.toLowerCase().includes(q),
       );
       return entries.length ? [{ ...sec, entries }] : [];
     });
@@ -360,8 +319,7 @@ const hasResults = computed(() => filteredModules.value.length > 0);
 /** Split modules into two balanced columns by total shortcut count. */
 const filteredColumns = computed<[DisplayModule[], DisplayModule[]]>(() => {
   const mods = filteredModules.value;
-  const count = (m: DisplayModule) =>
-    m.sections.reduce((s, sec) => s + sec.entries.length, 0);
+  const count = (m: DisplayModule) => m.sections.reduce((s, sec) => s + sec.entries.length, 0);
   const total = mods.reduce((s, m) => s + count(m), 0);
   const target = total / 2;
   let acc = 0;
@@ -484,8 +442,7 @@ const KEY_SYMBOLS: Record<string, string> = {
 };
 
 function formatKey(key: string): string[] {
-  if (key.includes(" ") || (key.includes("/") && !key.includes("ctrl+")))
-    return [key];
+  if (key.includes(" ") || (key.includes("/") && !key.includes("ctrl+"))) return [key];
   if (key.includes(">")) {
     const r: string[] = [];
     key.split(">").forEach((p, i) => {

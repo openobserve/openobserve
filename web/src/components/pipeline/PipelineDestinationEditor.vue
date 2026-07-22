@@ -22,15 +22,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-      <template #title>
-        <span data-test="pipeline-destination-editor-title">
-          <template v-if="destination"
-            >{{ t("alert_destinations.updateTitle") }} -
-            {{ destination.name }}</template
-          >
-          <template v-else>{{ t("alert_destinations.addTitle") }}</template>
-        </span>
-      </template>
+    <template #title>
+      <span data-test="pipeline-destination-editor-title">
+        <template v-if="destination"
+          >{{ t("alert_destinations.updateTitle") }} - {{ destination.name }}</template
+        >
+        <template v-else>{{ t("alert_destinations.addTitle") }}</template>
+      </span>
+    </template>
 
     <div class="rounded-default py-2 px-3 overflow-auto">
       <div class="w-full">
@@ -75,4 +74,3 @@ const handleCancel = () => {
   emit("cancel");
 };
 </script>
-

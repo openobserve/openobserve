@@ -15,16 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="performance-fields-dialog" :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" title="Index Fields Detected"
+  <ODialog
+    data-test="performance-fields-dialog"
+    :open="modelValue"
+    @update:open="(v) => $emit('update:modelValue', v)"
+    persistent
+    size="md"
+    title="Index Fields Detected"
     secondary-button-label="Skip"
     primary-button-label="Add Fields"
     @click:secondary="$emit('skip')"
     @click:primary="$emit('add-fields')"
   >
     <div v-if="fieldsByType.fts.length > 0" class="mb-2">
-      <div class="text-xs font-medium mb-1">
-        Full Text Search ({{ fieldsByType.fts.length }})
-      </div>
+      <div class="text-xs font-medium mb-1">Full Text Search ({{ fieldsByType.fts.length }})</div>
       <div
         class="p-2 max-h-50 overflow-y-auto border rounded-default border-border-default bg-surface-subtle"
       >
@@ -112,9 +116,7 @@ export default defineComponent({
     const fieldsByType = computed(() => {
       return {
         fts: props.missingFields.filter((f) => f.type === "Full Text Search"),
-        secondaryIndex: props.missingFields.filter(
-          (f) => f.type === "Secondary Index"
-        ),
+        secondaryIndex: props.missingFields.filter((f) => f.type === "Secondary Index"),
       };
     });
 
@@ -124,4 +126,3 @@ export default defineComponent({
   },
 });
 </script>
-

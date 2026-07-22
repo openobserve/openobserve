@@ -17,38 +17,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- src/components/PipelineFlow.vue -->
 <template>
   <div data-test="pipeline-flow-container" class="flex items-center justify-between">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="text-status-warning-text border border-status-warning-text rounded-default flex items-center px-2 mr-3">
-      <OIcon name="info" class="mr-1 " size="sm" />
-     Unsaved changes detected. Click "Save" to preserve your updates.
-   </div>
+    <div
+      data-test="pipeline-flow-unsaved-changes-warning-text"
+      v-show="pipelineObj.dirtyFlag"
+      class="text-status-warning-text border border-status-warning-text rounded-default flex items-center px-2 mr-3"
+    >
+      <OIcon name="info" class="mr-1" size="sm" />
+      Unsaved changes detected. Click "Save" to preserve your updates.
+    </div>
 
-   <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-default text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
-     <OIcon name="info" class="mr-1" size="sm" />
-     Press Backspace/Delete to remove the edge
-   </div>
+    <!-- Edge deletion help notification -->
+    <div
+      v-if="showEdgeHelpNotification"
+      class="edge-help-notification absolute top-5 left-1/2 -translate-x-1/2 z-[1000] bg-surface-base text-text-body py-2.5 px-4 rounded-default text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] border border-border-default flex items-center dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    >
+      <OIcon name="info" class="mr-1" size="sm" />
+      Press Backspace/Delete to remove the edge
+    </div>
+  </div>
 
- </div>
-
-    <VueFlow
+  <VueFlow
     @drop="onDrop"
     ref="vueFlowRef"
-      v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
-      v-model:edges="pipelineObj.currentSelectedPipeline.edges"
-      @node-change="onNodeChange"
-      @nodes-change="onNodesChange"
-      @edges-change="onEdgesChange"
-      @edge-click="onEdgeClick"
-      @connect="onConnect"
-      @dragover="onDragOver"
-      :default-viewport="{ zoom: 0.8 }"
-      :min-zoom="0.2"
-      :max-zoom="4"
-      @dragleave="onDragLeave"
-      class="basic-flow"
-
-    >
-
+    v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
+    v-model:edges="pipelineObj.currentSelectedPipeline.edges"
+    @node-change="onNodeChange"
+    @nodes-change="onNodesChange"
+    @edges-change="onEdgesChange"
+    @edge-click="onEdgeClick"
+    @connect="onConnect"
+    @dragover="onDragOver"
+    :default-viewport="{ zoom: 0.8 }"
+    :min-zoom="0.2"
+    :max-zoom="4"
+    @dragleave="onDragLeave"
+    class="basic-flow"
+  >
     <!-- <template #edge-button="buttonEdgeProps">
       <EdgeWithButton
         :id="buttonEdgeProps.id"
@@ -74,42 +78,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="customEdgeProps.data"
         :marker-end="customEdgeProps.markerEnd"
         :style="customEdgeProps.style"
-        :is-in-view = false
+        :is-in-view="false"
       />
     </template>
-      <!-- Drag-over highlight: same role as OFile's drop target, so it shares
+    <!-- Drag-over highlight: same role as OFile's drop target, so it shares
            --color-file-drag-bg (theme-aware; the old raw blue had no dark step).
            Stays a binding because the fill is driven by isDragOver at runtime. -->
-      <DropzoneBackground
-        :style="{
-          backgroundColor: isDragOver
-            ? 'var(--color-file-drag-bg)'
-            : 'transparent',
-          transition: 'background-color 0.2s ease',
-        }"
-      >
-        <p v-if="isDragOver">Drop here</p>
-      </DropzoneBackground>
-      <template #node-input="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="input" />
-      </template>
-      <template #node-output="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="output" />
-      </template>
-      <template #node-default="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="default" />
-      </template>
-      <Controls
-      :showInteractive=false
-
-      class="controls-grp"
-        position="top-left">
-    </Controls>
-    </VueFlow>
-    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-text-muted text-[1.5em] text-center pointer-events-none z-10">
-      {{ t('pipeline.dragDropNodesHere') }}
-    </div>
-    <!-- Add UI elements or buttons to interact with the methods -->
+    <DropzoneBackground
+      :style="{
+        backgroundColor: isDragOver ? 'var(--color-file-drag-bg)' : 'transparent',
+        transition: 'background-color 0.2s ease',
+      }"
+    >
+      <p v-if="isDragOver">Drop here</p>
+    </DropzoneBackground>
+    <template #node-input="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="input" />
+    </template>
+    <template #node-output="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="output" />
+    </template>
+    <template #node-default="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="default" />
+    </template>
+    <Controls :showInteractive="false" class="controls-grp" position="top-left"> </Controls>
+  </VueFlow>
+  <div
+    v-if="isCanvasEmpty"
+    data-test="pipeline-flow-empty-text"
+    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-text-muted text-[1.5em] text-center pointer-events-none z-10"
+  >
+    {{ t("pipeline.dragDropNodesHere") }}
+  </div>
+  <!-- Add UI elements or buttons to interact with the methods -->
 </template>
 
 <script lang="ts">
@@ -117,7 +118,7 @@ import { ref, onMounted, watch, computed } from "vue";
 import type { Ref } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import type { VueFlowStore } from "@vue-flow/core";
-import { Controls } from '@vue-flow/controls'
+import { Controls } from "@vue-flow/controls";
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
@@ -131,8 +132,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
 export default {
-  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls, FlowEdge
-   },
+  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls, FlowEdge },
   setup() {
     const { t } = useI18n();
     const {
@@ -163,50 +163,47 @@ export default {
     const showEdgeHelpNotification = ref(false);
     let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const { setViewport } = useVueFlow()
+    const { setViewport } = useVueFlow();
 
     // Handle edge click events
     const onEdgeClick = () => {
-
       // Clear any existing timeout
       if (notificationTimeout) {
-        clearTimeout(notificationTimeout)
-        notificationTimeout = null
+        clearTimeout(notificationTimeout);
+        notificationTimeout = null;
       }
 
       // Always show notification on edge click (even if already visible)
-      showEdgeHelpNotification.value = true
+      showEdgeHelpNotification.value = true;
 
       // Auto-hide notification after 3.5 seconds
       notificationTimeout = setTimeout(() => {
-        showEdgeHelpNotification.value = false
-        notificationTimeout = null
-      }, 3500)
-    }
+        showEdgeHelpNotification.value = false;
+        notificationTimeout = null;
+      }, 3500);
+    };
 
-
-
-
-    watch(() => pipelineObj.currentSelectedPipeline, () => {
-          if(pipelineObj.dirtyFlag){
-            pipelineObj.dirtyFlag = false;
-          }
-        });
+    watch(
+      () => pipelineObj.currentSelectedPipeline,
+      () => {
+        if (pipelineObj.dirtyFlag) {
+          pipelineObj.dirtyFlag = false;
+        }
+      },
+    );
     onMounted(async () => {
-        setTimeout(() => {
-          if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
-            vueFlowRef.value.fitView({ padding: 0.1});
-          }
-          else if(vueFlowRef.value){
-            vueFlowRef.value.fitView({ padding: 1});
-          }
-        }, 100);
-      });
+      setTimeout(() => {
+        if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
+          vueFlowRef.value.fitView({ padding: 0.1 });
+        } else if (vueFlowRef.value) {
+          vueFlowRef.value.fitView({ padding: 1 });
+        }
+      }, 100);
+    });
 
-
-function resetTransform() {
-  setViewport({ x: 0, y: 0, zoom: 1 })
-}
+    function resetTransform() {
+      setViewport({ x: 0, y: 0, zoom: 1 });
+    }
     const zoomIn = () => {
       if (vueFlowRef.value) vueFlowRef.value.zoomIn();
     };

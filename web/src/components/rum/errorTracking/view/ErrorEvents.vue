@@ -20,18 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       {{ t("rum.events") }}
     </h4>
 
-    <div
-      v-if="!timelineEvents.length"
-      data-test="error-events-empty"
-    >
+    <div v-if="!timelineEvents.length" data-test="error-events-empty">
       <NoData />
     </div>
 
-    <ol
-      v-else
-      class="event-timeline list-none m-0 p-0"
-      data-test="error-events-timeline"
-    >
+    <ol v-else class="event-timeline list-none m-0 p-0" data-test="error-events-timeline">
       <li
         v-for="(event, index) in timelineEvents"
         :key="index"
@@ -42,19 +35,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           class="event-timeline__dot"
           :class="
-            isErrorEvent(event)
-              ? 'event-timeline__dot--error'
-              : 'event-timeline__dot--default'
+            isErrorEvent(event) ? 'event-timeline__dot--error' : 'event-timeline__dot--default'
           "
           aria-hidden="true"
         />
         <ErrorTypeIcons :column="event" class="shrink-0 mt-0.5" />
         <div class="flex-1 min-w-0">
           <div class="flex items-baseline gap-1.5 flex-wrap">
-            <span
-              class="font-medium"
-              :data-test="`error-events-timeline-category-${index}`"
-            >{{ getErrorCategory(event) }}</span>
+            <span class="font-medium" :data-test="`error-events-timeline-category-${index}`">{{
+              getErrorCategory(event)
+            }}</span>
             <OTag
               v-if="isErrorEvent(event)"
               :label="t('rum.error')"
@@ -70,7 +60,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="tabular-nums text-text-secondary"
             :data-test="`error-events-timeline-offset-${index}`"
             :title="getFormattedDate(event._timestamp / 1000)"
-          >{{ offsetLabel(event) }}</span>
+            >{{ offsetLabel(event) }}</span
+          >
         </div>
       </li>
     </ol>
@@ -165,11 +156,7 @@ const getFormattedDate = (timestamp: number) =>
 }
 
 .event-timeline__item--error {
-  background: color-mix(
-    in srgb,
-    var(--color-severity-error-color) 6%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--color-severity-error-color) 6%, transparent);
   border-radius: 0.375rem;
 }
 </style>

@@ -3,16 +3,7 @@
 
 import type { InputProps, InputEmits, InputSlots } from "./OInput.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  useAttrs,
-  useId,
-  watch,
-} from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
 
 // Forward the consumer's `data-test` from <OInput data-test="…"> onto the
 // root wrapper so E2E selectors can scope to the specific field instance
@@ -251,7 +242,9 @@ const wrapperClasses = computed(() => [
       :for="inputId"
       :class="[
         'o-input-label text-compact leading-tight flex items-center gap-1',
-        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        props.disabled
+          ? 'font-normal text-input-label-text-disabled'
+          : 'font-medium text-input-label-text',
       ]"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -261,7 +254,8 @@ const wrapperClasses = computed(() => [
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <!-- Input row -->
@@ -270,7 +264,8 @@ const wrapperClasses = computed(() => [
       <span
         v-if="label && labelPosition === 'inside' && !isTextarea"
         class="absolute top-1 start-3 end-7 text-2xs font-medium leading-none text-text-secondary select-none pointer-events-none whitespace-nowrap overflow-hidden text-ellipsis"
-      >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span>
+        >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
+      >
 
       <!-- Icon-left slot (inside border, left — matches OButton #icon-left pattern) -->
       <span
@@ -348,7 +343,9 @@ const wrapperClasses = computed(() => [
           'disabled:cursor-not-allowed disabled:text-input-disabled-text',
           'h-full',
           // Inside-label: push text down to leave room for the floating mini-label
-          labelPosition === 'inside' && label ? 'pt-3 pb-0.5 text-xs font-semibold' : textSizeClasses[size ?? 'md'],
+          labelPosition === 'inside' && label
+            ? 'pt-3 pb-0.5 text-xs font-semibold'
+            : textSizeClasses[size ?? 'md'],
           $slots['icon-left'] || $slots.prefix || prefix ? 'ps-2' : 'ps-3',
           $slots['icon-right'] || $slots.suffix || suffix || clearable ? 'pe-2' : 'pe-3',
         ]"
@@ -362,12 +359,7 @@ const wrapperClasses = computed(() => [
 
       <!-- Clear button -->
       <button
-        v-if="
-          clearable &&
-          modelValue !== '' &&
-          modelValue !== undefined &&
-          modelValue !== null
-        "
+        v-if="clearable && modelValue !== '' && modelValue !== undefined && modelValue !== null"
         type="button"
         tabindex="-1"
         aria-label="Clear"
@@ -423,10 +415,7 @@ const wrapperClasses = computed(() => [
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-input-hint leading-none"
-      >
+      <span v-else-if="helpText" class="text-xs text-input-hint leading-none">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />
@@ -435,9 +424,7 @@ const wrapperClasses = computed(() => [
         v-if="maxlength"
         :class="[
           'text-xs leading-none tabular-nums shrink-0',
-          charCount > maxlength
-            ? 'text-input-error-text'
-            : 'text-input-hint',
+          charCount > maxlength ? 'text-input-error-text' : 'text-input-hint',
         ]"
       >
         {{ charCount }}/{{ maxlength }}

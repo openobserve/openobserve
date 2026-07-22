@@ -58,10 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="value" />
     </div>
 
-    <div
-      v-if="$slots.trend"
-      class="text-3xs font-medium flex items-center gap-1"
-    >
+    <div v-if="$slots.trend" class="text-3xs font-medium flex items-center gap-1">
       <slot name="trend" />
     </div>
 

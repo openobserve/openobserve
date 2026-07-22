@@ -28,7 +28,7 @@ vi.mock("@/services/alert_templates", () => ({
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     getImageURL: vi.fn((p: string) => `mock-${p}`),
@@ -170,25 +170,19 @@ describe("PipelinesDestinationList", () => {
     it("renders the table when no editor is open", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="alert-destinations-list-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-destinations-list-table"]').exists()).toBe(true);
     });
 
     it("does not render the editor initially", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists()).toBe(false);
     });
 
     it("renders the add button", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="pipeline-destination-list-add-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-destination-list-add-btn"]').exists()).toBe(true);
     });
   });
 
@@ -355,9 +349,7 @@ describe("PipelinesDestinationList", () => {
       await flushPromises();
       (wrapper.vm as any).showDestinationEditor = true;
       await nextTick();
-      expect(
-        wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="pipeline-destination-editor-stub"]').exists()).toBe(true);
     });
 
     it("hides the table when editor is open", async () => {
@@ -365,9 +357,7 @@ describe("PipelinesDestinationList", () => {
       await flushPromises();
       (wrapper.vm as any).showDestinationEditor = true;
       await nextTick();
-      expect(
-        wrapper.find('[data-test="alert-destinations-list-table"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alert-destinations-list-table"]').exists()).toBe(false);
     });
   });
 
@@ -384,9 +374,7 @@ describe("PipelinesDestinationList", () => {
     it("returns undefined for unknown name", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      expect(
-        (wrapper.vm as any).getDestinationByName("no-such-dest"),
-      ).toBeUndefined();
+      expect((wrapper.vm as any).getDestinationByName("no-such-dest")).toBeUndefined();
     });
   });
 
@@ -458,10 +446,7 @@ describe("PipelinesDestinationList", () => {
     it("selectedDestinationIds is computed from selectedDestinations", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      (wrapper.vm as any).selectedDestinations = [
-        makeDestination(1),
-        makeDestination(2),
-      ];
+      (wrapper.vm as any).selectedDestinations = [makeDestination(1), makeDestination(2)];
       const ids = (wrapper.vm as any).selectedDestinationIds;
       expect(ids).toContain("destination-1");
       expect(ids).toContain("destination-2");

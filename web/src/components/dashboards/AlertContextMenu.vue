@@ -45,11 +45,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onBeforeUnmount } from 'vue';
+import { defineComponent, ref, computed, watch, onBeforeUnmount } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
-  name: 'AlertContextMenu',
+  name: "AlertContextMenu",
   components: {
     OIcon,
   },
@@ -71,12 +71,12 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['select', 'close'],
+  emits: ["select", "close"],
   setup(props, { emit }) {
     const menuRef = ref<HTMLElement | null>(null);
 
     const formattedValue = computed(() => {
-      if (typeof props.value === 'number') {
+      if (typeof props.value === "number") {
         return props.value.toLocaleString(undefined, {
           maximumFractionDigits: 2,
         });
@@ -89,8 +89,8 @@ export default defineComponent({
       top: `${props.y}px`,
     }));
 
-    const handleMenuItemClick = (condition: 'above' | 'below') => {
-      emit('select', {
+    const handleMenuItemClick = (condition: "above" | "below") => {
+      emit("select", {
         condition,
         threshold: props.value,
       });
@@ -98,13 +98,13 @@ export default defineComponent({
 
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.value && !menuRef.value.contains(event.target as Node)) {
-        emit('close');
+        emit("close");
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        emit('close');
+      if (event.key === "Escape") {
+        emit("close");
       }
     };
 
@@ -113,19 +113,19 @@ export default defineComponent({
       (newVisible) => {
         if (newVisible) {
           setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-            document.addEventListener('keydown', handleEscape);
+            document.addEventListener("click", handleClickOutside);
+            document.addEventListener("keydown", handleEscape);
           }, 0);
         } else {
-          document.removeEventListener('click', handleClickOutside);
-          document.removeEventListener('keydown', handleEscape);
+          document.removeEventListener("click", handleClickOutside);
+          document.removeEventListener("keydown", handleEscape);
         }
       },
     );
 
     onBeforeUnmount(() => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     });
 
     return {
@@ -137,4 +137,3 @@ export default defineComponent({
   },
 });
 </script>
-

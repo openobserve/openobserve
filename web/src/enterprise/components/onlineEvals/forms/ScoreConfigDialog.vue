@@ -36,7 +36,9 @@
               <strong class="font-bold">{{ nextVersionLabel }}</strong>
             </template>
           </i18n-t>
-          <em class="italic font-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.editInfoBannerDetail") }}</em>
+          <em class="italic font-normal text-text-secondary">{{
+            t("onlineEvals.scoreConfig.editInfoBannerDetail")
+          }}</em>
         </div>
       </div>
 
@@ -70,7 +72,9 @@
 
       <!-- Data type -->
       <div class="mb-2.5">
-        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
+        <label
+          class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1"
+        >
           {{ t("onlineEvals.scoreConfig.dataTypeLabel")
           }}<span v-if="mode === 'create'" class="select-none" aria-hidden="true">&nbsp;*</span>
         </label>
@@ -109,8 +113,12 @@
               :data-test="`score-config-datatype-${type}`"
             >
               <template #label>
-                <span class="text-compact font-bold text-text-heading">{{ t(`onlineEvals.scoreConfig.dataTypes.${type}`) }}</span>
-                <span class="text-2xs font-normal text-text-secondary mt-0.75 leading-[1.4]">{{ t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`) }}</span>
+                <span class="text-compact font-bold text-text-heading">{{
+                  t(`onlineEvals.scoreConfig.dataTypes.${type}`)
+                }}</span>
+                <span class="text-2xs font-normal text-text-secondary mt-0.75 leading-[1.4]">{{
+                  t(`onlineEvals.scoreConfig.dataTypeHelp.${type}`)
+                }}</span>
               </template>
             </ORadio>
           </div>
@@ -119,11 +127,15 @@
 
       <!-- Numeric range -->
       <div v-if="formValues.dataType === 'numeric'" class="mb-2.5">
-        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
+        <label
+          class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1"
+        >
           {{ t("onlineEvals.scoreConfig.numericRangeLabel") }}
         </label>
         <div class="flex items-center gap-2.5">
-          <span class="text-text-secondary text-2xs">{{ t("onlineEvals.scoreConfig.minLabel") }}</span>
+          <span class="text-text-secondary text-2xs">{{
+            t("onlineEvals.scoreConfig.minLabel")
+          }}</span>
           <OFormInput
             name="min"
             type="number"
@@ -131,7 +143,9 @@
             field-width="xs"
             data-test="score-config-min-input"
           />
-          <span class="text-text-secondary text-2xs">{{ t("onlineEvals.scoreConfig.maxLabel") }}</span>
+          <span class="text-text-secondary text-2xs">{{
+            t("onlineEvals.scoreConfig.maxLabel")
+          }}</span>
           <OFormInput
             name="max"
             type="number"
@@ -144,7 +158,9 @@
 
       <!-- Categories -->
       <div v-if="formValues.dataType === 'categorical'" class="mb-2.5">
-        <label class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1">
+        <label
+          class="o-input-label text-compact font-medium leading-tight text-input-label-text flex items-center mb-1"
+        >
           {{ t("onlineEvals.scoreConfig.categoriesLabel") }}
         </label>
         <!-- Categories are a `string[]` OForm field — OFormTagInput binds it by
@@ -173,7 +189,10 @@
       >
         <div class="flex items-center gap-2.5 mb-3">
           <span class="inline-flex items-center gap-1">
-            <span class="o-input-label text-compact font-medium leading-tight text-input-label-text">{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span>
+            <span
+              class="o-input-label text-compact font-medium leading-tight text-input-label-text"
+              >{{ t("onlineEvals.scoreConfig.healthyThresholdTitle") }}</span
+            >
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
@@ -186,7 +205,9 @@
 
         <!-- Numeric threshold -->
         <template v-if="formValues.dataType === 'numeric'">
-          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}</div>
+          <div class="text-xs font-medium text-text-secondary mb-2">
+            {{ t("onlineEvals.scoreConfig.healthyWhenValueIs") }}
+          </div>
           <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
@@ -205,7 +226,9 @@
                 @change="form.setFieldValue('healthyDirection', 'gte')"
               />
               <span class="font-mono text-lg font-bold text-text-body text-center">≥</span>
-              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.gteLabel") }}</span>
+              <span class="text-compact text-text-body">{{
+                t("onlineEvals.scoreConfig.gteLabel")
+              }}</span>
               <OFormInput
                 name="healthyGteValue"
                 type="number"
@@ -232,7 +255,9 @@
                 @change="form.setFieldValue('healthyDirection', 'lte')"
               />
               <span class="font-mono text-lg font-bold text-text-body text-center">≤</span>
-              <span class="text-compact text-text-body">{{ t("onlineEvals.scoreConfig.lteLabel") }}</span>
+              <span class="text-compact text-text-body">{{
+                t("onlineEvals.scoreConfig.lteLabel")
+              }}</span>
               <OFormInput
                 name="healthyLteValue"
                 type="number"
@@ -248,11 +273,19 @@
 
         <!-- Categorical threshold -->
         <template v-else-if="formValues.dataType === 'categorical'">
-          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyCategories") }}</div>
-          <div v-if="formValues.categories.length === 0" class="text-2xs italic text-text-secondary px-3 py-2.5 border border-dashed border-dialog-header-border rounded-default bg-card-bg">
+          <div class="text-xs font-medium text-text-secondary mb-2">
+            {{ t("onlineEvals.scoreConfig.healthyCategories") }}
+          </div>
+          <div
+            v-if="formValues.categories.length === 0"
+            class="text-2xs italic text-text-secondary px-3 py-2.5 border border-dashed border-dialog-header-border rounded-default bg-card-bg"
+          >
             {{ t("onlineEvals.scoreConfig.addCategoryPlaceholder") }}…
           </div>
-          <div v-else class="flex flex-col gap-0.5 border border-dialog-header-border rounded-default bg-card-bg p-1">
+          <div
+            v-else
+            class="flex flex-col gap-0.5 border border-dialog-header-border rounded-default bg-card-bg p-1"
+          >
             <label
               v-for="cat in formValues.categories"
               :key="cat"
@@ -280,7 +313,9 @@
 
         <!-- Boolean threshold -->
         <template v-else>
-          <div class="text-xs font-medium text-text-secondary mb-2">{{ t("onlineEvals.scoreConfig.healthyValue") }}</div>
+          <div class="text-xs font-medium text-text-secondary mb-2">
+            {{ t("onlineEvals.scoreConfig.healthyValue") }}
+          </div>
           <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
             <label
@@ -299,8 +334,12 @@
                 @change="form.setFieldValue('healthyBool', true)"
               />
               <div>
-                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.trueIsHealthy") }}</div>
-                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}</div>
+                <div class="text-text-body font-mono">
+                  {{ t("onlineEvals.scoreConfig.trueIsHealthy") }}
+                </div>
+                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">
+                  {{ t("onlineEvals.scoreConfig.trueIsHealthyHint") }}
+                </div>
               </div>
             </label>
             <label
@@ -319,14 +358,20 @@
                 @change="form.setFieldValue('healthyBool', false)"
               />
               <div>
-                <div class="text-text-body font-mono">{{ t("onlineEvals.scoreConfig.falseIsHealthy") }}</div>
-                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">{{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}</div>
+                <div class="text-text-body font-mono">
+                  {{ t("onlineEvals.scoreConfig.falseIsHealthy") }}
+                </div>
+                <div class="text-2xs text-text-secondary mt-0.5 leading-[1.4]">
+                  {{ t("onlineEvals.scoreConfig.falseIsHealthyHint") }}
+                </div>
               </div>
             </label>
           </div>
         </template>
 
-        <div class="flex items-start gap-1.5 mt-2.5 pt-2 border-t border-dashed border-dialog-header-border text-2xs text-text-secondary leading-normal">
+        <div
+          class="flex items-start gap-1.5 mt-2.5 pt-2 border-t border-dashed border-dialog-header-border text-2xs text-text-secondary leading-normal"
+        >
           <OIcon name="info" size="xs" class="shrink-0 mt-0.5 text-text-secondary" />
           <span>{{ t("onlineEvals.scoreConfig.thresholdEmptyHint") }}</span>
         </div>
@@ -357,10 +402,7 @@ import onlineEvalsService, {
 } from "@/services/online-evals.service";
 import { dataTypeOf, entityId, valueOf } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
-import {
-  makeScoreConfigSchema,
-  type ScoreConfigForm,
-} from "./ScoreConfigDialog.schema";
+import { makeScoreConfigSchema, type ScoreConfigForm } from "./ScoreConfigDialog.schema";
 
 const props = defineProps<{
   orgId: string;
@@ -386,9 +428,7 @@ function handleOpenChange(value: boolean) {
 
 // Plain-text drawer title. Edit mode shows just the (immutable) config name.
 const drawerTitle = computed(() =>
-  props.mode === "edit" && props.row
-    ? props.row.name
-    : t("onlineEvals.scoreConfig.createTitle"),
+  props.mode === "edit" && props.row ? props.row.name : t("onlineEvals.scoreConfig.createTitle"),
 );
 
 // Data-type radio options.
@@ -472,8 +512,10 @@ function initForm(row: ScoreConfig | null): ScoreConfigForm {
     max: typeof range.max === "number" ? range.max : 1,
     categories: Array.isArray(row.categories) ? [...row.categories] : [],
     healthyDirection: ht.direction === "lte" ? "lte" : "gte",
-    healthyGteValue: ht.direction === "gte" && ht.value !== undefined ? Number(ht.value) : undefined,
-    healthyLteValue: ht.direction === "lte" && ht.value !== undefined ? Number(ht.value) : undefined,
+    healthyGteValue:
+      ht.direction === "gte" && ht.value !== undefined ? Number(ht.value) : undefined,
+    healthyLteValue:
+      ht.direction === "lte" && ht.value !== undefined ? Number(ht.value) : undefined,
     healthyCategories: Array.isArray(ht.healthy_categories)
       ? [...ht.healthy_categories]
       : Array.isArray(ht.healthyCategories)
@@ -506,7 +548,10 @@ watch(
 function toggleHealthyCategory(cat: string) {
   const cur = formValues.value.healthyCategories;
   if (cur.includes(cat)) {
-    form.setFieldValue("healthyCategories", cur.filter((c) => c !== cat));
+    form.setFieldValue(
+      "healthyCategories",
+      cur.filter((c) => c !== cat),
+    );
   } else {
     form.setFieldValue("healthyCategories", [...cur, cat]);
   }

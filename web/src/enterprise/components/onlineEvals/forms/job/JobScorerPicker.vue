@@ -1,7 +1,9 @@
 <template>
   <div class="mb-4">
     <div class="flex flex-col gap-0.5 mb-2">
-      <span class="text-xs font-semibold text-text-heading">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
+      <span class="text-xs font-semibold text-text-heading">{{
+        t("onlineEvals.job.scorerPicker.title")
+      }}</span>
       <span class="text-2xs text-text-secondary">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
     </div>
     <OSelect
@@ -53,7 +55,10 @@ const options = computed(() =>
 
 function onChange(value: unknown) {
   if (Array.isArray(value)) {
-    emit("update:modelValue", value.map((v) => String(v)));
+    emit(
+      "update:modelValue",
+      value.map((v) => String(v)),
+    );
   }
 }
 </script>

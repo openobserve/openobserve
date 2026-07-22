@@ -26,39 +26,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="$emit('popoverLeave')"
   >
     <!-- ── Header ── -->
-    <div
-      class="wcp__header flex items-center justify-between gap-2 pt-2.5 px-3 pb-1.5"
-    >
-      <div
-        class="wcp__header-left flex items-center gap-1.5 min-w-0"
-      >
+    <div class="wcp__header flex items-center justify-between gap-2 pt-2.5 px-3 pb-1.5">
+      <div class="wcp__header-left flex items-center gap-1.5 min-w-0">
         <OTag
           type="fieldType"
           :value="tokenType"
           :label="tokenType"
           class="wcp__type-badge shrink-0 font-mono font-bold"
         />
-        <span
-          class="wcp__title text-compact font-semibold text-text-heading truncate"
-        >{{ t('logs.wildcardValuePopover.variableSlot', { type: tokenType }) }}</span>
+        <span class="wcp__title text-compact font-semibold text-text-heading truncate">{{
+          t("logs.wildcardValuePopover.variableSlot", { type: tokenType })
+        }}</span>
       </div>
-      <div
-        class="wcp__header-right flex items-baseline gap-1 shrink-0"
-      >
+      <div class="wcp__header-right flex items-baseline gap-1 shrink-0">
         <span
           class="wcp__unique-count text-sm font-bold text-text-body [font-variant-numeric:tabular-nums]"
-        >{{ displayValues.length }}</span>
-        <span
-          class="wcp__unique-label text-2xs text-text-secondary"
-        >{{ t('logs.wildcardValuePopover.unique') }}</span>
+          >{{ displayValues.length }}</span
+        >
+        <span class="wcp__unique-label text-2xs text-text-secondary">{{
+          t("logs.wildcardValuePopover.unique")
+        }}</span>
       </div>
     </div>
 
-
     <!-- ── Value rows ── -->
-    <div
-      class="wcp__body py-1 max-h-80 overflow-y-auto"
-    >
+    <div class="wcp__body py-1 max-h-80 overflow-y-auto">
       <div
         v-for="(item, i) in displayValues.slice(0, 10)"
         :key="i"
@@ -66,15 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`wildcard-value-row-${i}`"
       >
         <!-- Value name + count -->
-        <div
-          class="wcp__row-top flex items-baseline justify-between gap-2 mb-1"
-        >
+        <div class="wcp__row-top flex items-baseline justify-between gap-2 mb-1">
           <span
             class="wcp__row-value text-xs font-semibold font-mono text-text-body truncate flex-1 min-w-0"
-          >{{ item.value || t('logs.wildcardValuePopover.empty') }}</span>
+            >{{ item.value || t("logs.wildcardValuePopover.empty") }}</span
+          >
           <span
             class="wcp__row-count text-compact font-bold text-text-body [font-variant-numeric:tabular-nums] shrink-0"
-          >{{ item.count.toLocaleString() }}</span>
+            >{{ item.count.toLocaleString() }}</span
+          >
         </div>
         <!-- Full-width progress bar -->
         <div
@@ -87,10 +79,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <!-- Percentage -->
-        <div
-          class="wcp__row-pct text-3xs text-text-secondary [font-variant-numeric:tabular-nums]"
-        >
-          {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + '%' : '' }}
+        <div class="wcp__row-pct text-3xs text-text-secondary [font-variant-numeric:tabular-nums]">
+          {{ totalOccurrences > 0 ? ((item.count / totalOccurrences) * 100).toFixed(1) + "%" : "" }}
         </div>
       </div>
 
@@ -109,7 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <span
         class="wcp__occurrences text-2xs font-semibold text-text-secondary [font-variant-numeric:tabular-nums]"
-      >{{ t('logs.wildcardValuePopover.occurrences', { count: totalOccurrences.toLocaleString() }) }}</span>
+        >{{
+          t("logs.wildcardValuePopover.occurrences", { count: totalOccurrences.toLocaleString() })
+        }}</span
+      >
     </div>
   </div>
 </template>
@@ -140,13 +133,9 @@ const flipUpward = ref(false);
 
 const tokenType = computed(() => wildcardLabel(props.token, props.displayValues));
 
-const totalOccurrences = computed(() =>
-  props.displayValues.reduce((sum, v) => sum + v.count, 0),
-);
+const totalOccurrences = computed(() => props.displayValues.reduce((sum, v) => sum + v.count, 0));
 
-const maxCount = computed(() =>
-  Math.max(...props.displayValues.map((v) => v.count), 1),
-);
+const maxCount = computed(() => Math.max(...props.displayValues.map((v) => v.count), 1));
 
 const barWidth = (count: number): string => {
   if (!count) return "0%";
@@ -155,8 +144,8 @@ const barWidth = (count: number): string => {
 
 const barColorClass = computed(() => {
   const cls = wildcardChipColor(props.token, props.displayValues);
-  if (cls.includes("blue"))   return "bg-wildcard-bar-blue";
-  if (cls.includes("green"))  return "bg-wildcard-bar-green";
+  if (cls.includes("blue")) return "bg-wildcard-bar-blue";
+  if (cls.includes("green")) return "bg-wildcard-bar-green";
   if (cls.includes("orange")) return "bg-wildcard-bar-orange";
   if (cls.includes("purple")) return "bg-wildcard-bar-purple";
   return "bg-accent";
@@ -247,4 +236,3 @@ watch(
   }
 }
 </style>
-

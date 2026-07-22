@@ -200,7 +200,7 @@ limitations under the License.
           :label="t('alerts.prebuiltDestinations.opsgenieEuRegion')"
         />
         <span class="text-xs text-text-secondary">
-          {{ t('alerts.prebuiltDestinations.opsgenieEuRegionHelp') }}
+          {{ t("alerts.prebuiltDestinations.opsgenieEuRegionHelp") }}
         </span>
       </div>
     </template>
@@ -215,7 +215,7 @@ limitations under the License.
           @click="$emit('preview')"
           icon-left="preview"
         >
-          {{ t('alerts.preview') }}
+          {{ t("alerts.preview") }}
         </OButton>
         <OButton
           data-test="destination-test-button"
@@ -225,7 +225,7 @@ limitations under the License.
           @click="$emit('test')"
           icon-left="send"
         >
-          {{ t('common.test') }}
+          {{ t("common.test") }}
         </OButton>
       </div>
     </div>
@@ -233,12 +233,12 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
-import { useI18n } from 'vue-i18n';
-import OButton from '@/lib/core/Button/OButton.vue';
-import OFormInput from '@/lib/forms/Input/OFormInput.vue';
-import OFormSelect from '@/lib/forms/Select/OFormSelect.vue';
-import OFormSwitch from '@/lib/forms/Switch/OFormSwitch.vue';
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 
 // Presentational only: renders the active type's credential OForm* fields into
 // the parent AddDestination form (they carry `name="credentials.<key>"` and
@@ -261,24 +261,24 @@ defineProps({
   },
 });
 
-defineEmits(['preview', 'test']);
+defineEmits(["preview", "test"]);
 
 const { t } = useI18n();
 
 // PagerDuty severity options — computed so the labels re-resolve on locale change.
 const severityOptions = computed(() => [
-  { label: t('alerts.prebuiltDestinations.severityCritical'), value: 'critical' },
-  { label: t('alerts.prebuiltDestinations.severityError'), value: 'error' },
-  { label: t('alerts.prebuiltDestinations.severityWarning'), value: 'warning' },
-  { label: t('alerts.prebuiltDestinations.severityInfo'), value: 'info' }
+  { label: t("alerts.prebuiltDestinations.severityCritical"), value: "critical" },
+  { label: t("alerts.prebuiltDestinations.severityError"), value: "error" },
+  { label: t("alerts.prebuiltDestinations.severityWarning"), value: "warning" },
+  { label: t("alerts.prebuiltDestinations.severityInfo"), value: "info" },
 ]);
 
 // Opsgenie priority options — computed so the labels re-resolve on locale change.
 const priorityOptions = computed(() => [
-  { label: t('alerts.prebuiltDestinations.priorityP1'), value: 'P1' },
-  { label: t('alerts.prebuiltDestinations.priorityP2'), value: 'P2' },
-  { label: t('alerts.prebuiltDestinations.priorityP3'), value: 'P3' },
-  { label: t('alerts.prebuiltDestinations.priorityP4'), value: 'P4' },
-  { label: t('alerts.prebuiltDestinations.priorityP5'), value: 'P5' }
+  { label: t("alerts.prebuiltDestinations.priorityP1"), value: "P1" },
+  { label: t("alerts.prebuiltDestinations.priorityP2"), value: "P2" },
+  { label: t("alerts.prebuiltDestinations.priorityP3"), value: "P3" },
+  { label: t("alerts.prebuiltDestinations.priorityP4"), value: "P4" },
+  { label: t("alerts.prebuiltDestinations.priorityP5"), value: "P5" },
 ]);
 </script>

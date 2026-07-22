@@ -133,7 +133,10 @@ the Free Software Foundation, either version 3 of the License, or
           </div>
 
           <div v-if="creators.length" class="p-2.5 mb-2.5">
-            <div class="section-title text-text-heading text-base mb-2.5 uppercase" data-test="scorer-import-creation-title">
+            <div
+              class="section-title text-text-heading text-base mb-2.5 uppercase"
+              data-test="scorer-import-creation-title"
+            >
               {{ t("onlineEvals.scorer.import.creation") }}
             </div>
             <div
@@ -205,7 +208,9 @@ const scoreConfigs = toRef(props, "scoreConfigs");
 const providers = toRef(props, "providers");
 
 const errors = ref<ScorerImportError[]>([]);
-const creators = ref<Array<{ name: string; status: "success" | "error" | "exists"; message: string }>>([]);
+const creators = ref<
+  Array<{ name: string; status: "success" | "error" | "exists"; message: string }>
+>([]);
 
 // Inline-fixer state, indexed by itemIndex in the imported batch.
 const nameFixers = reactive<Record<number, string>>({});
@@ -340,7 +345,10 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
       const raw: any = rawItems[e.itemIndex] ?? {};
       const scorer = raw.scorer ?? raw;
 
-      if ((e.field === "name" || e.field === "nameConflict") && nameFixers[e.itemIndex] === undefined) {
+      if (
+        (e.field === "name" || e.field === "nameConflict") &&
+        nameFixers[e.itemIndex] === undefined
+      ) {
         nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";
       }
       if (e.field === "type" && typeFixers[e.itemIndex] === undefined) {

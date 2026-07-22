@@ -106,8 +106,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
 
   // NEW: Extended color families for correlation dimensions
   // Teal
-  teal:
-    "bg-badge-teal-soft-bg text-badge-teal-soft-text ring-1 ring-inset ring-badge-teal-ol-border/30",
+  teal: "bg-badge-teal-soft-bg text-badge-teal-soft-text ring-1 ring-inset ring-badge-teal-ol-border/30",
   "teal-outline": [
     "bg-transparent",
     "text-badge-teal-ol-text",
@@ -128,8 +127,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "bg-badge-orange-soft-bg text-badge-orange-soft-text ring-1 ring-inset ring-badge-orange-ol-border/30",
 
   // Lime
-  lime:
-    "bg-badge-lime-soft-bg text-badge-lime-soft-text ring-1 ring-inset ring-badge-lime-ol-border/30",
+  lime: "bg-badge-lime-soft-bg text-badge-lime-soft-text ring-1 ring-inset ring-badge-lime-ol-border/30",
   "lime-outline": [
     "bg-transparent",
     "text-badge-lime-ol-text",
@@ -150,8 +148,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "bg-badge-amber-soft-bg text-badge-amber-soft-text ring-1 ring-inset ring-badge-amber-ol-border/30",
 
   // Cyan
-  cyan:
-    "bg-badge-cyan-soft-bg text-badge-cyan-soft-text ring-1 ring-inset ring-badge-cyan-ol-border/30",
+  cyan: "bg-badge-cyan-soft-bg text-badge-cyan-soft-text ring-1 ring-inset ring-badge-cyan-ol-border/30",
   "cyan-outline": [
     "bg-transparent",
     "text-badge-cyan-ol-text",
@@ -161,8 +158,7 @@ const variantClasses: Record<NonNullable<BadgeProps["variant"]>, string> = {
     "bg-badge-cyan-soft-bg text-badge-cyan-soft-text ring-1 ring-inset ring-badge-cyan-ol-border/30",
 
   // Blue
-  blue:
-    "bg-badge-blue-soft-bg text-badge-blue-soft-text ring-1 ring-inset ring-badge-blue-ol-border/30",
+  blue: "bg-badge-blue-soft-bg text-badge-blue-soft-text ring-1 ring-inset ring-badge-blue-ol-border/30",
   "blue-outline": [
     "bg-transparent",
     "text-badge-blue-ol-text",
@@ -204,9 +200,7 @@ const shapeClasses: Record<NonNullable<BadgeProps["shape"]>, string> = {
 };
 
 // ── Trailing segment padding per size ────────────────────────────────────
-const trailingSizeClasses = computed(() =>
-  props.size === "md" ? "ps-1.5 ms-1" : "ps-1 ms-0.5",
-);
+const trailingSizeClasses = computed(() => (props.size === "md" ? "ps-1.5 ms-1" : "ps-1 ms-0.5"));
 
 // ── Root element classes ──────────────────────────────────────────────────
 const classes = computed(() => [
@@ -219,14 +213,15 @@ const classes = computed(() => [
   sizeClasses[props.size],
   shapeClasses[props.shape],
   // Clickable — interaction states (button element handles :disabled natively)
-  props.clickable && [
-    "cursor-pointer",
-    "enabled:hover:opacity-80",
-    "focus-visible:outline-none",
-    "focus-visible:ring-2",
-    "focus-visible:ring-badge-focus-ring",
-    "focus-visible:ring-offset-1",
-  ].join(" "),
+  props.clickable &&
+    [
+      "cursor-pointer",
+      "enabled:hover:opacity-80",
+      "focus-visible:outline-none",
+      "focus-visible:ring-2",
+      "focus-visible:ring-badge-focus-ring",
+      "focus-visible:ring-offset-1",
+    ].join(" "),
   // Disabled — always mutes regardless of clickable
   props.disabled && "opacity-40 pointer-events-none",
 ]);
@@ -275,18 +270,14 @@ function handleKeydown(e: KeyboardEvent): void {
     <template v-if="hasIcon">
       <slot name="icon">
         <!-- OIcon registry name (kebab-case SVG icon) -->
-        <OIcon
-          v-if="icon && isOIcon"
-          :name="(icon as any)"
-          size="xs"
-          class="shrink-0"
-        />
+        <OIcon v-if="icon && isOIcon" :name="icon as any" size="xs" class="shrink-0" />
         <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else
           class="material-icons-outlined text-[1em] leading-none shrink-0"
           aria-hidden="true"
-        >{{ icon }}</span>
+          >{{ icon }}</span
+        >
       </slot>
     </template>
 
@@ -299,10 +290,7 @@ function handleKeydown(e: KeyboardEvent): void {
     -->
     <span
       v-if="hasTrailing"
-      :class="[
-        'border-s border-current/25 opacity-75 leading-none shrink-0',
-        trailingSizeClasses,
-      ]"
+      :class="['border-s border-current/25 opacity-75 leading-none shrink-0', trailingSizeClasses]"
     >
       <slot name="trailing">{{ count }}</slot>
     </span>

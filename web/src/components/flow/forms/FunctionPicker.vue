@@ -60,10 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template v-else>
       <!-- create / pick toggle -->
-      <div
-        class="flex items-center gap-3"
-        :class="createNewFunction ? 'px-4 pt-4 shrink-0' : ''"
-      >
+      <div class="flex items-center gap-3" :class="createNewFunction ? 'px-4 pt-4 shrink-0' : ''">
         <OSwitch
           v-model="createNewFunction"
           :label="t('flow.function.createNew')"
@@ -88,10 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- inline function editor (full-width; its own toolbar owns save/cancel) -->
-      <div
-        v-if="createNewFunction"
-        class="flow-add-function flex-1 min-h-0 w-full"
-      >
+      <div v-if="createNewFunction" class="flow-add-function flex-1 min-h-0 w-full">
         <!-- ALWAYS a fresh function. AddFunction's `is-updated` means "editing an
              EXISTING function" and disables its name input (`:disable-name`), so
              it must never be fed our `isUpdating` — that flag means "editing the
@@ -139,10 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCard
             class="function-definition-card border border-border-default bg-surface-base rounded-default overflow-hidden shadow-[0_0.125rem_0.25rem_color-mix(in_srgb,var(--color-black)_5%,transparent)]"
           >
-            <OCardSection
-              role="header"
-              class="border-b border-b-border-default bg-surface-subtle"
-            >
+            <OCardSection role="header" class="border-b border-b-border-default bg-surface-subtle">
               <div class="text-base font-semibold text-text-heading">
                 {{ t("function.function_definition") }}
               </div>
@@ -154,7 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <pre
                   class="font-mono bg-transparent m-0 p-4 text-compact leading-normal whitespace-pre-wrap break-words border-0 font-normal cursor-default select-text text-text-code"
-                >{{ selectedDefinition }}</pre>
+                  >{{ selectedDefinition }}</pre
+                >
               </div>
             </OCardSection>
           </OCard>
@@ -171,7 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                notes use, so all three match and work in dark mode (the old
                #f9f290/#2d3748 were light-only). These were --color-note-* until
                #13173 removed that set; banner-warning-* is its replacement. -->
-          <div class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2">
+          <div
+            class="bg-banner-warning-bg text-banner-warning-text w-full rounded-default p-3 flex flex-col gap-2"
+          >
             <div class="text-sm">
               {{ t("flow.function.guidelinesTitle") }}
             </div>
@@ -199,14 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import {
-  computed,
-  defineAsyncComponent,
-  nextTick,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -227,9 +214,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import functionsService from "@/services/jstransform";
 import { isJsFunction } from "@/utils/functionLanguage";
 
-const AddFunction = defineAsyncComponent(
-  () => import("@/components/functions/AddFunction.vue"),
-);
+const AddFunction = defineAsyncComponent(() => import("@/components/functions/AddFunction.vue"));
 
 const props = withDefaults(
   defineProps<{
@@ -301,13 +286,9 @@ const form = useOForm<AssociateFunctionForm>({
 });
 
 // Reactive view of the SAME form (no mirror ref).
-const selectedFunction = form.useStore(
-  (s: any) => s.values?.selectedFunction ?? "",
-);
+const selectedFunction = form.useStore((s: any) => s.values?.selectedFunction ?? "");
 
-const selectedDefinition = computed(
-  () => functionDefs.value[selectedFunction.value] || "",
-);
+const selectedDefinition = computed(() => functionDefs.value[selectedFunction.value] || "");
 
 // Only functions written in the host's language are selectable: a pipeline runs
 // VRL, a workflow node runs JS. Offering the other kind would let a user attach a

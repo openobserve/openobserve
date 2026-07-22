@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex flex-col w-full h-full bg-card-glass-bg discovered-services"
-  >
+  <div class="flex flex-col w-full h-full bg-card-glass-bg discovered-services">
     <!-- Loading State -->
     <div v-if="loading" class="flex flex-1 items-center justify-center">
       <OSpinner size="sm" data-test="discovered-services-loading-indicator" />
@@ -27,7 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="error" class="flex flex-col flex-1 items-center justify-center gap-3">
       <OIcon
         name="error-outline"
-        class="text-status-error-text" style="width: 3rem; height: 3rem;" />
+        class="text-status-error-text"
+        style="width: 3rem; height: 3rem"
+      />
       <div class="text-base text-status-error-text">{{ error }}</div>
       <OButton
         data-test="retry-discovered-services-btn"
@@ -70,14 +70,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="info-banner shrink-0 mb-3 mx-page-edge rounded-default flex items-center gap-3 py-3 px-4 bg-banner-info-bg border border-banner-info-border"
       >
-        <OIcon
-          name="info"
-          size="md"
-          class="shrink-0 info-banner-icon text-status-info-text"
-        />
-        <div
-          class="text-sm leading-relaxed info-banner-text text-text-body"
-        >
+        <OIcon name="info" size="md" class="shrink-0 info-banner-icon text-status-info-text" />
+        <div class="text-sm leading-relaxed info-banner-text text-text-body">
           {{ t("settings.correlation.discoveredServicesDescription") }}
           <a
             class="cursor-pointer inline-block mx-1 px-2 py-0.5 rounded-default text-xs font-semibold no-underline align-middle border border-text-link text-text-link bg-badge-blue-soft-bg transition-[background] duration-150 hover:bg-[color-mix(in_srgb,var(--color-badge-blue-ol-border)_18%,transparent)]"
@@ -93,10 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           class="services-header-bar flex justify-between items-center w-full py-3 px-page-edge h-[4.25rem]"
         >
-          <div
-            class="text-xl tracking-[0.005em] font-[600]"
-            data-test="services-list-title"
-          >
+          <div class="text-xl tracking-[0.005em] font-[600]" data-test="services-list-title">
             {{ t("settings.correlation.discoveredServicesTitle") }}
           </div>
           <!-- Filter bar -->
@@ -127,7 +118,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-filter-value"
                 class="o2-search-input filter-select min-w-40"
               />
-              <OTooltip v-if="!filterKey" :content="t('settings.correlation.selectFieldFirst')" side="top" />
+              <OTooltip
+                v-if="!filterKey"
+                :content="t('settings.correlation.selectFieldFirst')"
+                side="top"
+              />
             </span>
             <OSearchInput
               v-model="searchQuery"
@@ -183,11 +178,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :keep-page-on-data-change="true"
             :current-page="currentPage"
             class="o2-table o2-row-md o2-table-header-sticky services-table w-full"
-            :class="filteredGroupCount > 0 ? 'services-table-full-height h-[calc(100vh-21.25rem)]' : ''"
+            :class="
+              filteredGroupCount > 0 ? 'services-table-full-height h-[calc(100vh-21.25rem)]' : ''
+            "
             data-test="services-list-table"
             @update:expanded-ids="syncExpansion"
             @row-click="handleRowClick"
-            @pagination-change="({ page }: { page: number }) => currentPage = page"
+            @pagination-change="({ page }: { page: number }) => (currentPage = page)"
           >
             <template #empty>
               <OEmptyState
@@ -211,11 +208,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OTag>
               </div>
               <div v-else class="flex items-center gap-2 flex-wrap">
-                <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ row.set_id }}</span>
+                <span
+                  class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border"
+                  >{{ row.set_id }}</span
+                >
                 <ODimensionChip
-                  v-for="[key, value] in Object.entries(
-                    row.disambiguation,
-                  ).sort(([a], [b]) => a.localeCompare(b))"
+                  v-for="[key, value] in Object.entries(row.disambiguation).sort(([a], [b]) =>
+                    a.localeCompare(b),
+                  )"
                   :key="`${key}=${value}`"
                   :dim-key="key"
                   :value="String(value)"
@@ -228,31 +228,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #cell-telemetry="{ row }">
-              <div v-if="row.__type === 'group'" class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start">
-                <OTag
-                  v-if="row.totalLogs > 0"
-                  type="streamType"
-                  :value="'logs'"
-                />
+              <div
+                v-if="row.__type === 'group'"
+                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start"
+              >
+                <OTag v-if="row.totalLogs > 0" type="streamType" :value="'logs'" />
                 <span v-else class="telemetry-slot-empty inline-block"></span>
-                <OTag
-                  v-if="row.totalTraces > 0"
-                  type="streamType"
-                  :value="'traces'"
-                />
+                <OTag v-if="row.totalTraces > 0" type="streamType" :value="'traces'" />
                 <span v-else class="telemetry-slot-empty inline-block"></span>
-                <OTag
-                  v-if="row.totalMetrics > 0"
-                  type="streamType"
-                  :value="'metrics'"
-                />
+                <OTag v-if="row.totalMetrics > 0" type="streamType" :value="'metrics'" />
                 <span v-else class="telemetry-slot-empty inline-block"></span>
               </div>
-              <div v-else class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start">
-                <span
-                  v-if="row.logs_streams.length > 0"
-                  class="inline-flex min-w-0"
-                >
+              <div
+                v-else
+                class="instance-telemetry-grid inline-grid grid-cols-[minmax(4rem,auto)_minmax(5rem,auto)_minmax(5.75rem,auto)] gap-1 items-center justify-items-start"
+              >
+                <span v-if="row.logs_streams.length > 0" class="inline-flex min-w-0">
                   <OTag type="streamType" :value="'logs'">
                     {{
                       t("settings.correlation.logsWithCount", {
@@ -260,17 +251,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     }}
                   </OTag>
-                  <OTooltip
-                    :content="row.logs_streams.join(', ')"
-                    content-class="text-xs"
-                  />
+                  <OTooltip :content="row.logs_streams.join(', ')" content-class="text-xs" />
                 </span>
                 <span v-else class="telemetry-slot-empty inline-block"></span>
 
-                <span
-                  v-if="row.traces_streams.length > 0"
-                  class="inline-flex min-w-0"
-                >
+                <span v-if="row.traces_streams.length > 0" class="inline-flex min-w-0">
                   <OTag type="streamType" :value="'traces'">
                     {{
                       t("settings.correlation.tracesWithCount", {
@@ -278,17 +263,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     }}
                   </OTag>
-                  <OTooltip
-                    :content="row.traces_streams.join(', ')"
-                    content-class="text-xs"
-                  />
+                  <OTooltip :content="row.traces_streams.join(', ')" content-class="text-xs" />
                 </span>
                 <span v-else class="telemetry-slot-empty inline-block"></span>
 
-                <span
-                  v-if="row.metrics_streams.length > 0"
-                  class="inline-flex min-w-0"
-                >
+                <span v-if="row.metrics_streams.length > 0" class="inline-flex min-w-0">
                   <OTag type="streamType" :value="'metrics'">
                     {{
                       t("settings.correlation.metricsWithCount", {
@@ -296,10 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     }}
                   </OTag>
-                  <OTooltip
-                    :content="row.metrics_streams.join(', ')"
-                    content-class="text-xs"
-                  />
+                  <OTooltip :content="row.metrics_streams.join(', ')" content-class="text-xs" />
                 </span>
                 <span v-else class="telemetry-slot-empty inline-block"></span>
               </div>
@@ -315,9 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Bottom -->
             <template #bottom>
-              <div
-                class="flex items-center justify-between w-full h-9"
-              >
+              <div class="flex items-center justify-between w-full h-9">
                 <div class="text-xs font-normal w-[15.625rem] mr-md">
                   {{
                     filteredGroupCount === 1
@@ -355,7 +329,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="service-side-panel"
     >
       <template #header-right>
-        <span class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border">{{ selectedService?.set_id }}</span>
+        <span
+          class="set-id-badge inline-flex items-center py-[0.0625rem] px-2 rounded-default text-2xs font-semibold border whitespace-nowrap shrink-0 bg-badge-purple-soft-bg text-badge-purple-soft-text border-badge-purple-ol-border"
+          >{{ selectedService?.set_id }}</span
+        >
       </template>
 
       <!-- Default set warning banner -->
@@ -365,9 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OIcon name="info-outline" size="sm" class="shrink-0 mt-0.5" />
         <div class="text-xs leading-relaxed">
-          <span class="font-semibold">{{
-            t("settings.correlation.defaultSetWarningTitle")
-          }}</span>
+          <span class="font-semibold">{{ t("settings.correlation.defaultSetWarningTitle") }}</span>
           {{ t("settings.correlation.defaultSetWarningBody") }}
         </div>
       </div>
@@ -378,20 +353,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="panel-body flex-1 overflow-y-auto p-0">
         <!-- Instance Identity -->
         <div class="panel-block py-4 px-5 border-b border-b-border-default">
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
+          <div
+            class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5"
+          >
             {{ t("settings.correlation.instanceIdentity") }}
           </div>
           <div
-            v-if="
-              selectedService &&
-              Object.keys(selectedService.disambiguation).length > 0
-            "
+            v-if="selectedService && Object.keys(selectedService.disambiguation).length > 0"
             class="flex flex-wrap gap-1.5"
           >
             <ODimensionChip
-              v-for="[key, value] in Object.entries(
-                selectedService.disambiguation,
-              ).sort(([a], [b]) => a.localeCompare(b))"
+              v-for="[key, value] in Object.entries(selectedService.disambiguation).sort(
+                ([a], [b]) => a.localeCompare(b),
+              )"
               :key="`${key}=${value}`"
               :dim-key="key"
               :value="value"
@@ -404,20 +378,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Stream Sources -->
         <div class="panel-block py-4 px-5 border-b border-b-border-default">
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
+          <div
+            class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5"
+          >
             {{ t("settings.correlation.streamSources") }}
           </div>
           <div class="flex flex-col gap-3">
             <!-- Logs -->
-            <div
-              v-if="selectedService && selectedService.logs_streams.length > 0"
-            >
+            <div v-if="selectedService && selectedService.logs_streams.length > 0">
               <div class="panel-signal-row flex items-start gap-3">
-                <OTag
-                  type="streamType"
-                  :value="'logs'"
-                  class="panel-signal-type"
-                />
+                <OTag type="streamType" :value="'logs'" class="panel-signal-type" />
                 <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="stream in selectedService.logs_streams"
@@ -430,17 +400,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Traces -->
-            <div
-              v-if="
-                selectedService && selectedService.traces_streams.length > 0
-              "
-            >
+            <div v-if="selectedService && selectedService.traces_streams.length > 0">
               <div class="panel-signal-row flex items-start gap-3">
-                <OTag
-                  type="streamType"
-                  :value="'traces'"
-                  class="panel-signal-type"
-                />
+                <OTag type="streamType" :value="'traces'" class="panel-signal-type" />
                 <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="stream in selectedService.traces_streams"
@@ -453,17 +415,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Metrics -->
-            <div
-              v-if="
-                selectedService && selectedService.metrics_streams.length > 0
-              "
-            >
+            <div v-if="selectedService && selectedService.metrics_streams.length > 0">
               <div class="panel-signal-row flex items-start gap-3">
-                <OTag
-                  type="streamType"
-                  :value="'metrics'"
-                  class="panel-signal-type"
-                />
+                <OTag type="streamType" :value="'metrics'" class="panel-signal-type" />
                 <div class="flex flex-wrap gap-1.5">
                   <span
                     v-for="stream in selectedService.metrics_streams"
@@ -479,29 +433,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Field Name Mapping -->
         <div
-          v-if="
-            selectedService &&
-            Object.keys(selectedService.field_name_mapping ?? {}).length > 0
-          "
+          v-if="selectedService && Object.keys(selectedService.field_name_mapping ?? {}).length > 0"
           class="panel-block py-4 px-5 border-b border-b-border-default"
         >
-          <div class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5">
+          <div
+            class="panel-block-label text-xs font-semibold normal-case tracking-normal text-text-label mb-2.5"
+          >
             {{ t("settings.correlation.fieldNameMapping") }}
           </div>
           <div class="panel-mapping-grid">
             <template
-              v-for="[raw, mapped] in Object.entries(
-                selectedService.field_name_mapping ?? {},
-              ).sort(([a], [b]) => a.localeCompare(b))"
+              v-for="[raw, mapped] in Object.entries(selectedService.field_name_mapping ?? {}).sort(
+                ([a], [b]) => a.localeCompare(b),
+              )"
               :key="raw"
             >
-              <span class="mapping-key font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-surface-subtle text-text-body border-border-default">{{ raw }}</span>
-              <OIcon
-                name="arrow-forward"
-                size="xs"
-                class="text-text-muted justify-self-center"
-              />
-              <span class="mapping-val font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border">{{ mapped }}</span>
+              <span
+                class="mapping-key font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-surface-subtle text-text-body border-border-default"
+                >{{ raw }}</span
+              >
+              <OIcon name="arrow-forward" size="xs" class="text-text-muted justify-self-center" />
+              <span
+                class="mapping-val font-mono text-2xs py-[0.0625rem] px-1.5 rounded-default border whitespace-nowrap bg-badge-success-soft-bg text-badge-success-soft-text border-badge-success-ol-border"
+                >{{ mapped }}</span
+              >
             </template>
           </div>
         </div>
@@ -537,7 +492,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -603,9 +558,7 @@ const allKeys = computed((): { label: string; value: string }[] => {
   for (const s of services.value) {
     for (const k of Object.keys(s.disambiguation)) keys.add(k);
   }
-  return [...keys]
-    .sort()
-    .map((k) => ({ label: KEY_DISPLAY_LABELS[k] ?? k, value: k }));
+  return [...keys].sort().map((k) => ({ label: KEY_DISPLAY_LABELS[k] ?? k, value: k }));
 });
 
 const allValues = computed((): string[] => {
@@ -666,7 +619,7 @@ function syncExpansion(ids: string[]) {
 }
 
 function handleRowClick(row: any) {
-  if (row.__type !== 'group') {
+  if (row.__type !== "group") {
     selectedService.value = row;
   }
 }
@@ -689,9 +642,7 @@ const serviceGroups = computed((): ServiceGroup[] => {
       const shared: [string, string][] = [];
       const varying: string[] = [];
       for (const key of allDimKeys) {
-        const values = new Set(
-          instances.map((i) => i.disambiguation[key]).filter(Boolean),
-        );
+        const values = new Set(instances.map((i) => i.disambiguation[key]).filter(Boolean));
         if (values.size === 1) {
           shared.push([key, [...values][0]]);
         } else {
@@ -711,9 +662,7 @@ const serviceGroups = computed((): ServiceGroup[] => {
       }
 
       const correlationScore =
-        (allLogs.size > 0 ? 1 : 0) +
-        (allTraces.size > 0 ? 1 : 0) +
-        (allMetrics.size > 0 ? 1 : 0);
+        (allLogs.size > 0 ? 1 : 0) + (allTraces.size > 0 ? 1 : 0) + (allMetrics.size > 0 ? 1 : 0);
 
       const sortedInstances = [...instances].sort((a, b) => {
         const aIsDefault = a.set_id === "default" ? 1 : 0;
@@ -772,19 +721,11 @@ const filteredGroups = computed((): any[] => {
           (inst) =>
             inst.set_id.toLowerCase().includes(query) ||
             Object.entries(inst.disambiguation).some(
-              ([k, v]) =>
-                k.toLowerCase().includes(query) ||
-                v.toLowerCase().includes(query),
+              ([k, v]) => k.toLowerCase().includes(query) || v.toLowerCase().includes(query),
             ) ||
-            inst.logs_streams.some((stream) =>
-              stream.toLowerCase().includes(query),
-            ) ||
-            inst.traces_streams.some((stream) =>
-              stream.toLowerCase().includes(query),
-            ) ||
-            inst.metrics_streams.some((stream) =>
-              stream.toLowerCase().includes(query),
-            ),
+            inst.logs_streams.some((stream) => stream.toLowerCase().includes(query)) ||
+            inst.traces_streams.some((stream) => stream.toLowerCase().includes(query)) ||
+            inst.metrics_streams.some((stream) => stream.toLowerCase().includes(query)),
         ),
     );
   }
@@ -814,7 +755,7 @@ const filteredGroups = computed((): any[] => {
   for (const g of groups) {
     const groupRow = {
       id: g.service_name,
-      __type: 'group',
+      __type: "group",
       service_name: g.service_name,
       totalLogs: g.totalLogs,
       totalTraces: g.totalTraces,
@@ -829,7 +770,7 @@ const filteredGroups = computed((): any[] => {
         result.push({
           ...inst,
           id: inst.id,
-          __type: 'instance',
+          __type: "instance",
           lastSeen: inst.last_seen,
         });
       }
@@ -838,12 +779,14 @@ const filteredGroups = computed((): any[] => {
   return result;
 });
 
-const filteredGroupCount = computed(() =>
-  filteredGroups.value.filter((r: any) => r.__type === 'group').length,
+const filteredGroupCount = computed(
+  () => filteredGroups.value.filter((r: any) => r.__type === "group").length,
 );
 
 const totalInstances = computed(() =>
-  filteredGroups.value.filter((r: any) => r.__type === 'group').reduce((sum: number, g: any) => sum + g.instances.length, 0),
+  filteredGroups.value
+    .filter((r: any) => r.__type === "group")
+    .reduce((sum: number, g: any) => sum + g.instances.length, 0),
 );
 
 const loadServices = async (isRefresh = false) => {
@@ -917,4 +860,3 @@ onMounted(() => {
   loadServices();
 });
 </script>
-

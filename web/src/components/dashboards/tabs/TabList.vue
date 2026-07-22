@@ -15,12 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex items-center"
+  <div
+    class="flex items-center"
     data-test="dashboard-tab-list-container"
     @mouseover="isHovered = true"
     @mouseleave="isHovered = false"
   >
-    <OTabs class="max-w-[calc(100%_-_2.5rem)]"
+    <OTabs
+      class="max-w-[calc(100%_-_2.5rem)]"
       v-model="selectedTabId"
       :align="'left'"
       dense
@@ -36,11 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`dashboard-tab-${tab.tabId}`"
       >
         <div class="w-full flex justify-between flex-nowrap">
-          <span class="whitespace-nowrap overflow-hidden text-ellipsis w-full"
+          <span
+            class="whitespace-nowrap overflow-hidden text-ellipsis w-full"
             :title="tab?.name"
             :data-test="`dashboard-tab-${tab.tabId}-name`"
             :data-test-tab-name="tab?.name"
-          >{{ tab?.name }}</span
+            >{{ tab?.name }}</span
           >
         </div>
       </OTab>

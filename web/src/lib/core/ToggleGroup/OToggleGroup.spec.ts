@@ -12,11 +12,7 @@ function mountGroup(
     props: groupProps,
     slots: {
       default: items.map((item) =>
-        h(
-          OToggleGroupItem,
-          { value: item.value, disabled: item.disabled },
-          () => item.label,
-        ),
+        h(OToggleGroupItem, { value: item.value, disabled: item.disabled }, () => item.label),
       ),
     },
   });
@@ -64,9 +60,7 @@ describe("OToggleGroup", () => {
   // --- Controlled value ---
 
   it("emits update:modelValue when an item is clicked", async () => {
-    const wrapper = mountGroup({ modelValue: "" }, [
-      { value: "left", label: "Left" },
-    ]);
+    const wrapper = mountGroup({ modelValue: "" }, [{ value: "left", label: "Left" }]);
     await wrapper.find("button").trigger("click");
     expect(wrapper.emitted("update:modelValue")).toBeDefined();
   });

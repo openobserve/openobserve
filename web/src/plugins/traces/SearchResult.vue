@@ -18,9 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div data-test="traces-search-result" class="overflow-hidden h-full">
-    <div
-      class="bg-card-glass-bg h-full flex flex-col overflow-hidden"
-    >
+    <div class="bg-card-glass-bg h-full flex flex-col overflow-hidden">
       <!-- Section header: title + count badge + insights + pagination -->
       <div
         v-if="
@@ -41,11 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleFieldList"
         >
           <OIcon
-            :name="searchObj.meta.showFields ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+            :name="
+              searchObj.meta.showFields
+                ? 'keyboard-double-arrow-left'
+                : 'keyboard-double-arrow-right'
+            "
             size="sm"
           />
           <OTooltip
-            :content="searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')"
+            :content="
+              searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+            "
             side="bottom"
           />
         </OButton>
@@ -56,7 +60,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           type="logsResultChip"
           value="neutral"
           class="mr-[0.6rem]"
-        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OTag>
+          >{{
+            `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
+          }}</OTag
+        >
         <OTag
           v-if="
             searchObj.data.queryResults.errorCount != null &&
@@ -66,12 +73,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="error"
           :clickable="true"
           class="text-xs rounded-default! py-[0.4rem]! px-2.5! text-xs!"
-          :class="showErrorOnly
-            ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
-            : 'bg-error-tag-bg! text-error-tag-text!'"
+          :class="
+            showErrorOnly
+              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
+              : 'bg-error-tag-bg! text-error-tag-text!'
+          "
           @click="toggleErrorOnly"
         >
-          {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
+          {{
+            `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
+          }}
           <OTooltip
             :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
             side="bottom"
@@ -84,7 +95,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex-1" />
 
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
-        <div class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 mr-1 overflow-hidden">
+        <div
+          class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 mr-1 overflow-hidden"
+        >
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading"
@@ -99,7 +112,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="insights-button"
         >
           <OIcon name="timeline" size="sm" />
-          <span v-if="showActionLabels" class="whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
+          <span v-if="showActionLabels" class="whitespace-nowrap">{{
+            t("volumeInsights.analyzeBtnLabel")
+          }}</span>
           <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
         <template v-if="searchObj.meta.resultGrid.showPagination">
@@ -137,10 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <TracesMetricsDashboard
             v-show="searchObj.meta.showHistogram"
-            v-if="
-              searchObj.data.stream.selectedStream.value &&
-              searchObj.searchApplied
-            "
+            v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
             ref="metricsDashboardRef"
             :streamName="searchObj.data.stream.selectedStream.value"
             :timeRange="{
@@ -149,10 +161,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
-            :show="
-              searchObj.searchApplied &&
-              !searchObj.data.errorMsg?.trim()?.length
-            "
+            :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
             @time-range-selected="onMetricsTimeRangeSelected"
             @filters-updated="onMetricsFiltersUpdated"
           />
@@ -236,7 +245,7 @@ export default defineComponent({
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
     OIcon,
-},
+  },
   props: {
     showErrorOnly: {
       type: Boolean,
@@ -278,13 +287,10 @@ export default defineComponent({
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
-      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name,
-      );
+      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(col.name);
 
       this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
-      this.searchObj.organizationIdentifier =
-        this.store.state.selectedOrganization.identifier;
+      this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },
     onTimeBoxed(obj: any) {
@@ -321,7 +327,7 @@ export default defineComponent({
         headerResizeObserver.observe(sectionHeaderRef.value);
       }
     });
-    
+
     //Before unmount
     onBeforeUnmount(() => {
       headerResizeObserver?.disconnect();
@@ -343,9 +349,7 @@ export default defineComponent({
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
-        const spanEnd = Math.ceil(
-          (props.end_time || props.start_time || 0) / 1000,
-        );
+        const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
         from = spanStart - 60_000_000; // -1 min in µs
         to = spanEnd + 3_600_000_000; // +1 hr in µs
       } else {
@@ -358,9 +362,7 @@ export default defineComponent({
         query: {
           stream: router.currentRoute.value.query.stream,
           trace_id: props.trace_id,
-          ...(searchObj.meta.searchMode === "spans"
-            ? { span_id: props.span_id }
-            : {}),
+          ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
           from,
           to,
           org_identifier: store.state.selectedOrganization.identifier,
@@ -370,10 +372,7 @@ export default defineComponent({
       emit("get:traceDetails", props);
     };
 
-    const onMetricsTimeRangeSelected = (range: {
-      start: number;
-      end: number;
-    }) => {
+    const onMetricsTimeRangeSelected = (range: { start: number; end: number }) => {
       emit("update:datetime", {
         start: range.start,
         end: range.end,
@@ -394,10 +393,7 @@ export default defineComponent({
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
     const searchPerformed = computed(() =>
-      Object.prototype.hasOwnProperty.call(
-        searchObj.data.queryResults,
-        "total",
-      ),
+      Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
     );
 
     const rowsPerPageOptions = [10, 25, 50, 100];
@@ -406,10 +402,7 @@ export default defineComponent({
       searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
         ? Math.max(
             1,
-            Math.ceil(
-              searchObj.data.queryResults.total /
-                searchObj.meta.resultGrid.rowsPerPage,
-            ),
+            Math.ceil(searchObj.data.queryResults.total / searchObj.meta.resultGrid.rowsPerPage),
           )
         : 1,
     );

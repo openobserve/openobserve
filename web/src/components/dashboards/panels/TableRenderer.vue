@@ -40,7 +40,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-ai-context-button="false"
       :enable-column-filter="enableFiltering"
       data-test="dashboard-panel-table"
-      @click:dataRow="(row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)"
+      @click:dataRow="
+        (row: any, _idx: number, evt?: MouseEvent) => $emit('row-click', evt ?? null, row, _idx)
+      "
     >
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
       <template #bottom="scope">
@@ -76,10 +78,7 @@ import TablePaginationControls from "@/components/dashboards/addPanel/TablePagin
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
-import {
-  buildValueMappingCache,
-  lookupValueMappingFull,
-} from "@/utils/dashboard/tableConfigUtils";
+import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
 import { useStore } from "vuex";
 
 export default defineComponent({
@@ -125,9 +124,7 @@ export default defineComponent({
     const store = useStore();
     const tableRef = ref<any>(null);
 
-    const tableColumns = computed(
-      () => (props.data?.columns as any[]) || [],
-    );
+    const tableColumns = computed(() => (props.data?.columns as any[]) || []);
 
     /**
      * Computes the inline style for a given TanStack cell.
@@ -138,20 +135,25 @@ export default defineComponent({
     const autoColorCache = new Map<string, Map<string, string>>();
 
     // Value-mapping lookup cache, rebuilt only when the mappings change.
-    const valueMappingCache = computed(() =>
-      buildValueMappingCache(props.valueMapping),
-    );
+    const valueMappingCache = computed(() => buildValueMappingCache(props.valueMapping));
 
     const evalCondition = (val: number, op: string, threshold: number): boolean => {
       switch (op) {
-        case "<":  return val < threshold;
-        case ">":  return val > threshold;
-        case "<=": return val <= threshold;
-        case ">=": return val >= threshold;
+        case "<":
+          return val < threshold;
+        case ">":
+          return val > threshold;
+        case "<=":
+          return val <= threshold;
+        case ">=":
+          return val >= threshold;
         case "=":
-        case "==": return val === threshold;
-        case "!=": return val !== threshold;
-        default:   return false;
+        case "==":
+          return val === threshold;
+        case "!=":
+          return val !== threshold;
+        default:
+          return false;
       }
     };
 
@@ -166,18 +168,14 @@ export default defineComponent({
         const colKey = col.field ?? col.name;
         if (!autoColorCache.has(colKey)) autoColorCache.set(colKey, new Map<string, string>());
         const map = autoColorCache.get(colKey)!;
-        if (!map.has(key))
-          map.set(key, palette[map.size % palette.length]);
+        if (!map.has(key)) map.set(key, palette[map.size % palette.length]);
         const hex = map.get(key) as string;
         return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
 
       // 2) Value-mapping color (valid hex only; else fall through).
       const found = lookupValueMappingFull(value, valueMappingCache.value, "color");
-      if (
-        found?.color &&
-        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)
-      ) {
+      if (found?.color && /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/i.test(found.color)) {
         const hex = found.color;
         return `background-color: ${hex}; color: ${isColorDark(hex) ? "#ffffff" : "#000000"}`;
       }
@@ -287,11 +285,7 @@ export default defineComponent({
 
     const downloadTableAsJSON = (title?: string) => {
       const rows = tableRef.value?.getRows() ?? [];
-      const content = JSON.stringify(
-        { columns: props.data?.columns, rows },
-        null,
-        2,
-      );
+      const content = JSON.stringify({ columns: props.data?.columns, rows }, null, 2);
       const blob = new Blob([content], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -382,7 +376,9 @@ export default defineComponent({
 }
 
 .table-wrapper :deep(.sticky-column.pivot-total-col) {
-  box-shadow: 0.25rem 0 0.5rem var(--color-actions-column-shadow), inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
+  box-shadow:
+    0.25rem 0 0.5rem var(--color-actions-column-shadow),
+    inset 0.25rem 0 0.375rem -0.125rem var(--color-actions-column-shadow) !important;
 }
 
 @media print {

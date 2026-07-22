@@ -105,23 +105,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <div class="pl-4 pr-2 py-0">
-        <slot name="body">
-          <FieldValuesPanel
-            ref="fieldValuesPanelRef"
-            :field-name="field.name"
-            :field-values="mappedFieldValues"
-            :show-multi-select="effectiveShowMultiSelect"
-            :default-values-count="defaultValuesCount"
-            :theme="theme"
-            :active-include-values="activeIncludeValues"
-            :active-exclude-values="activeExcludeValues"
-            @add-search-term="(fn: string, v: string, a: string) => emit('add-search-term', fn, v, a)"
-            @add-multiple-search-terms="(fn: string, vs: string[], a: string) => emit('add-multiple-search-terms', fn, vs, a)"
-            @remove-field-filter="(fn: string) => emit('remove-field-filter', fn)"
-            @load-more-values="(fn: string) => emit('load-more-values', fn)"
-            @search-field-values="(fn: string, t: string) => emit('search-field-values', fn, t)"
-          />
-        </slot>
+      <slot name="body">
+        <FieldValuesPanel
+          ref="fieldValuesPanelRef"
+          :field-name="field.name"
+          :field-values="mappedFieldValues"
+          :show-multi-select="effectiveShowMultiSelect"
+          :default-values-count="defaultValuesCount"
+          :theme="theme"
+          :active-include-values="activeIncludeValues"
+          :active-exclude-values="activeExcludeValues"
+          @add-search-term="(fn: string, v: string, a: string) => emit('add-search-term', fn, v, a)"
+          @add-multiple-search-terms="
+            (fn: string, vs: string[], a: string) => emit('add-multiple-search-terms', fn, vs, a)
+          "
+          @remove-field-filter="(fn: string) => emit('remove-field-filter', fn)"
+          @load-more-values="(fn: string) => emit('load-more-values', fn)"
+          @search-field-values="(fn: string, t: string) => emit('search-field-values', fn, t)"
+        />
+      </slot>
     </div>
   </OCollapsible>
 </template>
@@ -181,11 +183,7 @@ const emit = defineEmits<{
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
   "add-search-term": [fieldName: string, value: string, action: string];
-  "add-multiple-search-terms": [
-    fieldName: string,
-    values: string[],
-    action: string,
-  ];
+  "add-multiple-search-terms": [fieldName: string, values: string[], action: string];
   "remove-field-filter": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
   "load-more-values": [fieldName: string];
@@ -203,15 +201,10 @@ watch(
   },
 );
 
-const isFieldSelected = computed(() =>
-  (props.selectedFields ?? []).includes(props.field.name),
-);
+const isFieldSelected = computed(() => (props.selectedFields ?? []).includes(props.field.name));
 
 const effectiveShowMultiSelect = computed(() => {
-  if (
-    props.selectedStreamsCount !== undefined &&
-    props.field.streams !== undefined
-  ) {
+  if (props.selectedStreamsCount !== undefined && props.field.streams !== undefined) {
     return props.selectedStreamsCount === props.field.streams.length;
   }
   return props.showMultiSelect;

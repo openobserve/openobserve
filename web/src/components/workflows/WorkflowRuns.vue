@@ -31,10 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   editor — the two surfaces never blur together, and nothing resizes mid-flow.
 -->
 <template>
-  <div
-    data-test="workflow-runs-page"
-    class="flex flex-col h-full min-h-0"
-  >
+  <div data-test="workflow-runs-page" class="flex flex-col h-full min-h-0">
     <OPageHeader
       :title="workflowName || t('workflow.runs.title')"
       :back="{
@@ -48,18 +45,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            after the title+subtitle column, stranding it far from the title). -->
       <template #title>
         <span class="inline-flex items-center gap-2 min-w-0">
-          <span class="truncate">{{
-            workflowName || t("workflow.runs.title")
-          }}</span>
+          <span class="truncate">{{ workflowName || t("workflow.runs.title") }}</span>
           <BetaBadge />
         </span>
       </template>
       <template #actions>
-        <OButton
-          variant="outline"
-          data-test="workflow-runs-edit"
-          @click="onEditWorkflow"
-        >
+        <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
           {{ t("workflow.runs.edit") }}
         </OButton>
       </template>
@@ -67,9 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex-1 flex min-h-0 pt-3 px-2 gap-2">
       <!-- Read-only canvas (per-node run status overlay). -->
-      <div
-        class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle"
-      >
+      <div class="flex-1 relative min-w-0 rounded-surface overflow-hidden mb-3 bg-surface-subtle">
         <WorkflowCanvas />
       </div>
 
@@ -120,15 +109,9 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
-const orgId = computed(
-  () => store.state.selectedOrganization.identifier as string,
-);
-const workflowId = computed(
-  () => (router.currentRoute.value.query.id as string) || "",
-);
-const workflowName = computed(
-  () => workflowObj.currentSelectedWorkflow?.name || "",
-);
+const orgId = computed(() => store.state.selectedOrganization.identifier as string);
+const workflowId = computed(() => (router.currentRoute.value.query.id as string) || "");
+const workflowName = computed(() => workflowObj.currentSelectedWorkflow?.name || "");
 const selectedRunId = ref<string>("");
 
 // Steps this run executed that no longer exist in the workflow (deleted/edited

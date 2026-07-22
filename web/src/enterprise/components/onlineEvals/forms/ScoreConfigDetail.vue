@@ -42,39 +42,67 @@
         <!-- ─────────── OVERVIEW TAB ─────────── -->
         <template v-if="activeTab === 'overview'">
           <section v-if="row.description" class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}</h4>
+            <h4
+              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+            >
+              {{ t("onlineEvals.scoreConfig.detail.descriptionSection") }}
+            </h4>
             <p class="m-0 text-compact leading-[1.55] text-text-body">{{ row.description }}</p>
           </section>
 
           <section class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.configurationSection") }}</h4>
+            <h4
+              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+            >
+              {{ t("onlineEvals.scoreConfig.detail.configurationSection") }}
+            </h4>
             <dl class="grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
-              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}</dt>
+              <dt class="text-xs font-semibold text-text-secondary">
+                {{ t("onlineEvals.scoreConfig.detail.dataTypeLabel") }}
+              </dt>
               <dd class="m-0 text-compact text-text-body">
                 <OTag type="evalDataType" :value="dataType" />
               </dd>
 
               <template v-if="dataType === 'numeric' && numericRange">
-                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}</dt>
-                <dd class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">{{ numericRange.min }} – {{ numericRange.max }}</dd>
+                <dt class="text-xs font-semibold text-text-secondary">
+                  {{ t("onlineEvals.scoreConfig.detail.rangeLabel") }}
+                </dt>
+                <dd
+                  class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+                >
+                  {{ numericRange.min }} – {{ numericRange.max }}
+                </dd>
               </template>
 
               <template v-if="dataType === 'categorical' && categories.length">
-                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}</dt>
+                <dt class="text-xs font-semibold text-text-secondary">
+                  {{ t("onlineEvals.scoreConfig.detail.categoriesLabel") }}
+                </dt>
                 <dd class="m-0 text-compact text-text-body">
-                  <OTag v-for="cat in categories" :key="cat" type="fieldTag" value="soft">{{ cat }}</OTag>
+                  <OTag v-for="cat in categories" :key="cat" type="fieldTag" value="soft">{{
+                    cat
+                  }}</OTag>
                 </dd>
               </template>
 
               <template v-if="dataType === 'boolean'">
-                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}</dt>
-                <dd class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">true / false</dd>
+                <dt class="text-xs font-semibold text-text-secondary">
+                  {{ t("onlineEvals.scoreConfig.detail.valuesLabel") }}
+                </dt>
+                <dd
+                  class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+                >
+                  true / false
+                </dd>
               </template>
             </dl>
           </section>
 
           <section class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">
+            <h4
+              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+            >
               {{ t("onlineEvals.scoreConfig.detail.thresholdSection") }}
               <OTag v-if="!healthyLabel" type="thresholdFlag" value="notdeclared" />
             </h4>
@@ -84,7 +112,9 @@
             >
               <span class="text-lg font-bold text-status-success-text">{{ thresholdSign }}</span>
               <span class="font-mono font-bold text-sm text-text-body">{{ healthyLabel }}</span>
-              <span class="ml-auto text-2xs text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.thresholdHint") }}</span>
+              <span class="ml-auto text-2xs text-text-secondary">{{
+                t("onlineEvals.scoreConfig.detail.thresholdHint")
+              }}</span>
             </div>
             <p v-else class="m-0 text-compact leading-[1.55] text-text-secondary">
               {{ t("onlineEvals.scoreConfig.detail.noThresholdHint") }}
@@ -92,40 +122,75 @@
           </section>
 
           <section class="flex flex-col gap-2">
-            <h4 class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5">{{ t("onlineEvals.scoreConfig.detail.metadataSection") }}</h4>
+            <h4
+              class="scd-section__title m-0 font-semibold text-compact leading-normal text-text-heading pb-1.5 border-b border-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] inline-flex items-center gap-1.5"
+            >
+              {{ t("onlineEvals.scoreConfig.detail.metadataSection") }}
+            </h4>
             <dl class="grid grid-cols-[7.5rem_1fr] gap-x-3.5 gap-y-1.5 m-0">
-              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.statusLabel") }}</dt>
+              <dt class="text-xs font-semibold text-text-secondary">
+                {{ t("onlineEvals.scoreConfig.detail.statusLabel") }}
+              </dt>
               <dd class="m-0 text-compact text-text-body">
                 <OTag type="booleanState" :value="isActive ? 'enabled' : 'disabled'">
-                  {{ isActive
-                    ? t("onlineEvals.scoreConfig.detail.statusActive")
-                    : t("onlineEvals.scoreConfig.detail.statusInactive") }}
+                  {{
+                    isActive
+                      ? t("onlineEvals.scoreConfig.detail.statusActive")
+                      : t("onlineEvals.scoreConfig.detail.statusInactive")
+                  }}
                 </OTag>
               </dd>
-              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.versionLabel") }}</dt>
-              <dd class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">v{{ row.version }}</dd>
-              <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.createdLabel") }}</dt>
-              <dd v-if="createdAt" class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">{{ formatTimestamp(createdAt) }}</dd>
-              <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}</dt>
-              <dd v-if="updatedAt" class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</dd>
+              <dt class="text-xs font-semibold text-text-secondary">
+                {{ t("onlineEvals.scoreConfig.detail.versionLabel") }}
+              </dt>
+              <dd
+                class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+              >
+                v{{ row.version }}
+              </dd>
+              <dt v-if="createdAt" class="text-xs font-semibold text-text-secondary">
+                {{ t("onlineEvals.scoreConfig.detail.createdLabel") }}
+              </dt>
+              <dd
+                v-if="createdAt"
+                class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+              >
+                {{ formatTimestamp(createdAt) }}
+              </dd>
+              <dt v-if="updatedAt" class="text-xs font-semibold text-text-secondary">
+                {{ t("onlineEvals.scoreConfig.detail.updatedLabel") }}
+              </dt>
+              <dd
+                v-if="updatedAt"
+                class="m-0 text-compact text-text-body font-mono [font-variant-numeric:tabular-nums]"
+              >
+                {{ formatTimestamp(updatedAt) }}
+              </dd>
             </dl>
           </section>
         </template>
 
         <!-- ─────────── VERSIONS TAB ─────────── -->
         <template v-else-if="activeTab === 'versions'">
-          <p class="m-0 text-xs leading-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.versionsIntro") }}</p>
+          <p class="m-0 text-xs leading-normal text-text-secondary">
+            {{ t("onlineEvals.scoreConfig.detail.versionsIntro") }}
+          </p>
           <ul class="list-none m-0 p-0 flex flex-col gap-2">
             <li
               class="p-[12px_14px] bg-card-bg border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! rounded-default"
             >
               <div class="flex items-center gap-2">
-                <span class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-body">v{{ row.version }}</span>
+                <span
+                  class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-body"
+                  >v{{ row.version }}</span
+                >
                 <OTag type="activeVersionFlag" value="active" />
               </div>
               <div v-if="updatedAt" class="mt-1.5 text-2xs text-text-secondary">
                 {{ t("onlineEvals.scoreConfig.detail.lastUpdated") }}
-                <span class="font-mono [font-variant-numeric:tabular-nums]">{{ formatTimestamp(updatedAt) }}</span>
+                <span class="font-mono [font-variant-numeric:tabular-nums]">{{
+                  formatTimestamp(updatedAt)
+                }}</span>
               </div>
             </li>
           </ul>
@@ -133,7 +198,9 @@
 
         <!-- ─────────── USED BY TAB ─────────── -->
         <template v-else-if="activeTab === 'usedBy'">
-          <p class="m-0 text-xs leading-normal text-text-secondary">{{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}</p>
+          <p class="m-0 text-xs leading-normal text-text-secondary">
+            {{ t("onlineEvals.scoreConfig.detail.usedByIntro") }}
+          </p>
           <div
             v-if="usedByScorers.length === 0"
             class="inline-flex items-center gap-1.5 p-[8px_10px] bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,transparent)] rounded-default text-xs text-text-secondary"
@@ -151,12 +218,21 @@
               >
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <span class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-heading">{{ scorer.name }}</span>
+                    <span
+                      class="font-mono [font-variant-numeric:tabular-nums] font-bold text-compact text-text-heading"
+                      >{{ scorer.name }}</span
+                    >
                     <OTag type="scorerType" :value="scorerTypeOf(scorer)" />
-                    <span class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]">v{{ scorer.version }}</span>
+                    <span class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
+                      >v{{ scorer.version }}</span
+                    >
                   </div>
                 </div>
-                <OIcon name="chevron-right" size="sm" class="scd-used-card__chevron shrink-0 text-text-secondary opacity-50" />
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="scd-used-card__chevron shrink-0 text-text-secondary opacity-50"
+                />
               </OButton>
             </li>
           </ul>
@@ -176,10 +252,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { ScoreConfig, Scorer } from "@/services/online-evals.service";
-import {
-  dataTypeOf,
-  entityId,
-} from "../utils/evalEntity";
+import { dataTypeOf, entityId } from "../utils/evalEntity";
 
 const props = defineProps<{
   row: ScoreConfig;

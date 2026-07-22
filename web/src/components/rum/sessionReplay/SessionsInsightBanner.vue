@@ -19,11 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        `error` banner stays reserved for hard failures. -->
   <OBanner
     :variant="insight.kind === 'frustration' ? 'warning' : 'error-soft'"
-    :icon="
-      insight.kind === 'frustration'
-        ? 'sentiment-very-dissatisfied'
-        : 'error-outline'
-    "
+    :icon="insight.kind === 'frustration' ? 'sentiment-very-dissatisfied' : 'error-outline'"
     dense
     inline-actions
     data-test="rum-sessions-insight-banner"
@@ -106,8 +102,7 @@ const viewPath = computed(() => {
   }
 });
 
-const truncate = (text: string, max = 120) =>
-  text.length > max ? `${text.slice(0, max)}…` : text;
+const truncate = (text: string, max = 120) => (text.length > max ? `${text.slice(0, max)}…` : text);
 
 const message = computed(() => {
   if (props.insight.kind === "frustration") {
@@ -134,4 +129,3 @@ const message = computed(() => {
   });
 });
 </script>
-

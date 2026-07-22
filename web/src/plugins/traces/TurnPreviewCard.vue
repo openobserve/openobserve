@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Header: Turn N · time · status -->
           <div class="flex items-center gap-2 mb-2">
             <span class="text-compact font-bold">
-              {{ t('traces.sessionDetail.turnLabel') }} {{ index + 1 }}
+              {{ t("traces.sessionDetail.turnLabel") }} {{ index + 1 }}
             </span>
             <span class="text-3xs text-text-muted">{{ timeLabel }}</span>
             <OBadge
@@ -47,7 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="ml-auto"
               :variant="turn.status === 'error' ? 'error-soft' : 'success-soft'"
             >
-              {{ turn.status === 'error' ? t('traces.sessionDetail.statusError') : t('traces.sessionDetail.statusOk') }}
+              {{
+                turn.status === "error"
+                  ? t("traces.sessionDetail.statusError")
+                  : t("traces.sessionDetail.statusOk")
+              }}
             </OBadge>
           </div>
 
@@ -56,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               class="block text-3xs font-bold uppercase tracking-[0.05em] text-text-muted mb-0.5"
             >
-              {{ t('traces.sessionDetail.roles.user') }}
+              {{ t("traces.sessionDetail.roles.user") }}
             </span>
             <span class="line-clamp-2">{{ userText }}</span>
           </div>
@@ -66,19 +70,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="grid grid-cols-2 gap-x-3 gap-y-[7px] border-t border-card-glass-border pt-2.25"
           >
             <div class="flex items-center justify-between text-2xs">
-              <span class="text-text-muted">{{ t('traces.sessionDetail.stats.cost') }}</span>
+              <span class="text-text-muted">{{ t("traces.sessionDetail.stats.cost") }}</span>
               <span class="font-[650]">{{ costLabel }}</span>
             </div>
             <div class="flex items-center justify-between text-2xs">
-              <span class="text-text-muted">{{ t('traces.sessionDetail.kpi.duration') }}</span>
+              <span class="text-text-muted">{{ t("traces.sessionDetail.kpi.duration") }}</span>
               <span class="font-[650]">{{ latencyLabel }}</span>
             </div>
             <div class="flex items-center justify-between text-2xs">
-              <span class="text-text-muted">{{ t('traces.sessionDetail.kpi.tokens') }}</span>
+              <span class="text-text-muted">{{ t("traces.sessionDetail.kpi.tokens") }}</span>
               <span class="font-[650]">{{ tokensLabel }}</span>
             </div>
             <div class="flex items-center justify-between text-2xs">
-              <span class="text-text-muted">{{ t('traces.sessionDetail.stats.cache') }}</span>
+              <span class="text-text-muted">{{ t("traces.sessionDetail.stats.cache") }}</span>
               <span class="font-[650]">{{ cachePct }}%</span>
             </div>
           </div>
@@ -95,10 +99,7 @@ import { formatDate } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { SessionTraceRow } from "./composables/useSessions";
-import {
-  splitNumberWithUnit,
-  splitDuration,
-} from "./llmInsightsDashboard.utils";
+import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 
 const props = withDefaults(
   defineProps<{

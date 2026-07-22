@@ -14,18 +14,12 @@ const props = defineProps<FormSliderProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormSlider] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormSlider] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="flex flex-col gap-1">
         <OSlider
@@ -43,9 +37,7 @@ if (import.meta.env.DEV && !form) {
           :id="props.id"
           :name="props.name"
           :model-value="field.state.value"
-          :error="
-            field.state.meta.errors.length > 0
-          "
+          :error="field.state.meta.errors.length > 0"
           @update:model-value="
             (v: number) => {
               field.handleChange(v);
@@ -58,12 +50,7 @@ if (import.meta.env.DEV && !form) {
             <slot name="label" />
           </template>
         </OSlider>
-        <div
-          v-if="
-            field.state.meta.errors.length > 0
-          "
-          class="text-xs text-slider-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-xs text-slider-error-text">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

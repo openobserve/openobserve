@@ -22,9 +22,7 @@ the Free Software Foundation, either version 3 of the License, or
     >
       <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
       <div class="text-status-error-text">{{ loadError }}</div>
-      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
-        Retry
-      </OButton>
+      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog"> Retry </OButton>
     </div>
 
     <div
@@ -38,7 +36,9 @@ the Free Software Foundation, either version 3 of the License, or
     <div v-else class="flex flex-col min-h-0 flex-1">
       <div class="flex items-end gap-3 mb-4">
         <div class="flex items-center gap-2 shrink-0 w-60">
-          <label class="text-xs font-semibold text-text-secondary whitespace-nowrap">Provider</label>
+          <label class="text-xs font-semibold text-text-secondary whitespace-nowrap"
+            >Provider</label
+          >
           <OSelect
             v-model="selectedProviderId"
             :options="providerOptions"
@@ -63,15 +63,10 @@ the Free Software Foundation, either version 3 of the License, or
           class="inline-flex items-center gap-2 py-0.5 px-1 text-xs font-medium text-text-secondary select-none"
           data-test="scorer-library-select-all"
         >
-          <OCheckbox
-            :model-value="allVisibleSelected"
-            @update:model-value="toggleSelectAll"
-          />
+          <OCheckbox :model-value="allVisibleSelected" @update:model-value="toggleSelectAll" />
           <span>{{ allVisibleSelected ? "Clear all" : "Select all" }}</span>
         </label>
-        <span class="text-xs text-text-secondary">
-          {{ filteredEntries.length }} scorer(s)
-        </span>
+        <span class="text-xs text-text-secondary"> {{ filteredEntries.length }} scorer(s) </span>
       </div>
 
       <div class="overflow-y-auto flex-1 min-h-0">
@@ -81,13 +76,13 @@ the Free Software Foundation, either version 3 of the License, or
           class="mt-4 first:mt-0"
           :data-test="`scorer-library-section-${group.category}`"
         >
-          <h4 class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-text-heading">
+          <h4
+            class="flex items-baseline gap-1.5 m-0 mb-1.5 text-xs font-bold uppercase tracking-[0.04em] text-text-heading"
+          >
             <span>{{ group.category }}</span>
             <span class="font-medium text-text-secondary">({{ group.entries.length }})</span>
           </h4>
-          <ul
-            class="flex flex-col rounded-default border border-border-default"
-          >
+          <ul class="flex flex-col rounded-default border border-border-default">
             <li
               v-for="entry in group.entries"
               :key="entry.name"
@@ -109,10 +104,7 @@ the Free Software Foundation, either version 3 of the License, or
               </div>
               <div class="flex flex-col flex-1 min-w-0">
                 <span class="text-sm font-medium">{{ entry.displayName }}</span>
-                <span
-                  v-if="entry.description"
-                  class="block text-xs text-text-secondary"
-                >
+                <span v-if="entry.description" class="block text-xs text-text-secondary">
                   {{ entry.description }}
                 </span>
               </div>
@@ -245,11 +237,10 @@ function toggleSelectAll() {
   selectedNames.value = next;
 }
 
-watch(
-  selectedNames,
-  (val) => emit("update:selected-count", val.size),
-  { deep: true, immediate: true },
-);
+watch(selectedNames, (val) => emit("update:selected-count", val.size), {
+  deep: true,
+  immediate: true,
+});
 
 async function importSelected() {
   if (isImporting.value || selectedNames.value.size === 0) return;
@@ -352,4 +343,3 @@ function scorerPayload(entry: CatalogScorer, scoreConfigId: string) {
 
 defineExpose({ importSelected });
 </script>
-

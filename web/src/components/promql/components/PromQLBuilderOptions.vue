@@ -8,7 +8,9 @@
         <div
           data-test="promql-builder-options-label"
           class="whitespace-nowrap min-w-21.5 text-sm flex items-center"
-        >{{ t("panel.options") }}</div>
+        >
+          {{ t("panel.options") }}
+        </div>
         <span class="flex items-center ml-0.5 mr-0.5">:</span>
         <div
           data-test="promql-builder-options-axis-container"
@@ -22,7 +24,8 @@
             <span
               data-test="promql-builder-options-field-label"
               class="text-2xs font-medium whitespace-nowrap opacity-85"
-            >{{ t("dashboard.legendLabel") }}</span>
+              >{{ t("dashboard.legendLabel") }}</span
+            >
             <div
               data-test="promql-builder-options-field-input-wrapper"
               class="relative inline-block"
@@ -47,7 +50,8 @@
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
-                    ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.legend') }}</b>
+                    ({{ t("dashboard.optional") }})
+                    <b>{{ t("metrics.promQLBuilderOptions.legend") }}</b>
                     {{ t("dashboard.overrideMessage") }}
                     <br />
                     {{ t("dashboard.overrideMessageExample") }}
@@ -65,7 +69,8 @@
             <span
               data-test="promql-builder-options-field-label"
               class="text-2xs font-medium whitespace-nowrap opacity-85"
-            >{{ t("dashboard.stepValue") }}</span>
+              >{{ t("dashboard.stepValue") }}</span
+            >
             <OInput
               v-model="
                 dashboardPanelDataModel.data.queries[
@@ -81,7 +86,8 @@
                 <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
-                      ({{ t("dashboard.optional") }}) <b>{{ t('metrics.promQLBuilderOptions.step') }}</b>
+                      ({{ t("dashboard.optional") }})
+                      <b>{{ t("metrics.promQLBuilderOptions.step") }}</b>
                       {{ t("dashboard.stepValueTooltip") }}
                       <br />
                       {{ t("dashboard.stepValueTooltipInfo") }}
@@ -102,7 +108,8 @@
             <span
               data-test="promql-builder-options-field-label"
               class="text-2xs font-medium whitespace-nowrap opacity-85"
-            >{{ t("common.type") }}</span>
+              >{{ t("common.type") }}</span
+            >
             <OSelect
               v-model="
                 dashboardPanelDataModel.data.queries[
@@ -123,9 +130,10 @@
             >
               <OTooltip side="top" max-width="250px">
                 <template #content>
-                  <b>{{ t('metrics.promQLBuilderOptions.queryType') }}</b><br />
-                  {{ t('metrics.promQLBuilderOptions.rangeDescription') }}<br />
-                  {{ t('metrics.promQLBuilderOptions.instantDescription') }}
+                  <b>{{ t("metrics.promQLBuilderOptions.queryType") }}</b
+                  ><br />
+                  {{ t("metrics.promQLBuilderOptions.rangeDescription") }}<br />
+                  {{ t("metrics.promQLBuilderOptions.instantDescription") }}
                 </template>
               </OTooltip>
             </OIcon>
@@ -170,9 +178,7 @@ export default defineComponent({
 
     // Initialize query_type if not set (default to "range")
     const currentQuery =
-      props.dashboardPanelData.data.queries[
-        props.dashboardPanelData.layout.currentQueryIndex
-      ];
+      props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
     if (!currentQuery.config.query_type) {
       currentQuery.config.query_type = "range";
     }
@@ -193,18 +199,15 @@ export default defineComponent({
     const dashboardSelectfieldPromQlList = computed(() => {
       // Get fields from groupedFields based on current query's stream
       const currentQuery =
-        props.dashboardPanelData.data.queries[
-          props.dashboardPanelData.layout.currentQueryIndex
-        ];
+        props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
       const currentStream = currentQuery?.fields?.stream;
 
       if (!currentStream) return [];
 
       // Find the current stream in groupedFields
-      const streamFields =
-        props.dashboardPanelData.meta.streamFields.groupedFields.find(
-          (group: any) => group.name === currentStream,
-        );
+      const streamFields = props.dashboardPanelData.meta.streamFields.groupedFields.find(
+        (group: any) => group.name === currentStream,
+      );
 
       if (!streamFields?.schema) return [];
 
@@ -219,9 +222,8 @@ export default defineComponent({
     // Method to replace PromQL legend value with selected option
     const selectPromQlNameOption = (option: any) => {
       const inputValue =
-        props.dashboardPanelData.data.queries[
-          props.dashboardPanelData.layout.currentQueryIndex
-        ].config.promql_legend;
+        props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex]
+          .config.promql_legend;
 
       // Find the index of the last opening brace '{'
       const openingBraceIndex = inputValue.lastIndexOf("{");
@@ -230,12 +232,10 @@ export default defineComponent({
 
       const fieldName = (option as any)?.value ?? option;
       if (openingBraceIndex === -1) {
-        const newValue =
-          "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
+        const newValue = "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       } else {
-        const newValue =
-          inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
+        const newValue = inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       }
     };
@@ -250,4 +250,3 @@ export default defineComponent({
   },
 });
 </script>
-

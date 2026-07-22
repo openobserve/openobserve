@@ -14,10 +14,9 @@
           </h1>
           <p class="text-sm text-text-secondary mt-1 max-w-2xl">
             Every preset below is a real
-            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its
-            production copy, illustration, and action. Each detailed scene has its
-            own character micro-animation and pauses under OS "reduce motion".
-            Nothing is wired into real pages yet.
+            <code class="text-text-body">&lt;OEmptyState&gt;</code> with its production copy,
+            illustration, and action. Each detailed scene has its own character micro-animation and
+            pauses under OS "reduce motion". Nothing is wired into real pages yet.
           </p>
         </div>
         <div class="flex items-center gap-2">
@@ -29,7 +28,12 @@
           >
             {{ filteredPreview ? "First-run state" : "Filtered state" }}
           </OButton>
-          <OButton variant="outline" size="sm" icon-left="dark-mode" @click="localDark = !localDark">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="dark-mode"
+            @click="localDark = !localDark"
+          >
             {{ localDark ? "Light preview" : "Dark preview" }}
           </OButton>
         </div>
@@ -60,9 +64,9 @@
           Character — optional, only where it adds value
         </h2>
         <p class="text-sm text-text-secondary mb-3 max-w-2xl">
-          The illustration is just a named choice, so a scene can opt into a
-          character (e.g. a prominent first-run hero) while everything else stays
-          object-only. Same component, <code class="text-text-body">illustration="explorer"</code>.
+          The illustration is just a named choice, so a scene can opt into a character (e.g. a
+          prominent first-run hero) while everything else stays object-only. Same component,
+          <code class="text-text-body">illustration="explorer"</code>.
         </p>
         <div class="rounded-default border border-border-default h-110 overflow-hidden">
           <OEmptyState

@@ -19,13 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="dashboard-custom-chart-editor-container"
     class="bg-card-glass-bg w-full h-full overflow-hidden flex flex-col"
   >
-    <div class="w-full h-full flex flex-col"
-      data-test="dashboard-custom-chart-editor-inner"
-    >
-      <div
-        data-test="dashboard-custom-chart-editor-flex-col"
-        class="flex flex-col h-full"
-      >
+    <div class="w-full h-full flex flex-col" data-test="dashboard-custom-chart-editor-inner">
+      <div data-test="dashboard-custom-chart-editor-flex-col" class="flex flex-col h-full">
         <QueryEditor
           v-model:query="javascriptCodeContent"
           :debounceTime="500"
@@ -33,7 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-markdown-editor-query-editor"
           language="javascript"
           class="javascript-query-editor pl-5 h-full flex-1 bg-code-block-bg"
-         
         />
       </div>
     </div>
@@ -43,9 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 

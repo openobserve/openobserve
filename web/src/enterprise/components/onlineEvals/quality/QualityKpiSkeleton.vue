@@ -14,7 +14,13 @@
         <OSkeleton type="text" class="w-[22%] h-2.75" />
       </div>
       <div class="flex items-end gap-0.75 h-7 mt-auto">
-        <OSkeleton type="text" v-for="bar in 14" :key="bar" :style="{ height: `${30 + ((bar * 23) % 65)}%` }" class="w-full" />
+        <OSkeleton
+          type="text"
+          v-for="bar in 14"
+          :key="bar"
+          :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
+          class="w-full"
+        />
       </div>
     </div>
   </KpiCardRow>

@@ -38,17 +38,11 @@ const props = defineProps<{
   dense?: boolean;
   bordered?: boolean;
   enableCellCopy?: boolean;
-  getCellStyle?: (params: {
-    columnId: string;
-    row: any;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
 }>();
 
 const emit = defineEmits<{
-  "cell-click": [
-    params: { columnId: string; row: any; value: any },
-  ];
+  "cell-click": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const meta = computed(() => props.cell.column.columnDef.meta as any);
@@ -56,9 +50,7 @@ const align = computed(() => meta.value?.align ?? "left");
 
 // Record-name column weight. Only the default-rendered text path uses this;
 // custom cells style their own.
-const defaultTextClass = computed(() => [
-  "text-text-body",
-]);
+const defaultTextClass = computed(() => ["text-text-body"]);
 
 const alignClass = computed(() => {
   if (align.value === "center") return "text-center";
@@ -82,28 +74,20 @@ const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
 const pinOffset = computed(() => {
   if (!isPinned.value) return 0;
-  if (isPinned.value === "left")
-    return props.cell.column.getStart?.("left") ?? 0;
-  if (isPinned.value === "right")
-    return props.cell.column.getAfter?.("right") ?? 0;
+  if (isPinned.value === "left") return props.cell.column.getStart?.("left") ?? 0;
+  if (isPinned.value === "right") return props.cell.column.getAfter?.("right") ?? 0;
   return 0;
 });
 
 const rawValue = computed(() => props.cell.getValue());
 
 const displayValue = computed(() => {
-  const formatFn = meta.value?.format as
-    | ((value: any, row: any) => any)
-    | undefined;
-  if (rawValue.value === null || rawValue.value === undefined)
-    return rawValue.value;
+  const formatFn = meta.value?.format as ((value: any, row: any) => any) | undefined;
+  if (rawValue.value === null || rawValue.value === undefined) return rawValue.value;
   return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
 });
 
-const horizontalScroll = inject<{ value: boolean } | null>(
-  "o2TableHorizontalScroll",
-  null,
-);
+const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
 
 const isAutoWidth = computed(() => meta.value?.autoWidth === true);
 
@@ -157,9 +141,7 @@ const highlightedHtml = computed(() => {
 // ── Tree mode: inline chevron + indent for the designated tree column ──
 const treeCtx = inject(OTableTreeContextKey, null);
 const isTreeColumn = computed(
-  () =>
-    !!treeCtx?.value?.enabled &&
-    treeCtx.value.treeColumnId === props.cell.column.id,
+  () => !!treeCtx?.value?.enabled && treeCtx.value.treeColumnId === props.cell.column.id,
 );
 const treeMeta = computed(() => {
   if (!isTreeColumn.value) return null;
@@ -173,9 +155,7 @@ const treeIndentPx = computed(() => (treeMeta.value?.depth ?? 0) * 16);
  * For child rows we want the horizontal stub to start at the *parent's*
  * chevron x, which is `depth - 1` indents in.
  */
-const treeChevronX = computed(
-  () => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9,
-);
+const treeChevronX = computed(() => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9);
 const treeParentChevronX = computed(
   () => 8 + Math.max((treeMeta.value?.depth ?? 0) - 1, 0) * 16 + 9,
 );
@@ -204,14 +184,18 @@ function handleClick() {
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
       'text-text-body',
-      meta?.spacer ? 'px-0 align-middle' : (meta?.compactPadding ? 'px-1 align-middle' : 'px-2 align-middle'),
+      meta?.spacer
+        ? 'px-0 align-middle'
+        : meta?.compactPadding
+          ? 'px-1 align-middle'
+          : 'px-2 align-middle',
       bordered ? 'border-b border-table-row-divider' : '',
       alignClass,
       isAction ? 'w-0 whitespace-nowrap' : '',
-       isPinned
-        ? (rowSelected
-            ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
-            : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150')
+      isPinned
+        ? rowSelected
+          ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
         : '',
       wrap
         ? 'break-words whitespace-normal'
@@ -223,9 +207,11 @@ function handleClick() {
       meta?.cellClass ?? '',
       isTreeColumn ? 'relative' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
-      isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
+      isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
-      isTreeColumn && treeMeta && (treeMeta.parentId !== null) && !treeMeta.hasChildren ? 'o2-tree-leaf' : '',
+      isTreeColumn && treeMeta && treeMeta.parentId !== null && !treeMeta.hasChildren
+        ? 'o2-tree-leaf'
+        : '',
     ]"
     :style="[
       cellStyle,
@@ -256,10 +242,7 @@ function handleClick() {
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
         >
-          <OIcon
-            :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'"
-            size="sm"
-          />
+          <OIcon :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'" size="sm" />
         </button>
         <span
           v-else
@@ -277,11 +260,7 @@ function handleClick() {
           :render="cell.column.columnDef.cell"
           :props="cell.getContext()"
         />
-        <span
-          v-else-if="highlightedHtml"
-          :class="defaultTextClass"
-          v-html="highlightedHtml"
-        />
+        <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
         <span v-else :class="defaultTextClass">
           {{ displayValue }}
         </span>
@@ -301,11 +280,7 @@ function handleClick() {
         :props="cell.getContext()"
       />
       <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
-      <span
-        v-else-if="highlightedHtml"
-        :class="defaultTextClass"
-        v-html="highlightedHtml"
-      />
+      <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
       <!-- Default: plain text -->
       <span v-else :class="defaultTextClass">
         {{ displayValue }}

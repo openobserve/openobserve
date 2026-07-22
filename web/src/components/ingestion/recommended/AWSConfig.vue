@@ -23,19 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("ingestion.awsSetup.title") }}
       </div>
-      <div
-        data-test="aws-config-page-description"
-        class="text-sm m-0 mb-4 text-text-secondary"
-      >
+      <div data-test="aws-config-page-description" class="text-sm m-0 mb-4 text-text-secondary">
         {{ t("ingestion.awsSetup.description") }}
       </div>
 
-      <OTabs
-        v-model="activeTab"
-        dense
-        class="aws-tabs"
-        align="left"
-      >
+      <OTabs v-model="activeTab" dense class="aws-tabs" align="left">
         <OTab
           name="quick-setup"
           :label="t('ingestion.awsSetup.quickSetup')"
@@ -76,11 +68,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRoute } from "vue-router";
@@ -107,7 +99,10 @@ export default defineComponent({
   },
   components: {
     OSeparator,
-    OTabs, OTab, OTabPanels, OTabPanel,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
     CopyContent,
     AWSQuickSetup,
     AWSIndividualServices,
@@ -118,21 +113,29 @@ export default defineComponent({
     const route = useRoute();
 
     // If there's a search query, default to individual-services tab
-    const activeTab = ref(props.searchQuery || route.query.search ? "individual-services" : "quick-setup");
+    const activeTab = ref(
+      props.searchQuery || route.query.search ? "individual-services" : "quick-setup",
+    );
 
     // Watch for search query changes in route
-    watch(() => route.query.search, (newSearch) => {
-      if (newSearch) {
-        activeTab.value = "individual-services";
-      }
-    });
+    watch(
+      () => route.query.search,
+      (newSearch) => {
+        if (newSearch) {
+          activeTab.value = "individual-services";
+        }
+      },
+    );
 
     // Watch for searchQuery prop changes
-    watch(() => props.searchQuery, (newSearch) => {
-      if (newSearch) {
-        activeTab.value = "individual-services";
-      }
-    });
+    watch(
+      () => props.searchQuery,
+      (newSearch) => {
+        if (newSearch) {
+          activeTab.value = "individual-services";
+        }
+      },
+    );
     // TODO OK: Create interface for ENDPOINT
     const endpoint: any = ref({
       url: "",

@@ -19,14 +19,19 @@ import i18n from "@/locales";
 // @ts-ignore
 import store from "@/test/unit/helpers/store";
 
-const { mockToast, mockGetStream, mockStreamServiceSchema, mockStreamServiceList, mockUpdateSettings } =
-  vi.hoisted(() => ({
-    mockToast: vi.fn(() => vi.fn()),
-    mockGetStream: vi.fn(),
-    mockStreamServiceSchema: vi.fn(),
-    mockStreamServiceList: vi.fn(),
-    mockUpdateSettings: vi.fn().mockResolvedValue({ data: { code: 200 } }),
-  }));
+const {
+  mockToast,
+  mockGetStream,
+  mockStreamServiceSchema,
+  mockStreamServiceList,
+  mockUpdateSettings,
+} = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()),
+  mockGetStream: vi.fn(),
+  mockStreamServiceSchema: vi.fn(),
+  mockStreamServiceList: vi.fn(),
+  mockUpdateSettings: vi.fn().mockResolvedValue({ data: { code: 200 } }),
+}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
@@ -39,7 +44,12 @@ vi.mock("@/composables/useStreams", () => ({
     getStream: mockGetStream,
     getStreams: vi.fn().mockResolvedValue({}),
     getUpdatedSettings: vi.fn((_prev, settings) => settings),
-    streamsCache: { logs: { value: {} }, traces: { value: {} }, metrics: { value: {} }, enrichment_tables: { value: {} } },
+    streamsCache: {
+      logs: { value: {} },
+      traces: { value: {} },
+      metrics: { value: {} },
+      enrichment_tables: { value: {} },
+    },
     updateStreamsInStore: vi.fn(),
   }),
 }));
@@ -128,9 +138,28 @@ describe("Schema Component Tests", () => {
       name: "test-stream",
       stream_type: "logs",
       storage_type: "s3",
-      stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+      stats: {
+        doc_time_min: 0,
+        doc_time_max: 0,
+        doc_num: 0,
+        file_num: 0,
+        storage_size: 0,
+        compressed_size: 0,
+      },
       schema: [{ name: "_timestamp", type: "Int64" }],
-      settings: { partition_time_level: "hourly", partition_keys: {}, full_text_search_keys: [], index_fields: [], bloom_filter_fields: [], data_retention: 30, max_query_range: 0, store_original_data: false, approx_partition: false, defined_schema_fields: [], extended_retention_days: [] },
+      settings: {
+        partition_time_level: "hourly",
+        partition_keys: {},
+        full_text_search_keys: [],
+        index_fields: [],
+        bloom_filter_fields: [],
+        data_retention: 30,
+        max_query_range: 0,
+        store_original_data: false,
+        approx_partition: false,
+        defined_schema_fields: [],
+        extended_retention_days: [],
+      },
       pattern_associations: [],
     });
   });
@@ -242,11 +271,11 @@ describe("Schema Component Tests", () => {
     it("should update active tab and result total", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
-      
+
       wrapper.vm.updateActiveTab("schemaFields");
       expect(wrapper.vm.activeTab).toBe("schemaFields");
       expect(wrapper.vm.resultTotal).toBe(1);
-      
+
       wrapper.vm.updateActiveTab("allFields");
       expect(wrapper.vm.activeTab).toBe("allFields");
       expect(wrapper.vm.resultTotal).toBe(2);
@@ -294,24 +323,23 @@ describe("Schema Component Tests", () => {
     it("should compute hasUserDefinedSchema correctly", () => {
       // Initially false
       expect(wrapper.vm.hasUserDefinedSchema).toBe(false);
-      
+
       // Set defined schema fields
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       expect(wrapper.vm.hasUserDefinedSchema).toBe(true);
     });
 
-
-    // Test 10: showDataRetention computed property  
+    // Test 10: showDataRetention computed property
     it("should compute showDataRetention correctly", async () => {
       expect(wrapper.vm.showDataRetention).toBe(true);
-      
+
       // Test with enrichment_tables
       const enrichmentWrapper = mount(LogStream, {
         props: {
           modelValue: {
             name: "test-stream",
             stream_type: "enrichment_tables",
-            settings: { defined_schema_fields: [] }
+            settings: { defined_schema_fields: [] },
           },
         },
         global: {
@@ -326,7 +354,6 @@ describe("Schema Component Tests", () => {
       enrichmentWrapper.unmount();
     });
 
-
     // Test 12: getFieldIndices function with full text search
     it("should get correct field indices for full text search", () => {
       const property = { name: "message" };
@@ -336,16 +363,17 @@ describe("Schema Component Tests", () => {
         bloom_filter_fields: [],
         partition_keys: {},
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("fullTextSearchKey");
       expect(property.index_type).toContain("fullTextSearchKey");
     });
-
 
     // Test 14: getFieldIndices function with secondary index
     it("should get correct field indices for secondary index", () => {
@@ -356,11 +384,13 @@ describe("Schema Component Tests", () => {
         bloom_filter_fields: [],
         partition_keys: {},
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("secondaryIndexKey");
     });
@@ -374,11 +404,13 @@ describe("Schema Component Tests", () => {
         bloom_filter_fields: ["userId"],
         partition_keys: {},
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("bloomFilterKey");
     });
@@ -391,14 +423,16 @@ describe("Schema Component Tests", () => {
         index_fields: [],
         bloom_filter_fields: [],
         partition_keys: {
-          level1: { field: "region", types: "value", disabled: false }
+          level1: { field: "region", types: "value", disabled: false },
         },
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("keyPartition");
       expect(property.level).toBe("level1");
@@ -412,14 +446,16 @@ describe("Schema Component Tests", () => {
         index_fields: [],
         bloom_filter_fields: [],
         partition_keys: {
-          level1: { field: "customerId", types: { hash: 16 }, disabled: false }
+          level1: { field: "customerId", types: { hash: 16 }, disabled: false },
         },
       };
-      
+
       // Mock store properties that are used in getFieldIndices
-      wrapper.vm.store.state.zoConfig.default_fts_keys = wrapper.vm.store.state.zoConfig.default_fts_keys || [];
-      wrapper.vm.store.state.zoConfig.default_secondary_index_fields = wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
-      
+      wrapper.vm.store.state.zoConfig.default_fts_keys =
+        wrapper.vm.store.state.zoConfig.default_fts_keys || [];
+      wrapper.vm.store.state.zoConfig.default_secondary_index_fields =
+        wrapper.vm.store.state.zoConfig.default_secondary_index_fields || [];
+
       const indices = wrapper.vm.getFieldIndices(property, settings);
       expect(indices).toContain("hashPartition_16");
     });
@@ -429,9 +465,9 @@ describe("Schema Component Tests", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1", "field2", "field3"];
       wrapper.vm.selectedFields = [{ name: "field2" }];
       wrapper.vm.activeTab = "schemaFields";
-      
+
       wrapper.vm.updateDefinedSchemaFields();
-      
+
       expect(wrapper.vm.indexData.defined_schema_fields).toEqual(["field1", "field3"]);
       expect(wrapper.vm.selectedFields).toEqual([]);
       expect(wrapper.vm.formDirtyFlag).toBe(true);
@@ -442,9 +478,9 @@ describe("Schema Component Tests", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.selectedFields = [{ name: "field2" }];
       wrapper.vm.activeTab = "allFields";
-      
+
       wrapper.vm.updateDefinedSchemaFields();
-      
+
       expect(wrapper.vm.indexData.defined_schema_fields).toContain("field1");
       expect(wrapper.vm.indexData.defined_schema_fields).toContain("field2");
     });
@@ -454,9 +490,9 @@ describe("Schema Component Tests", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.selectedFields = [{ name: "field1" }];
       wrapper.vm.activeTab = "schemaFields";
-      
+
       wrapper.vm.updateDefinedSchemaFields();
-      
+
       expect(wrapper.vm.indexData.defined_schema_fields).toEqual([]);
       expect(wrapper.vm.activeTab).toBe("allFields");
     });
@@ -465,16 +501,16 @@ describe("Schema Component Tests", () => {
     it("should update stream response with user defined flags", () => {
       const streamResponse = {
         settings: {
-          defined_schema_fields: ["field1"]
+          defined_schema_fields: ["field1"],
         },
         schema: [
           { name: "field1", type: "string" },
-          { name: "field2", type: "number" }
-        ]
+          { name: "field2", type: "number" },
+        ],
       };
-      
+
       const result = wrapper.vm.updateStreamResponse(streamResponse);
-      
+
       expect(result.schema[0].isUserDefined).toBe(true);
       expect(result.schema[1].isUserDefined).toBe(false);
     });
@@ -508,11 +544,11 @@ describe("Schema Component Tests", () => {
     // Test 26: openPatternAssociationDialog function
     it("should open pattern association dialog", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1" }]
+        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1" }],
       };
-      
+
       wrapper.vm.openPatternAssociationDialog("field1");
-      
+
       expect(wrapper.vm.patternAssociationDialog.show).toBe(true);
       expect(wrapper.vm.patternAssociationDialog.fieldName).toBe("field1");
     });
@@ -524,14 +560,14 @@ describe("Schema Component Tests", () => {
         pattern_name: "test-pattern",
         pattern_id: "pattern-123",
         policy: "replace",
-        apply_at: "ingestion"
+        apply_at: "ingestion",
       };
-      
+
       wrapper.vm.handleAddPattern(pattern);
-      
+
       expect(wrapper.vm.formDirtyFlag).toBe(true);
       expect(wrapper.vm.patternAssociations.field1).toEqual(
-        expect.arrayContaining([expect.objectContaining(pattern)])
+        expect.arrayContaining([expect.objectContaining(pattern)]),
       );
     });
 
@@ -540,12 +576,12 @@ describe("Schema Component Tests", () => {
       wrapper.vm.patternAssociations = {
         field1: [
           { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
-          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" }
-        ]
+          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" },
+        ],
       };
-      
+
       wrapper.vm.handleRemovePattern("id1", "field1");
-      
+
       expect(wrapper.vm.formDirtyFlag).toBe(true);
       expect(wrapper.vm.patternAssociations.field1).toHaveLength(1);
       expect(wrapper.vm.patternAssociations.field1[0].pattern_id).toBe("id2");
@@ -554,16 +590,16 @@ describe("Schema Component Tests", () => {
     // Test 29: handleUpdateAppliedPattern for policy
     it("should update applied pattern policy", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", policy: "old" }]
+        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", policy: "old" }],
       };
-      
+
       const updatedPattern = {
         field: "field1",
         pattern_name: "pattern1",
         pattern_id: "id1",
-        policy: "new"
+        policy: "new",
       };
-      
+
       wrapper.vm.handleUpdateAppliedPattern(updatedPattern, "field1", "id1", "policy");
       expect(wrapper.vm.patternAssociations.field1[0].policy).toBe("new");
     });
@@ -572,9 +608,9 @@ describe("Schema Component Tests", () => {
     it("should scroll to add fields section", () => {
       const mockElement = { scrollIntoView: vi.fn() };
       vi.spyOn(document, "getElementById").mockReturnValue(mockElement);
-      
+
       wrapper.vm.scrollToAddFields();
-      
+
       expect(document.getElementById).toHaveBeenCalledWith("schema-add-fields-section");
       expect(mockElement.scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth" });
     });
@@ -599,9 +635,9 @@ describe("Schema Component Tests", () => {
     // Test 32: deleteDates function
     it("should delete dates correctly", () => {
       wrapper.vm.selectedDateFields = [
-        { original_start: 1703505000000, original_end: 1703591400000 }
+        { original_start: 1703505000000, original_end: 1703591400000 },
       ];
-      
+
       wrapper.vm.deleteDates();
       expect(wrapper.vm.formDirtyFlag).toBe(true);
     });
@@ -611,9 +647,9 @@ describe("Schema Component Tests", () => {
       const associations = [
         { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
         { field: "field1", pattern_name: "pattern2", pattern_id: "id2" },
-        { field: "field2", pattern_name: "pattern3", pattern_id: "id3" }
+        { field: "field2", pattern_name: "pattern3", pattern_id: "id3" },
       ];
-      
+
       const result = wrapper.vm.groupPatternAssociationsByField(associations);
       expect(result.field1).toHaveLength(2);
       expect(result.field2).toHaveLength(1);
@@ -624,11 +660,11 @@ describe("Schema Component Tests", () => {
       const grouped = {
         field1: [
           { field: "field1", pattern_name: "pattern1", pattern_id: "id1" },
-          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" }
+          { field: "field1", pattern_name: "pattern2", pattern_id: "id2" },
         ],
-        field2: [{ field: "field2", pattern_name: "pattern3", pattern_id: "id3" }]
+        field2: [{ field: "field2", pattern_name: "pattern3", pattern_id: "id3" }],
       };
-      
+
       const result = wrapper.vm.ungroupPatternAssociations(grouped);
       expect(result).toHaveLength(3);
     });
@@ -637,7 +673,7 @@ describe("Schema Component Tests", () => {
     it("should compute schema fields name correctly", () => {
       // Without user defined schema
       expect(wrapper.vm.computedSchemaFieldsName).toBe("All Fields");
-      
+
       // With user defined schema
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       expect(wrapper.vm.computedSchemaFieldsName).toBe("All Fields");
@@ -647,7 +683,7 @@ describe("Schema Component Tests", () => {
     it("should compute tabs correctly", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1"];
       wrapper.vm.indexData.schema = [{ name: "field1" }, { name: "field2" }];
-      
+
       const tabs = wrapper.vm.tabs;
       expect(tabs[0].value).toBe("schemaFields");
       expect(tabs[1].value).toBe("allFields");
@@ -678,14 +714,14 @@ describe("Schema Component Tests", () => {
     // Test 40: showStoreOriginalDataToggle computed property
     it("should compute store original data toggle visibility", async () => {
       expect(wrapper.vm.showStoreOriginalDataToggle).toBe(true);
-      
+
       // Test with traces
       const tracesWrapper = mount(LogStream, {
         props: {
           modelValue: {
             name: "test-stream",
             stream_type: "traces",
-            settings: { defined_schema_fields: [] }
+            settings: { defined_schema_fields: [] },
           },
         },
         global: {
@@ -708,44 +744,40 @@ describe("Schema Component Tests", () => {
 
     it("should handle adding pattern to existing field", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "existing", pattern_id: "existing-id" }]
+        field1: [{ field: "field1", pattern_name: "existing", pattern_id: "existing-id" }],
       };
-      
+
       const newPattern = {
         field: "field1",
         pattern_name: "new-pattern",
-        pattern_id: "new-id"
+        pattern_id: "new-id",
       };
-      
+
       wrapper.vm.handleAddPattern(newPattern);
       expect(wrapper.vm.patternAssociations.field1).toHaveLength(2);
     });
 
     it("should handle updateAppliedPattern with apply_at attribute", () => {
       wrapper.vm.patternAssociations = {
-        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", apply_at: "old" }]
+        field1: [{ field: "field1", pattern_name: "pattern1", pattern_id: "id1", apply_at: "old" }],
       };
-      
+
       const updatedPattern = {
         field: "field1",
-        pattern_name: "pattern1", 
+        pattern_name: "pattern1",
         pattern_id: "id1",
-        apply_at: "new"
+        apply_at: "new",
       };
-      
+
       wrapper.vm.handleUpdateAppliedPattern(updatedPattern, "field1", "id1", "apply_at");
       expect(wrapper.vm.patternAssociations.field1[0].apply_at).toBe("new");
     });
 
     it("should handle filter field function with schema fields", () => {
       wrapper.vm.indexData.defined_schema_fields = ["field1", "field2"];
-      
-      const rows = [
-        { name: "field1" },
-        { name: "field2" },
-        { name: "field3" }
-      ];
-      
+
+      const rows = [{ name: "field1" }, { name: "field2" }, { name: "field3" }];
+
       const result = wrapper.vm.filterFieldFn(rows, "field@schemaFields");
       expect(result.length).toBe(2);
     });
@@ -765,9 +797,9 @@ describe("Schema Component Tests", () => {
     it("should handle empty stream response in updateStreamResponse", () => {
       const streamResponse = {
         settings: {},
-        schema: []
+        schema: [],
       };
-      
+
       const result = wrapper.vm.updateStreamResponse(streamResponse);
       expect(result.schema).toEqual([]);
     });
@@ -775,14 +807,14 @@ describe("Schema Component Tests", () => {
     it("should handle partition key conflicts in disableOptions", () => {
       const schema = { index_type: ["prefixPartition"] };
       const keyPartitionOption = { value: "keyPartition" };
-      
+
       expect(wrapper.vm.disableOptions(schema, keyPartitionOption)).toBe(true);
     });
 
     it("should handle hash partition conflicts in disableOptions", () => {
       const schema = { index_type: ["hashPartition_8"] };
       const hashOption = { value: "hashPartition_16" };
-      
+
       expect(wrapper.vm.disableOptions(schema, hashOption)).toBe(true);
     });
 
@@ -878,7 +910,7 @@ describe("Schema Component Tests", () => {
               approx_partition: false,
               defined_schema_fields: [],
               extended_retention_days: [],
-              pattern_associations: []
+              pattern_associations: [],
             },
           },
         },
@@ -893,8 +925,8 @@ describe("Schema Component Tests", () => {
                   default_fts_keys: ["user_id"],
                   default_secondary_index_fields: ["log_level"],
                   user_defined_schema_max_fields: 100,
-                }
-              }
+                },
+              },
             },
           },
           plugins: [i18n],
@@ -910,9 +942,9 @@ describe("Schema Component Tests", () => {
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
       expect(missing.length).toBeGreaterThan(0);
-      const ftsFields = missing.filter(f => f.type === "Full Text Search");
+      const ftsFields = missing.filter((f) => f.type === "Full Text Search");
       expect(ftsFields.length).toBeGreaterThan(0);
-      expect(ftsFields.some(f => f.name === "user_id" || f.name === "message")).toBe(true);
+      expect(ftsFields.some((f) => f.name === "user_id" || f.name === "message")).toBe(true);
     });
 
     // Test 2: getMissingPerformanceFields should detect missing Secondary Index fields
@@ -921,9 +953,9 @@ describe("Schema Component Tests", () => {
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
       expect(missing.length).toBeGreaterThan(0);
-      const secondaryIndexFields = missing.filter(f => f.type === "Secondary Index");
+      const secondaryIndexFields = missing.filter((f) => f.type === "Secondary Index");
       expect(secondaryIndexFields.length).toBeGreaterThan(0);
-      expect(secondaryIndexFields.some(f => f.name === "log_level")).toBe(true);
+      expect(secondaryIndexFields.some((f) => f.name === "log_level")).toBe(true);
     });
 
     // Test 3: getMissingPerformanceFields should not detect fields already selected
@@ -940,8 +972,8 @@ describe("Schema Component Tests", () => {
       const selectedFieldsSet = new Set(["message", "timestamp"]); // Not including user_id
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
-      const ftsFields = missing.filter(f => f.type === "Full Text Search");
-      expect(ftsFields.some(f => f.name === "user_id")).toBe(true);
+      const ftsFields = missing.filter((f) => f.type === "Full Text Search");
+      expect(ftsFields.some((f) => f.name === "user_id")).toBe(true);
     });
 
     // Test 5: getMissingPerformanceFields should detect default secondary index keys from config
@@ -950,8 +982,8 @@ describe("Schema Component Tests", () => {
       const selectedFieldsSet = new Set(["user_id", "timestamp"]); // Not including log_level
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
-      const secondaryIndexFields = missing.filter(f => f.type === "Secondary Index");
-      expect(secondaryIndexFields.some(f => f.name === "log_level")).toBe(true);
+      const secondaryIndexFields = missing.filter((f) => f.type === "Secondary Index");
+      expect(secondaryIndexFields.some((f) => f.name === "log_level")).toBe(true);
     });
 
     // Test 6: updateDefinedSchemaFields should show popup when UDS is enabled first time with missing fields
@@ -974,7 +1006,7 @@ describe("Schema Component Tests", () => {
         { name: "user_id" },
         { name: "message" },
         { name: "log_level" },
-        { name: "timestamp" }
+        { name: "timestamp" },
       ];
       wrapper.vm.activeTab = "allFields";
 
@@ -1003,7 +1035,7 @@ describe("Schema Component Tests", () => {
       wrapper.vm.pendingSelectedFields = ["timestamp"];
       wrapper.vm.missingPerformanceFields = [
         { name: "user_id", type: "Full Text Search" },
-        { name: "log_level", type: "Secondary Index" }
+        { name: "log_level", type: "Secondary Index" },
       ];
 
       wrapper.vm.addPerformanceFields();
@@ -1021,7 +1053,7 @@ describe("Schema Component Tests", () => {
       wrapper.vm.pendingSelectedFields = ["timestamp"];
       wrapper.vm.missingPerformanceFields = [
         { name: "user_id", type: "Full Text Search" },
-        { name: "log_level", type: "Secondary Index" }
+        { name: "log_level", type: "Secondary Index" },
       ];
 
       wrapper.vm.skipPerformanceFields();
@@ -1068,9 +1100,9 @@ describe("Schema Component Tests", () => {
       const selectedFieldsSet = new Set(["timestamp"]);
       const missing = wrapper.vm.getMissingPerformanceFields(selectedFieldsSet);
 
-      const ftsFields = missing.filter(f => f.type === "Full Text Search");
-      expect(ftsFields.some(f => f.name === "user_id")).toBe(true);
-      expect(ftsFields.some(f => f.name === "nonexistent_field")).toBe(false);
+      const ftsFields = missing.filter((f) => f.type === "Full Text Search");
+      expect(ftsFields.some((f) => f.name === "user_id")).toBe(true);
+      expect(ftsFields.some((f) => f.name === "nonexistent_field")).toBe(false);
     });
 
     // Test 15: updateDefinedSchemaFields should respect max field limit
@@ -1087,7 +1119,7 @@ describe("Schema Component Tests", () => {
         expect.objectContaining({
           variant: "error",
           message: expect.stringContaining("Maximum allowed fields"),
-        })
+        }),
       );
       expect(wrapper.vm.selectedFields).toEqual([]);
     });
@@ -1185,7 +1217,9 @@ describe("Schema Component Tests", () => {
       await flushPromises();
     });
 
-    afterEach(() => { w.unmount(); });
+    afterEach(() => {
+      w.unmount();
+    });
 
     it("should render storage-size-tile", async () => {
       expect(w.find('[data-test="storage-size-tile"]').exists()).toBe(true);
@@ -1281,7 +1315,9 @@ describe("Schema Component Tests", () => {
       await flushPromises();
     });
 
-    afterEach(() => { w.unmount(); });
+    afterEach(() => {
+      w.unmount();
+    });
 
     it("should show the stream name in the header badge", async () => {
       expect(w.find('[data-test="schema-title-text"]').text()).toContain("my-stream-name");
@@ -1321,9 +1357,27 @@ describe("Schema Component Tests", () => {
             name: "test-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [{ name: "_timestamp", type: "Int64" }],
-            settings: { full_text_search_keys: [], index_fields: [], bloom_filter_fields: [], data_retention: 30, max_query_range: 0, store_original_data: false, approx_partition: false, defined_schema_fields: [], extended_retention_days: [], pattern_associations: [] },
+            settings: {
+              full_text_search_keys: [],
+              index_fields: [],
+              bloom_filter_fields: [],
+              data_retention: 30,
+              max_query_range: 0,
+              store_original_data: false,
+              approx_partition: false,
+              defined_schema_fields: [],
+              extended_retention_days: [],
+              pattern_associations: [],
+            },
           },
         },
         global: { provide: { store }, plugins: [i18n], stubs: { ODrawer: ODrawerStub } },
@@ -1596,7 +1650,9 @@ describe("Schema Component Tests", () => {
       await flushPromises();
     });
 
-    afterEach(() => { w.unmount(); });
+    afterEach(() => {
+      w.unmount();
+    });
 
     it("should render the config tab when activeMainTab is 'configuration'", async () => {
       w.vm.updateActiveMainTab("configuration");
@@ -1715,9 +1771,7 @@ describe("Schema Component Tests", () => {
           store_original_data: false,
           approx_partition: false,
           defined_schema_fields: [],
-          extended_retention_days: [
-            { start: 1703505000, end: 1703591400 },
-          ],
+          extended_retention_days: [{ start: 1703505000, end: 1703591400 }],
         },
         pattern_associations: [],
       });
@@ -1745,9 +1799,7 @@ describe("Schema Component Tests", () => {
               store_original_data: false,
               approx_partition: false,
               defined_schema_fields: [],
-              extended_retention_days: [
-                { start: 1703505000, end: 1703591400 },
-              ],
+              extended_retention_days: [{ start: 1703505000, end: 1703591400 }],
               pattern_associations: [],
             },
           },
@@ -1761,7 +1813,9 @@ describe("Schema Component Tests", () => {
       await flushPromises();
     });
 
-    afterEach(() => { w.unmount(); });
+    afterEach(() => {
+      w.unmount();
+    });
 
     it("should render the red button tab when activeMainTab is 'redButton'", async () => {
       w.vm.updateActiveMainTab("redButton");
@@ -2007,9 +2061,7 @@ describe("Schema Component Tests", () => {
 
     it("should close dialog when last missing performance field is removed", () => {
       wrapper.vm.confirmAddPerformanceFieldsDialog = true;
-      wrapper.vm.missingPerformanceFields = [
-        { name: "field1", type: "Full Text Search" },
-      ];
+      wrapper.vm.missingPerformanceFields = [{ name: "field1", type: "Full Text Search" }];
       wrapper.vm.pendingSelectedFields = ["field3"];
 
       wrapper.vm.removeFieldFromList("fts", "field1");
@@ -2374,7 +2426,9 @@ describe("Schema Component Tests", () => {
       await flushPromises();
     });
 
-    afterEach(() => { w.unmount(); });
+    afterEach(() => {
+      w.unmount();
+    });
 
     it("should show cross-linking tab when enable_cross_linking is true", async () => {
       store.state.zoConfig.enable_cross_linking = true;
@@ -2412,8 +2466,18 @@ describe("Schema Component Tests", () => {
         name: "fts-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
-        schema: [{ name: "_timestamp", type: "Int64" }, { name: "message", type: "Utf8" }],
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
+        schema: [
+          { name: "_timestamp", type: "Int64" },
+          { name: "message", type: "Utf8" },
+        ],
         settings: {
           full_text_search_keys: [],
           index_fields: [],
@@ -2433,8 +2497,18 @@ describe("Schema Component Tests", () => {
             name: "fts-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
-            schema: [{ name: "_timestamp", type: "Int64" }, { name: "message", type: "Utf8" }],
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
+            schema: [
+              { name: "_timestamp", type: "Int64" },
+              { name: "message", type: "Utf8" },
+            ],
             settings: {
               full_text_search_keys: [],
               index_fields: [],
@@ -2465,7 +2539,14 @@ describe("Schema Component Tests", () => {
         name: "extra-uds-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [{ name: "_timestamp", type: "Int64" }],
         settings: {
           full_text_search_keys: [],
@@ -2486,7 +2567,14 @@ describe("Schema Component Tests", () => {
             name: "extra-uds-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [{ name: "_timestamp", type: "Int64" }],
             settings: {
               full_text_search_keys: [],
@@ -2520,7 +2608,14 @@ describe("Schema Component Tests", () => {
         name: "empty-schema-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [],
         settings: {
           full_text_search_keys: [],
@@ -2541,7 +2636,14 @@ describe("Schema Component Tests", () => {
             name: "empty-schema-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [],
             settings: {
               full_text_search_keys: [],
@@ -2581,7 +2683,14 @@ describe("Schema Component Tests", () => {
         name: "selection-sync-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [
           { name: "_timestamp", type: "Int64" },
           { name: "message", type: "Utf8" },
@@ -2606,7 +2715,14 @@ describe("Schema Component Tests", () => {
             name: "selection-sync-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [
               { name: "_timestamp", type: "Int64" },
               { name: "message", type: "Utf8" },
@@ -2656,9 +2772,7 @@ describe("Schema Component Tests", () => {
         { index: 0, start: "01-01-2024", end: "02-01-2024" },
         { index: 1, start: "03-01-2024", end: "04-01-2024" },
       ];
-      wrapper.vm.selectedDateFields = [
-        { index: 0, start: "01-01-2024", end: "02-01-2024" },
-      ];
+      wrapper.vm.selectedDateFields = [{ index: 0, start: "01-01-2024", end: "02-01-2024" }];
       expect(wrapper.vm.selectedDateIds).toEqual([0]);
     });
 
@@ -2683,7 +2797,14 @@ describe("Schema Component Tests", () => {
         name: "cross-link-save",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [{ name: "_timestamp", type: "Int64" }],
         settings: {
           full_text_search_keys: [],
@@ -2705,7 +2826,14 @@ describe("Schema Component Tests", () => {
             name: "cross-link-save",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [{ name: "_timestamp", type: "Int64" }],
             settings: {
               full_text_search_keys: [],
@@ -2747,9 +2875,7 @@ describe("Schema Component Tests", () => {
         "logs",
         expect.objectContaining({
           cross_links: expect.objectContaining({
-            add: expect.arrayContaining([
-              expect.objectContaining({ name: "new-link" }),
-            ]),
+            add: expect.arrayContaining([expect.objectContaining({ name: "new-link" })]),
             remove: [],
           }),
         }),
@@ -2768,7 +2894,14 @@ describe("Schema Component Tests", () => {
         name: "update-idx-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [
           { name: "_timestamp", type: "Int64", index_type: [] },
           { name: "message", type: "Utf8", index_type: ["fullTextSearchKey"] },
@@ -2794,7 +2927,14 @@ describe("Schema Component Tests", () => {
             name: "update-idx-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [
               { name: "_timestamp", type: "Int64", index_type: [] },
               { name: "message", type: "Utf8", index_type: ["fullTextSearchKey"] },
@@ -2828,10 +2968,7 @@ describe("Schema Component Tests", () => {
       const row = wrapper.vm.indexData.schema.find((f: any) => f.name === "level");
       expect(row).toBeDefined();
 
-      wrapper.vm.updateIndexType(
-        { row },
-        ["fullTextSearchKey", "bloomFilterKey"],
-      );
+      wrapper.vm.updateIndexType({ row }, ["fullTextSearchKey", "bloomFilterKey"]);
 
       // row.index_type should be updated (fullTextSearchKey + bloomFilterKey)
       expect(row.index_type).toContain("fullTextSearchKey");
@@ -2844,10 +2981,7 @@ describe("Schema Component Tests", () => {
       expect(row).toBeDefined();
 
       // "message" is in default_fts_keys — fullTextSearchKey should be filtered
-      wrapper.vm.updateIndexType(
-        { row },
-        ["fullTextSearchKey", "secondaryIndexKey"],
-      );
+      wrapper.vm.updateIndexType({ row }, ["fullTextSearchKey", "secondaryIndexKey"]);
 
       // fullTextSearchKey is env-default, should be filtered out
       expect(row.index_type).not.toContain("fullTextSearchKey");
@@ -2860,10 +2994,7 @@ describe("Schema Component Tests", () => {
       expect(row).toBeDefined();
 
       // "status" is in default_secondary_index_fields — secondaryIndexKey should be filtered
-      wrapper.vm.updateIndexType(
-        { row },
-        ["fullTextSearchKey", "secondaryIndexKey"],
-      );
+      wrapper.vm.updateIndexType({ row }, ["fullTextSearchKey", "secondaryIndexKey"]);
 
       expect(row.index_type).toContain("fullTextSearchKey");
       expect(row.index_type).not.toContain("secondaryIndexKey");
@@ -2900,7 +3031,12 @@ describe("Schema Component Tests", () => {
       });
       const w = mount(LogStream, {
         props: {
-          modelValue: { name: "empty-name", schema: [], stats: {}, settings: { defined_schema_fields: [] } },
+          modelValue: {
+            name: "empty-name",
+            schema: [],
+            stats: {},
+            settings: { defined_schema_fields: [] },
+          },
         },
         global: {
           provide: { store },
@@ -2923,7 +3059,14 @@ describe("Schema Component Tests", () => {
         name: "date-change-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [{ name: "_timestamp", type: "Int64" }],
         settings: {
           full_text_search_keys: [],
@@ -2944,7 +3087,14 @@ describe("Schema Component Tests", () => {
             name: "date-change-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [{ name: "_timestamp", type: "Int64" }],
             settings: {
               full_text_search_keys: [],
@@ -3002,7 +3152,14 @@ describe("Schema Component Tests", () => {
         name: "apply-at-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [{ name: "_timestamp", type: "Int64" }],
         settings: {
           full_text_search_keys: [],
@@ -3016,7 +3173,13 @@ describe("Schema Component Tests", () => {
           extended_retention_days: [],
         },
         pattern_associations: [
-          { field: "field1", pattern_name: "p1", pattern_id: "id1", policy: "replace", apply_at: "ingestion" },
+          {
+            field: "field1",
+            pattern_name: "p1",
+            pattern_id: "id1",
+            policy: "replace",
+            apply_at: "ingestion",
+          },
         ],
       });
       wrapper = mount(LogStream, {
@@ -3025,7 +3188,14 @@ describe("Schema Component Tests", () => {
             name: "apply-at-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [{ name: "_timestamp", type: "Int64" }],
             settings: {
               full_text_search_keys: [],
@@ -3038,7 +3208,13 @@ describe("Schema Component Tests", () => {
               defined_schema_fields: [],
               extended_retention_days: [],
               pattern_associations: [
-                { field: "field1", pattern_name: "p1", pattern_id: "id1", policy: "replace", apply_at: "ingestion" },
+                {
+                  field: "field1",
+                  pattern_name: "p1",
+                  pattern_id: "id1",
+                  policy: "replace",
+                  apply_at: "ingestion",
+                },
               ],
             },
           },
@@ -3093,7 +3269,14 @@ describe("Schema Component Tests", () => {
         name: "delete-paths-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [
           { name: "_timestamp", type: "Int64" },
           { name: "_all", type: "Utf8" },
@@ -3118,7 +3301,14 @@ describe("Schema Component Tests", () => {
             name: "delete-paths-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [
               { name: "_timestamp", type: "Int64" },
               { name: "_all", type: "Utf8" },
@@ -3150,11 +3340,7 @@ describe("Schema Component Tests", () => {
     it("should delete timestamp_column and allFieldsName from selectedFieldsSet", () => {
       // Include _timestamp and _all in selected fields to exercise the
       // delete paths at lines 2357-2361 in updateDefinedSchemaFields
-      wrapper.vm.selectedFields = [
-        { name: "_timestamp" },
-        { name: "_all" },
-        { name: "message" },
-      ];
+      wrapper.vm.selectedFields = [{ name: "_timestamp" }, { name: "_all" }, { name: "message" }];
       wrapper.vm.activeTab = "allFields";
 
       wrapper.vm.updateDefinedSchemaFields();
@@ -3194,8 +3380,18 @@ describe("Schema Component Tests", () => {
         name: "del-non200-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
-        schema: [{ name: "_timestamp", type: "Int64" }, { name: "field_to_delete", type: "Utf8" }],
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
+        schema: [
+          { name: "_timestamp", type: "Int64" },
+          { name: "field_to_delete", type: "Utf8" },
+        ],
         settings: {
           full_text_search_keys: [],
           index_fields: [],
@@ -3215,8 +3411,18 @@ describe("Schema Component Tests", () => {
             name: "del-non200-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
-            schema: [{ name: "_timestamp", type: "Int64" }, { name: "field_to_delete", type: "Utf8" }],
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
+            schema: [
+              { name: "_timestamp", type: "Int64" },
+              { name: "field_to_delete", type: "Utf8" },
+            ],
             settings: {
               full_text_search_keys: [],
               index_fields: [],
@@ -3296,7 +3502,14 @@ describe("Schema Component Tests", () => {
         name: "null-apply-at-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [{ name: "_timestamp", type: "Int64" }],
         settings: {
           full_text_search_keys: [],
@@ -3317,7 +3530,14 @@ describe("Schema Component Tests", () => {
             name: "null-apply-at-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [{ name: "_timestamp", type: "Int64" }],
             settings: {
               full_text_search_keys: [],
@@ -3344,9 +3564,23 @@ describe("Schema Component Tests", () => {
 
     it("should handle updateAppliedPattern with null apply_at (else branch line 2587)", () => {
       wrapper.vm.patternAssociations = {
-        fieldX: [{ field: "fieldX", pattern_name: "px", pattern_id: "pidX", policy: "replace", apply_at: "ingestion" }],
+        fieldX: [
+          {
+            field: "fieldX",
+            pattern_name: "px",
+            pattern_id: "pidX",
+            policy: "replace",
+            apply_at: "ingestion",
+          },
+        ],
       };
-      const pattern = { field: "fieldX", pattern_name: "px", pattern_id: "pidX", policy: "replace", apply_at: null };
+      const pattern = {
+        field: "fieldX",
+        pattern_name: "px",
+        pattern_id: "pidX",
+        policy: "replace",
+        apply_at: null,
+      };
 
       wrapper.vm.handleUpdateAppliedPattern(pattern, "fieldX", "pidX", "apply_at");
 
@@ -3365,7 +3599,14 @@ describe("Schema Component Tests", () => {
         name: "filter-idx-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [
           { name: "_timestamp", type: "Int64", index_type: [] },
           { name: "message", type: "Utf8", index_type: ["fullTextSearchKey"] },
@@ -3390,7 +3631,14 @@ describe("Schema Component Tests", () => {
             name: "filter-idx-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [
               { name: "_timestamp", type: "Int64", index_type: [] },
               { name: "message", type: "Utf8", index_type: ["fullTextSearchKey"] },
@@ -3500,7 +3748,14 @@ describe("Schema Component Tests", () => {
         name: "coverage-close-stream",
         stream_type: "logs",
         storage_type: "s3",
-        stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+        stats: {
+          doc_time_min: 0,
+          doc_time_max: 0,
+          doc_num: 0,
+          file_num: 0,
+          storage_size: 0,
+          compressed_size: 0,
+        },
         schema: [{ name: "_timestamp", type: "Int64" }],
         settings: {
           full_text_search_keys: [],
@@ -3522,7 +3777,14 @@ describe("Schema Component Tests", () => {
             name: "coverage-close-stream",
             stream_type: "logs",
             storage_type: "s3",
-            stats: { doc_time_min: 0, doc_time_max: 0, doc_num: 0, file_num: 0, storage_size: 0, compressed_size: 0 },
+            stats: {
+              doc_time_min: 0,
+              doc_time_max: 0,
+              doc_num: 0,
+              file_num: 0,
+              storage_size: 0,
+              compressed_size: 0,
+            },
             schema: [{ name: "_timestamp", type: "Int64" }],
             settings: {
               full_text_search_keys: [],
@@ -3671,9 +3933,7 @@ describe("Schema Component Tests", () => {
     it("should exercise cross-links diff in onSubmit with modified links", async () => {
       // Set up cross-links to exercise the diff computation
       // (func 61: prevCrossLinks.map, func 64: currCrossLinks.filter, func 65: inline fn)
-      wrapper.vm.streamCrossLinks = [
-        { name: "a", url: "https://a.com", fields: ["_timestamp"] },
-      ];
+      wrapper.vm.streamCrossLinks = [{ name: "a", url: "https://a.com", fields: ["_timestamp"] }];
       // prevCrossLinks has "a" in it (from settings.cross_links which was set in previousSchemaVersion)
       // streamCrossLinks has "a" — so prevCrossLinkNames includes "a" and currCrossLinkNames includes "a"
       // This exercises the diff path

@@ -96,26 +96,23 @@ vi.mock("@/utils/synthetics/mapRecordedStep", () => ({
   journeyToWireSteps: vi.fn(() => []),
 }));
 
-vi.mock(
-  "@/components/synthetics/CreateBrowserTest.schema",
-  () => {
-    const { z } = require("zod");
-    return {
-      makeBrowserCheckGateSchema: (t: any) =>
-        z.object({
-          url: z.string().min(1, "URL is required"),
-          name: z.string().optional(),
-        }),
-      makeBrowserCheckSaveSchema: (t: any) =>
-        z.object({
-          name: z.string().optional(),
-          url: z.string().optional(),
-          locations: z.array(z.any()).optional(),
-          journey: z.array(z.any()).optional(),
-        }),
-    };
-  },
-);
+vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
+  const { z } = require("zod");
+  return {
+    makeBrowserCheckGateSchema: (t: any) =>
+      z.object({
+        url: z.string().min(1, "URL is required"),
+        name: z.string().optional(),
+      }),
+    makeBrowserCheckSaveSchema: (t: any) =>
+      z.object({
+        name: z.string().optional(),
+        url: z.string().optional(),
+        locations: z.array(z.any()).optional(),
+        journey: z.array(z.any()).optional(),
+      }),
+  };
+});
 
 import CreateBrowserTest from "./CreateBrowserTest.vue";
 
@@ -138,7 +135,7 @@ const baseStubs = {
     emits: ["update:modelValue", "blur"],
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class", "ariaHidden"],
   },
   OSwitch: {
@@ -148,12 +145,19 @@ const baseStubs = {
   },
   ODialog: {
     template: '<div v-if="open" :data-test="$attrs[\'data-test\']"><slot /></div>',
-    props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "primaryButtonVariant"],
+    props: [
+      "open",
+      "size",
+      "title",
+      "primaryButtonLabel",
+      "secondaryButtonLabel",
+      "primaryButtonVariant",
+    ],
     emits: ["click:primary", "click:secondary", "update:open"],
     inheritAttrs: true,
   },
   OStepper: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue", "navigable", "class"],
   },
   OStep: {
@@ -198,11 +202,11 @@ const baseStubs = {
     inheritAttrs: true,
   },
   EmptyBrowserCheck: {
-    template: '<div />',
+    template: "<div />",
     props: ["width"],
   },
   Teleport: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
   },
 };
 
@@ -238,24 +242,16 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-url-input"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-name-input"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-url-input"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-name-input"]').exists()).toBe(true);
     });
 
     it("should render Record journey and Build manually buttons", async () => {
       wrapper = mountPage();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-create-record-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-create-build-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-record-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-create-build-btn"]').exists()).toBe(true);
     });
 
     it("should disable action buttons when URL is empty", async () => {
@@ -287,9 +283,7 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       // Now we should be on the extension setup phase - check for setup elements
-      expect(
-        wrapper.find('[data-test="synthetics-setup-recheck-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-setup-recheck-btn"]').exists()).toBe(true);
     });
   });
 });

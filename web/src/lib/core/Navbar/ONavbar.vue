@@ -36,19 +36,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Single sliding-selection pill: tracks the active rail tile and slides to
            it on navigation. Active MenuLinks defer their fill to this (see
            RailIndicatorActiveKey). Snaps (no slide) on mount/reflow/reveal. -->
-      <div
-        ref="indicatorRef"
-        aria-hidden="true"
-        :class="indicatorClass"
-        :style="indicatorStyle"
-      />
+      <div ref="indicatorRef" aria-hidden="true" :class="indicatorClass" :style="indicatorStyle" />
       <template
         v-for="entry in topEntries"
-        :key="
-          entry.type === 'group'
-            ? `g-${entry.key}`
-            : `l-${entry.item.name}`
-        "
+        :key="entry.type === 'group' ? `g-${entry.key}` : `l-${entry.item.name}`"
       >
         <menu-link
           v-if="entry.type === 'link'"
@@ -94,23 +85,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * Left sidebar navigation bar. Renders a list of MenuLink items with keyboard
  * navigation (ArrowUp/ArrowDown) and Tab trapping.
  */
-import {
-  computed,
-  provide,
-  ref,
-  watch,
-  nextTick,
-  onMounted,
-  onBeforeUnmount,
-} from "vue";
+import { computed, provide, ref, watch, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
-import type {
-  NavbarProps,
-  NavbarEmits,
-  NavbarSlots,
-  RailEntry,
-} from "./ONavbar.types";
+import type { NavbarProps, NavbarEmits, NavbarSlots, RailEntry } from "./ONavbar.types";
 import { RailIndicatorActiveKey } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
 import MenuLink from "@/components/MenuLink.vue";
@@ -133,17 +111,16 @@ const { t } = useI18n();
 // config / occasional items fold into flyout groups. Split out pinned-bottom
 // groups so the template can float them to the foot of the rail. `t` is passed
 // so group tile labels are localized (and re-resolve on language change).
-const railEntries = computed<RailEntry[]>(() =>
-  groupNavLinks(props.linksList, t),
-);
+const railEntries = computed<RailEntry[]>(() => groupNavLinks(props.linksList, t));
 const topEntries = computed(() =>
   railEntries.value.filter((e) => !(e.type === "group" && e.pinBottom)),
 );
 const bottomEntries = computed(
   () =>
-    railEntries.value.filter(
-      (e) => e.type === "group" && e.pinBottom,
-    ) as Extract<RailEntry, { type: "group" }>[],
+    railEntries.value.filter((e) => e.type === "group" && e.pinBottom) as Extract<
+      RailEntry,
+      { type: "group" }
+    >[],
 );
 
 // ── Sliding-selection pill ──────────────────────────────────────────────────
@@ -256,19 +233,14 @@ function handleKeydown(event: KeyboardEvent) {
   switch (event.key) {
     case "ArrowDown": {
       event.preventDefault();
-      const next =
-        currentIndex < 0 || currentIndex + 1 >= menuLinks.length
-          ? 0
-          : currentIndex + 1;
+      const next = currentIndex < 0 || currentIndex + 1 >= menuLinks.length ? 0 : currentIndex + 1;
       menuLinks[next]?.focus();
       break;
     }
     case "ArrowUp": {
       event.preventDefault();
       const prev =
-        currentIndex < 0 || currentIndex - 1 < 0
-          ? menuLinks.length - 1
-          : currentIndex - 1;
+        currentIndex < 0 || currentIndex - 1 < 0 ? menuLinks.length - 1 : currentIndex - 1;
       menuLinks[prev]?.focus();
       break;
     }

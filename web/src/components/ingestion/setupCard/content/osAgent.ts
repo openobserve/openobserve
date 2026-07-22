@@ -24,8 +24,7 @@ import type { CardSubstitutions, RichCardDetect, RichCardExtras } from "../types
 import { applySubs, applySubsMasked } from "../subs";
 
 /** Base of the agent install scripts, e.g. `${AGENTS_REPO}/linux/install.sh`. */
-export const AGENTS_REPO =
-  "https://raw.githubusercontent.com/openobserve/agents/main";
+export const AGENTS_REPO = "https://raw.githubusercontent.com/openobserve/agents/main";
 
 /** Environment the agent is installed onto — drives the script path. */
 export type AgentEnv = "generic" | "ec2";

@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="sqlmode ? 'sql-mode' : 'normal-mode'"
       >
         <OIcon name="help" size="sm" />
-        {{ t('search.syntaxGuideLabel') }}
+        {{ t("search.syntaxGuideLabel") }}
       </OButton>
     </template>
     <div>
@@ -49,9 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.rangeVector") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-default"
-                    >metric_name[5m]</span
-                  >
+                  <span class="bg-highlight-bg px-1.25 rounded-default">metric_name[5m]</span>
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.aggregate") }}
@@ -65,9 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </li>
                 <li>
                   {{ t("metrics.syntaxGuide.rate") }}
-                  <span class="bg-highlight-bg px-1.25 rounded-default"
-                    >rate(metric_name[5m])</span
-                  >
+                  <span class="bg-highlight-bg px-1.25 rounded-default">rate(metric_name[5m])</span>
                 </li>
               </ul>
             </div>
@@ -95,8 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   {{ t("metrics.syntaxGuide.sqlColumn") }}
                   <span class="bg-highlight-bg px-1.25 rounded-default"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    str_match(<b>fieldname</b>, 'error')</span
+                    >SELECT * FROM <b>stream</b> WHERE str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
@@ -114,12 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li>
                   <!-- The function name is a parameter, so the sentence can be
                        reordered by a translator without stranding the `<i>`. -->
-                  {{
-                    t("metrics.syntaxGuide.sqlFunction", { fn: "extract_ip" })
-                  }}
+                  {{ t("metrics.syntaxGuide.sqlFunction", { fn: "extract_ip" }) }}
                   <span class="bg-highlight-bg px-1.25 rounded-default"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
+                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
@@ -144,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";

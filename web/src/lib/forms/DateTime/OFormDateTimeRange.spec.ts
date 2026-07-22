@@ -109,9 +109,7 @@ describe("OFormDateTimeRange", () => {
     wrapper = mount(OForm, {
       props: {
         defaultValues: {
-          dashboards: [
-            { timerange: { type: "relative", period: "30m", from: 0, to: 0 } },
-          ],
+          dashboards: [{ timerange: { type: "relative", period: "30m", from: 0, to: 0 } }],
         },
       },
       slots: {
@@ -125,9 +123,7 @@ describe("OFormDateTimeRange", () => {
     expect(wrapper.find('[data-test="dt-stub"]').text()).toBe("relative|30m");
 
     (wrapper.vm as any).form.reset({
-      dashboards: [
-        { timerange: { type: "relative", period: "12h", from: 0, to: 0 } },
-      ],
+      dashboards: [{ timerange: { type: "relative", period: "12h", from: 0, to: 0 } }],
     });
     await nextTick();
     await flushPromises();

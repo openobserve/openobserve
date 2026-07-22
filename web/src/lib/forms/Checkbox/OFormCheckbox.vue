@@ -41,11 +41,7 @@ const passthroughProps = computed(() => {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="flex flex-col gap-1">
         <OCheckbox
@@ -62,12 +58,7 @@ const passthroughProps = computed(() => {
             <slot name="label" />
           </template>
         </OCheckbox>
-        <div
-          v-if="
-            field.state.meta.errors.length > 0
-          "
-          class="text-xs text-input-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-xs text-input-error-text">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

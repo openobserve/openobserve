@@ -22,6 +22,5 @@
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
-const { currentDialog, handleConfirm, handleCancel, handleUpdateOpen } =
-  useConfirmDialog();
+const { currentDialog, handleConfirm, handleCancel, handleUpdateOpen } = useConfirmDialog();
 </script>

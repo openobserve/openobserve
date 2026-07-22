@@ -22,10 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   tinted-active treatment. Sentence-case group headings, soft single-line items.
 -->
 <template>
-  <nav
-    class="flex flex-col h-full min-h-0 bg-surface-panel"
-    data-test="section-rail"
-  >
+  <nav class="flex flex-col h-full min-h-0 bg-surface-panel" data-test="section-rail">
     <!-- Title aligns with the item LABELS below it (the page-edge grid line the
          OTab pills' text lands on), not the pill edge — so 'IAM'/'Settings' sits
          directly above 'Users'. Matches FolderList's heading. -->
@@ -107,5 +104,4 @@ const visibleGroups = computed(() =>
     }))
     .filter((g) => g.items.length > 0),
 );
-
 </script>

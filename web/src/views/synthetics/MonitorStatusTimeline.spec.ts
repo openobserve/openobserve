@@ -59,9 +59,7 @@ function makeFailExec(overrides?: Partial<TimelineExecution>): TimelineExecution
   };
 }
 
-function makeSegment(
-  overrides?: Partial<TimelineSegment>,
-): TimelineSegment {
+function makeSegment(overrides?: Partial<TimelineSegment>): TimelineSegment {
   return {
     runId: "run-001",
     status: "all-pass",
@@ -118,9 +116,7 @@ describe("MonitorStatusTimeline", () => {
         mixedCount: "2",
       });
 
-      expect(
-        wrapper.find('[data-test="monitor-status-timeline"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="monitor-status-timeline"]').exists()).toBe(true);
     });
 
     it("should render timeline bars for each segment", () => {
@@ -241,11 +237,7 @@ describe("MonitorStatusTimeline", () => {
     });
 
     it("should show correct pass/fail counts in tooltip header", () => {
-      const executions: TimelineExecution[] = [
-        makePassExec(),
-        makePassExec(),
-        makeFailExec(),
-      ];
+      const executions: TimelineExecution[] = [makePassExec(), makePassExec(), makeFailExec()];
       wrapper = makeWrapper({
         segments: [makeSegment({ executions })],
       });
@@ -270,9 +262,13 @@ describe("MonitorStatusTimeline", () => {
       // We should have at least 2 bars with style (the timeline segments)
       // plus potentially more from the legend dots.
       // Just verify bars exist with color classes
-      const allNodes = wrapper.findAll('[data-test="monitor-status-timeline"] > div > div > div > div > div > div');
+      const allNodes = wrapper.findAll(
+        '[data-test="monitor-status-timeline"] > div > div > div > div > div > div',
+      );
       // The color class is bound to each segment div inside the scroll area
-      const bars_in_scroll = wrapper.find('[data-test="monitor-status-timeline"]').findAll('[class*="bg-"]');
+      const bars_in_scroll = wrapper
+        .find('[data-test="monitor-status-timeline"]')
+        .findAll('[class*="bg-"]');
       expect(bars_in_scroll.length).toBeGreaterThanOrEqual(2);
     });
   });

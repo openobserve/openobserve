@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 const props = defineProps<{
   x: number;
@@ -90,7 +90,7 @@ const emit = defineEmits<{
       value: number;
       panelId: string;
       panelTitle: string;
-    }
+    },
   ];
   "select-alert": [string];
   "configure-dedup": [string];
@@ -99,7 +99,6 @@ const emit = defineEmits<{
 }>();
 
 const isAlertNameContext = computed(() => {
-
   // Check if we're clicking on a panel that shows alert names
   const alertNamePanels = [
     "Panel_Alert_Frequency",
@@ -110,10 +109,7 @@ const isAlertNameContext = computed(() => {
     "Panel_Execution_Duration",
   ];
 
-  return (
-    typeof props.value === "string" &&
-    alertNamePanels.includes(props.panelId)
-  );
+  return typeof props.value === "string" && alertNamePanels.includes(props.panelId);
 });
 
 const configureDedupForAlert = () => {

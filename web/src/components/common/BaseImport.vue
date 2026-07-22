@@ -40,7 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="cancelButtonClass"
           @click="handleCancel"
           :data-test="`${testPrefix}-import-cancel-btn`"
-        >{{ t('function.cancel') }}</OButton>
+          >{{ t("function.cancel") }}</OButton
+        >
         <OButton
           variant="primary"
           size="sm"
@@ -50,7 +51,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="isImporting || $props.isImporting"
           :disabled="isImporting || $props.isImporting"
           :data-test="`${testPrefix}-import-json-btn`"
-        >{{ t('dashboard.import') }}</OButton>
+          >{{ t("dashboard.import") }}</OButton
+        >
       </template>
     </OPageHeader>
 
@@ -92,12 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
                     <div class="flex mb-3 shrink-0">
-                        <OInput
-                          :data-test="`${testPrefix}-import-url-input`"
-                          v-model="url"
-                          size="md"
-                          :placeholder="t('dashboard.addURL')"
-                        />
+                      <OInput
+                        :data-test="`${testPrefix}-import-url-input`"
+                        v-model="url"
+                        size="md"
+                        :placeholder="t('dashboard.addURL')"
+                      />
                     </div>
                   </slot>
 
@@ -136,7 +138,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </template>
                           <template v-slot:append>
                             <OIcon
-                              name="close" size="sm"
+                              name="close"
+                              size="sm"
                               @click.stop.prevent="jsonFiles = null"
                               class="cursor-pointer"
                             />
@@ -172,12 +175,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">Output Messages</div>
+                  <div class="text-center text-sm font-semibold text-text-heading py-3 shrink-0">
+                    Output Messages
+                  </div>
                   <OSeparator class="mt-1 shrink-0" />
                   <div class="error-report-container flex-1 min-h-0 overflow-auto">
-                    <div class="text-center p-3 text-text-muted">
-                      No messages to display
-                    </div>
+                    <div class="text-center p-3 text-text-muted">No messages to display</div>
                   </div>
                 </slot>
               </slot>
@@ -211,17 +214,15 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "BaseImport",
   components: {
     OSeparator,
     OSplitter,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     AppTabs,
     OPageHeader,
     OButton,
@@ -324,14 +325,7 @@ export default defineComponent({
       default: "",
     },
   },
-  emits: [
-    "back",
-    "cancel",
-    "import",
-    "update:jsonStr",
-    "update:jsonArray",
-    "update:activeTab",
-  ],
+  emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
     const { t } = useI18n();
 
@@ -417,9 +411,7 @@ export default defineComponent({
                 try {
                   const parsedJson = JSON.parse(e.target.result);
                   // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
+                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
                   toast({
@@ -459,9 +451,7 @@ export default defineComponent({
               response.headers["content-type"]?.includes("text/plain")
             ) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = Array.isArray(response.data)
-                ? response.data
-                : [response.data];
+              jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
               emit("update:jsonStr", jsonStr.value);
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
@@ -510,7 +500,7 @@ export default defineComponent({
           emit("update:jsonArray", newVal);
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Cleanup before component unmounts to prevent Monaco editor errors

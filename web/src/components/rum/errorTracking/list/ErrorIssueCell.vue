@@ -21,11 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex items-baseline gap-1 min-w-0">
       <span
         class="font-semibold shrink-0"
-        :class="
-          isUnhandled
-            ? 'text-severity-error-color'
-            : 'text-severity-warning-color'
-        "
+        :class="isUnhandled ? 'text-severity-error-color' : 'text-severity-warning-color'"
         data-test="rum-error-issue-cell-type"
         >{{ issue.error_type || t("rum.error") }}:</span
       >
@@ -53,9 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="topFrame.line !== null ? `${topFrame.file}:${topFrame.line}` : topFrame.file"
         data-test="rum-error-issue-cell-frame"
         >{{ topFrame.file
-        }}<template v-if="topFrame.line !== null"
-          >:{{ topFrame.line }}</template
-        ></code
+        }}<template v-if="topFrame.line !== null">:{{ topFrame.line }}</template></code
       >
       <OTag
         v-if="route"
@@ -66,12 +60,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="shrink-0"
         data-test="rum-error-issue-cell-route-tag"
       />
-      <small
-        v-if="issue.service"
-        class="truncate"
-        data-test="rum-error-issue-cell-service"
-        >{{ issue.service }}</small
-      >
+      <small v-if="issue.service" class="truncate" data-test="rum-error-issue-cell-service">{{
+        issue.service
+      }}</small>
     </div>
   </div>
 </template>

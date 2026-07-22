@@ -45,7 +45,9 @@
         <!-- Field row: render field name with expand chevron + actions inside OFieldRow -->
         <template #field-row="{ row }">
           <OFieldRow>
-            <span class="field-type-container relative w-[0.55rem] h-4 mr-[0.3rem] ml-[0.2rem] shrink-0 flex items-center justify-center">
+            <span
+              class="field-type-container relative w-[0.55rem] h-4 mr-[0.3rem] ml-[0.2rem] shrink-0 flex items-center justify-center"
+            >
               <OIcon
                 class="field-expand-icon absolute inline-flex items-center justify-center shrink-0 w-4 text-text-muted"
                 :name="expandedRows[row.name] ? 'expand-more' : 'chevron-right'"
@@ -98,10 +100,7 @@
 
         <!-- Loading skeleton -->
         <template #loading>
-          <div
-            data-test="search-fieldlist-loading-skeleton"
-            class="w-full flex flex-col"
-          >
+          <div data-test="search-fieldlist-loading-skeleton" class="w-full flex flex-col">
             <!-- Group 1 header -->
             <div class="h-7 flex items-center justify-between px-2">
               <OSkeleton type="rect" class="h-3 w-24 rounded-default" />
@@ -173,14 +172,9 @@
             >
               <OIcon name="fast-rewind" size="sm" />
             </OButton>
-            <template
-              v-for="page in visiblePagesForTotal(bottomProps)"
-              :key="page"
-            >
+            <template v-for="page in visiblePagesForTotal(bottomProps)" :key="page">
               <OButton
-                :variant="
-                  bottomProps.currentPage === page ? 'primary' : 'ghost'
-                "
+                :variant="bottomProps.currentPage === page ? 'primary' : 'ghost'"
                 size="icon-panel"
                 class="py-1.5 px-1! m-0! min-w-6! w-6! min-h-5.5! h-5.5! text-xs! font-medium leading-none text-text-body! rounded-default! overflow-visible!"
                 @click="setPage(page)"
@@ -283,13 +277,9 @@ const expandedIds = ref<string[]>([]);
 const currentPage = ref(1);
 const fieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 
-const defaultValuesCount = computed(
-  () => store.state.zoConfig?.query_values_default_num || 10,
-);
+const defaultValuesCount = computed(() => store.state.zoConfig?.query_values_default_num || 10);
 
-const showFtsFieldValues = computed(
-  () => store.state.zoConfig?.showFtsFieldValues ?? false,
-);
+const showFtsFieldValues = computed(() => store.state.zoConfig?.showFtsFieldValues ?? false);
 
 // ─── Derive currently-filtered values from the active query ──────────
 // Mirrors logs IndexList.vue's activeIncludeFilterValues/activeExcludeFilterValues
@@ -307,9 +297,10 @@ const extractColName = (col: any): string | null => {
   return null;
 };
 
-function walkFilters(
-  query: string,
-): { include: Record<string, string[]>; exclude: Record<string, string[]> } {
+function walkFilters(query: string): {
+  include: Record<string, string[]>;
+  exclude: Record<string, string[]>;
+} {
   const include: Record<string, string[]> = {};
   const exclude: Record<string, string[]> = {};
   if (!query?.trim()) return { include, exclude };
@@ -318,11 +309,7 @@ function walkFilters(
     const parsed = fnParsedSQL(`select * from stream where ${query}`);
     if (!parsed?.where) return { include, exclude };
 
-    const push = (
-      target: Record<string, string[]>,
-      field: string,
-      value: string,
-    ) => {
+    const push = (target: Record<string, string[]>, field: string, value: string) => {
       if (!target[field]) target[field] = [];
       if (!target[field].includes(value)) target[field].push(value);
     };
@@ -390,9 +377,7 @@ onMounted(() => {
   }
 });
 
-const groupingActive = computed(
-  () => props.enableGrouping && semanticIndex.value !== null,
-);
+const groupingActive = computed(() => props.enableGrouping && semanticIndex.value !== null);
 
 // Map raw schema fields → FieldObj, bucket them, and annotate label rows so
 // OFieldList renders group headers (isGroup) vs field rows.
@@ -472,16 +457,13 @@ const {
 
 const currentSizePerField: Ref<Record<string, number>> = ref({});
 const currentKeyword: Ref<Record<string, string>> = ref({});
-const fieldValuesTimeRange: Ref<
-  Record<string, { start_time: number; end_time: number }>
-> = ref({});
+const fieldValuesTimeRange: Ref<Record<string, { start_time: number; end_time: number }>> = ref({});
 
 // ─── SQL helper ──────────────────────────────────────────────────────
 
 const buildSql = (streamName: string, whereClause?: string) =>
-  b64EncodeUnicode(
-    `SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`,
-  ) || "";
+  b64EncodeUnicode(`SELECT * FROM "${streamName}"${whereClause ? ` WHERE ${whereClause}` : ""}`) ||
+  "";
 
 // ─── Expansion handling ──────────────────────────────────────────────
 
@@ -591,9 +573,7 @@ function setPage(page: number) {
 // ─── FieldValuesPanel event handlers ─────────────────────────────────
 
 const handleSearchFieldValues = (fieldName: string, term: string) => {
-  const row: any = (props.fields as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
+  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
   const resolvedStream = row?.stream_name || props.streamName;
   currentKeyword.value[fieldName] = term;
   currentSizePerField.value[fieldName] = defaultValuesCount.value;
@@ -619,18 +599,13 @@ const handleSearchFieldValues = (fieldName: string, term: string) => {
 };
 
 const handleLoadMoreValues = (fieldName: string) => {
-  const row: any = (props.fields as any[]).find(
-    (f: any) => f.name === fieldName,
-  );
+  const row: any = (props.fields as any[]).find((f: any) => f.name === fieldName);
   const resolvedStream = row?.stream_name || props.streamName;
   const newSize =
-    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) +
-    defaultValuesCount.value;
+    (currentSizePerField.value[fieldName] ?? defaultValuesCount.value) + defaultValuesCount.value;
   currentSizePerField.value[fieldName] = newSize;
   fieldValuesCurrentSize.value[fieldName] = newSize;
-  fieldValuesFinalizedValues.value[fieldName] = [
-    ...(fieldValues.value[fieldName]?.values || []),
-  ];
+  fieldValuesFinalizedValues.value[fieldName] = [...(fieldValues.value[fieldName]?.values || [])];
 
   const pinnedTime = fieldValuesTimeRange.value[fieldName];
   fetchFieldValues({
@@ -660,24 +635,14 @@ const buildExpression = (fieldName: string, v: string, action: string) =>
       ? `${fieldName}='${v}'`
       : `${fieldName}!='${v}'`;
 
-const handleAddSearchTerm = (
-  fieldName: string,
-  value: string,
-  action: string,
-) => {
+const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
   addSearchTerm(buildExpression(fieldName, value, action));
 };
 
-const handleAddMultipleSearchTerms = (
-  fieldName: string,
-  values: string[],
-  action: string,
-) => {
+const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
   const joinOp = action === "include" ? " or " : " and ";
   const expressions = values.map((v) => buildExpression(fieldName, v, action));
-  addSearchTerm(
-    expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0],
-  );
+  addSearchTerm(expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0]);
 };
 
 const handleRemoveFieldFilter = (fieldName: string) => {
@@ -715,5 +680,4 @@ const copyContentValue = (value: string) => {
   padding-top: 0;
   padding-bottom: 0;
 }
-
 </style>

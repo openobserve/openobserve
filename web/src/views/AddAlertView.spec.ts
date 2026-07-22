@@ -1,17 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mount, flushPromises } from '@vue/test-utils';
-import { createStore } from 'vuex';
-import { createRouter, createWebHistory } from 'vue-router';
-import AddAlertView from './AddAlertView.vue';
-import destinationService from '@/services/alert_destination';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createRouter, createWebHistory } from "vue-router";
+import AddAlertView from "./AddAlertView.vue";
+import destinationService from "@/services/alert_destination";
 
-vi.mock('@/services/alert_destination', () => ({
+vi.mock("@/services/alert_destination", () => ({
   default: {
     list: vi.fn(),
   },
 }));
 
-describe('AddAlertView.vue', () => {
+describe("AddAlertView.vue", () => {
   let store: any;
   let router: any;
 
@@ -21,7 +21,7 @@ describe('AddAlertView.vue', () => {
     store = createStore({
       state: {
         selectedOrganization: {
-          identifier: 'test-org',
+          identifier: "test-org",
         },
         organizationData: {
           allAlertsListByFolderId: {},
@@ -35,15 +35,15 @@ describe('AddAlertView.vue', () => {
     router = createRouter({
       history: createWebHistory(),
       routes: [
-        { path: '/', component: { template: '<div>Home</div>' } },
-        { path: '/alerts', name: 'alertList', component: { template: '<div>Alerts</div>' } },
+        { path: "/", component: { template: "<div>Home</div>" } },
+        { path: "/alerts", name: "alertList", component: { template: "<div>Alerts</div>" } },
       ],
     });
   });
 
-  it('should render AddAlert component when destinations are loaded', async () => {
+  it("should render AddAlert component when destinations are loaded", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: 'Destination 1' }],
+      data: [{ id: 1, name: "Destination 1" }],
     } as any);
 
     const wrapper = mount(AddAlertView, {
@@ -51,7 +51,7 @@ describe('AddAlertView.vue', () => {
         plugins: [store, router],
         stubs: {
           AddAlert: {
-            name: 'AddAlert',
+            name: "AddAlert",
             template: '<div class="add-alert-stub"></div>',
           },
         },
@@ -60,12 +60,12 @@ describe('AddAlertView.vue', () => {
 
     await flushPromises();
 
-    expect(wrapper.find('.add-alert-stub').exists()).toBe(true);
+    expect(wrapper.find(".add-alert-stub").exists()).toBe(true);
   });
 
-  it('should fetch destinations on mount', async () => {
+  it("should fetch destinations on mount", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: 'Destination 1' }],
+      data: [{ id: 1, name: "Destination 1" }],
     } as any);
 
     mount(AddAlertView, {
@@ -80,12 +80,12 @@ describe('AddAlertView.vue', () => {
     await flushPromises();
 
     expect(destinationService.list).toHaveBeenCalledWith({
-      org_identifier: 'test-org',
-      module: 'alert',
+      org_identifier: "test-org",
+      module: "alert",
     });
   });
 
-  it('should not render AddAlert when destinations are empty', async () => {
+  it("should not render AddAlert when destinations are empty", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
       data: [],
     } as any);
@@ -95,7 +95,7 @@ describe('AddAlertView.vue', () => {
         plugins: [store, router],
         stubs: {
           AddAlert: {
-            name: 'AddAlert',
+            name: "AddAlert",
             template: '<div class="add-alert-stub"></div>',
           },
         },
@@ -104,11 +104,11 @@ describe('AddAlertView.vue', () => {
 
     await flushPromises();
 
-    expect(wrapper.find('.add-alert-stub').exists()).toBe(false);
+    expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
   });
 
-  it('should handle getDestinations error', async () => {
-    vi.mocked(destinationService.list).mockRejectedValue(new Error('Network error'));
+  it("should handle getDestinations error", async () => {
+    vi.mocked(destinationService.list).mockRejectedValue(new Error("Network error"));
 
     const wrapper = mount(AddAlertView, {
       global: {
@@ -126,19 +126,19 @@ describe('AddAlertView.vue', () => {
     expect(wrapper.vm.destinations).toEqual([]);
   });
 
-  it('should navigate to alert list on handleUpdateList', async () => {
+  it("should navigate to alert list on handleUpdateList", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: 'Destination 1' }],
+      data: [{ id: 1, name: "Destination 1" }],
     } as any);
 
-    const pushSpy = vi.spyOn(router, 'push');
+    const pushSpy = vi.spyOn(router, "push");
 
     const wrapper = mount(AddAlertView, {
       global: {
         plugins: [store, router],
         stubs: {
           AddAlert: {
-            name: 'AddAlert',
+            name: "AddAlert",
             template: '<div class="add-alert-stub" @update:list="$emit(\'update:list\')"></div>',
           },
         },
@@ -147,33 +147,34 @@ describe('AddAlertView.vue', () => {
 
     await flushPromises();
 
-    wrapper.findComponent({ name: 'AddAlert' }).vm.$emit('update:list');
+    wrapper.findComponent({ name: "AddAlert" }).vm.$emit("update:list");
     await flushPromises();
 
     expect(pushSpy).toHaveBeenCalledWith({
-      name: 'alertList',
+      name: "alertList",
       query: {
-        org_identifier: 'test-org',
-        folder: 'default',
-        tab: 'all',
+        org_identifier: "test-org",
+        folder: "default",
+        tab: "all",
       },
     });
   });
 
-  it('should navigate back on handleCancel', async () => {
+  it("should navigate back on handleCancel", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: 'Destination 1' }],
+      data: [{ id: 1, name: "Destination 1" }],
     } as any);
 
-    const backSpy = vi.spyOn(router, 'back');
+    const backSpy = vi.spyOn(router, "back");
 
     const wrapper = mount(AddAlertView, {
       global: {
         plugins: [store, router],
         stubs: {
           AddAlert: {
-            name: 'AddAlert',
-            template: '<div class="add-alert-stub" @cancel:hideform="$emit(\'cancel:hideform\')"></div>',
+            name: "AddAlert",
+            template:
+              '<div class="add-alert-stub" @cancel:hideform="$emit(\'cancel:hideform\')"></div>',
           },
         },
       },
@@ -181,15 +182,15 @@ describe('AddAlertView.vue', () => {
 
     await flushPromises();
 
-    wrapper.findComponent({ name: 'AddAlert' }).vm.$emit('cancel:hideform');
+    wrapper.findComponent({ name: "AddAlert" }).vm.$emit("cancel:hideform");
     await flushPromises();
 
     expect(backSpy).toHaveBeenCalled();
   });
 
-  it('should refresh destinations when event is emitted', async () => {
+  it("should refresh destinations when event is emitted", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
-      data: [{ id: 1, name: 'Destination 1' }],
+      data: [{ id: 1, name: "Destination 1" }],
     } as any);
 
     const wrapper = mount(AddAlertView, {
@@ -197,8 +198,9 @@ describe('AddAlertView.vue', () => {
         plugins: [store, router],
         stubs: {
           AddAlert: {
-            name: 'AddAlert',
-            template: '<div class="add-alert-stub" @refresh:destinations="$emit(\'refresh:destinations\')"></div>',
+            name: "AddAlert",
+            template:
+              '<div class="add-alert-stub" @refresh:destinations="$emit(\'refresh:destinations\')"></div>',
           },
         },
       },
@@ -209,16 +211,16 @@ describe('AddAlertView.vue', () => {
     // Clear previous calls
     vi.mocked(destinationService.list).mockClear();
 
-    wrapper.findComponent({ name: 'AddAlert' }).vm.$emit('refresh:destinations');
+    wrapper.findComponent({ name: "AddAlert" }).vm.$emit("refresh:destinations");
     await flushPromises();
 
     expect(destinationService.list).toHaveBeenCalledTimes(1);
   });
 
-  it('should pass correct props to AddAlert', async () => {
+  it("should pass correct props to AddAlert", async () => {
     const mockDestinations = [
-      { id: 1, name: 'Destination 1' },
-      { id: 2, name: 'Destination 2' },
+      { id: 1, name: "Destination 1" },
+      { id: 2, name: "Destination 2" },
     ];
 
     vi.mocked(destinationService.list).mockResolvedValue({
@@ -230,9 +232,9 @@ describe('AddAlertView.vue', () => {
         plugins: [store, router],
         stubs: {
           AddAlert: {
-            name: 'AddAlert',
+            name: "AddAlert",
             template: '<div class="add-alert-stub"></div>',
-            props: ['destinations', 'isUpdated'],
+            props: ["destinations", "isUpdated"],
           },
         },
       },
@@ -240,8 +242,8 @@ describe('AddAlertView.vue', () => {
 
     await flushPromises();
 
-    const addAlert = wrapper.findComponent({ name: 'AddAlert' });
-    expect(addAlert.props('destinations')).toEqual(mockDestinations);
-    expect(addAlert.props('isUpdated')).toBe(false);
+    const addAlert = wrapper.findComponent({ name: "AddAlert" });
+    expect(addAlert.props("destinations")).toEqual(mockDestinations);
+    expect(addAlert.props("isUpdated")).toBe(false);
   });
 });

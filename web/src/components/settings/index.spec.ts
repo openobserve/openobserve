@@ -37,7 +37,6 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mocked-${path}`),
 }));
 
-
 // Mock Vuex store
 const mockStore = {
   state: {
@@ -209,7 +208,9 @@ describe("SettingsIndex", () => {
       const queryItem = items.find((i: any) => i.key === "queryManagement");
       const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
       const domainItem = items.find((i: any) => i.dataTest === "domain-management-tab");
-      const orgManagementItem = items.find((i: any) => i.dataTest === "organization-management-tab");
+      const orgManagementItem = items.find(
+        (i: any) => i.dataTest === "organization-management-tab",
+      );
 
       expect(queryItem?.visible).toBe(true);
       expect(nodesItem?.visible).toBe(true);
@@ -277,9 +278,7 @@ describe("SettingsIndex", () => {
     it("should contain DESTINATIONS & TEMPLATES group", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
-      const destGroup = groups.find(
-        (g: any) => g.label === "Destinations & Templates",
-      );
+      const destGroup = groups.find((g: any) => g.label === "Destinations & Templates");
       expect(destGroup).toBeDefined();
     });
   });

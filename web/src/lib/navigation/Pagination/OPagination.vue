@@ -8,9 +8,7 @@ defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
 // Forward consumer's `data-test` so individual buttons can be addressed via
 // `${parent}-prev` / `${parent}-next` / `${parent}-page-{n}` selectors.
-const parentDataTest = computed(
-  () => $attrs["data-test"] as string | undefined,
-);
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<PaginationProps>(), {
   disable: false,
@@ -20,8 +18,7 @@ const props = withDefaults(defineProps<PaginationProps>(), {
 const emit = defineEmits<PaginationEmits>();
 
 /** Clamp a value between min and max (inclusive). */
-const clamp = (val: number, min: number, max: number) =>
-  Math.min(Math.max(val, min), max);
+const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
 /** Visible page-number window, centred around the current page. */
 const pages = computed<number[]>(() => {
@@ -119,6 +116,5 @@ const navigate = (page: number) => {
     >
       <OIcon name="fast-forward" size="sm" />
     </button>
-
   </div>
 </template>

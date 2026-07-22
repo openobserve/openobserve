@@ -52,15 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onMounted,
-  onActivated,
-  nextTick,
-  type Ref,
-} from "vue";
+import { defineComponent, ref, watch, onMounted, onActivated, nextTick, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { reactive } from "vue";
@@ -261,10 +253,7 @@ export default defineComponent({
 
       // if variables data is null, set it to empty list
       if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
+        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
       ) {
         if (variablesData.value) {
           variablesData.value.isVariablesLoading = false;
@@ -315,4 +304,3 @@ export default defineComponent({
   },
 });
 </script>
-

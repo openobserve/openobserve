@@ -16,7 +16,7 @@
         @click="onAddClick"
         data-test="add-cross-link-btn"
       >
-        {{ t('crossLinks.addCrossLink') }}
+        {{ t("crossLinks.addCrossLink") }}
       </OButton>
     </div>
 
@@ -37,12 +37,7 @@
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
-              <OTag
-                v-if="link._source"
-                type="crossLinkSource"
-                :value="link._source"
-                class="ml-1"
-              />
+              <OTag v-if="link._source" type="crossLinkSource" :value="link._source" class="ml-1" />
             </div>
             <!-- URL -->
             <div
@@ -87,11 +82,7 @@
     </div>
 
     <!-- Empty State -->
-    <div
-      v-else
-      class="text-center py-4 text-sm text-text-muted"
-      data-test="cross-link-empty"
-    >
+    <div v-else class="text-center py-4 text-sm text-text-muted" data-test="cross-link-empty">
       {{ t("crossLinks.emptyState", { addLabel: t("crossLinks.addCrossLink") }) }}
     </div>
 
@@ -111,9 +102,8 @@ import { defineComponent, ref, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import CrossLinkDialog from "./CrossLinkDialog.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTag from '@/lib/core/Badge/OTag.vue';
-
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export interface CrossLink {
   name: string;
@@ -183,9 +173,7 @@ export default defineComponent({
       let updated: CrossLink[];
 
       if (editingOriginalName.value) {
-        const idx = props.modelValue.findIndex(
-          (l) => l.name === editingOriginalName.value,
-        );
+        const idx = props.modelValue.findIndex((l) => l.name === editingOriginalName.value);
         if (idx >= 0) {
           updated = [...props.modelValue];
           updated[idx] = link;

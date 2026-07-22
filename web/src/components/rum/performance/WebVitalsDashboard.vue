@@ -18,19 +18,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div class="rounded-default relative-position">
-    <div
-      class="performance-dashboard"
-      :class="isLoading.length ? 'invisible' : 'visible'"
-    >
+    <div class="performance-dashboard" :class="isLoading.length ? 'invisible' : 'visible'">
       <div
         data-test="learn-web-vitals-link"
         class="font-bold ml-3 px-2 rounded-default mt-2 py-1 text-sm w-fit flex items-center bg-badge-indigo-soft-bg"
       >
-        <OIcon
-          name="info"
-          size="sm"
-          class="mr-1"
-        />
+        <OIcon name="info" size="sm" class="mr-1" />
         {{ t("rum.learnWebVitalsLabel") }}
         <a
           href="https://web.dev/articles/vitals"
@@ -66,15 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onActivated,
-  nextTick,
-  onMounted,
-  type Ref,
-} from "vue";
+import { defineComponent, ref, watch, onActivated, nextTick, onMounted, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -99,7 +84,7 @@ export default defineComponent({
     RenderDashboardCharts,
     OSpinner,
     OIcon,
-},
+  },
   props: {
     dateTime: {
       type: Object,
@@ -156,16 +141,12 @@ export default defineComponent({
 
     const loadDashboard = async () => {
       // schema migration
-      currentDashboardData.data =
-        convertDashboardSchemaVersion(overviewDashboard);
+      currentDashboardData.data = convertDashboardSchemaVersion(overviewDashboard);
 
       // if variables data is null, set it to empty list
 
       if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
+        !(currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length)
       ) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];

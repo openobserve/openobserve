@@ -13,12 +13,14 @@
         @update:model-value="updateModelValueOfSelect(index, $event)"
         class="flex-1"
       />
-      <OSelect class="w-auto"
+      <OSelect
+        class="w-auto"
         v-model="adhocVariables[index].operator"
         :options="operatorOptions"
         data-test="dashboard-variable-adhoc-operator-selector"
       />
-      <OInput class="w-31.25"
+      <OInput
+        class="w-31.25"
         v-model="adhocVariables[index].value"
         :placeholder="t('dashboard.variableAdHocValueSelector.enterValue')"
         :debounce="1000"
@@ -115,10 +117,7 @@ export default defineComponent({
     };
 
     const emitValue = () => {
-      emit(
-        "update:modelValue",
-        JSON.parse(JSON.stringify(adhocVariables.value)),
-      );
+      emit("update:modelValue", JSON.parse(JSON.stringify(adhocVariables.value)));
     };
 
     return {
@@ -136,4 +135,3 @@ export default defineComponent({
   },
 });
 </script>
-

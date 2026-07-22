@@ -95,9 +95,7 @@ import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
-import agentSignalsService, {
-  type AgentSignalRecord,
-} from "@/services/agent_signals";
+import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 
 const props = defineProps<{
   startTime?: number;
@@ -120,17 +118,12 @@ const detailOpen = ref(false);
 const detailRow = ref<any>(null);
 
 /** Open the details panel for a clicked Behavior row (maps the table row to a signal). */
-const openDetail = (
-  signalType: "loop" | "failure" | "cost",
-  row: Record<string, any>,
-) => {
+const openDetail = (signalType: "loop" | "failure" | "cost", row: Record<string, any>) => {
   detailRow.value = { signalType, ...row };
   detailOpen.value = true;
 };
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
 /** Signals scoped to the selected agent (Agent mode) or all agents (Stream mode). */
 const scopedSignals = computed(() => {
@@ -256,10 +249,7 @@ const fetchSignals = async () => {
 };
 
 onMounted(fetchSignals);
-watch(
-  () => [props.startTime, props.endTime, props.sourceStream, orgId.value],
-  fetchSignals,
-);
+watch(() => [props.startTime, props.endTime, props.sourceStream, orgId.value], fetchSignals);
 
 defineExpose({ refresh: fetchSignals, lastRunAt, loading });
 </script>

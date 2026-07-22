@@ -19,11 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div data-test="error-tags-title" class="text-base font-bold ml-1">{{ t("rum.tags") }}</div>
     <div class="flex items-center">
       <div class="mr-4 items-center">
-        <img
-          :src="ip"
-          :alt="t('rum.ipLabel')"
-          class="mr-2 inline-block w-[1.875rem]! h-auto!"
-        />
+        <img :src="ip" :alt="t('rum.ipLabel')" class="mr-2 inline-block w-[1.875rem]! h-auto!" />
         <div class="inline-block">
           <div class="pl-1">{{ t("rum.ipLabel") }}</div>
           <span class="pl-1"> {{ error.ip }} </span>
@@ -97,25 +93,15 @@ onMounted(() => {
 const getBrowserIcon = () => {
   if (!props.error.user_agent_user_agent_family) return chrome;
 
-  if (
-    props.error.user_agent_user_agent_family?.toLowerCase().includes("chrome")
-  ) {
+  if (props.error.user_agent_user_agent_family?.toLowerCase().includes("chrome")) {
     return chrome;
-  } else if (
-    props.error.user_agent_user_agent_family?.toLowerCase().includes("opera")
-  ) {
+  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("opera")) {
     return opera;
-  } else if (
-    props.error.user_agent_user_agent_family?.toLowerCase().includes("firefox")
-  ) {
+  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("firefox")) {
     return firefox;
-  } else if (
-    props.error.user_agent_user_agent_family?.toLowerCase().includes("edge")
-  ) {
+  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("edge")) {
     return edge;
-  } else if (
-    props.error.user_agent_user_agent_family?.toLowerCase().includes("safari")
-  ) {
+  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("safari")) {
     return safari;
   }
   return chrome;
@@ -126,9 +112,7 @@ const getOsIcon = () => {
     return windows;
   } else if (props.error?.user_agent_os_family?.toLowerCase().includes("mac")) {
     return mac;
-  } else if (
-    props.error?.user_agent_os_family?.toLowerCase().includes("linux")
-  ) {
+  } else if (props.error?.user_agent_os_family?.toLowerCase().includes("linux")) {
     return linux;
   } else {
     return windows;
@@ -140,14 +124,11 @@ const getOsVersion = computed(() => {
 
   if (!props.error.user_agent_os_major) return version + t("rum.unknown");
 
-  if (props.error.user_agent_os_major)
-    version += props.error.user_agent_os_major;
+  if (props.error.user_agent_os_major) version += props.error.user_agent_os_major;
 
-  if (props.error.user_agent_os_minor)
-    version += "." + props.error.user_agent_os_minor;
+  if (props.error.user_agent_os_minor) version += "." + props.error.user_agent_os_minor;
 
-  if (props.error.user_agent_os_patch)
-    version += "." + props.error.user_agent_os_patch;
+  if (props.error.user_agent_os_patch) version += "." + props.error.user_agent_os_patch;
 
   return version;
 });
@@ -157,8 +138,7 @@ const getBrowserVersion = computed(() => {
 
   if (!props.error.user_agent_user_agent_major) return version + t("rum.unknown");
 
-  if (props.error.user_agent_user_agent_major)
-    version += props.error.user_agent_user_agent_major;
+  if (props.error.user_agent_user_agent_major) version += props.error.user_agent_user_agent_major;
 
   if (props.error.user_agent_user_agent_minor)
     version += "." + props.error.user_agent_user_agent_minor;
@@ -186,28 +166,18 @@ const getTags = computed(() => {
 });
 
 const getDevice = () => {
-  if (
-    !props.error.user_agent_device_brand &&
-    !props.error.user_agent_device_family
-  )
+  if (!props.error.user_agent_device_brand && !props.error.user_agent_device_family)
     return t("rum.unknown");
 
-  if (!props.error.user_agent_device_brand)
-    return props.error.user_agent_device_family;
+  if (!props.error.user_agent_device_brand) return props.error.user_agent_device_family;
 
-  if (!props.error.user_agent_device_family)
-    return props.error.user_agent_device_brand;
+  if (!props.error.user_agent_device_family) return props.error.user_agent_device_brand;
 
-  return (
-    props.error.user_agent_device_brand +
-    " " +
-    props.error.user_agent_device_family
-  );
+  return props.error.user_agent_device_brand + " " + props.error.user_agent_device_family;
 };
 
 const getLocation = () => {
-  if (!props.error.geo_info_country && !props.error.geo_info_city)
-    return t("rum.unknown");
+  if (!props.error.geo_info_country && !props.error.geo_info_city) return t("rum.unknown");
   if (!props.error.geo_info_country) return props.error.geo_info_city;
   if (!props.error.geo_info_city) return props.error.geo_info_country;
 

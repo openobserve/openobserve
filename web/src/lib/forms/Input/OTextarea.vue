@@ -1,11 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  TextareaProps,
-  TextareaEmits,
-  TextareaSlots,
-} from "./OTextarea.types";
+import type { TextareaProps, TextareaEmits, TextareaSlots } from "./OTextarea.types";
 import { computed, nextTick, onMounted, ref, useAttrs, useId, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -14,9 +10,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 // (Same pattern as ODialog / OInput.)
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
-const parentDataTest = computed(
-  () => $attrs["data-test"] as string | undefined,
-);
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
@@ -115,11 +109,7 @@ const wrapperClasses = computed(() => [
 <template>
   <div
     v-bind="wrapperAttrs"
-    :class="[
-      'flex flex-col gap-1',
-      fieldWidthClass,
-      fill && 'h-full min-h-0',
-    ]"
+    :class="['flex flex-col gap-1', fieldWidthClass, fill && 'h-full min-h-0']"
   >
     <!-- Label -->
     <label
@@ -127,7 +117,9 @@ const wrapperClasses = computed(() => [
       :for="textareaId"
       :class="[
         'o-input-label text-compact leading-tight flex items-center gap-1',
-        props.disabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        props.disabled
+          ? 'font-normal text-input-label-text-disabled'
+          : 'font-medium text-input-label-text',
       ]"
     >
       {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
@@ -137,7 +129,8 @@ const wrapperClasses = computed(() => [
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <!-- Textarea wrapper -->
@@ -165,12 +158,7 @@ const wrapperClasses = computed(() => [
           fill ? 'h-full min-h-0 resize-none' : 'min-h-20',
           !fill && (autogrow ? 'resize-none' : 'resize-y'),
         ]"
-        @input="
-          emit(
-            'update:modelValue',
-            ($event.target as HTMLTextAreaElement).value,
-          )
-        "
+        @input="emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
         @blur="emit('blur', $event)"
         @focus="emit('focus', $event)"
         @keydown="emit('keydown', $event)"
@@ -190,10 +178,7 @@ const wrapperClasses = computed(() => [
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-input-hint leading-none"
-      >
+      <span v-else-if="helpText" class="text-xs text-input-hint leading-none">
         {{ helpText }}
       </span>
       <span v-else class="flex-1" />
@@ -202,9 +187,7 @@ const wrapperClasses = computed(() => [
         v-if="maxlength"
         :class="[
           'text-xs leading-none tabular-nums shrink-0',
-          charCount > maxlength
-            ? 'text-input-error-text'
-            : 'text-input-hint',
+          charCount > maxlength ? 'text-input-error-text' : 'text-input-hint',
         ]"
       >
         {{ charCount }}/{{ maxlength }}

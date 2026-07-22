@@ -1,5 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
-import http from './http'
+import http from "./http";
 
 const STREAM_NAME = "synthetics_results";
 
@@ -25,34 +25,32 @@ export interface GetRunPayload {
 
 const syntheticsService = {
   create: (orgIdentifier: string, payload: unknown, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().post(`/api/${orgIdentifier}/synthetics${params}`, payload)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().post(`/api/${orgIdentifier}/synthetics${params}`, payload);
   },
 
   update: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().put(`/api/${orgIdentifier}/synthetics/${id}`, payload)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().put(`/api/${orgIdentifier}/synthetics/${id}`, payload);
   },
 
-  get: (orgIdentifier: string, id: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}`),
+  get: (orgIdentifier: string, id: string) => http().get(`/api/${orgIdentifier}/synthetics/${id}`),
 
-  list: (orgIdentifier: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics`),
+  list: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/synthetics`),
 
   listByFolderId: (orgIdentifier: string, folderId?: string) => {
-    const params = folderId && folderId !== 'all' ? `?folder=${folderId}` : ''
-    return http().get(`/api/${orgIdentifier}/synthetics${params}`)
+    const params = folderId && folderId !== "all" ? `?folder=${folderId}` : "";
+    return http().get(`/api/${orgIdentifier}/synthetics${params}`);
   },
 
   delete: (orgIdentifier: string, id: string, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().delete(`/api/${orgIdentifier}/synthetics/${id}${params}`)
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().delete(`/api/${orgIdentifier}/synthetics/${id}${params}`);
   },
 
   bulkDelete: (orgIdentifier: string, payload: { ids: string[] }, folderId?: string) => {
-    const params = folderId ? `?folder=${folderId}` : ''
-    return http().delete(`/api/${orgIdentifier}/synthetics${params}`, { data: payload })
+    const params = folderId ? `?folder=${folderId}` : "";
+    return http().delete(`/api/${orgIdentifier}/synthetics${params}`, { data: payload });
   },
 
   enable: (orgIdentifier: string, id: string, payload: unknown) =>
@@ -70,9 +68,9 @@ const syntheticsService = {
   artifactUrl: (orgIdentifier: string, key: string) => {
     // Fallback proxy URL. key format:
     // synthetics/{org}/{synthetics_id}/{yyyy}/{mm}/{dd}/{run_id}/{execution_id|job_id}/{filename}
-    const parts = key.split('/')
-    const synthetics_id = parts[2] ?? '_'
-    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}`
+    const parts = key.split("/");
+    const synthetics_id = parts[2] ?? "_";
+    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}`;
   },
 
   // Batch-sign artifact download URLs. Returns { mode: "presigned" | "proxy",
@@ -81,14 +79,9 @@ const syntheticsService = {
   presignArtifacts: (orgIdentifier: string, syntheticsId: string, keys: string[]) =>
     http().post(`/api/${orgIdentifier}/synthetics/${syntheticsId}/artifacts/presign`, { keys }),
 
-  getLocations: (orgIdentifier: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/locations`),
+  getLocations: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/synthetics/locations`),
 
-  listRunsPayload(
-    monitorId: string,
-    startTime: number,
-    endTime: number,
-  ): ListRunsPayload {
+  listRunsPayload(monitorId: string, startTime: number, endTime: number): ListRunsPayload {
     const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' ORDER BY _timestamp DESC LIMIT 500`;
     return {
       query: {
@@ -118,6 +111,6 @@ const syntheticsService = {
       },
     };
   },
-}
+};
 
-export default syntheticsService
+export default syntheticsService;

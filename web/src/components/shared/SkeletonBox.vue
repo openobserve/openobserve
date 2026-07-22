@@ -5,53 +5,59 @@
     :style="{
       width: width,
       height: height,
-      borderRadius: customRadius
+      borderRadius: customRadius,
     }"
     aria-hidden="true"
   ></div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from "vue";
 
 interface Props {
   // Size props
-  width?: string
-  height?: string
+  width?: string;
+  height?: string;
 
   // Variant presets
-  variant?: 'text' | 'title' | 'button' | 'avatar' | 'image' | 'custom'
+  variant?: "text" | "title" | "button" | "avatar" | "image" | "custom";
 
   // Shape props
-  rounded?: boolean
-  circle?: boolean
-  customRadius?: string
+  rounded?: boolean;
+  circle?: boolean;
+  customRadius?: string;
 
   // Text-specific props (when variant is 'text')
-  lines?: number
+  lines?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  width: '100px',
-  height: '16px',
-  variant: 'custom',
+  width: "100px",
+  height: "16px",
+  variant: "custom",
   rounded: false,
   circle: false,
-  lines: 1
-})
+  lines: 1,
+});
 
 // Corner radius resolves from a single source: an explicit circle/rounded prop
 // wins, otherwise the variant preset maps onto the sanctioned radius scale.
 const shapeClass = computed(() => {
-  if (props.circle) return 'rounded-full aspect-square'
-  if (props.rounded) return 'rounded-surface'
+  if (props.circle) return "rounded-full aspect-square";
+  if (props.rounded) return "rounded-surface";
   switch (props.variant) {
-    case 'text':   return 'rounded-default'
-    case 'title':  return 'rounded-default'
-    case 'button': return 'rounded-default'
-    case 'avatar': return 'rounded-full'
-    case 'image':  return 'rounded-surface'
-    default:       return 'rounded-default'
+    case "text":
+      return "rounded-default";
+    case "title":
+      return "rounded-default";
+    case "button":
+      return "rounded-default";
+    case "avatar":
+      return "rounded-full";
+    case "image":
+      return "rounded-surface";
+    default:
+      return "rounded-default";
   }
-})
+});
 </script>

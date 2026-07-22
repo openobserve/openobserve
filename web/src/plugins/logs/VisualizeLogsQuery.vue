@@ -46,13 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  watch,
-  defineAsyncComponent,
-  computed,
-} from "vue";
+import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -105,10 +99,7 @@ export default defineComponent({
   },
   emits: ["handleChartApiError", "searchRequestTraceIdsUpdated"],
   setup(props, { emit }) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "logs",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
     const { t } = useI18n();
     const store = useStore();
     const { dashboardPanelData, resetAggregationFunction, validatePanel } =
@@ -136,10 +127,7 @@ export default defineComponent({
       return undefined;
     });
 
-    const {
-      visualizeChartData,
-      is_ui_histogram,
-    }: any = toRefs(props);
+    const { visualizeChartData, is_ui_histogram }: any = toRefs(props);
     const chartData = ref(visualizeChartData.value);
 
     const showAddToDashboardDialog = ref(false);
@@ -148,15 +136,7 @@ export default defineComponent({
     const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
 
     // Allowed chart types for logs visualization
-    const allowedChartTypes = [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "table",
-    ];
+    const allowedChartTypes = ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "table"];
 
     // Watch for external chart data changes
     watch(
@@ -185,9 +165,7 @@ export default defineComponent({
         store.state.zoConfig.quick_mode_enabled === true &&
         isSimpleSelectAllQuery(logsPageQuery)
       ) {
-        showErrorNotification(
-          t("logs.visualizeLogsQuery.selectAllNotSupported"),
-        );
+        showErrorNotification(t("logs.visualizeLogsQuery.selectAllNotSupported"));
         // Prevent the change by not updating the type
         return;
       }
@@ -227,12 +205,7 @@ export default defineComponent({
       setHoveredSeriesName: function (name: string) {
         hoveredSeriesState.value.hoveredSeriesName = name ?? "";
       },
-      setIndex: function (
-        dataIndex: number,
-        seriesIndex: number,
-        panelId: any,
-        hoveredTime?: any,
-      ) {
+      setIndex: function (dataIndex: number, seriesIndex: number, panelId: any, hoveredTime?: any) {
         hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
         hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
         hoveredSeriesState.value.panelId = panelId ?? -1;
@@ -257,8 +230,7 @@ export default defineComponent({
             searchObj.data.queryResults.converted_histogram_query;
         } else if (props.searchResponse?.converted_histogram_query) {
           // Fallback: check searchResponse (from logs search API)
-          dashboardPanelData.data.queries[0].query =
-            props.searchResponse.converted_histogram_query;
+          dashboardPanelData.data.queries[0].query = props.searchResponse.converted_histogram_query;
         } else if (panelResultMetaData?.[0]?.[0]?.converted_histogram_query) {
           // Fallback: check panelResultMetaData (new format)
           dashboardPanelData.data.queries[0].query =
@@ -280,9 +252,7 @@ export default defineComponent({
       if (errors.length) {
         // set errors into errorData
         errorDataModel.value.errors = errors;
-        showErrorNotification(
-          t("logs.visualizeLogsQuery.fixErrorsAndRetry"),
-        );
+        showErrorNotification(t("logs.visualizeLogsQuery.fixErrorsAndRetry"));
         return;
       } else {
         showAddToDashboardDialog.value = true;
@@ -324,4 +294,3 @@ export default defineComponent({
   },
 });
 </script>
-

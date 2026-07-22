@@ -16,7 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="overflow-hidden"
-    :title="isUpdatingTemplate ? t('alert_templates.updateTitle') : isClone ? t('alert_templates.cloneTitle') : t('alert_templates.addTitle')"
+    :title="
+      isUpdatingTemplate
+        ? t('alert_templates.updateTitle')
+        : isClone
+          ? t('alert_templates.cloneTitle')
+          : t('alert_templates.addTitle')
+    "
     title-data-test="add-template-title"
     :back="{
       label: t('alert_templates.header'),
@@ -24,71 +30,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <OSplitter class="h-full"
-      v-model="splitterModel"
-      unit="%"
-      :horizontal="false"
-    >
+    <OSplitter class="h-full" v-model="splitterModel" unit="%" :horizontal="false">
       <template v-slot:before>
-        <OForm
-          :form="form"
-          v-slot="{ isSubmitting }"
-          class="bg-card-glass-bg h-full flex flex-col"
-        >
+        <OForm :form="form" v-slot="{ isSubmitting }" class="bg-card-glass-bg h-full flex flex-col">
           <div class="p-3 overflow-auto">
             <div class="w-full pb-2 pt-2 o2-input">
-            <OFormInput
-              name="name"
-              data-test="add-template-name-input"
-              :label="t('alerts.name')"
-              required
-              :readonly="isUpdatingTemplate"
-              :disabled="isUpdatingTemplate"
-              tabindex="0"
-            />
-          </div>
-          <div class="w-full pb-3">
-            <div class="app-tabs-container w-fit">
-              <app-tabs
-                class="tabs-selection-container"
-                :tabs="tabs"
-                :active-tab="templateType"
-                @update:active-tab="onTypeChange"
+              <OFormInput
+                name="name"
+                data-test="add-template-name-input"
+                :label="t('alerts.name')"
+                required
+                :readonly="isUpdatingTemplate"
+                :disabled="isUpdatingTemplate"
+                tabindex="0"
               />
             </div>
-          </div>
-          <div v-if="templateType === 'email'" class="w-full pt-1 o2-input">
-            <OFormInput
-              name="title"
-              data-test="add-template-email-title-input"
-              :label="t('alerts.title')"
-              required
-              tabindex="0"
-            />
-          </div>
-          <div class="w-full py-3 ">
-            <div
-              class="pb-2 font-bold flex items-center gap-0.5"
-              data-test="add-template-body-input-title"
-            >
-              <span>{{ t("alert_templates.body") }}</span>
-              <span aria-hidden="true" class="select-none">*</span>
+            <div class="w-full pb-3">
+              <div class="app-tabs-container w-fit">
+                <app-tabs
+                  class="tabs-selection-container"
+                  :tabs="tabs"
+                  :active-tab="templateType"
+                  @update:active-tab="onTypeChange"
+                />
+              </div>
             </div>
-            <!-- `:key` forces a remount when the type flips. CodeQueryEditor
+            <div v-if="templateType === 'email'" class="w-full pt-1 o2-input">
+              <OFormInput
+                name="title"
+                data-test="add-template-email-title-input"
+                :label="t('alerts.title')"
+                required
+                tabindex="0"
+              />
+            </div>
+            <div class="w-full py-3">
+              <div
+                class="pb-2 font-bold flex items-center gap-0.5"
+                data-test="add-template-body-input-title"
+              >
+                <span>{{ t("alert_templates.body") }}</span>
+                <span aria-hidden="true" class="select-none">*</span>
+              </div>
+              <!-- `:key` forces a remount when the type flips. CodeQueryEditor
                  reads `language` only at monaco.editor.create() — it never
                  watches the prop, and setModelLanguage is used nowhere — so
                  without this the editor keeps its mount-time language and paints
                  a markdown body with JSON errors (pre-migration got the remount
                  for free from two v-if/v-else editors). -->
-            <query-editor
-              :key="bodyLanguage"
-              data-test="template-body-editor"
-              editor-id="template-body-editor"
-              class="w-full min-h-77.5! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"
-              :language="bodyLanguage"
-              :query="body"
-              @update:query="onBodyChange"
-            />
+              <query-editor
+                :key="bodyLanguage"
+                data-test="template-body-editor"
+                editor-id="template-body-editor"
+                class="w-full min-h-77.5! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"
+                :language="bodyLanguage"
+                :query="body"
+                @update:query="onBodyChange"
+              />
             </div>
           </div>
           <div
@@ -101,21 +99,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :disabled="isSubmitting"
               @click="$emit('cancel:hideform')"
               data-test="add-template-cancel-btn"
-            >{{ t('alerts.cancel') }}</OButton>
+              >{{ t("alerts.cancel") }}</OButton
+            >
             <OButton
               variant="primary"
               size="sm-action"
               :loading="isSubmitting"
               data-test="add-template-submit-btn"
               @click="handleSave"
-            >{{ t('alerts.save') }}</OButton>
+              >{{ t("alerts.save") }}</OButton
+            >
           </div>
         </OForm>
       </template>
       <template v-slot:after>
-        <div
-          class="px-2 pt-2 h-full overflow-auto bg-card-glass-bg border-l border-border-default"
-        >
+        <div class="px-2 pt-2 h-full overflow-auto bg-card-glass-bg border-l border-border-default">
           <div class="font-bold py-2 px-1 text-sm font-medium">
             {{ t("alert_templates.variable_guide_header") }}
           </div>
@@ -127,11 +125,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div>alert_count, alert_agg_value</div>
             <div>alert_start_time, alert_end_time, alert_url</div>
             <div>
-              alert_trigger_time, alert_trigger_time_millis,
-              alert_trigger_time_seconds, alert_trigger_time_str
+              alert_trigger_time, alert_trigger_time_millis, alert_trigger_time_seconds,
+              alert_trigger_time_str
             </div>
             <div><b>rows</b> {{ t("alert_templates.variableRowsDescription") }}</div>
-            <div><b>{{ t("alert_templates.variableStreamFields") }}</b></div>
+            <div>
+              <b>{{ t("alert_templates.variableStreamFields") }}</b>
+            </div>
             <div>{{ t("alert_templates.variableLimits") }}</div>
           </div>
           <div class="pb-3 px-1">
@@ -171,20 +171,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </OPageLayout>
 </template>
 <script lang="ts" setup>
-import {
-  ref,
-  onActivated,
-  computed,
-  watch,
-  defineAsyncComponent,
-} from "vue";
+import { ref, onActivated, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -199,7 +193,7 @@ import {
 } from "@/utils/templates/validation";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import {
   makeAddTemplateSchema,
@@ -221,9 +215,7 @@ const props = withDefaults(
 );
 const emit = defineEmits(["get:templates", "cancel:hideform"]);
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 const { t } = useI18n();
 const splitterModel: Ref<number> = ref(75);
 const store = useStore();
@@ -246,9 +238,7 @@ const form = useOForm<AddTemplateForm>({
 // Reactive views of the two bridged values.
 const templateType = form.useStore((s: any) => s.values.type as "http" | "email");
 const body = form.useStore((s: any) => (s.values.body as string) ?? "");
-const bodyLanguage = computed(() =>
-  templateType.value === "email" ? "markdown" : "json",
-);
+const bodyLanguage = computed(() => (templateType.value === "email" ? "markdown" : "json"));
 
 // app-tabs is a UI toggle whose value is the schema discriminator (not an
 // <input>) → bridge it into the form (sanctioned Rule-② bridge).

@@ -31,12 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   #tabs slot — it receives { tabs, filter } so you can render/filter yourself.
 -->
 <template>
-  <OSplitter
-    v-model="splitterWidthModel"
-    unit="px"
-    :horizontal="false"
-    class="h-full"
-  >
+  <OSplitter v-model="splitterWidthModel" unit="px" :horizontal="false" class="h-full">
     <template #before>
       <div class="w-full h-full">
         <div class="h-full bg-surface-panel border-r border-border-default">
@@ -70,7 +65,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :to="tab.to"
                   :icon="tab.icon"
                   :label="tab.label"
-                  :data-test="tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)"
+                  :data-test="
+                    tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)
+                  "
                 />
               </slot>
             </OTabs>

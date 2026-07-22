@@ -99,15 +99,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click.stop="openResult"
       >
         <OIcon name="error" size="xs" />
-        <span v-if="errorCount > 1" class="wf-test-count bg-white text-status-negative">{{ errorCount }}</span>
+        <span v-if="errorCount > 1" class="wf-test-count bg-white text-status-negative">{{
+          errorCount
+        }}</span>
         <OTooltip side="top" align="center" :side-offset="8" max-width="360px">
           <template #content>
             <div class="p-2 text-left flex flex-col gap-1">
-              <div
-                v-for="(m, i) in errorMessages"
-                :key="i"
-                class="text-xs leading-[1.35]"
-              >
+              <div v-for="(m, i) in errorMessages" :key="i" class="text-xs leading-[1.35]">
                 {{ m }}
               </div>
             </div>
@@ -153,11 +151,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
-import useWorkflowCanvas, {
-  nodeMeta,
-  workflowObj,
-  nodeConfigDetail,
-} from "./useWorkflowCanvas";
+import useWorkflowCanvas, { nodeMeta, workflowObj, nodeConfigDetail } from "./useWorkflowCanvas";
 
 const props = defineProps<{
   id: string;

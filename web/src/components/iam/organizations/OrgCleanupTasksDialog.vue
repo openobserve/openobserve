@@ -28,10 +28,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="tasks.length" class="mb-4">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-medium text-text-body">
-            {{ t('iam.orgCleanupTasksDialog.stepsComplete', { done: doneCount, total: tasks.length }) }}
+            {{
+              t("iam.orgCleanupTasksDialog.stepsComplete", { done: doneCount, total: tasks.length })
+            }}
           </span>
           <OBadge
-            :variant="overallStatus === 'completed' ? 'success-soft' : overallStatus === 'failed' ? 'error-soft' : 'primary-soft'"
+            :variant="
+              overallStatus === 'completed'
+                ? 'success-soft'
+                : overallStatus === 'failed'
+                  ? 'error-soft'
+                  : 'primary-soft'
+            "
             size="sm"
           >
             <OIcon
@@ -40,7 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="xs"
               class="mr-1 animate-spin"
             />
-            {{ overallStatus === 'completed' ? t('iam.orgCleanupTasksDialog.completed') : overallStatus === 'failed' ? t('iam.orgCleanupTasksDialog.failed') : t('iam.orgCleanupTasksDialog.inProgress') }}
+            {{
+              overallStatus === "completed"
+                ? t("iam.orgCleanupTasksDialog.completed")
+                : overallStatus === "failed"
+                  ? t("iam.orgCleanupTasksDialog.failed")
+                  : t("iam.orgCleanupTasksDialog.inProgress")
+            }}
           </OBadge>
         </div>
         <OProgressBar :value="progressValue" :variant="progressBarVariant" size="sm" />
@@ -48,12 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Loading -->
       <div v-if="loading && !tasks.length" class="py-8 text-center text-text-secondary text-sm">
-        {{ t('iam.orgCleanupTasksDialog.loading') }}
+        {{ t("iam.orgCleanupTasksDialog.loading") }}
       </div>
 
       <!-- Empty -->
       <div v-else-if="!tasks.length" class="py-8 text-center text-text-secondary text-sm">
-        {{ t('iam.orgCleanupTasksDialog.noTasks') }}
+        {{ t("iam.orgCleanupTasksDialog.noTasks") }}
       </div>
 
       <!-- Task rows -->
@@ -208,23 +222,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="mt-3 text-xs text-text-secondary flex items-center gap-1.5"
       >
         <OIcon name="autorenew" size="xs" class="animate-spin" />
-        <span>{{ t('iam.orgCleanupTasksDialog.refreshingEvery5s') }}</span>
+        <span>{{ t("iam.orgCleanupTasksDialog.refreshingEvery5s") }}</span>
       </div>
-      <div
-        v-else-if="tasks.length && overallStatus === 'failed'"
-        class="mt-3 text-xs text-error"
-      >
-        {{ t('iam.orgCleanupTasksDialog.stepsFailedPermanently', { n: failedCount }) }}
+      <div v-else-if="tasks.length && overallStatus === 'failed'" class="mt-3 text-xs text-error">
+        {{ t("iam.orgCleanupTasksDialog.stepsFailedPermanently", { n: failedCount }) }}
       </div>
     </div>
 
     <template #footer>
       <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
-        {{ t('iam.orgCleanupTasksDialog.close') }}
+        {{ t("iam.orgCleanupTasksDialog.close") }}
       </OButton>
       <OButton variant="ghost" size="sm" :disabled="loading" @click="fetchTasks">
         <OIcon name="refresh" size="sm" />
-        {{ t('iam.orgCleanupTasksDialog.refresh') }}
+        {{ t("iam.orgCleanupTasksDialog.refresh") }}
       </OButton>
     </template>
   </ODialog>
@@ -270,7 +281,7 @@ export default defineComponent({
     let pollTimer: ReturnType<typeof setInterval> | null = null;
 
     const sortedTasks = computed(() =>
-      [...tasks.value].sort((a, b) => a.step_order - b.step_order)
+      [...tasks.value].sort((a, b) => a.step_order - b.step_order),
     );
 
     // Which collapsible groups are expanded. Collapsed by default; state is keyed
@@ -293,9 +304,7 @@ export default defineComponent({
     // group row; every other task stays a standalone row. Order follows step_order.
     const displayRows = computed(() => {
       const rows: any[] = [];
-      const streamChildren = sortedTasks.value.filter((t) =>
-        t.step.startsWith("delete_stream:")
-      );
+      const streamChildren = sortedTasks.value.filter((t) => t.step.startsWith("delete_stream:"));
       let groupInserted = false;
 
       for (const task of sortedTasks.value) {
@@ -325,25 +334,21 @@ export default defineComponent({
       return idx >= 0 ? step.slice(idx + 1) : step;
     };
 
-    const doneCount = computed(() =>
-      tasks.value.filter((t) => t.status === "done").length
+    const doneCount = computed(() => tasks.value.filter((t) => t.status === "done").length);
+
+    const failedCount = computed(
+      () => tasks.value.filter((t) => t.status === "failed" && t.attempts >= 10).length,
     );
 
-    const failedCount = computed(() =>
-      tasks.value.filter(
-        (t) => t.status === "failed" && t.attempts >= 10
-      ).length
-    );
-
-    const isComplete = computed(() =>
-      tasks.value.length > 0 && tasks.value.every((t) => t.status === "done")
+    const isComplete = computed(
+      () => tasks.value.length > 0 && tasks.value.every((t) => t.status === "done"),
     );
 
     const hasFailed = computed(() => failedCount.value > 0 && isComplete.value === false);
 
     // Progress fraction (0–1) for the bar.
     const progressValue = computed(() =>
-      tasks.value.length ? doneCount.value / tasks.value.length : 0
+      tasks.value.length ? doneCount.value / tasks.value.length : 0,
     );
 
     // Overall state: completed / failed / in-progress — drives the header chip + bar colour.
@@ -424,7 +429,7 @@ export default defineComponent({
         } else {
           stopPolling();
         }
-      }
+      },
     );
 
     onUnmounted(stopPolling);
@@ -435,9 +440,7 @@ export default defineComponent({
         const [prefix, rest] = step.split(":", 2);
         return `${prefix.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}: ${rest}`;
       }
-      return step
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase());
+      return step.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     };
 
     const badgeVariant = (status: string): BadgeVariant => {

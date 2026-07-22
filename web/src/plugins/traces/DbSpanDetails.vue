@@ -17,9 +17,7 @@ const props = defineProps<{
 
 const dbSystem = computed(() => props.span.db_system ?? "");
 
-const queryText = computed(
-  () => props.span.db_query_text ?? props.span.db_statement ?? "",
-);
+const queryText = computed(() => props.span.db_query_text ?? props.span.db_statement ?? "");
 
 const editorLanguage = computed(() => {
   switch (dbSystem.value) {
@@ -46,9 +44,7 @@ const hostDisplay = computed(() => {
   return "";
 });
 
-const tableDisplay = computed(
-  () => props.span.db_collection_name ?? props.span.db_sql_table ?? "",
-);
+const tableDisplay = computed(() => props.span.db_collection_name ?? props.span.db_sql_table ?? "");
 
 const hasPerformanceData = computed(
   () =>
@@ -109,22 +105,15 @@ const metadataRows = computed(() =>
               color: var(--color-text-heading);
             "
           >
-            <span class="text-text-secondary"
-              >{{ row.label }}:</span
-            >
+            <span class="text-text-secondary">{{ row.label }}:</span>
             <span class="break-all">{{ row.value }}</span>
           </span>
         </div>
       </OCardSection>
     </OCard>
 
-    <OCard
-      class="flex-1 flex flex-col"
-      data-test="traces-db-span-details-query-editor"
-    >
-      <OCardSection
-        class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-1.5!"
-      >
+    <OCard class="flex-1 flex flex-col" data-test="traces-db-span-details-query-editor">
+      <OCardSection class="flex-1 flex flex-col p-0 min-h-[18.75rem] p-1.5!">
         <CodeQueryEditor
           v-if="queryText"
           :query="queryText"
@@ -152,36 +141,34 @@ const metadataRows = computed(() =>
       data-test="traces-db-span-details-performance"
     >
       <div class="py-2 px-3">
-          <div class="grid grid-cols-2 gap-x-4 gap-y-1">
-            <template v-if="span.db_response_returned_rows">
-              <div class="text-xs text-text-secondary">
-                {{ t("traces.dbSpanDetails.rowsReturned") }}
-              </div>
-              <div class="text-xs">{{ span.db_response_returned_rows }}</div>
-            </template>
-            <template v-if="span.db_operation_batch_size">
-              <div class="text-xs text-text-secondary">
-                {{ t("traces.dbSpanDetails.batchSize") }}
-              </div>
-              <div class="text-xs">{{ span.db_operation_batch_size }}</div>
-            </template>
-            <template v-if="span.db_query_summary">
-              <div class="text-xs text-text-secondary">
-                {{ t("traces.dbSpanDetails.querySummary") }}
-              </div>
-              <div class="text-xs">{{ span.db_query_summary }}</div>
-            </template>
-            <template v-if="span.db_response_status_code">
-              <div class="text-xs text-text-secondary">
-                {{ t("traces.dbSpanDetails.responseStatus") }}
-              </div>
-              <div
-                class="text-xs text-status-error-text"
-              >
-                {{ span.db_response_status_code }}
-              </div>
-            </template>
-          </div>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1">
+          <template v-if="span.db_response_returned_rows">
+            <div class="text-xs text-text-secondary">
+              {{ t("traces.dbSpanDetails.rowsReturned") }}
+            </div>
+            <div class="text-xs">{{ span.db_response_returned_rows }}</div>
+          </template>
+          <template v-if="span.db_operation_batch_size">
+            <div class="text-xs text-text-secondary">
+              {{ t("traces.dbSpanDetails.batchSize") }}
+            </div>
+            <div class="text-xs">{{ span.db_operation_batch_size }}</div>
+          </template>
+          <template v-if="span.db_query_summary">
+            <div class="text-xs text-text-secondary">
+              {{ t("traces.dbSpanDetails.querySummary") }}
+            </div>
+            <div class="text-xs">{{ span.db_query_summary }}</div>
+          </template>
+          <template v-if="span.db_response_status_code">
+            <div class="text-xs text-text-secondary">
+              {{ t("traces.dbSpanDetails.responseStatus") }}
+            </div>
+            <div class="text-xs text-status-error-text">
+              {{ span.db_response_status_code }}
+            </div>
+          </template>
+        </div>
       </div>
     </OCollapsible>
   </div>

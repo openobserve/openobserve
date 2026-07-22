@@ -10,7 +10,9 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
 </script>
 
 <template>
-  <div class="grid w-full gap-3.5 [grid-template-columns:repeat(4,minmax(0,1fr))] max-[64rem]:[grid-template-columns:repeat(2,minmax(0,1fr))] max-[40rem]:[grid-template-columns:1fr]">
+  <div
+    class="grid w-full gap-3.5 [grid-template-columns:repeat(4,minmax(0,1fr))] max-[64rem]:[grid-template-columns:repeat(2,minmax(0,1fr))] max-[40rem]:[grid-template-columns:1fr]"
+  >
     <OCard
       v-for="card in CAPABILITY_CARDS"
       :key="card.id"
@@ -37,10 +39,14 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
-      <div class="capability-card__title relative z-[1] m-0 text-sm font-semibold leading-[1.3] text-typography-body whitespace-nowrap overflow-hidden text-ellipsis">
+      <div
+        class="capability-card__title relative z-[1] m-0 text-sm font-semibold leading-[1.3] text-typography-body whitespace-nowrap overflow-hidden text-ellipsis"
+      >
         {{ t(`aiAssistant.capabilities.${card.id}.title`) }}
       </div>
-      <div class="capability-card__desc relative z-[1] mt-1.5 mb-0 text-xs leading-[1.45] text-text-secondary">
+      <div
+        class="capability-card__desc relative z-[1] mt-1.5 mb-0 text-xs leading-[1.45] text-text-secondary"
+      >
         {{ t(`aiAssistant.capabilities.${card.id}.description`) }}
       </div>
       <span

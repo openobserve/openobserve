@@ -55,9 +55,7 @@ export const classicColorPaletteDarkTheme = [
 ];
 
 export const getColorPalette = (theme: string) => {
-  return theme === "dark"
-    ? classicColorPaletteDarkTheme
-    : classicColorPaletteLightTheme;
+  return theme === "dark" ? classicColorPaletteDarkTheme : classicColorPaletteLightTheme;
 };
 
 const isValidHexColor = (color: string): boolean => {
@@ -74,11 +72,7 @@ export const shadeColor = (
   if (!isValidHexColor(color)) {
     return null;
   }
-  if (
-    typeof value !== "number" ||
-    typeof min !== "number" ||
-    typeof max !== "number"
-  ) {
+  if (typeof value !== "number" || typeof min !== "number" || typeof max !== "number") {
     return null;
   }
   let percent = 0;
@@ -112,9 +106,7 @@ interface Metric {
   result?: MetricResult[];
 }
 
-export const getMetricMinMaxValue = (
-  searchQueryData: Metric[],
-): [number, number] => {
+export const getMetricMinMaxValue = (searchQueryData: Metric[]): [number, number] => {
   let min = Infinity;
   let max = -Infinity;
 
@@ -184,17 +176,11 @@ const getSeriesHash = (seriesName: string, colorPalette: string[]) => {
 type SeriesBy = "last" | "min" | "max";
 
 // `values` may be a bare number from gauge callers; the try/catch below absorbs the non-array case
-const getSeriesValueBasedOnSeriesBy = (
-  values: any,
-  seriesBy: SeriesBy,
-): number | null => {
+const getSeriesValueBasedOnSeriesBy = (values: any, seriesBy: SeriesBy): number | null => {
   try {
     const validValues = values.filter(
       (value: number | string) =>
-        value != null &&
-        value !== "" &&
-        isNumber(value) &&
-        !Number.isNaN(value),
+        value != null && value !== "" && isNumber(value) && !Number.isNaN(value),
     );
 
     if (validValues.length === 0) return null;
@@ -231,11 +217,7 @@ interface ColorConfig {
   seriesBy?: SeriesBy;
 }
 
-function getDomainPartitions(
-  chartMin: number,
-  chartMax: number,
-  numPartitions: number,
-) {
+function getDomainPartitions(chartMin: number, chartMax: number, numPartitions: number) {
   // If there's only one partition, return just chartMin and chartMax
   if (numPartitions < 2) {
     return [chartMin, chartMax];
@@ -274,9 +256,7 @@ export const getSeriesColor = (
   }
 
   if (!colorCfg) {
-    return colorPalette[
-      getSeriesHash(seriesName?.toString() ?? "", colorPalette)
-    ];
+    return colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
   } else if (colorCfg.mode === "fixed") {
     return colorCfg?.fixedColor?.[0] ?? "#53ca53";
   } else if (colorCfg.mode === "shades") {
@@ -287,23 +267,16 @@ export const getSeriesColor = (
       chartMax,
     );
   } else if (colorCfg.mode === "palette-classic-by-series") {
-    return colorPalette[
-      getSeriesHash(seriesName?.toString() ?? "", colorPalette)
-    ];
+    return colorPalette[getSeriesHash(seriesName?.toString() ?? "", colorPalette)];
   } else if (colorCfg.mode === "palette-classic") {
     return null;
   } else {
     const d3ColorObj = scaleLinear(
-      getDomainPartitions(
-        chartMin,
-        chartMax,
-        colorCfg?.fixedColor?.length ?? colorPalette.length,
-      ),
+      getDomainPartitions(chartMin, chartMax, colorCfg?.fixedColor?.length ?? colorPalette.length),
       colorCfg?.fixedColor?.length ? colorCfg.fixedColor : colorPalette,
     );
     return d3ColorObj(
-      (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ??
-        chartMin) as number,
+      (getSeriesValueBasedOnSeriesBy(value, colorCfg?.seriesBy ?? "last") ?? chartMin) as number,
     );
   }
 };
@@ -405,8 +378,7 @@ export const colorToRgba = (color: string, alpha: number): string => {
 export const getGridLineStyle = (theme: string) => ({
   type: "dashed",
   width: 1,
-  color:
-    theme === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)",
+  color: theme === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(0, 0, 0, 0.08)",
 });
 
 /**
@@ -446,12 +418,10 @@ export const getAreaStyleOverride = (
   seriesName: any,
   theme: string,
 ) => {
-  const isAreaChart =
-    panelType === "area" || panelType === "area-stacked";
+  const isAreaChart = panelType === "area" || panelType === "area-stacked";
   if (!isAreaChart || !baseAreaStyle) return {};
   const palette = getColorPalette(theme);
-  const color =
-    resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
+  const color = resolvedColor ?? palette[getSeriesHash(seriesName?.toString() ?? "", palette)];
   return {
     areaStyle: {
       ...baseAreaStyle,

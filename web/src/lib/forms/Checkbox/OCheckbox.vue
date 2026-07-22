@@ -24,13 +24,9 @@ defineSlots<CheckboxSlots>();
 // ── Group context ──────────────────────────────────────────────────────────
 const groupContext = inject(CHECKBOX_GROUP_KEY, null);
 
-const resolvedValue = computed<CheckboxPrimitive | undefined>(
-  () => props.value ?? props.val,
-);
+const resolvedValue = computed<CheckboxPrimitive | undefined>(() => props.value ?? props.val);
 
-const isGroupMember = computed(
-  () => groupContext !== null && resolvedValue.value !== undefined,
-);
+const isGroupMember = computed(() => groupContext !== null && resolvedValue.value !== undefined);
 
 const isArrayModel = computed(
   () => Array.isArray(props.modelValue) && resolvedValue.value !== undefined,
@@ -42,25 +38,16 @@ const hasCustomValues = computed(
 
 /** Whether this checkbox is checked, considering the group context if present */
 const checked = computed((): boolean | "indeterminate" => {
-  if (
-    isGroupMember.value &&
-    groupContext &&
-    resolvedValue.value !== undefined
-  ) {
+  if (isGroupMember.value && groupContext && resolvedValue.value !== undefined) {
     return groupContext.isChecked(resolvedValue.value);
   }
 
   if (isArrayModel.value && resolvedValue.value !== undefined) {
-    return (props.modelValue as CheckboxPrimitive[]).includes(
-      resolvedValue.value,
-    );
+    return (props.modelValue as CheckboxPrimitive[]).includes(resolvedValue.value);
   }
 
   if (hasCustomValues.value) {
-    if (
-      props.indeterminateValue !== undefined &&
-      props.modelValue === props.indeterminateValue
-    ) {
+    if (props.indeterminateValue !== undefined && props.modelValue === props.indeterminateValue) {
       return "indeterminate";
     }
     if (props.trueValue !== undefined) {
@@ -73,18 +60,14 @@ const checked = computed((): boolean | "indeterminate" => {
   return Boolean(props.modelValue);
 });
 
-const isDisabled = computed(
-  () => props.disabled || (groupContext?.disabled ?? false),
-);
+const isDisabled = computed(() => props.disabled || (groupContext?.disabled ?? false));
 
 const dataState = computed<"checked" | "unchecked" | "indeterminate">(() => {
   if (checked.value === "indeterminate") return "indeterminate";
   return checked.value ? "checked" : "unchecked";
 });
 
-function mapToCustomValue(
-  value: boolean | "indeterminate",
-): CheckboxModelValue {
+function mapToCustomValue(value: boolean | "indeterminate"): CheckboxModelValue {
   if (!hasCustomValues.value) return value;
   if (value === "indeterminate") {
     return props.indeterminateValue ?? "indeterminate";
@@ -98,11 +81,7 @@ function mapToCustomValue(
 function toggle() {
   if (isDisabled.value) return;
 
-  if (
-    isGroupMember.value &&
-    groupContext &&
-    resolvedValue.value !== undefined
-  ) {
+  if (isGroupMember.value && groupContext && resolvedValue.value !== undefined) {
     groupContext.toggle(resolvedValue.value);
     emit("change", !groupContext.isChecked(resolvedValue.value));
     return;
@@ -131,7 +110,6 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
   sm: "size-3.5",
   md: "size-4",
 };
-
 </script>
 
 <template>
@@ -221,10 +199,13 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       v-if="$slots.label || label"
       :class="[
         'o-input-label text-compact select-none leading-tight',
-        isDisabled ? 'font-normal text-input-label-text-disabled' : 'font-medium text-input-label-text',
+        isDisabled
+          ? 'font-normal text-input-label-text-disabled'
+          : 'font-medium text-input-label-text',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true">&nbsp;*</span>
     </span>
   </label>
 </template>

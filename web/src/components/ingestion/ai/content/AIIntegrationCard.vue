@@ -80,10 +80,7 @@ const renderedSections = computed(() =>
             {{ metadata.runtime }}
           </OTag>
         </div>
-        <p
-          v-if="metadata.tagline"
-          class="text-sm opacity-60 mt-1.5 mb-0"
-        >
+        <p v-if="metadata.tagline" class="text-sm opacity-60 mt-1.5 mb-0">
           {{ metadata.tagline }}
         </p>
       </header>
@@ -98,11 +95,7 @@ const renderedSections = computed(() =>
       />
 
       <!-- Sections (all open — install guides read top to bottom) -->
-      <section
-        v-for="section in renderedSections"
-        :key="section.title"
-        class="o2-section min-w-0"
-      >
+      <section v-for="section in renderedSections" :key="section.title" class="o2-section min-w-0">
         <h3 class="o2-section-title">{{ section.title }}</h3>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div

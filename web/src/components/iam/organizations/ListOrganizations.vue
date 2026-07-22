@@ -26,19 +26,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     :scroll="false"
   >
-      <template #actions>
-        <OButton
-          variant="primary"
-          size="sm"
-          @click="addOrganization"
-          data-test="Add Organization"
-        >
-          {{ t('organization.add') }}
-        </OButton>
-      </template>
+    <template #actions>
+      <OButton variant="primary" size="sm" @click="addOrganization" data-test="Add Organization">
+        {{ t("organization.add") }}
+      </OButton>
+    </template>
     <div class="w-full flex-1 min-h-0 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
-      <OTable
+        <OTable
           :frame="false"
           :data="organizations"
           :columns="columns"
@@ -77,7 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="organizations-list-refresh-btn"
               @click="getOrganizations"
             >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="iamOrganizationsRefresh" />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamOrganizationsRefresh"
+              />
             </OButton>
           </template>
           <template #empty>
@@ -89,7 +88,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @action="(id) => id === 'clear-filters' && (filterQuery = '')"
             />
           </template>
-
 
           <template #cell-identifier="{ row }">
             <OCodeCell :value="row.identifier" />
@@ -107,10 +105,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-status="{ row }">
             <OBadge
-              :variant="row.status === 'pending_deletion' ? 'warning' : row.status === 'deleting' ? 'warning' : 'success-soft'"
+              :variant="
+                row.status === 'pending_deletion'
+                  ? 'warning'
+                  : row.status === 'deleting'
+                    ? 'warning'
+                    : 'success-soft'
+              "
               size="sm"
             >
-              {{ row.status === 'pending_deletion' ? pendingLabel(row) : row.status }}
+              {{ row.status === "pending_deletion" ? pendingLabel(row) : row.status }}
             </OBadge>
           </template>
 
@@ -124,7 +128,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 :disabled="row.status !== 'active'"
-                :title="row.status === 'deleting' ? t('iam.listOrganizations.cannotEditWhileDeleting') : t('iam.listOrganizations.edit')"
+                :title="
+                  row.status === 'deleting'
+                    ? t('iam.listOrganizations.cannotEditWhileDeleting')
+                    : t('iam.listOrganizations.edit')
+                "
                 @click="row.status === 'active' && renameOrganization(row)"
               >
                 <OIcon name="edit" size="sm" />
@@ -161,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </div>
           </template>
-      </OTable>
+        </OTable>
       </div>
     </div>
     <add-update-organization
@@ -180,7 +188,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
 // @ts-nocheck
 import { defineComponent, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
@@ -227,7 +234,7 @@ export default defineComponent({
     OIcon,
     OTable,
     OSearchInput,
-},
+  },
   setup() {
     const store = useStore();
     const { isMetaOrg } = useIsMetaOrg();
@@ -319,8 +326,7 @@ export default defineComponent({
       (action) => {
         if (action == "add") {
           showAddOrganizationDialog.value = true;
-        }
-        else if (action == "update") {
+        } else if (action == "update") {
           showAddOrganizationDialog.value = true;
           toBeUpdatedOrganization.value = {
             id: router.currentRoute.value.query?.to_be_updated_org_id || "",
@@ -337,9 +343,7 @@ export default defineComponent({
       // is intentionally NOT handled here — the dialog only opens via the
       // "Add Organization" button click; refreshing on an `action=add` URL
       // should leave the user on the list view.
-      if (
-        router.currentRoute.value.query.action == "update"
-      ) {
+      if (router.currentRoute.value.query.action == "update") {
         showAddOrganizationDialog.value = true;
         toBeUpdatedOrganization.value = {
           id: router.currentRoute.value.query?.to_be_updated_org_id || "",
@@ -354,8 +358,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("iam.listOrganizations.loadingOrganizations"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
       loading.value = true;
       // In the _meta admin context on cloud, use the admin endpoint so admins can
       // track org deletion status; otherwise use the regular list. Access is always
@@ -364,75 +368,77 @@ export default defineComponent({
       const request = useAdminEndpoint
         ? organizationsService.get_admin_org("_meta")
         : organizationsService.list(0, 1000000, "name", false, "");
-      request.then((res) => {
-        const billingPlans = {
-          "0": "Free",
-          "1": "Pay as you go",
-          "2": "Enterprise"
-        };
-        organizations.value = res.data.data.map((data) => {
-          // Common fields for all configurations
-
-          const commonOrganization = {
-            name: data.name,
-            identifier: data.identifier,
-            type: convertToTitleCase(data.type),
-            plan: billingPlans[data.plan] || "-",
-            status: data.status ?? "active",
-            deleted_at: data.deleted_at ?? null,
-            grace_period_days: data.grace_period_days ?? null,
-            _userRole: data.role ?? data.user_role ?? "",
+      request
+        .then((res) => {
+          const billingPlans = {
+            "0": "Free",
+            "1": "Pay as you go",
+            "2": "Enterprise",
           };
+          organizations.value = res.data.data.map((data) => {
+            // Common fields for all configurations
 
-          // Additional fields and logic for cloud configuration
-          // if (config.isCloud === "true") {
-          //   const memberrole = data.OrganizationMemberObj.filter(
-          //     (v) =>
-          //       v.user_id === store.state.currentuser.id && v.role === "admin",
-          //   );
+            const commonOrganization = {
+              name: data.name,
+              identifier: data.identifier,
+              type: convertToTitleCase(data.type),
+              plan: billingPlans[data.plan] || "-",
+              status: data.status ?? "active",
+              deleted_at: data.deleted_at ?? null,
+              grace_period_days: data.grace_period_days ?? null,
+              _userRole: data.role ?? data.user_role ?? "",
+            };
 
-          //   // If invited, pass props to inviteTeam function
-          //   // if (
-          //   //   router.currentRoute.value.query.action === "invite" &&
-          //   //   data.identifier === router.currentRoute.value.query.id
-          //   // ) {
-          //   //   const props = {
-          //   //     row: {
-          //   //       id: data.id,
-          //   //       name: data.name,
-          //   //       identifier: data.identifier,
-          //   //       role: data.role,
-          //   //       member_lists: [],
-          //   //     },
-          //   //   };
-          //   //   inviteTeam(props);
-          //   // }
+            // Additional fields and logic for cloud configuration
+            // if (config.isCloud === "true") {
+            //   const memberrole = data.OrganizationMemberObj.filter(
+            //     (v) =>
+            //       v.user_id === store.state.currentuser.id && v.role === "admin",
+            //   );
 
-          //   const role = memberrole.length ? memberrole[0].role : "member";
+            //   // If invited, pass props to inviteTeam function
+            //   // if (
+            //   //   router.currentRoute.value.query.action === "invite" &&
+            //   //   data.identifier === router.currentRoute.value.query.id
+            //   // ) {
+            //   //   const props = {
+            //   //     row: {
+            //   //       id: data.id,
+            //   //       name: data.name,
+            //   //       identifier: data.identifier,
+            //   //       role: data.role,
+            //   //       member_lists: [],
+            //   //     },
+            //   //   };
+            //   //   inviteTeam(props);
+            //   // }
 
-          //   // Extend common fields with cloud-specific data
-          //   return {
-          //     ...commonOrganization,
-          //     id: data.id,
-          //     created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
-          //     role: convertToTitleCase(role),
-          //     status: convertToTitleCase(data.status),
-          //     plan_type:
-          //       data.CustomerBillingObj.subscription_type === config.freePlan ||
-          //       data.CustomerBillingObj.subscription_type === ""
-          //         ? "Developer"
-          //         : "Pro",
-          //   };
-          // }
+            //   const role = memberrole.length ? memberrole[0].role : "member";
 
-          // For open-source or enterprise, return only common fields
-          return commonOrganization;
+            //   // Extend common fields with cloud-specific data
+            //   return {
+            //     ...commonOrganization,
+            //     id: data.id,
+            //     created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
+            //     role: convertToTitleCase(role),
+            //     status: convertToTitleCase(data.status),
+            //     plan_type:
+            //       data.CustomerBillingObj.subscription_type === config.freePlan ||
+            //       data.CustomerBillingObj.subscription_type === ""
+            //         ? "Developer"
+            //         : "Pro",
+            //   };
+            // }
+
+            // For open-source or enterprise, return only common fields
+            return commonOrganization;
+          });
+
+          dismiss();
+        })
+        .finally(() => {
+          loading.value = false;
         });
-
-        dismiss();
-      }).finally(() => {
-        loading.value = false;
-      });
     };
 
     getOrganizations();
@@ -519,7 +525,10 @@ export default defineComponent({
         toast({ variant: "success", message: t("iam.listOrganizations.deletionInitiated") });
         getOrganizations();
       } catch (e: any) {
-        const msg = e?.response?.data?.message || e?.message || t("iam.listOrganizations.failedToInitiateDeletion");
+        const msg =
+          e?.response?.data?.message ||
+          e?.message ||
+          t("iam.listOrganizations.failedToInitiateDeletion");
         toast({ variant: "error", message: msg });
       }
     };
@@ -544,7 +553,10 @@ export default defineComponent({
         toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
         getOrganizations();
       } catch (e: any) {
-        toast({ variant: "error", message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect") });
+        toast({
+          variant: "error",
+          message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect"),
+        });
       }
     };
 
@@ -568,7 +580,12 @@ export default defineComponent({
     };
 
     useShortcuts([
-      { id: "iamOrganizationsRefresh", handler: () => { if (!isInputFocused()) getOrganizations(); } },
+      {
+        id: "iamOrganizationsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getOrganizations();
+        },
+      },
     ]);
 
     return {
@@ -616,12 +633,14 @@ export default defineComponent({
         id: "",
         name: "",
         identifier: "",
-      }
+      };
       this.getOrganizations();
 
       toast({
         variant: "success",
-        message: isUpdated ? this.t('iam.listOrganizations.organizationUpdated') : this.t('iam.listOrganizations.organizationAdded'),
+        message: isUpdated
+          ? this.t("iam.listOrganizations.organizationUpdated")
+          : this.t("iam.listOrganizations.organizationAdded"),
       });
     },
     joinOrganization() {

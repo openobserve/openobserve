@@ -111,13 +111,9 @@ export const getSpanColor = (index: number): string => {
  * @param theme - 'light' or 'dark' theme (defaults to 'light')
  * @returns Hex color string
  */
-export const getSpanColorHex = (
-  index: number,
-  theme: "light" | "dark" = "light",
-): string => {
+export const getSpanColorHex = (index: number, theme: "light" | "dark" = "light"): string => {
   const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
-  const colorIndex =
-    (((index - 1) % colors.length) + colors.length) % colors.length;
+  const colorIndex = (((index - 1) % colors.length) + colors.length) % colors.length;
   return colors[colorIndex];
 };
 
@@ -167,10 +163,7 @@ export const getServiceColorHex = (
  * @param opacity - Opacity value (0-1)
  * @returns RGB color string with alpha
  */
-export const getSpanColorWithOpacity = (
-  index: number,
-  opacity: number = 1,
-): string => {
+export const getSpanColorWithOpacity = (index: number, opacity: number = 1): string => {
   const colorIndex = ((index - 1) % 50) + 1;
   return `color-mix(in srgb, var(--color-span-${colorIndex}) ${opacity * 100}%, transparent)`;
 };
@@ -181,9 +174,7 @@ export const getSpanColorWithOpacity = (
  * @param theme - 'light' or 'dark' theme (defaults to 'light')
  * @returns Array of hex color strings
  */
-export const getAllSpanColors = (
-  theme: "light" | "dark" = "light",
-): string[] => {
+export const getAllSpanColors = (theme: "light" | "dark" = "light"): string[] => {
   const colors = theme === "dark" ? DARK_SPAN_COLORS : LIGHT_SPAN_COLORS;
   // Return reversed order to maintain existing behavior
   return [...colors].reverse();
@@ -206,9 +197,7 @@ export const traceUIColors = {
  * @param serviceNames - Array of service names
  * @returns Map of service name to color
  */
-export const generateServiceColorMap = (
-  serviceNames: string[],
-): Map<string, string> => {
+export const generateServiceColorMap = (serviceNames: string[]): Map<string, string> => {
   const colorMap = new Map<string, string>();
   const usedColors = new Set<number>();
 

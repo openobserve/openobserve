@@ -17,9 +17,12 @@
         </template>
         {{ changeStyle ? getTrimmedDisplayValue() : getDisplayValue() }}
         <template #icon-right>
-          <OIcon name="arrow-drop-down" size="sm"
+          <OIcon
+            name="arrow-drop-down"
+            size="sm"
             class="transition-transform duration-[250ms] ease-in-out"
-            :class="picker.showMenu ? 'rotate-180' : ''" />
+            :class="picker.showMenu ? 'rotate-180' : ''"
+          />
         </template>
       </OButton>
     </template>
@@ -34,10 +37,7 @@
                 :key="'date_' + periodIndex"
               >
                 <div class="text-sm font-semibold min-w-18.75">{{ period.label }}</div>
-                <div
-                  v-for="item in relativeDates[period.value]"
-                  :key="item"
-                >
+                <div v-for="item in relativeDates[period.value]" :key="item">
                   <OButton
                     :data-test="`date-time-relative-${item}-${period.value}-btn`"
                     variant="ghost"
@@ -52,7 +52,9 @@
                   >
                 </div>
               </div>
-              <div class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default">
+              <div
+                class="relative-row [&>*]:mr-1.5 px-3 py-2 flex items-center border-b border-border-default"
+              >
                 <div class="text-sm font-semibold min-w-18.75">Custom</div>
                 <div class="flex gap-2">
                   <div class="flex flex-col w-20">
@@ -118,8 +120,7 @@ const props = defineProps({
     default: "end",
     required: false,
     type: String as PropType<DropdownAlign>,
-    validator: (v: DropdownAlign) =>
-      ["start", "center", "end"].includes(v),
+    validator: (v: DropdownAlign) => ["start", "center", "end"].includes(v),
   },
 });
 
@@ -186,9 +187,7 @@ watch(
 
       picker.data.selectedDate.relative.value = Number(value);
       picker.data.selectedDate.relative.period = period ?? "";
-      picker.data.selectedDate.relative.label = getPeriodLabelFromValue(
-        period ?? "",
-      ); // Dynamically set label
+      picker.data.selectedDate.relative.label = getPeriodLabelFromValue(period ?? ""); // Dynamically set label
     }
   },
   { immediate: true },
@@ -198,9 +197,7 @@ watch(
 const setRelativeDate = (period: RelativePeriod, item: number) => {
   picker.data.selectedDate.relative.period = period.value;
   picker.data.selectedDate.relative.value = item;
-  picker.data.selectedDate.relative.label = getPeriodLabelFromValue(
-    period.value,
-  ); // Set label dynamically
+  picker.data.selectedDate.relative.label = getPeriodLabelFromValue(period.value); // Set label dynamically
 
   // Emit the new value to update modelValue in the parent component
   emit("update:modelValue", `${item}${period.value}`);
@@ -209,10 +206,7 @@ const setRelativeDate = (period: RelativePeriod, item: number) => {
 // Function to update custom period when selecting from the select
 const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
   picker.data.selectedDate.relative.label = getPeriodLabelFromValue(newPeriod);
-  emit(
-    "update:modelValue",
-    `${picker.data.selectedDate.relative.value}${newPeriod}`,
-  );
+  emit("update:modelValue", `${picker.data.selectedDate.relative.value}${newPeriod}`);
 };
 
 // Display the current selected offset
@@ -244,4 +238,3 @@ const computedClass = computed(() => {
   return props.changeStyle ? "bg-surface-base!" : "";
 });
 </script>
-

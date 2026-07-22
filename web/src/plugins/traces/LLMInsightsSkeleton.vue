@@ -15,17 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="pt-2.5 flex flex-col gap-2.5 tile-content"
-  >
+  <div class="pt-2.5 flex flex-col gap-2.5 tile-content">
     <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
          when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
          switch the real toolbar is already shown, so `hideToolbar` drops this to
          avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
-    <div
-      v-if="!kpiOnly && !hideToolbar"
-      class="flex items-center justify-end gap-2 py-2"
-    >
+    <div v-if="!kpiOnly && !hideToolbar" class="flex items-center justify-end gap-2 py-2">
       <OSkeleton type="text" class="w-29 h-8" />
       <OSkeleton type="text" class="w-56 h-9" />
     </div>
@@ -41,7 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSkeleton type="text" class="w-[55%] h-5.5" />
         <OSkeleton type="text" class="w-[40%] h-2.5" />
         <div class="flex items-end gap-[0.15rem] h-8 mt-auto">
-          <OSkeleton type="text" v-for="bar in 16" :key="bar" :style="{ height: `${30 + ((bar * 23) % 65)}%` }" class="w-full" />
+          <OSkeleton
+            type="text"
+            v-for="bar in 16"
+            :key="bar"
+            :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
+            class="w-full"
+          />
         </div>
       </div>
     </div>
@@ -58,11 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSkeleton type="text" class="w-40 h-2.5" />
         </div>
         <div class="relative h-55 overflow-hidden">
-          <svg
-            class="w-full h-full block"
-            viewBox="0 0 200 80"
-            preserveAspectRatio="none"
-          >
+          <svg class="w-full h-full block" viewBox="0 0 200 80" preserveAspectRatio="none">
             <path
               class="panel-tile__area-fill fill-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"

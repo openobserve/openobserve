@@ -1,54 +1,52 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { useI18n } from 'vue-i18n'
-import OTag from '@/lib/core/Badge/OTag.vue'
-import EmptyStateActionCard from '@/lib/core/EmptyState/EmptyStateActionCard.vue'
-import { CHECK_TYPE_CARDS, type CheckTypeCard } from '@/constants/synthetics'
-import type { SyntheticCheckType } from '@/types/synthetics'
+import { useI18n } from "vue-i18n";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
+import { CHECK_TYPE_CARDS, type CheckTypeCard } from "@/constants/synthetics";
+import type { SyntheticCheckType } from "@/types/synthetics";
 
 const props = withDefaults(
   defineProps<{
-    variant: 'modal' | 'inline'
-    layout: 'row' | 'grid'
-    disabledTypes?: SyntheticCheckType[]
-    comingSoonTypes?: SyntheticCheckType[]
+    variant: "modal" | "inline";
+    layout: "row" | "grid";
+    disabledTypes?: SyntheticCheckType[];
+    comingSoonTypes?: SyntheticCheckType[];
   }>(),
   {
     disabledTypes: () => [],
     comingSoonTypes: () => [],
   },
-)
+);
 
 const emit = defineEmits<{
-  select: [type: SyntheticCheckType]
-}>()
+  select: [type: SyntheticCheckType];
+}>();
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 function isDisabled(card: CheckTypeCard): boolean {
-  return props.disabledTypes.includes(card.type)
+  return props.disabledTypes.includes(card.type);
 }
 
 function isComingSoon(card: CheckTypeCard): boolean {
-  return props.comingSoonTypes.includes(card.type)
+  return props.comingSoonTypes.includes(card.type);
 }
 
 function isClickable(card: CheckTypeCard): boolean {
-  return !isDisabled(card) && !isComingSoon(card)
+  return !isDisabled(card) && !isComingSoon(card);
 }
 
 function onSelect(card: CheckTypeCard) {
   if (isClickable(card)) {
-    emit('select', card.type)
+    emit("select", card.type);
   }
 }
 </script>
 
 <template>
   <div
-    :class="layout === 'grid'
-      ? 'flex flex-wrap justify-center gap-4'
-      : 'flex flex-col gap-2'"
+    :class="layout === 'grid' ? 'flex flex-wrap justify-center gap-4' : 'flex flex-col gap-2'"
     :data-test="`check-type-picker-${layout}`"
   >
     <div

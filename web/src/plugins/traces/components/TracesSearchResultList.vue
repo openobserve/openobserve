@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="traces-search-result-list h-auto! flex flex-col bg-card-glass-solid"
-  >
+  <div class="traces-search-result-list h-auto! flex flex-col bg-card-glass-solid">
     <!-- ════════════════════ Empty State ════════════════════ -->
     <TracesNoEventsState
       v-if="noResults"
@@ -38,10 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col h-auto! traces-table-container"
     >
       <!-- Table scroll area: no overflow here — parent handles unified scroll -->
-      <div
-        data-test="traces-search-result-list"
-        class="w-full h-auto! relative"
-      >
+      <div data-test="traces-search-result-list" class="w-full h-auto! relative">
         <TenstackTable
           class="h-auto!"
           :columns="searchObj.data.resultGrid.columns"
@@ -66,30 +61,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #cell-actions="{ row, column, active }">
             <CellActions
-              v-if="
-                showCellActions &&
-                active &&
-                !column.columnDef.meta.disableCellAction
-              "
+              v-if="showCellActions && active && !column.columnDef.meta.disableCellAction"
               :column="column"
               :row="row"
-              :selected-stream-fields="
-                searchObj.data.stream.selectedStreamFields
-              "
+              :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
               :hide-search-term-actions="false"
               :hide-ai="true"
               @copy="copyToClipboard(column.id, row[column.id])"
-              @add-search-term="
-                (field, value, action) =>
-                  addSearchTerm(field, value, action, row)
-              "
+              @add-search-term="(field, value, action) => addSearchTerm(field, value, action, row)"
               @send-to-ai-chat="sendToAiChat"
             />
           </template>
 
-          <template
-            #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }"
-          >
+          <template #[`cell-${store.state.zoConfig.timestamp_column}`]="{ cell }">
             <TraceTimestampCell :value="cell.getValue()" />
           </template>
 
@@ -98,10 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-operation_name="{ item }">
-            <span
-              class="text-xs truncate text-text-body"
-              data-test="trace-row-operation-name"
-            >
+            <span class="text-xs truncate text-text-body" data-test="trace-row-operation-name">
               {{ item.operation_name }}
               <OTooltip :content="item.operation_name" side="bottom" align="center" />
             </span>
@@ -132,30 +113,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #cell-input_tokens="{ item }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-input-tokens">
-              {{
-                isLLMTrace(item)
-                  ? formatTokens(extractLLMData(item)?.usage?.input ?? 0)
-                  : "-"
-              }}
+              {{ isLLMTrace(item) ? formatTokens(extractLLMData(item)?.usage?.input ?? 0) : "-" }}
             </span>
           </template>
 
           <template #cell-output_tokens="{ item }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-output-tokens">
-              {{
-                isLLMTrace(item)
-                  ? formatTokens(extractLLMData(item)?.usage?.output ?? 0)
-                  : "-"
-              }}
+              {{ isLLMTrace(item) ? formatTokens(extractLLMData(item)?.usage?.output ?? 0) : "-" }}
             </span>
           </template>
 
           <template #cell-cost="{ item }">
             <span class="text-xs text-text-body font-mono" data-test="trace-row-cost">
               {{
-                isLLMTrace(item)
-                  ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}`
-                  : "-"
+                isLLMTrace(item) ? `$${formatCost(extractLLMData(item)?.cost?.total ?? 0)}` : "-"
               }}
             </span>
           </template>
@@ -184,15 +155,8 @@ import TraceLatencyCell from "./TraceLatencyCell.vue";
 import TraceStatusCell from "./TraceStatusCell.vue";
 import SpanStatusPill from "./SpanStatusPill.vue";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
-import {
-  isLLMTrace,
-  extractLLMData,
-  formatCost,
-  formatTokens,
-} from "../../../utils/llmUtils";
-import {
-  formatTimeWithSuffix,
-} from "../../../utils/zincutils";
+import { isLLMTrace, extractLLMData, formatCost, formatTokens } from "../../../utils/llmUtils";
+import { formatTimeWithSuffix } from "../../../utils/zincutils";
 import { useStore } from "vuex";
 import type { TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
@@ -270,9 +234,7 @@ const emit = defineEmits<{
 
 const copyToClipboard = (field: string, value: any) =>
   qCopyToClipboard(
-    field === "span_kind"
-      ? (SPAN_KIND_MAP[String(value)] ?? String(value))
-      : String(value),
+    field === "span_kind" ? (SPAN_KIND_MAP[String(value)] ?? String(value)) : String(value),
   );
 
 const addSearchTerm = (
@@ -309,9 +271,7 @@ const sendToAiChat = (value: string) => emit("send-to-ai-chat", value);
 const { searchObj, updatedLocalLogFilterField } = useTraces();
 const { buildColumns } = useTracesTableColumns();
 
-const timestampCol = computed(
-  () => store.state.zoConfig.timestamp_column || "_timestamp",
-);
+const timestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
 const sortFieldMap = computed<Record<string, string>>(() => ({
   [timestampCol.value]: "start_time",
@@ -320,11 +280,7 @@ const sortFieldMap = computed<Record<string, string>>(() => ({
 
 onMounted(() => {
   if (!searchObj.data.resultGrid.columns.length) {
-    searchObj.data.resultGrid.columns = buildColumns(
-      false,
-      "traces",
-      DEFAULT_TRACE_COLUMNS.traces,
-    );
+    searchObj.data.resultGrid.columns = buildColumns(false, "traces", DEFAULT_TRACE_COLUMNS.traces);
   }
 });
 
@@ -389,10 +345,7 @@ const noResults = computed(
   () => props.searchPerformed && !props.loading && props.hits.length === 0,
 );
 
-const hasResults = computed(
-  () => props.searchPerformed && props.hits.length > 0,
-);
-
+const hasResults = computed(() => props.searchPerformed && props.hits.length > 0);
 </script>
 
 <style scoped>

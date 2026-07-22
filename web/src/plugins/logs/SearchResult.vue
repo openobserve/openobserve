@@ -17,15 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    class="flex flex-col h-full max-h-full overflow-hidden"
-  >
-    <div
-      class="h-full max-h-full overflow-hidden w-full flex flex-col"
-      ref="searchListContainer"
-    >
+  <div class="flex flex-col h-full max-h-full overflow-hidden">
+    <div class="h-full max-h-full overflow-hidden w-full flex flex-col" ref="searchListContainer">
       <!-- Section header: static at top -->
-      <div class="flex items-center h-9 shrink-0 border-b border-card-glass-border bg-card-glass-bg">
+      <div
+        class="flex items-center h-9 shrink-0 border-b border-card-glass-border bg-card-glass-bg"
+      >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
@@ -35,11 +32,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="toggleFieldList"
         >
           <OIcon
-            :name="searchObj.meta.showFields ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+            :name="
+              searchObj.meta.showFields
+                ? 'keyboard-double-arrow-left'
+                : 'keyboard-double-arrow-right'
+            "
             size="sm"
           />
           <OTooltip
-            :content="searchObj.meta.showFields ? t('logs.searchResult.collapseFields') : t('logs.searchResult.openFields')"
+            :content="
+              searchObj.meta.showFields
+                ? t('logs.searchResult.collapseFields')
+                : t('logs.searchResult.openFields')
+            "
             side="bottom"
             shortcut-id="logsToggleSidebar"
           />
@@ -57,28 +62,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-else
           class="flex-1 min-w-0 text-left pl-2 text-warning flex items-center flex-wrap gap-1.5"
           data-test="logs-search-result-title"
-          :data-search-state="searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'"
+          :data-search-state="
+            searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
+          "
           :data-hits-count="searchObj.data?.queryResults?.hits?.length ?? 0"
         >
           <!-- Logs mode: structured chips -->
           <template v-if="searchObj.meta.logsVisualizeToggle !== 'patterns'">
             <template v-if="recordsChips">
-              <OTag
-                type="logsResultChip"
-                value="neutral"
-                data-test="logs-result-records-chip"
-              >{{ recordsChips.records }}</OTag>
-              <OTag
-                type="logsResultChip"
-                value="info"
-                data-test="logs-result-time-chip"
-              >{{ recordsChips.time }}</OTag>
+              <OTag type="logsResultChip" value="neutral" data-test="logs-result-records-chip">{{
+                recordsChips.records
+              }}</OTag>
+              <OTag type="logsResultChip" value="info" data-test="logs-result-time-chip">{{
+                recordsChips.time
+              }}</OTag>
               <OTag
                 v-if="recordsChips.scan"
                 type="logsResultChip"
                 value="warn"
                 data-test="logs-result-scan-chip"
-              >{{ recordsChips.scan }}</OTag>
+                >{{ recordsChips.scan }}</OTag
+              >
             </template>
             <span v-else class="truncate min-w-0">{{ noOfRecordsTitle }}</span>
           </template>
@@ -90,17 +94,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 type="logsResultChip"
                 value="neutral"
                 data-test="logs-result-events-chip"
-              >{{ patternChips.events }} {{ t('logs.searchResult.events') }}</OTag>
-              <OTag
-                type="logsResultChip"
-                value="neutral"
-                data-test="logs-result-patterns-chip"
-              >{{ patternChips.patterns }} {{ t('logs.searchResult.patterns') }}</OTag>
-              <OTag
-                type="logsResultChip"
-                value="info"
-                data-test="logs-result-pattern-time-chip"
-              >{{ patternChips.time }} ms</OTag>
+                >{{ patternChips.events }} {{ t("logs.searchResult.events") }}</OTag
+              >
+              <OTag type="logsResultChip" value="neutral" data-test="logs-result-patterns-chip"
+                >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
+              >
+              <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
+                >{{ patternChips.time }} ms</OTag
+              >
             </template>
             <span v-else class="truncate min-w-0">{{ patternSummaryText }}</span>
           </template>
@@ -124,21 +125,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
-              <OButton
-                variant="outline"
-                size="icon-chip"
-                data-test="logs-result-actions-menu-btn"
-              >
+              <OButton variant="outline" size="icon-chip" data-test="logs-result-actions-menu-btn">
                 <OIcon name="more-horiz" size="sm" />
                 <OTooltip :content="t('search.moreActions')" />
               </OButton>
             </template>
-            <ODropdownItem
-              data-test="logs-result-refresh-menu-item"
-              @select="$emit('run-query')"
-            >
+            <ODropdownItem data-test="logs-result-refresh-menu-item" @select="$emit('run-query')">
               <template #icon-left><OIcon name="refresh" size="sm" /></template>
-              {{ t('common.refresh') }}
+              {{ t("common.refresh") }}
             </ODropdownItem>
             <ODropdownItem
               v-if="showWrapBtn"
@@ -146,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="searchObj.meta.toggleSourceWrap = !searchObj.meta.toggleSourceWrap"
             >
               <template #icon-left><OIcon name="wrap-text" size="sm" /></template>
-              {{ t('search.messageWrapContent') }}
+              {{ t("search.messageWrapContent") }}
               <template v-if="searchObj.meta.toggleSourceWrap" #icon-right>
                 <OIcon name="check" size="sm" />
               </template>
@@ -157,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openSearchJobInspector"
             >
               <template #icon-left><OIcon name="troubleshoot" size="sm" /></template>
-              {{ t('volumeInsights.searchInspectionsLabel') }}
+              {{ t("volumeInsights.searchInspectionsLabel") }}
             </ODropdownItem>
             <ODropdownItem
               v-if="showAnalyzeBtn"
@@ -165,14 +159,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openVolumeAnalysisDashboard"
             >
               <template #icon-left><OIcon name="timeline" size="sm" /></template>
-              {{ t('volumeInsights.analyzeTooltipLogs') }}
+              {{ t("volumeInsights.analyzeTooltipLogs") }}
             </ODropdownItem>
           </ODropdown>
 
           <!-- INLINE BUTTONS (wider container) -->
           <template v-else>
             <!-- Refresh in bordered wrapper -->
-            <div class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 overflow-hidden">
+            <div
+              class="inline-flex items-center border border-card-glass-border rounded-default px-1 h-6 overflow-hidden"
+            >
               <ORefreshButton
                 :last-run-at="searchObj.meta.lastRunAt"
                 :loading="searchObj.loading || searchObj.loadingHistogram"
@@ -193,8 +189,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-inspect-button"
               >
                 <OIcon name="troubleshoot" size="sm" />
-                <span v-if="showActionLabels" class="whitespace-nowrap">{{ t('volumeInsights.inspectBtnLabel') }}</span>
-                <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.searchInspectionsLabel')" />
+                <span v-if="showActionLabels" class="whitespace-nowrap">{{
+                  t("volumeInsights.inspectBtnLabel")
+                }}</span>
+                <OTooltip
+                  v-if="!showActionLabels"
+                  :content="t('volumeInsights.searchInspectionsLabel')"
+                />
               </OButton>
               <OButton
                 v-if="showAnalyzeBtn"
@@ -204,8 +205,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-analyze-dimensions-button"
               >
                 <OIcon name="timeline" size="sm" />
-                <span v-if="showActionLabels" class="whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
-                <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipLogs')" />
+                <span v-if="showActionLabels" class="whitespace-nowrap">{{
+                  t("volumeInsights.analyzeBtnLabel")
+                }}</span>
+                <OTooltip
+                  v-if="!showActionLabels"
+                  :content="t('volumeInsights.analyzeTooltipLogs')"
+                />
               </OButton>
               <OButton
                 v-if="showWrapBtn"
@@ -242,19 +248,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :disable="searchObj.loading"
             v-model="pageNumberInput"
-            :key="
-              searchObj.data.queryResults.total +
-              '-' +
-              searchObj.data.resultGrid.currentPage
-            "
+            :key="searchObj.data.queryResults.total + '-' + searchObj.data.resultGrid.currentPage"
             :max="
               Math.max(
                 1,
-                (searchObj.communicationMethod === 'streaming' ||
-                searchObj.meta.jobId != ''
+                (searchObj.communicationMethod === 'streaming' || searchObj.meta.jobId != ''
                   ? searchObj.data.queryResults?.pagination?.length
-                  : searchObj.data.queryResults?.partitionDetail?.paginations
-                      ?.length) || 0,
+                  : searchObj.data.queryResults?.partitionDetail?.paginations?.length) || 0,
               )
             "
             :max-pages="paginationMaxPages"
@@ -285,9 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             visible while it refreshes/replaces, mirroring the results table. -->
           <LoadingProgress
             :loading="searchObj.loadingHistogram"
-            :loadingProgressPercentage="
-              searchObj.loadingHistogramProgressPercentage || 0
-            "
+            :loadingProgressPercentage="searchObj.loadingHistogramProgressPercentage || 0"
           />
           <div
             v-if="
@@ -309,8 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             v-else-if="
-              searchObj.meta.showHistogram &&
-              (searchObj.loadingHistogram || searchObj.loading)
+              searchObj.meta.showHistogram && (searchObj.loadingHistogram || searchObj.loading)
             "
             class="histogram-skeleton"
             data-test="logs-search-histogram-skeleton"
@@ -343,9 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                inline min-height/padding overridden to fit the 6.25rem strip. -->
           <OEmptyState
             v-else-if="
-              searchObj.meta.showHistogram &&
-              !searchObj.loadingHistogram &&
-              !searchObj.loading
+              searchObj.meta.showHistogram && !searchObj.loadingHistogram && !searchObj.loading
             "
             size="inline"
             icon="bar-chart"
@@ -357,15 +352,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <div
             class="histogram-empty"
-            v-else-if="
-              searchObj.meta.showHistogram &&
-              Object.keys(plotChart)?.length === 0
-            "
+            v-else-if="searchObj.meta.showHistogram && Object.keys(plotChart)?.length === 0"
           >
             <h5 class="text-center">
-              <span class="histogram-empty__message" style="color: transparent"
-                >.</span
-              >
+              <span class="histogram-empty__message" style="color: transparent">.</span>
             </h5>
           </div>
         </div>
@@ -386,17 +376,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <h6
             class="text-center histogram-error"
             v-if="
-              searchObj.data.histogram.errorCode != 0 &&
-              searchObj.data.histogram.errorCode != -1
+              searchObj.data.histogram.errorCode != 0 && searchObj.data.histogram.errorCode != -1
             "
           >
-            <OIcon name="warning" size="xs"></OIcon> {{ t('logs.searchResult.histogramFetchError') }}
+            <OIcon name="warning" size="xs"></OIcon>
+            {{ t("logs.searchResult.histogramFetchError") }}
             <OButton
               variant="secondary"
               size="sm"
               @click="toggleErrorDetails"
-            data-test="logs-page-histogram-error-details-btn"
-                >{{ t("search.histogramErrorBtnLabel") }}</OButton
+              data-test="logs-page-histogram-error-details-btn"
+              >{{ t("search.histogramErrorBtnLabel") }}</OButton
             ><br />
             <span v-if="disableMoreErrorDetails">
               <SanitizedHtmlRenderer
@@ -405,10 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </span>
           </h6>
-          <h6
-            class="text-center"
-            v-else-if="searchObj.data.histogram.errorCode != -1"
-          >
+          <h6 class="text-center" v-else-if="searchObj.data.histogram.errorCode != -1">
             <SanitizedHtmlRenderer
               data-test="logs-search-histogram-error-message"
               :htmlContent="searchObj.data?.histogram?.errorMsg"
@@ -418,11 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Pinned breakdown tooltip — teleported to body to avoid stacking context issues -->
         <Teleport to="body">
-          <div
-            v-if="pinnedTooltip.visible"
-            class="oo-pin-backdrop"
-            @click="closePinnedTooltip"
-          />
+          <div v-if="pinnedTooltip.visible" class="oo-pin-backdrop" @click="closePinnedTooltip" />
           <div
             v-if="pinnedTooltip.visible"
             class="oo-pin-tooltip"
@@ -436,19 +419,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="oo-pin-tooltip__time">
               {{ pinnedTooltip.timestamp }}
             </div>
-            <div
-              v-for="row in pinnedTooltip.rows"
-              :key="row.rawValue"
-              class="oo-pin-tooltip__row"
-            >
-              <span
-                class="oo-pin-tooltip__dot"
-                :style="{ background: row.color }"
-              />
+            <div v-for="row in pinnedTooltip.rows" :key="row.rawValue" class="oo-pin-tooltip__row">
+              <span class="oo-pin-tooltip__dot" :style="{ background: row.color }" />
               <span class="oo-pin-tooltip__name">{{ row.displayLabel }}</span>
-              <span class="oo-pin-tooltip__count">{{
-                formatCount(row.count)
-              }}</span>
+              <span class="oo-pin-tooltip__count">{{ formatCount(row.count) }}</span>
               <span class="oo-pin-tooltip__row-actions">
                 <span
                   class="oo-pin-tooltip__action oo-pin-tooltip__action--include"
@@ -490,8 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :scroll-margin="0"
             :class="[
               !searchObj.meta.showHistogram ||
-              (searchObj.meta.showHistogram &&
-                searchObj.data.histogram.errorCode == -1)
+              (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
                 ? 'min-h-full!'
                 : 'min-h-[calc(100%-6.25rem)]!',
             ]"
@@ -515,8 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex flex-col h-full"
           :class="[
             !searchObj.meta.showHistogram ||
-            (searchObj.meta.showHistogram &&
-              searchObj.data.histogram.errorCode == -1)
+            (searchObj.meta.showHistogram && searchObj.data.histogram.errorCode == -1)
               ? 'min-h-full!'
               : 'min-h-[calc(100%-6.25rem)]!',
           ]"
@@ -525,9 +497,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <PatternList
             :patterns="patternsState?.patterns?.patterns || []"
             :loading="patternsState?.loading"
-            :totalLogsAnalyzed="
-              patternsState?.patterns?.statistics?.total_logs_analyzed
-            "
+            :totalLogsAnalyzed="patternsState?.patterns?.statistics?.total_logs_analyzed"
             :wrap="searchObj.meta.toggleSourceWrap"
             :scroll-target="scrollContainerRef"
             :stream-doc-time-range="streamDocTimeRange"
@@ -552,13 +522,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <DetailTable
           v-if="searchObj.data.queryResults?.hits?.length"
-          :key="
-            'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex
-          "
+          :key="'dialog_' + searchObj.meta.resultGrid.navigation.currentRowIndex"
           v-model="
-            searchObj.data.queryResults.hits[
-              searchObj.meta.resultGrid.navigation.currentRowIndex
-            ]
+            searchObj.data.queryResults.hits[searchObj.meta.resultGrid.navigation.currentRowIndex]
           "
           :stream-type="searchObj.data.stream.streamType"
           :correlation-props="correlationDashboardProps"
@@ -606,9 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :streamName="searchObj.data.stream.selectedStream[0]"
         streamType="logs"
         :timeRange="originalTimeRangeBeforeSelection || volumeAnalysisTimeRange"
-        :rateFilter="
-          hasHistogramSelection ? histogramSelectionRange : undefined
-        "
+        :rateFilter="hasHistogramSelection ? histogramSelectionRange : undefined"
         :baseFilter="searchObj.data.editorValue"
         :streamFields="
           searchObj.data.stream.userDefinedSchema?.length > 0
@@ -734,12 +698,8 @@ export default defineComponent({
     SanitizedHtmlRenderer,
     TenstackTable: defineAsyncComponent(() => import("./TenstackTable.vue")),
     TelemetryCorrelationDashboard,
-    PatternList: defineAsyncComponent(
-      () => import("./patterns/PatternList.vue"),
-    ),
-    PatternDetailsDialog: defineAsyncComponent(
-      () => import("./patterns/PatternDetailsDialog.vue"),
-    ),
+    PatternList: defineAsyncComponent(() => import("./patterns/PatternList.vue")),
+    PatternDetailsDialog: defineAsyncComponent(() => import("./patterns/PatternDetailsDialog.vue")),
     TracesAnalysisDashboard: defineAsyncComponent(
       () => import("../traces/metrics/TracesAnalysisDashboard.vue"),
     ),
@@ -782,16 +742,14 @@ export default defineComponent({
         Record<string, unknown>[]
       >;
       const prevColSizes =
-        colSizes?.[this.searchObj.data.stream.selectedStream.join(",")]?.[0] ||
-        {};
-      this.searchObj.data.resultGrid.colSizes[
-        this.searchObj.data.stream.selectedStream.join(",")
-      ] = [
-        {
-          ...prevColSizes,
-          ...newColSizes,
-        },
-      ];
+        colSizes?.[this.searchObj.data.stream.selectedStream.join(",")]?.[0] || {};
+      this.searchObj.data.resultGrid.colSizes[this.searchObj.data.stream.selectedStream.join(",")] =
+        [
+          {
+            ...prevColSizes,
+            ...newColSizes,
+          },
+        ];
     },
     handleColumnOrderUpdate(newColOrder: string[]) {
       // Here we are checking if the columns are default columns ( _timestamp and source)
@@ -808,14 +766,11 @@ export default defineComponent({
         ] = [...newColOrder];
 
         if (newColOrder.length > 0) {
-          this.searchObj.organizationIdentifier =
-            this.store.state.selectedOrganization.identifier;
+          this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
           let selectedFields = this.reorderSelectedFields();
 
           this.searchObj.data.stream.selectedFields = selectedFields.filter(
-            (_field) =>
-              _field !==
-              (this.store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+            (_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || "_timestamp"),
           );
           this.updatedLocalLogFilterField();
         }
@@ -835,8 +790,7 @@ export default defineComponent({
         if (
           this.searchObj.data.resultGrid.currentPage <=
           Math.round(
-            this.searchObj.data.queryResults.total /
-              this.searchObj.meta.resultGrid.rowsPerPage,
+            this.searchObj.data.queryResults.total / this.searchObj.meta.resultGrid.rowsPerPage,
           )
         ) {
           this.searchObj.data.resultGrid.currentPage =
@@ -872,15 +826,10 @@ export default defineComponent({
           this.searchObj.data.queryResults.pagination = [];
         }
         const maxPages =
-          this.searchObj.communicationMethod === "streaming" ||
-          this.searchObj.meta.jobId != ""
+          this.searchObj.communicationMethod === "streaming" || this.searchObj.meta.jobId != ""
             ? this.searchObj.data.queryResults.pagination.length
-            : this.searchObj.data.queryResults?.partitionDetail?.paginations
-                .length;
-        if (
-          this.pageNumberInput > Math.ceil(maxPages) &&
-          this.searchObj.meta.jobId == ""
-        ) {
+            : this.searchObj.data.queryResults?.partitionDetail?.paginations.length;
+        if (this.pageNumberInput > Math.ceil(maxPages) && this.searchObj.meta.jobId == "") {
           toast({
             variant: "error",
             message: this.t("logs.searchResult.pageOutOfRange"),
@@ -909,13 +858,10 @@ export default defineComponent({
       selectedFields.splice(SFIndex, 1);
 
       this.searchObj.data.stream.selectedFields = selectedFields.filter(
-        (_field) =>
-          _field !==
-          (this.store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+        (_field) => _field !== (this.store?.state?.zoConfig?.timestamp_column || "_timestamp"),
       );
 
-      this.searchObj.organizationIdentifier =
-        this.store.state.selectedOrganization.identifier;
+      this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },
     onChartUpdate({ start, end }: { start: any; end: any }) {
@@ -975,7 +921,7 @@ export default defineComponent({
     const containerWidth = ref(9999);
     let containerResizeObserver: ResizeObserver | null = null;
     // match shouldMoveActionsToMenu threshold: 3 pages when narrow, 5 when wide
-    const paginationMaxPages = computed(() => containerWidth.value < 700 ? 3 : 5);
+    const paginationMaxPages = computed(() => (containerWidth.value < 700 ? 3 : 5));
 
     const noOfRecordsTitle = computed<string>(
       () => (searchObj.data.histogram.chartParams.title as string) || "",
@@ -988,7 +934,8 @@ export default defineComponent({
       const logsAnalyzed = formatLargeNumber(stats.total_logs_analyzed || 0);
       const totalEvents = searchObj.data.queryResults?.total || stats.total_logs_analyzed || 0;
       const totalEventsStr = totalEvents ? formatLargeNumber(totalEvents) : logsAnalyzed;
-      const totalTimeMs = (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
+      const totalTimeMs =
+        (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
       return t("search.pattern_summary", {
         totalEvents: totalEventsStr,
         patternsFound,
@@ -1028,10 +975,8 @@ export default defineComponent({
       // extraction sample (capped at ~10K). Showing that read as "this window
       // holds 10K events" when it holds millions, and disagreed with the same
       // chip when arriving from the search page.
-      const totalEvents =
-        patternWindowTotal.value ?? searchObj.data.queryResults?.total ?? null;
-      const totalEventsStr =
-        totalEvents === null ? null : formatLargeNumber(totalEvents);
+      const totalEvents = patternWindowTotal.value ?? searchObj.data.queryResults?.total ?? null;
+      const totalEventsStr = totalEvents === null ? null : formatLargeNumber(totalEvents);
       const totalTimeMs =
         (searchObj.data.queryResults?.took || 0) + (stats.extraction_time_ms || 0);
 
@@ -1047,12 +992,12 @@ export default defineComponent({
     const router = useRouter();
     const { searchAroundData } = useSearchAround();
     const { refreshPagination } = useSearchStream();
-    const { refreshPartitionPagination, refreshJobPagination } =
-      usePagination();
+    const { refreshPartitionPagination, refreshJobPagination } = usePagination();
     const { updatedLocalLogFilterField } = logsUtils();
     const { extractFTSFields, filterHitsColumns } = useStreamFields();
 
-    const { reorderSelectedFields, getFilterExpressionByFieldType, resolveDefaultColumns } = useLogs();
+    const { reorderSelectedFields, getFilterExpressionByFieldType, resolveDefaultColumns } =
+      useLogs();
 
     const { searchObj } = searchState();
 
@@ -1153,9 +1098,7 @@ export default defineComponent({
 
     const shouldShowInlineDialog = computed(() => {
       return (
-        showCorrelation.value &&
-        correlationDashboardProps.value &&
-        !searchObj.meta.showDetailTab
+        showCorrelation.value && correlationDashboardProps.value && !searchObj.meta.showDetailTab
       );
     });
 
@@ -1187,8 +1130,7 @@ export default defineComponent({
         header: "Count",
         id: "frequency",
         size: 100,
-        cell: (info: any) =>
-          `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
+        cell: (info: any) => `${info.getValue()} (${info.row.original.percentage.toFixed(1)}%)`,
         meta: {
           closable: false,
           showWrap: false,
@@ -1222,9 +1164,7 @@ export default defineComponent({
     // Watch for theme color changes in localStorage
     const handleThemeColorChange = () => {
       const currentMode = isDark.value ? "dark" : "light";
-      const appliedThemeName = localStorage.getItem(
-        THEME_STORAGE_KEYS[currentMode].appliedName,
-      );
+      const appliedThemeName = localStorage.getItem(THEME_STORAGE_KEYS[currentMode].appliedName);
 
       // Custom color: user may be dragging the picker — debounce to avoid jank
       if (appliedThemeName === CUSTOM_THEME_NAME) {
@@ -1270,15 +1210,11 @@ export default defineComponent({
     const closePinnedTooltip = () => {
       pinnedTooltip.value.visible = false;
       // Restore tooltip mouse tracking
-      histogramChart.value?.chart?.setOption(
-        { tooltip: { triggerOn: "mousemove|click" } },
-        false,
-      );
+      histogramChart.value?.chart?.setOption({ tooltip: { triggerOn: "mousemove|click" } }, false);
     };
 
     const onHistogramAreaClick = (event: MouseEvent) => {
-      const { breakdownField, breakdownSeries, xData } =
-        searchObj.data.histogram;
+      const { breakdownField, breakdownSeries, xData } = searchObj.data.histogram;
       if (!breakdownSeries?.size || !xData?.length) return;
 
       const eChart = histogramChart.value?.chart;
@@ -1292,10 +1228,7 @@ export default defineComponent({
       // Ignore clicks outside the plot area (e.g. legend items)
       if (!eChart.containPixel("grid", [pixelX, pixelY])) return;
 
-      const dataPoint = eChart.convertFromPixel({ seriesIndex: 0 }, [
-        pixelX,
-        pixelY,
-      ]);
+      const dataPoint = eChart.convertFromPixel({ seriesIndex: 0 }, [pixelX, pixelY]);
       if (!dataPoint) return;
 
       const clickedTs: number = dataPoint[0];
@@ -1335,14 +1268,8 @@ export default defineComponent({
       const panelW = 250;
       // Cap panel height at the viewport so placement math stays valid even
       // for high-cardinality breakdowns. Actual scroll is handled in CSS.
-      const panelH = Math.min(
-        rows.length * 28 + 60,
-        window.innerHeight - 2 * margin,
-      );
-      const x = Math.min(
-        event.clientX + margin,
-        window.innerWidth - panelW - margin,
-      );
+      const panelH = Math.min(rows.length * 28 + 60, window.innerHeight - 2 * margin);
+      const x = Math.min(event.clientX + margin, window.innerWidth - panelW - margin);
       const y = Math.max(
         margin,
         Math.min(event.clientY + margin, window.innerHeight - panelH - margin),
@@ -1361,10 +1288,7 @@ export default defineComponent({
       eChart.setOption({ tooltip: { triggerOn: "none" } }, false);
     };
 
-    const applyPinnedFilter = (
-      rawValue: string,
-      action: "include" | "exclude",
-    ) => {
+    const applyPinnedFilter = (rawValue: string, action: "include" | "exclude") => {
       const field = pinnedTooltip.value.field;
       if (!field) return;
       addSearchTerm(field, rawValue, action);
@@ -1404,11 +1328,7 @@ export default defineComponent({
 
     const reDrawChart = () => {
       if (
-         
-        Object.prototype.hasOwnProperty.call(
-          searchObj.data.histogram,
-          "xData",
-        ) &&
+        Object.prototype.hasOwnProperty.call(searchObj.data.histogram, "xData") &&
         searchObj.data.histogram.xData.length > 0
       ) {
         const { xData, yData, breakdownSeries, chartParams, breakdownField } =
@@ -1463,20 +1383,16 @@ export default defineComponent({
       }
 
       // Find the index of this row in the hits array by comparing timestamp
-      const timestampColumn =
-        store.state.zoConfig?.timestamp_column || "_timestamp";
+      const timestampColumn = store.state.zoConfig?.timestamp_column || "_timestamp";
       const index = searchObj.data.queryResults?.hits?.findIndex(
         (hit: any) => hit[timestampColumn] === row[timestampColumn],
       );
 
       if (index === -1 || index === undefined) {
-        console.error(
-          "[SearchResult] Could not find flex index for correlation",
-          {
-            rowTimestamp: row[timestampColumn],
-            hitsCount: searchObj.data.queryResults?.hits?.length,
-          },
-        );
+        console.error("[SearchResult] Could not find flex index for correlation", {
+          rowTimestamp: row[timestampColumn],
+          hitsCount: searchObj.data.queryResults?.hits?.length,
+        });
         return;
       }
 
@@ -1557,8 +1473,7 @@ export default defineComponent({
         //
         // v2: backend returns per-stream actual field names in StreamInfo.filters
         // Use log stream filters as matchedDimensions (actual field names for source stream)
-        const logFilters =
-          result.correlationData.related_streams.logs?.[0]?.filters || {};
+        const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
         const actualMatchedDimensions =
           Object.keys(logFilters).length > 0
             ? logFilters
@@ -1567,11 +1482,7 @@ export default defineComponent({
         const sourceEvent = {
           timestamp: logData._timestamp,
           severity: extractSeverity(logData) ?? undefined,
-          message:
-            logData.body ||
-            logData.message ||
-            logData.log ||
-            logData.msg,
+          message: logData.body || logData.message || logData.log || logData.msg,
         };
 
         correlationDashboardProps.value = {
@@ -1586,7 +1497,11 @@ export default defineComponent({
             ...buildChipDimensionsFromFilters(result.correlationData, semanticGroups.value),
             // Subject dims (semantic IDs) for metrics tab subject chips (Pod, Node, Host…).
             // Keyed by semantic ID so unifiedChips recognises them as kind="subject".
-            ...buildWorkloadChipDimensions(result.correlationData.matched_set_id, semanticGroups.value, logData),
+            ...buildWorkloadChipDimensions(
+              result.correlationData.matched_set_id,
+              semanticGroups.value,
+              logData,
+            ),
           },
           sourceEvent,
           metricStreams: result.correlationData.related_streams.metrics || [],
@@ -1608,9 +1523,7 @@ export default defineComponent({
           !result.correlationData.related_streams.metrics ||
           result.correlationData.related_streams.metrics.length === 0
         ) {
-          console.warn(
-            "[SearchResult] No metric streams found for correlation",
-          );
+          console.warn("[SearchResult] No metric streams found for correlation");
           toast({
             variant: "info",
             message: t("logs.searchResult.noMetricStreams", {
@@ -1664,11 +1577,7 @@ export default defineComponent({
       field_value: string | number | boolean,
       action: string,
     ) => {
-      const searchExpression = getFilterExpressionByFieldType(
-        field,
-        field_value,
-        action,
-      );
+      const searchExpression = getFilterExpressionByFieldType(field, field_value, action);
       // Clicks on log-row include/exclude should always append (AND) to the
       // existing query, never replace an existing condition for the same field
       // — unlike the field-sidebar checkboxes which represent the full set of
@@ -1694,17 +1603,13 @@ export default defineComponent({
       // persist (clears any prior system-pick FTS-default marker).
       searchObj.meta.isFtsDefaultColumn = false;
       if (searchObj.data.stream.selectedFields.includes(fieldName)) {
-        searchObj.data.stream.selectedFields =
-          searchObj.data.stream.selectedFields.filter(
-            (v: any) => v !== fieldName,
-          );
-      } else if (
-        fieldName !== (store?.state?.zoConfig?.timestamp_column || "_timestamp")
-      ) {
+        searchObj.data.stream.selectedFields = searchObj.data.stream.selectedFields.filter(
+          (v: any) => v !== fieldName,
+        );
+      } else if (fieldName !== (store?.state?.zoConfig?.timestamp_column || "_timestamp")) {
         searchObj.data.stream.selectedFields.push(fieldName);
       }
-      searchObj.organizationIdentifier =
-        store.state.selectedOrganization.identifier;
+      searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
       updatedLocalLogFilterField();
       filterHitsColumns();
     }
@@ -1731,19 +1636,12 @@ export default defineComponent({
           to,
           refresh,
           org_identifier: store.state.selectedOrganization.identifier,
-          trace_id:
-            log[
-              store.state.organizationData.organizationSettings
-                .trace_id_field_name
-            ],
+          trace_id: log[store.state.organizationData.organizationSettings.trace_id_field_name],
           reload: "true",
         },
       };
 
-      query["span_id"] =
-        log[
-          store.state.organizationData.organizationSettings.span_id_field_name
-        ];
+      query["span_id"] = log[store.state.organizationData.organizationSettings.span_id_field_name];
 
       router.push(query);
     };
@@ -1751,8 +1649,7 @@ export default defineComponent({
     const getTableWidth = computed(() => {
       const leftSidebarMenu = 56;
       const fieldList =
-        (window.innerWidth - leftSidebarMenu) *
-        (searchObj.config.splitterModel / 100);
+        (window.innerWidth - leftSidebarMenu) * (searchObj.config.splitterModel / 100);
       return window.innerWidth - (leftSidebarMenu + fieldList) - 5;
     });
 
@@ -1761,9 +1658,7 @@ export default defineComponent({
     };
 
     const getColumns = computed(() => {
-      return searchObj.data?.resultGrid?.columns?.filter(
-        (col: any) => !!col.id,
-      );
+      return searchObj.data?.resultGrid?.columns?.filter((col: any) => !!col.id);
     });
 
     const getPartitionPaginations = computed(() => {
@@ -1788,7 +1683,10 @@ export default defineComponent({
     //this is used to show the histogram loader when the histogram is loading
     // 250 bars × 9px (7px bar + 2px gap) = 2250px — covers any viewport width.
     // Heights cycle through a realistic uneven pattern so it looks like real log data.
-    const SKELETON_HEIGHTS = [45,72,58,88,62,42,78,52,73,38,68,83,48,68,44,92,62,38,72,56,32,82,48,64,38,88,68,44,78,52,40,95,55,70,30,85,65,50,75,42];
+    const SKELETON_HEIGHTS = [
+      45, 72, 58, 88, 62, 42, 78, 52, 73, 38, 68, 83, 48, 68, 44, 92, 62, 38, 72, 56, 32, 82, 48,
+      64, 38, 88, 68, 44, 78, 52, 40, 95, 55, 70, 30, 85, 65, 50, 75, 42,
+    ];
     const skeletonBarHeights = Array.from({ length: 250 }, (_, i) => ({
       id: i,
       pct: SKELETON_HEIGHTS[i % SKELETON_HEIGHTS.length],
@@ -1863,8 +1761,7 @@ export default defineComponent({
           // system pick. A user-chosen selection (flag false, non-empty) — even
           // if it happens to be FTS fields like "message" — is left untouched.
           const currentFields = searchObj.data.stream.selectedFields;
-          const canResolveDefault =
-            !currentFields.length || searchObj.meta.isFtsDefaultColumn;
+          const canResolveDefault = !currentFields.length || searchObj.meta.isFtsDefaultColumn;
           if (canResolveDefault) {
             const hits = searchObj.data.queryResults?.hits || [];
             const globalFtsKeys = store?.state?.zoConfig?.default_fts_keys || [];
@@ -2082,8 +1979,7 @@ export default defineComponent({
     },
     volumeAnalysisTimeRange() {
       // Use histogram selection if available, otherwise use current time range
-      const hasSelection =
-        this.histogramSelectionRange.start && this.histogramSelectionRange.end;
+      const hasSelection = this.histogramSelectionRange.start && this.histogramSelectionRange.end;
       return {
         startTime: hasSelection
           ? this.histogramSelectionRange.start
@@ -2111,10 +2007,7 @@ export default defineComponent({
       );
     },
     showAnalyzeBtn() {
-      return (
-        this.searchObj.data?.queryResults?.hits?.length > 0 &&
-        !this.searchObj.meta.sqlMode
-      );
+      return this.searchObj.data?.queryResults?.hits?.length > 0 && !this.searchObj.meta.sqlMode;
     },
     showWrapBtn() {
       return (
@@ -2139,7 +2032,6 @@ export default defineComponent({
   },
 });
 </script>
-
 
 <style lang="scss" scoped>
 /* keep(generated-content): pin-breakdown tooltip. The rows are built from data
@@ -2331,11 +2223,11 @@ export default defineComponent({
 }
 
 .histogram-skeleton {
-  --hsk-bar:     var(--color-grey-100);
+  --hsk-bar: var(--color-grey-100);
   --hsk-shimmer: color-mix(in srgb, var(--color-white) 65%, transparent);
 
   .dark & {
-    --hsk-bar:     var(--color-grey-700);
+    --hsk-bar: var(--color-grey-700);
     --hsk-shimmer: color-mix(in srgb, var(--color-white) 6%, transparent);
   }
 
@@ -2395,11 +2287,11 @@ export default defineComponent({
       height: 100%;
       background: linear-gradient(
         90deg,
-        transparent        0%,
-        transparent       20%,
+        transparent 0%,
+        transparent 20%,
         var(--hsk-shimmer) 50%,
-        transparent       80%,
-        transparent       100%
+        transparent 80%,
+        transparent 100%
       );
       animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
       pointer-events: none;
@@ -2429,8 +2321,12 @@ export default defineComponent({
 }
 
 @keyframes histogram-bar-shimmer {
-  from { left: -100%; }
-  to   { left: 100%; }
+  from {
+    left: -100%;
+  }
+  to {
+    left: 100%;
+  }
 }
 
 .histogram-error {

@@ -13,11 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  PromqlStepSpec,
-  PromqlStepId,
-  PromqlStepGroup,
-} from "../types";
+import { PromqlStepSpec, PromqlStepId, PromqlStepGroup } from "../types";
 
 /**
  * Get all operation definitions for PromQL query builder
@@ -70,8 +66,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       ],
       defaultParams: ["$__rate_interval"],
       group: PromqlStepGroup.RateAndRange,
-      documentation:
-        "Calculates the total increase over the specified time range",
+      documentation: "Calculates the total increase over the specified time range",
     },
     {
       id: PromqlStepId.Delta,
@@ -85,8 +80,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       ],
       defaultParams: ["$__interval"],
       group: PromqlStepGroup.RateAndRange,
-      documentation:
-        "Calculates the difference between the first and last value in the range",
+      documentation: "Calculates the difference between the first and last value in the range",
     },
     {
       id: PromqlStepId.Idelta,
@@ -100,8 +94,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       ],
       defaultParams: ["$__interval"],
       group: PromqlStepGroup.RateAndRange,
-      documentation:
-        "Calculates the difference between the last two samples in the range",
+      documentation: "Calculates the difference between the last two samples in the range",
     },
     {
       id: PromqlStepId.AvgOverTime,
@@ -185,8 +178,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       ],
       defaultParams: ["$__interval"],
       group: PromqlStepGroup.RateAndRange,
-      documentation:
-        "Standard deviation of all points in the specified interval",
+      documentation: "Standard deviation of all points in the specified interval",
     },
     {
       id: PromqlStepId.QuantileOverTime,
@@ -206,8 +198,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       ],
       defaultParams: [0.95, "$__interval"],
       group: PromqlStepGroup.RateAndRange,
-      documentation:
-        "Quantile of all points in the specified interval (0-1)",
+      documentation: "Quantile of all points in the specified interval (0-1)",
     },
     {
       id: PromqlStepId.LastOverTime,
@@ -402,8 +393,7 @@ export function buildPromqlStepCatalog(): PromqlStepSpec[] {
       ],
       defaultParams: [0.95],
       group: PromqlStepGroup.Math,
-      documentation:
-        "Calculate quantile from histogram buckets (requires le label)",
+      documentation: "Calculate quantile from histogram buckets (requires le label)",
     },
     {
       id: PromqlStepId.Abs,

@@ -1,9 +1,5 @@
 <template>
-  <OForm
-    class="flex flex-col flex-1 min-h-0 bg-card-bg"
-    :form="form"
-    v-slot="{ isSubmitting }"
-  >
+  <OForm class="flex flex-col flex-1 min-h-0 bg-card-bg" :form="form" v-slot="{ isSubmitting }">
     <OPageLayout
       :subtitle="t('onlineEvals.provider.subtitle')"
       :back="{
@@ -15,7 +11,11 @@
     >
       <template #title>
         <span data-test="provider-form-title">
-          {{ mode === "create" ? t("onlineEvals.provider.createTitle") : t("onlineEvals.provider.editTitle") }}
+          {{
+            mode === "create"
+              ? t("onlineEvals.provider.createTitle")
+              : t("onlineEvals.provider.editTitle")
+          }}
         </span>
       </template>
       <template #actions>
@@ -31,135 +31,167 @@
         />
       </template>
 
-    <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
-      <section class="mb-6">
-        <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-          <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">01</span>
-          <div class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.provider.sectionTitle") }}</div>
-        </div>
+      <div class="py-4.5 [&_textarea]:max-h-55 [&_textarea]:overflow-y-auto [&_textarea]:font-mono">
+        <section class="mb-6">
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span
+              class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+              >01</span
+            >
+            <div class="m-0 text-sm font-semibold text-text-heading">
+              {{ t("onlineEvals.provider.sectionTitle") }}
+            </div>
+          </div>
 
-        <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
+          <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
+            <div class="mb-3">
+              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.provider.nameLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+                <OIcon
+                  v-if="mode === 'edit'"
+                  name="lock"
+                  size="xs"
+                  class="ml-1.5 text-text-secondary"
+                />
+              </div>
+              <OFormInput
+                name="name"
+                :placeholder="t('onlineEvals.provider.namePlaceholder')"
+                size="sm"
+                :disabled="mode === 'edit'"
+                data-test="provider-form-name-input"
+              />
+              <div v-if="mode === 'edit'" class="text-2xs text-text-secondary mt-1">
+                {{ t("onlineEvals.provider.cannotRename") }}
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.provider.typeLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+                <OIcon
+                  v-if="mode === 'edit'"
+                  name="lock"
+                  size="xs"
+                  class="ml-1.5 text-text-secondary"
+                />
+              </div>
+              <OFormSelect
+                name="providerType"
+                :options="providerTypeOptions"
+                size="md"
+                :disabled="mode === 'edit'"
+                data-test="provider-form-type-select"
+              />
+            </div>
+          </div>
+
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.provider.nameLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
+              {{ t("onlineEvals.provider.endpointLabel") }}
             </div>
             <OFormInput
-              name="name"
-              :placeholder="t('onlineEvals.provider.namePlaceholder')"
+              name="endpoint"
+              :placeholder="endpointPlaceholder"
               size="sm"
-              :disabled="mode === 'edit'"
-              data-test="provider-form-name-input"
+              data-test="provider-form-endpoint-input"
             />
-            <div v-if="mode === 'edit'" class="text-2xs text-text-secondary mt-1">
-              {{ t("onlineEvals.provider.cannotRename") }}
+          </div>
+
+          <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
+            <div class="mb-3">
+              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.provider.defaultModelLabel") }}
+                <span class="text-status-error-text ml-0.5">*</span>
+              </div>
+              <OFormInput
+                name="defaultModel"
+                :placeholder="t('onlineEvals.provider.defaultModelPlaceholder')"
+                size="sm"
+                data-test="provider-form-default-model-input"
+              />
             </div>
+
+            <div class="mb-3">
+              <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
+                {{ t("onlineEvals.provider.availableModelsLabel") }}
+              </div>
+              <OFormInput
+                name="availableModels"
+                :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
+                size="sm"
+                data-test="provider-form-available-models-input"
+              />
+              <div class="text-2xs text-text-secondary mt-1">
+                {{ t("onlineEvals.provider.availableModelsHelp") }}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="mb-6">
+          <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
+            <span
+              class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono"
+              >02</span
+            >
+            <div class="m-0 text-sm font-semibold text-text-heading">
+              {{ t("onlineEvals.provider.authSection") }}
+            </div>
+          </div>
+
+          <div
+            v-if="mode === 'edit'"
+            class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-default text-2xs text-text-secondary leading-[1.4]"
+          >
+            <OIcon name="lock" size="xs" class="shrink-0 mt-px text-status-info-text" />
+            <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
           </div>
 
           <div class="mb-3">
             <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.provider.typeLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-text-secondary" />
-            </div>
-            <OFormSelect
-              name="providerType"
-              :options="providerTypeOptions"
-              size="md"
-              :disabled="mode === 'edit'"
-              data-test="provider-form-type-select"
-            />
-          </div>
-        </div>
-
-        <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.endpointLabel") }}</div>
-          <OFormInput
-            name="endpoint"
-            :placeholder="endpointPlaceholder"
-            size="sm"
-            data-test="provider-form-endpoint-input"
-          />
-        </div>
-
-        <div class="grid grid-cols-2 max-[56.25rem]:grid-cols-1 gap-3.5">
-          <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
-              {{ t("onlineEvals.provider.defaultModelLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
+              {{ t("onlineEvals.provider.apiKeyLabel") }}
+              <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
             </div>
             <OFormInput
-              name="defaultModel"
-              :placeholder="t('onlineEvals.provider.defaultModelPlaceholder')"
+              name="apiKey"
+              type="password"
               size="sm"
-              data-test="provider-form-default-model-input"
+              :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
+              data-test="provider-form-api-key-input"
             />
+            <div class="text-2xs text-text-secondary mt-1">
+              {{ t("onlineEvals.provider.apiKeyHelp") }}
+            </div>
           </div>
+        </section>
+      </div>
 
-          <div class="mb-3">
-            <div class="flex items-center text-xs font-semibold text-text-heading mb-1">{{ t("onlineEvals.provider.availableModelsLabel") }}</div>
-            <OFormInput
-              name="availableModels"
-              :placeholder="t('onlineEvals.provider.availableModelsPlaceholder')"
-              size="sm"
-              data-test="provider-form-available-models-input"
-            />
-            <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.provider.availableModelsHelp") }}</div>
-          </div>
-        </div>
-
-      </section>
-
-      <section class="mb-6">
-        <div class="flex items-center gap-2.5 pb-2.5 border-b border-dialog-header-border mb-3">
-          <span class="inline-flex items-center justify-center w-5.5 h-5.5 rounded-full bg-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] text-text-secondary font-bold text-2xs font-mono">02</span>
-          <div class="m-0 text-sm font-semibold text-text-heading">{{ t("onlineEvals.provider.authSection") }}</div>
-        </div>
-
-        <div v-if="mode === 'edit'" class="provider-callout flex gap-2 items-start px-3 py-2 mb-3 bg-[color-mix(in_srgb,var(--color-status-info-text)_12%,transparent)] border border-[color-mix(in_srgb,var(--color-status-info-text)_30%,transparent)] rounded-default text-2xs text-text-secondary leading-[1.4]">
-          <OIcon name="lock" size="xs" class="shrink-0 mt-px text-status-info-text" />
-          <span>{{ t("onlineEvals.provider.authEditNote") }}</span>
-        </div>
-
-        <div class="mb-3">
-          <div class="flex items-center text-xs font-semibold text-text-heading mb-1">
-            {{ t("onlineEvals.provider.apiKeyLabel") }}
-            <span v-if="mode === 'create'" class="text-status-error-text ml-0.5">*</span>
-          </div>
-          <OFormInput
-            name="apiKey"
-            type="password"
-            size="sm"
-            :placeholder="t('onlineEvals.provider.apiKeyPlaceholder')"
-            data-test="provider-form-api-key-input"
-          />
-          <div class="text-2xs text-text-secondary mt-1">{{ t("onlineEvals.provider.apiKeyHelp") }}</div>
-        </div>
-      </section>
-    </div>
-
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 border-t border-dialog-header-border bg-card-bg shrink-0 z-1">
-      <OButton
-        data-test="provider-form-cancel-btn"
-        type="button"
-        variant="outline"
-        size="sm-action"
-        :disabled="isSubmitting"
-        @click="$emit('cancel')"
+      <footer
+        class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 border-t border-dialog-header-border bg-card-bg shrink-0 z-1"
       >
-        {{ t("onlineEvals.buttons.cancel") }}
-      </OButton>
-      <OButton
-        data-test="provider-form-save-btn"
-        type="submit"
-        variant="primary"
-        size="sm-action"
-        :loading="isSubmitting"
-      >
-        {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
-      </OButton>
-    </footer>
+        <OButton
+          data-test="provider-form-cancel-btn"
+          type="button"
+          variant="outline"
+          size="sm-action"
+          :disabled="isSubmitting"
+          @click="$emit('cancel')"
+        >
+          {{ t("onlineEvals.buttons.cancel") }}
+        </OButton>
+        <OButton
+          data-test="provider-form-save-btn"
+          type="submit"
+          variant="primary"
+          size="sm-action"
+          :loading="isSubmitting"
+        >
+          {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+        </OButton>
+      </footer>
     </OPageLayout>
   </OForm>
 </template>
@@ -176,16 +208,9 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
-import {
-  availableModelsOf,
-  defaultModelOf,
-  providerTypeOf,
-} from "../utils/evalEntity";
+import { availableModelsOf, defaultModelOf, providerTypeOf } from "../utils/evalEntity";
 import { showError, splitCsv } from "../utils/evalFormat";
-import {
-  makeProviderFormSchema,
-  type ProviderForm,
-} from "./ProviderFormPage.schema";
+import { makeProviderFormSchema, type ProviderForm } from "./ProviderFormPage.schema";
 
 const props = defineProps<{
   orgId: string;

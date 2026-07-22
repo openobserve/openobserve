@@ -48,11 +48,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ card.value }}</span
       >
 
-      <small
-        v-if="!loading"
-        :data-test="`rum-errors-kpi-${card.key}-caption`"
-        >{{ card.caption }}</small
-      >
+      <small v-if="!loading" :data-test="`rum-errors-kpi-${card.key}-caption`">{{
+        card.caption
+      }}</small>
     </article>
   </section>
 </template>
@@ -102,13 +100,9 @@ const crashFreeBadge = computed(() => {
 
 const cards = computed(() => {
   const kpis = props.kpis;
-  const uniqueIssues = `${addCommasToNumber(kpis.uniqueIssues)}${
-    kpis.issuesTruncated ? "+" : ""
-  }`;
+  const uniqueIssues = `${addCommasToNumber(kpis.uniqueIssues)}${kpis.issuesTruncated ? "+" : ""}`;
   const usersPct =
-    kpis.totalUsers > 0
-      ? Math.round((kpis.usersAffected / kpis.totalUsers) * 100)
-      : 0;
+    kpis.totalUsers > 0 ? Math.round((kpis.usersAffected / kpis.totalUsers) * 100) : 0;
   return [
     {
       key: "total-errors",
@@ -121,8 +115,7 @@ const cards = computed(() => {
     {
       key: "crash-free",
       label: t("rum.crashFreeSessions"),
-      value:
-        kpis.crashFreePct === null ? "—" : `${kpis.crashFreePct.toFixed(1)}%`,
+      value: kpis.crashFreePct === null ? "—" : `${kpis.crashFreePct.toFixed(1)}%`,
       valueClass:
         kpis.crashFreePct !== null && kpis.crashFreePct < CRASH_FREE_FAIR_MIN
           ? "text-severity-error-color"
@@ -148,8 +141,7 @@ const cards = computed(() => {
       key: "new-issues",
       label: t("rum.newIssues"),
       value: String(kpis.newIssues),
-      valueClass:
-        kpis.newIssues > 0 ? "text-severity-error-color" : "",
+      valueClass: kpis.newIssues > 0 ? "text-severity-error-color" : "",
       caption: kpis.deployVersion
         ? t("rum.firstSeenSinceDeploy", { version: kpis.deployVersion })
         : t("rum.firstSeenInWindow"),

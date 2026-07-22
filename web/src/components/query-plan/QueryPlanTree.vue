@@ -15,7 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="query-plan-tree font-mono text-compact leading-[1.8] p-4 bg-surface-subtle rounded-default overflow-x-auto">
+  <div
+    class="query-plan-tree font-mono text-compact leading-[1.8] p-4 bg-surface-subtle rounded-default overflow-x-auto"
+  >
     <div
       v-for="(node, index) in tree.children"
       :key="index"

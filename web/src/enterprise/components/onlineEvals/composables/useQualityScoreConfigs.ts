@@ -15,12 +15,7 @@ import {
 
 // "unhealthy" | "warn" | "noThreshold" are legacy — no longer produced here,
 // but QualityConfigSidebar still branches on them.
-export type ConfigStatus =
-  | "healthy"
-  | "noData"
-  | "unhealthy"
-  | "warn"
-  | "noThreshold";
+export type ConfigStatus = "healthy" | "noData" | "unhealthy" | "warn" | "noThreshold";
 
 export interface ScoreConfigRow {
   config: ScoreConfig;
@@ -130,17 +125,12 @@ export function useQualityScoreConfigs(
     try {
       const { startUs, endUs } = dateWindow.value;
       const interval = chooseBucketInterval((endUs - startUs) / 1000);
-      const agentWhere = buildScoresAgentFilterWhere(
-        agentFilter?.value ?? null,
-      );
+      const agentWhere = buildScoresAgentFilterWhere(agentFilter?.value ?? null);
       const aggSql = buildAggSql(agentWhere);
       const trendSql = buildTrendSql(interval, agentWhere);
 
       // `runQuery` swallows failures so one bad query doesn't blank the page.
-      const runQuery = async <T>(
-        sqlText: string,
-        label: string,
-      ): Promise<T[] | null> => {
+      const runQuery = async <T>(sqlText: string, label: string): Promise<T[] | null> => {
         try {
           const hits = await executeQuery(sqlText, startUs, endUs, "logs");
           console.debug(`[Quality:${label}]`, { hitCount: hits.length });
@@ -152,8 +142,7 @@ export function useQualityScoreConfigs(
       };
 
       const aggHits = (await runQuery<AggRow>(aggSql, "configs.agg")) ?? [];
-      const trendHits =
-        (await runQuery<TrendRow>(trendSql, "configs.trend")) ?? [];
+      const trendHits = (await runQuery<TrendRow>(trendSql, "configs.trend")) ?? [];
 
       const byId: Record<string, AggRow> = {};
       let maxUnique = 0;
@@ -176,9 +165,7 @@ export function useQualityScoreConfigs(
       const hitIds = Object.keys(byId);
       const matched = localIds.filter((l) => byId[l.joinId]);
       const unmatchedLocal = localIds.filter((l) => !byId[l.joinId]);
-      const unmatchedHits = hitIds.filter(
-        (h) => !localIds.find((l) => l.joinId === h),
-      );
+      const unmatchedHits = hitIds.filter((h) => !localIds.find((l) => l.joinId === h));
       console.debug("[Quality:configs.match]", {
         localIds,
         hitIds,
@@ -209,8 +196,7 @@ export function useQualityScoreConfigs(
       const total = toNumber(agg?.total_scores) ?? 0;
       const uniqueSpans = toNumber(agg?.unique_spans) ?? 0;
       const lastUpdatedUs = toNumber(agg?.last_updated_us);
-      const dataType =
-        (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
+      const dataType = (dataTypeOf(config) as ScoreConfigRow["dataType"]) || "unknown";
       const { status, priority } = statusOf(total);
 
       return {
@@ -222,8 +208,7 @@ export function useQualityScoreConfigs(
         totalScores: total,
         uniqueSpans,
         coveragePct: denom > 0 ? (uniqueSpans / denom) * 100 : null,
-        lastUpdatedMs:
-          lastUpdatedUs != null ? Math.round(lastUpdatedUs / 1000) : null,
+        lastUpdatedMs: lastUpdatedUs != null ? Math.round(lastUpdatedUs / 1000) : null,
         status,
         statusPriority: priority,
         trendSparkline: trendByConfig.value[lookup] ?? [],
@@ -231,8 +216,7 @@ export function useQualityScoreConfigs(
     });
 
     out.sort((a, b) => {
-      if (a.statusPriority !== b.statusPriority)
-        return a.statusPriority - b.statusPriority;
+      if (a.statusPriority !== b.statusPriority) return a.statusPriority - b.statusPriority;
       if (a.totalScores !== b.totalScores) return b.totalScores - a.totalScores;
       return a.name.localeCompare(b.name);
     });

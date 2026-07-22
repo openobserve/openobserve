@@ -54,9 +54,14 @@ the Free Software Foundation, either version 3 of the License, or
     />
 
     <template v-else>
-      <div v-if="!hideTabBar" class="online-evals__header flex items-center justify-between gap-4 min-h-17 py-2.5 px-4 shrink-0 bg-card-glass-bg">
+      <div
+        v-if="!hideTabBar"
+        class="online-evals__header flex items-center justify-between gap-4 min-h-17 py-2.5 px-4 shrink-0 bg-card-glass-bg"
+      >
         <div>
-          <h1 class="m-0 text-[var(--text-lg)] font-semibold text-text-heading [letter-spacing:0]">{{ t("onlineEvals.title") }}</h1>
+          <h1 class="m-0 text-[var(--text-lg)] font-semibold text-text-heading [letter-spacing:0]">
+            {{ t("onlineEvals.title") }}
+          </h1>
         </div>
       </div>
 
@@ -67,10 +72,7 @@ the Free Software Foundation, either version 3 of the License, or
         :icon="embeddedHeader.icon"
         class="shrink-0 border-b border-border-default"
       >
-        <template
-          v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'"
-          #actions
-        >
+        <template v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'" #actions>
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
@@ -84,38 +86,26 @@ the Free Software Foundation, either version 3 of the License, or
             </template>
             <ODropdownItem
               :data-test="`${activeTab}-import-custom`"
-              @select="
-                activeTab === 'scorers'
-                  ? goToImportScorer()
-                  : goToImportScoreConfig()
-              "
+              @select="activeTab === 'scorers' ? goToImportScorer() : goToImportScoreConfig()"
             >
               <div class="flex flex-col">
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
                 </span>
-                <span
-                  class="text-xs text-dropdown-item-text opacity-60"
-                >
+                <span class="text-xs text-dropdown-item-text opacity-60">
                   {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
                 </span>
               </div>
             </ODropdownItem>
             <ODropdownItem
               :data-test="`${activeTab}-import-library`"
-              @select="
-                activeTab === 'scorers'
-                  ? openScorerLibrary()
-                  : openScoreConfigLibrary()
-              "
+              @select="activeTab === 'scorers' ? openScorerLibrary() : openScoreConfigLibrary()"
             >
               <div class="flex flex-col">
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
                 </span>
-                <span
-                  class="text-xs text-dropdown-item-text opacity-60"
-                >
+                <span class="text-xs text-dropdown-item-text opacity-60">
                   {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
                 </span>
               </div>
@@ -168,13 +158,20 @@ the Free Software Foundation, either version 3 of the License, or
         </template>
       </OPageHeader>
 
-      <section class="online-evals__content flex flex-1 flex-col min-h-0 overflow-hidden bg-card-glass-bg">
-        <div v-if="!hideTabBar" class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-border-default">
+      <section
+        class="online-evals__content flex flex-1 flex-col min-h-0 overflow-hidden bg-card-glass-bg"
+      >
+        <div
+          v-if="!hideTabBar"
+          class="online-evals__tabs flex items-center gap-2 shrink-0 py-0 px-3.5 bg-transparent border-b border-border-default"
+        >
           <button
             v-for="tab in tabs"
             :key="tab.value"
             class="online-evals__tab inline-flex items-center gap-1.75 h-9.5 py-0 px-3.5 bg-transparent border-0 border-b-2 border-b-transparent text-text-muted cursor-pointer font-semibold text-compact"
-            :class="activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''"
+            :class="
+              activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''
+            "
             type="button"
             @click="activeTab = tab.value"
           >
@@ -286,9 +283,7 @@ the Free Software Foundation, either version 3 of the License, or
         <ScoreConfigLibrary
           ref="scoreConfigLibraryRef"
           :org-id="orgId"
-          @update:selected-count="
-            (n: number) => (scoreConfigLibrarySelectedCount = n)
-          "
+          @update:selected-count="(n: number) => (scoreConfigLibrarySelectedCount = n)"
           @imported="handleScoreConfigLibraryImported"
         />
       </ODrawer>
@@ -313,9 +308,7 @@ the Free Software Foundation, either version 3 of the License, or
           :score-configs="scoreConfigs"
           :scorers="scorers"
           :providers="providers"
-          @update:selected-count="
-            (n: number) => (scorerLibrarySelectedCount = n)
-          "
+          @update:selected-count="(n: number) => (scorerLibrarySelectedCount = n)"
           @imported="handleScorerLibraryImported"
         />
       </ODrawer>
@@ -411,10 +404,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
-import {
-  useAiDateRange,
-  resolveAiDateWindow,
-} from "@/enterprise/composables/useAiDateRange";
+import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
@@ -467,9 +457,7 @@ const dialog = ref<{
 
 const scorerFormRow = computed(() => dialog.value.row as Scorer | null);
 const jobFormRow = computed(() => dialog.value.row as EvalJob | null);
-const scoreConfigDialogRow = computed(
-  () => dialog.value.row as ScoreConfig | null,
-);
+const scoreConfigDialogRow = computed(() => dialog.value.row as ScoreConfig | null);
 
 const viewRow = ref<ScoreConfig | null>(null);
 const scorerViewRow = ref<Scorer | null>(null);
@@ -486,9 +474,7 @@ const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
-const scoreConfigLibraryRef = ref<InstanceType<
-  typeof ScoreConfigLibrary
-> | null>(null);
+const scoreConfigLibraryRef = ref<InstanceType<typeof ScoreConfigLibrary> | null>(null);
 const showScorerLibrary = ref(false);
 const scorerLibrarySelectedCount = ref(0);
 const scorerLibraryImporting = ref(false);
@@ -538,9 +524,7 @@ const filteredRows = computed<AnyRow[]>(() => {
   );
 });
 
-const tabs = computed<
-  Array<{ value: ActiveTab; label: string; badge?: string }>
->(() => [
+const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>>(() => [
   { value: "quality", label: t("onlineEvals.tabs.quality") },
   { value: "jobs", label: t("onlineEvals.tabs.jobs") },
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
@@ -554,19 +538,33 @@ const EMBEDDED_HEADER_META: Record<
   ActiveTab,
   { i18nKey: string; subtitleKey: string; icon: IconName }
 > = {
-  quality: { i18nKey: "aiObservability.nav.quality", subtitleKey: "aiObservability.subtitle.quality", icon: "star-rate" },
-  jobs: { i18nKey: "aiObservability.nav.evalJobs", subtitleKey: "aiObservability.subtitle.evalJobs", icon: "event" },
-  scorers: { i18nKey: "aiObservability.nav.scorers", subtitleKey: "aiObservability.subtitle.scorers", icon: "rule" },
-  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", subtitleKey: "aiObservability.subtitle.scoreConfigs", icon: "tune" },
+  quality: {
+    i18nKey: "aiObservability.nav.quality",
+    subtitleKey: "aiObservability.subtitle.quality",
+    icon: "star-rate",
+  },
+  jobs: {
+    i18nKey: "aiObservability.nav.evalJobs",
+    subtitleKey: "aiObservability.subtitle.evalJobs",
+    icon: "event",
+  },
+  scorers: {
+    i18nKey: "aiObservability.nav.scorers",
+    subtitleKey: "aiObservability.subtitle.scorers",
+    icon: "rule",
+  },
+  scoreConfigs: {
+    i18nKey: "aiObservability.nav.scoreConfigs",
+    subtitleKey: "aiObservability.subtitle.scoreConfigs",
+    icon: "tune",
+  },
 };
 
-const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(
-  () => {
-    const meta = EMBEDDED_HEADER_META[activeTab.value];
-    if (!meta) return null;
-    return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
-  },
-);
+const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(() => {
+  const meta = EMBEDDED_HEADER_META[activeTab.value];
+  if (!meta) return null;
+  return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
+});
 
 // Per-tab "create" button label for the embedded OPageHeader. Quality has
 // no list-style create, so it returns an empty string and the button is
@@ -638,9 +636,7 @@ const qualityAgentOptions = computed(() => [
 const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
   if (qualityAgentKey.value === ALL_AGENTS_VALUE) return null;
   return (
-    qualityAgents.value.find(
-      (agent) => agentFilterKey(agent) === qualityAgentKey.value,
-    ) ?? null
+    qualityAgents.value.find((agent) => agentFilterKey(agent) === qualityAgentKey.value) ?? null
   );
 });
 
@@ -655,17 +651,11 @@ async function loadQualityAgents() {
   if (!orgId.value || !startUs || !endUs) return;
   qualityAgentsLoading.value = true;
   try {
-    const response = await genAiAgentMappingService.listAgents(
-      orgId.value,
-      startUs,
-      endUs,
-    );
+    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
     qualityAgents.value = response.agents;
     if (
       qualityAgentKey.value !== ALL_AGENTS_VALUE &&
-      !qualityAgents.value.some(
-        (agent) => agentFilterKey(agent) === qualityAgentKey.value,
-      )
+      !qualityAgents.value.some((agent) => agentFilterKey(agent) === qualityAgentKey.value)
     ) {
       qualityAgentKey.value = ALL_AGENTS_VALUE;
     }
@@ -682,11 +672,7 @@ function syncQualityDateWindow() {
   const picker = qualityDatePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (
-    dt &&
-    typeof dt.startTime === "number" &&
-    typeof dt.endTime === "number"
-  ) {
+  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
     qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
@@ -776,9 +762,7 @@ watch(qualityRefreshing, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
 });
 
-const currentSingularLabel = computed(() =>
-  t(`onlineEvals.singular.${activeTab.value}`),
-);
+const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
 
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
@@ -791,9 +775,7 @@ const pendingDeleteLabel = computed(() => {
 const isBulkDelete = computed(() => pendingBulkDeleteIds.value.length > 0);
 
 const deleteDialogTitle = computed(() =>
-  isBulkDelete.value
-    ? t("onlineEvals.job.deleteBulkTitle")
-    : pendingDeleteLabel.value,
+  isBulkDelete.value ? t("onlineEvals.job.deleteBulkTitle") : pendingDeleteLabel.value,
 );
 
 const deleteDialogMessage = computed(() =>
@@ -911,20 +893,12 @@ function closeJobView() {
  * and overwrite the `action` / `id` params. The URL → state watcher then
  * syncs activeTab + opens the right drawer. */
 function crossNavigateToScorer(row: Scorer) {
-  const query = buildCrossNavigationQuery(
-    { ...route.query },
-    "scorers",
-    entityId(row),
-  );
+  const query = buildCrossNavigationQuery({ ...route.query }, "scorers", entityId(row));
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
 function crossNavigateToJob(row: EvalJob) {
-  const query = buildCrossNavigationQuery(
-    { ...route.query },
-    "jobs",
-    String(row.id),
-  );
+  const query = buildCrossNavigationQuery({ ...route.query }, "jobs", String(row.id));
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -1196,12 +1170,7 @@ function syncFromRoute() {
 }
 
 watch(
-  () => [
-    route.query.action,
-    route.query.id,
-    route.query.scorer_type,
-    route.query.tab,
-  ],
+  () => [route.query.action, route.query.id, route.query.scorer_type, route.query.tab],
   () => syncFromRoute(),
 );
 
@@ -1236,17 +1205,10 @@ async function performDelete() {
   const singular = t(`onlineEvals.singular.${tab}`);
   try {
     if (tab === "scoreConfigs")
-      await onlineEvalsService.scoreConfigs.delete(
-        orgId.value,
-        entityId(row as ScoreConfig),
-      );
+      await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
     else if (tab === "scorers")
-      await onlineEvalsService.scorers.delete(
-        orgId.value,
-        entityId(row as Scorer),
-      );
-    else if (tab === "jobs")
-      await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
+      await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
+    else if (tab === "jobs") await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
 
     toast({
       variant: "success",
@@ -1254,10 +1216,7 @@ async function performDelete() {
     });
     await loadAll(orgId.value);
   } catch (err: any) {
-    showError(
-      err,
-      t("onlineEvals.deleteError", { label: singular.toLowerCase() }),
-    );
+    showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
   } finally {
     pendingDeleteRow.value = null;
     pendingDeleteTab.value = null;
@@ -1276,8 +1235,7 @@ async function performBulkJobsDelete() {
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed > 0) {
       showError(
-        (results.find((r) => r.status === "rejected") as PromiseRejectedResult)
-          ?.reason,
+        (results.find((r) => r.status === "rejected") as PromiseRejectedResult)?.reason,
         t("onlineEvals.deleteError", {
           label: t("onlineEvals.singular.jobs").toLowerCase(),
         }),

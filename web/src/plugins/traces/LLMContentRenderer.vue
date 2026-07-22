@@ -19,17 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tool-specific rendering -->
     <div v-if="isToolObservation && toolContent !== null" class="tool-content flex flex-col h-full">
       <div v-if="toolMetadata" class="flex items-center flex-wrap gap-2 mb-2">
-        <OTag
-          v-if="toolMetadata.name"
-          type="toolMeta"
-          value="tool"
-          class="mr-2"
-        >{{ t('traces.lLMContentRenderer.tool', { name: toolMetadata.name }) }}</OTag>
-        <OTag
-          v-if="toolMetadata.callId"
-          type="toolMeta"
-          value="callid"
-        >{{ t('traces.lLMContentRenderer.callId', { callId: toolMetadata.callId }) }}</OTag>
+        <OTag v-if="toolMetadata.name" type="toolMeta" value="tool" class="mr-2">{{
+          t("traces.lLMContentRenderer.tool", { name: toolMetadata.name })
+        }}</OTag>
+        <OTag v-if="toolMetadata.callId" type="toolMeta" value="callid">{{
+          t("traces.lLMContentRenderer.callId", { callId: toolMetadata.callId })
+        }}</OTag>
       </div>
       <div class="tool-data flex-1">
         <CodeQueryEditor
@@ -49,21 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       class="content-wrapper"
-      :class="
-        props.viewMode === 'formatted' &&
-        !shouldRenderAsMessages &&
-        !isPlainText &&
-        'h-full'
-      "
+      :class="props.viewMode === 'formatted' && !shouldRenderAsMessages && !isPlainText && 'h-full'"
     >
       <!-- Truncated view -->
       <div
         v-if="!isExpanded && contentStats.shouldTruncate"
         :class="
-          props.viewMode === 'formatted' &&
-          !shouldRenderAsMessages &&
-          !isPlainText &&
-          'h-full'
+          props.viewMode === 'formatted' && !shouldRenderAsMessages && !isPlainText && 'h-full'
         "
       >
         <!-- Formatted mode -->
@@ -113,7 +100,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto">{{ contentStats.previewText }}</pre>
+            <pre
+              class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto"
+              >{{ contentStats.previewText }}</pre
+            >
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -150,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
-            {{ t('traces.lLMContentRenderer.expandMore', { count: contentStats.remainingChars }) }}
+            {{ t("traces.lLMContentRenderer.expandMore", { count: contentStats.remainingChars }) }}
           </OButton>
         </div>
       </div>
@@ -159,10 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-else
         :class="
-          props.viewMode === 'formatted' &&
-          !shouldRenderAsMessages &&
-          !isPlainText &&
-          'h-full'
+          props.viewMode === 'formatted' && !shouldRenderAsMessages && !isPlainText && 'h-full'
         "
       >
         <!-- Formatted mode -->
@@ -212,7 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto">{{ fullText }}</pre>
+            <pre
+              class="plain-text-content m-0 p-2 whitespace-pre-wrap wrap-break-word font-mono text-compact leading-normal bg-code-bg rounded-default overflow-x-auto"
+              >{{ fullText }}</pre
+            >
           </div>
           <div v-else class="json-content h-full">
             <CodeQueryEditor
@@ -243,12 +233,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div v-if="contentStats.shouldTruncate" class="text-center mt-2">
-          <OButton
-            variant="ghost-primary"
-            size="sm"
-            @click="isExpanded = false"
-          >
-            {{ t('traces.lLMContentRenderer.collapse') }}
+          <OButton variant="ghost-primary" size="sm" @click="isExpanded = false">
+            {{ t("traces.lLMContentRenderer.collapse") }}
           </OButton>
         </div>
       </div>
@@ -264,11 +250,9 @@ import { marked } from "marked";
 
 const { t } = useI18n();
 
-const CodeQueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTag from '@/lib/core/Badge/OTag.vue';
+const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 const INITIAL_LINE_LIMIT = 15;
 
@@ -299,9 +283,7 @@ const props = defineProps({
   },
 });
 
-const editorIdPrefix = computed(() =>
-  props.instanceId ? `${props.instanceId}-` : "",
-);
+const editorIdPrefix = computed(() => (props.instanceId ? `${props.instanceId}-` : ""));
 
 const isExpanded = ref(false);
 
@@ -352,11 +334,7 @@ const toolContent = computed(() => {
   // Handle nested content structure: {content: [{type: "text", text: "..."}]}
   if (content && typeof content === "object") {
     // Check if it has the Anthropic content format
-    if (
-      content.content &&
-      Array.isArray(content.content) &&
-      content.content.length > 0
-    ) {
+    if (content.content && Array.isArray(content.content) && content.content.length > 0) {
       const firstContent = content.content[0];
       if (firstContent.type === "text" && firstContent.text) {
         // Try to parse the inner text as JSON
@@ -447,9 +425,7 @@ const isMessagesArray = computed(() => {
   return (
     Array.isArray(parsedContent.value) &&
     parsedContent.value.length > 0 &&
-    parsedContent.value.every(
-      (item: any) => item && typeof item === "object" && "role" in item,
-    )
+    parsedContent.value.every((item: any) => item && typeof item === "object" && "role" in item)
   );
 });
 
@@ -474,18 +450,14 @@ const isContentPartsArray = computed(() => {
         item &&
         typeof item === "object" &&
         "type" in item &&
-        (item.type === "text" ||
-          item.type === "image_url" ||
-          item.type === "image"),
+        (item.type === "text" || item.type === "image_url" || item.type === "image"),
     )
   );
 });
 
 // Check if content should be rendered as messages (any format)
 const shouldRenderAsMessages = computed(() => {
-  return (
-    isMessagesArray.value || isSingleMessage.value || isContentPartsArray.value
-  );
+  return isMessagesArray.value || isSingleMessage.value || isContentPartsArray.value;
 });
 
 const isPlainText = computed(() => {
@@ -535,8 +507,7 @@ const toolContentJson = computed(() => {
 });
 
 const parsedContentJson = computed(() => {
-  if (parsedContent.value === null || parsedContent.value === undefined)
-    return "";
+  if (parsedContent.value === null || parsedContent.value === undefined) return "";
   return JSON.stringify(parsedContent.value, null, 2);
 });
 
@@ -591,9 +562,7 @@ const contentStats = computed(() => {
 
   if (shouldRenderAsMessages.value) {
     // For messages, concatenate all message contents
-    text = parsedMessages.value
-      .map((m: any) => `${m.role}: ${m.content}`)
-      .join("\n");
+    text = parsedMessages.value.map((m: any) => `${m.role}: ${m.content}`).join("\n");
   } else {
     text = fullText.value;
   }
@@ -627,10 +596,7 @@ const previewMessages = computed(() => {
       // Include partial message if possible
       const remainingLines = INITIAL_LINE_LIMIT - lineCount;
       if (remainingLines > 0) {
-        const truncatedContent = msg.content
-          .split("\n")
-          .slice(0, remainingLines)
-          .join("\n");
+        const truncatedContent = msg.content.split("\n").slice(0, remainingLines).join("\n");
         preview.push({
           ...msg,
           content: truncatedContent + "...",

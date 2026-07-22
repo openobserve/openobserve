@@ -64,15 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onMounted,
-  nextTick,
-  onActivated,
-  type Ref,
-} from "vue";
+import { defineComponent, ref, watch, onMounted, nextTick, onActivated, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
@@ -121,8 +113,7 @@ export default defineComponent({
 
     const loadDashboard = async () => {
       // schema migration
-      currentDashboardData.value.data =
-        convertDashboardSchemaVersion(overviewDashboard);
+      currentDashboardData.value.data = convertDashboardSchemaVersion(overviewDashboard);
 
       // if variables data is null, set it to empty list
 
@@ -171,11 +162,7 @@ export default defineComponent({
      * Retrieves the selected date from the query parameters.
      */
     const getSelectedDateFromQueryParams = (params) => ({
-      valueType: params.period
-        ? "relative"
-        : params.from && params.to
-          ? "absolute"
-          : "relative",
+      valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : null,
@@ -275,12 +262,7 @@ export default defineComponent({
     });
 
     const onDeletePanel = async (panelId: any) => {
-      await deletePanel(
-        store,
-        route.query.dashboard,
-        panelId,
-        route.query.folder ?? "default",
-      );
+      await deletePanel(store, route.query.dashboard, panelId, route.query.folder ?? "default");
       await loadDashboard();
     };
 

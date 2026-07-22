@@ -1,35 +1,37 @@
-import { describe, it, expect } from 'vitest'
-import { mount } from '@vue/test-utils'
-import { computed } from 'vue'
-import OTabPanel from './OTabPanel.vue'
-import { TAB_PANELS_CONTEXT_KEY } from './OTabPanels.types'
-import type { TabPanelsContext } from './OTabPanels.types'
+import { describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
+import { computed } from "vue";
+import OTabPanel from "./OTabPanel.vue";
+import { TAB_PANELS_CONTEXT_KEY } from "./OTabPanels.types";
+import type { TabPanelsContext } from "./OTabPanels.types";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function mountTabPanel(options: {
-  name?: string | number
-  activeTab?: string | number
-  keepAlive?: boolean
-  animated?: boolean
-  content?: string
-  padding?: 'none' | 'sm' | 'md'
-  layout?: 'block' | 'flex-col' | 'flex-row'
-  stretch?: boolean
-} = {}) {
-  const activeTab = options.activeTab ?? 'tab1'
-  const keepAlive = options.keepAlive ?? false
-  const animated = options.animated ?? false
+function mountTabPanel(
+  options: {
+    name?: string | number;
+    activeTab?: string | number;
+    keepAlive?: boolean;
+    animated?: boolean;
+    content?: string;
+    padding?: "none" | "sm" | "md";
+    layout?: "block" | "flex-col" | "flex-row";
+    stretch?: boolean;
+  } = {},
+) {
+  const activeTab = options.activeTab ?? "tab1";
+  const keepAlive = options.keepAlive ?? false;
+  const animated = options.animated ?? false;
 
   return mount(OTabPanel, {
     props: {
-      name: options.name ?? 'tab1',
+      name: options.name ?? "tab1",
       ...(options.padding !== undefined && { padding: options.padding }),
       ...(options.layout !== undefined && { layout: options.layout }),
       ...(options.stretch !== undefined && { stretch: options.stretch }),
     },
     slots: {
-      default: options.content ?? 'Panel content',
+      default: options.content ?? "Panel content",
     },
     global: {
       plugins: [
@@ -41,128 +43,128 @@ function mountTabPanel(options: {
                 modelValue: activeTab,
                 keepAlive,
                 animated,
-              }))
-            )
+              })),
+            );
           },
         },
       ],
     },
-  })
+  });
 }
 
 // ─── OTabPanel ───────────────────────────────────────────────────────────────
 
-describe('OTabPanel', () => {
+describe("OTabPanel", () => {
   // --- Visibility ---
 
-  it('renders panel content when it is the active tab', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.find('[role="tabpanel"]').exists()).toBe(true)
-    expect(wrapper.text()).toBe('Panel content')
-  })
+  it("renders panel content when it is the active tab", () => {
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1" });
+    expect(wrapper.find('[role="tabpanel"]').exists()).toBe(true);
+    expect(wrapper.text()).toBe("Panel content");
+  });
 
-  it('does not render panel when it is not the active tab (default, no keepAlive)', () => {
-    const wrapper = mountTabPanel({ name: 'tab2', activeTab: 'tab1' })
-    expect(wrapper.find('[role="tabpanel"]').exists()).toBe(false)
-  })
+  it("does not render panel when it is not the active tab (default, no keepAlive)", () => {
+    const wrapper = mountTabPanel({ name: "tab2", activeTab: "tab1" });
+    expect(wrapper.find('[role="tabpanel"]').exists()).toBe(false);
+  });
 
-  it('renders panel but hides it with v-show when keepAlive is true and inactive', () => {
-    const wrapper = mountTabPanel({ name: 'tab2', activeTab: 'tab1', keepAlive: true })
-    const panel = wrapper.find('[role="tabpanel"]')
-    expect(panel.exists()).toBe(true)
-    expect((panel.element as HTMLElement).style.display).toBe('none')
-  })
+  it("renders panel but hides it with v-show when keepAlive is true and inactive", () => {
+    const wrapper = mountTabPanel({ name: "tab2", activeTab: "tab1", keepAlive: true });
+    const panel = wrapper.find('[role="tabpanel"]');
+    expect(panel.exists()).toBe(true);
+    expect((panel.element as HTMLElement).style.display).toBe("none");
+  });
 
-  it('renders and shows the panel when keepAlive is true and active', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', keepAlive: true })
-    const panel = wrapper.find('[role="tabpanel"]')
-    expect(panel.exists()).toBe(true)
-    expect((panel.element as HTMLElement).style.display).not.toBe('none')
-  })
+  it("renders and shows the panel when keepAlive is true and active", () => {
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1", keepAlive: true });
+    const panel = wrapper.find('[role="tabpanel"]');
+    expect(panel.exists()).toBe(true);
+    expect((panel.element as HTMLElement).style.display).not.toBe("none");
+  });
 
   // --- ARIA ---
 
   it('has role="tabpanel"', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.find('[role="tabpanel"]').exists()).toBe(true)
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1" });
+    expect(wrapper.find('[role="tabpanel"]').exists()).toBe(true);
+  });
 
   it('has tabindex="0" so the panel is reachable by keyboard', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.find('[role="tabpanel"]').attributes('tabindex')).toBe('0')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1" });
+    expect(wrapper.find('[role="tabpanel"]').attributes("tabindex")).toBe("0");
+  });
 
   // --- Class ---
 
-  it('has o-tab-panel class', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.find('.o-tab-panel').exists()).toBe(true)
-  })
+  it("has o-tab-panel class", () => {
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1" });
+    expect(wrapper.find(".o-tab-panel").exists()).toBe(true);
+  });
 
   // --- Slot content ---
 
-  it('renders custom slot content', () => {
+  it("renders custom slot content", () => {
     const wrapper = mountTabPanel({
-      name: 'tab1',
-      activeTab: 'tab1',
+      name: "tab1",
+      activeTab: "tab1",
       content: '<div data-testid="inner">Custom content</div>',
-    })
-    expect(wrapper.find('[data-testid="inner"]').exists()).toBe(true)
-  })
+    });
+    expect(wrapper.find('[data-testid="inner"]').exists()).toBe(true);
+  });
 
   // --- padding prop ---
 
   it('applies p-0 by default (padding="none")', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('p-0')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1" });
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain("p-0");
+  });
 
   it('applies p-0 when padding="none"', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', padding: 'none' })
-    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('p-0')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1", padding: "none" });
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain("p-0");
+  });
 
   it('applies p-2 when padding="sm"', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', padding: 'sm' })
-    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('p-2')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1", padding: "sm" });
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain("p-2");
+  });
 
   it('applies p-4 when padding="md"', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', padding: 'md' })
-    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('p-4')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1", padding: "md" });
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain("p-4");
+  });
 
   // --- layout prop ---
 
   it('applies no flex classes by default (layout="block")', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    const classes = wrapper.find('[role="tabpanel"]').classes()
-    expect(classes).not.toContain('flex')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1" });
+    const classes = wrapper.find('[role="tabpanel"]').classes();
+    expect(classes).not.toContain("flex");
+  });
 
   it('applies flex flex-col when layout="flex-col"', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', layout: 'flex-col' })
-    const classes = wrapper.find('[role="tabpanel"]').classes()
-    expect(classes).toContain('flex')
-    expect(classes).toContain('flex-col')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1", layout: "flex-col" });
+    const classes = wrapper.find('[role="tabpanel"]').classes();
+    expect(classes).toContain("flex");
+    expect(classes).toContain("flex-col");
+  });
 
   it('applies flex flex-row when layout="flex-row"', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', layout: 'flex-row' })
-    const classes = wrapper.find('[role="tabpanel"]').classes()
-    expect(classes).toContain('flex')
-    expect(classes).toContain('flex-row')
-  })
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1", layout: "flex-row" });
+    const classes = wrapper.find('[role="tabpanel"]').classes();
+    expect(classes).toContain("flex");
+    expect(classes).toContain("flex-row");
+  });
 
   // --- stretch prop ---
 
-  it('does not add h-full by default', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1' })
-    expect(wrapper.find('[role="tabpanel"]').classes()).not.toContain('h-full')
-  })
+  it("does not add h-full by default", () => {
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1" });
+    expect(wrapper.find('[role="tabpanel"]').classes()).not.toContain("h-full");
+  });
 
-  it('adds h-full when stretch is true', () => {
-    const wrapper = mountTabPanel({ name: 'tab1', activeTab: 'tab1', stretch: true })
-    expect(wrapper.find('[role="tabpanel"]').classes()).toContain('h-full')
-  })
-})
+  it("adds h-full when stretch is true", () => {
+    const wrapper = mountTabPanel({ name: "tab1", activeTab: "tab1", stretch: true });
+    expect(wrapper.find('[role="tabpanel"]').classes()).toContain("h-full");
+  });
+});

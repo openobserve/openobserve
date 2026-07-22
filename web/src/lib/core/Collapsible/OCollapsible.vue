@@ -1,15 +1,7 @@
 <script setup lang="ts">
-import type {
-  OCollapsibleProps,
-  OCollapsibleEmits,
-  OCollapsibleSlots,
-} from "./OCollapsible.types";
+import type { OCollapsibleProps, OCollapsibleEmits, OCollapsibleSlots } from "./OCollapsible.types";
 import { useCollapsibleGroup } from "./useCollapsibleGroup";
-import {
-  CollapsibleRoot,
-  CollapsibleTrigger,
-  CollapsibleContent,
-} from "reka-ui";
+import { CollapsibleRoot, CollapsibleTrigger, CollapsibleContent } from "reka-ui";
 import { ref, computed, watch, useSlots } from "vue";
 import OIcon from "../Icon/OIcon.vue";
 import { iconRegistry } from "../Icon/OIcon.icons";
@@ -87,11 +79,7 @@ watch(
 </script>
 
 <template>
-  <CollapsibleRoot
-    :open="isOpen"
-    @update:open="handleOpenChange"
-    v-bind="$attrs"
-  >
+  <CollapsibleRoot :open="isOpen" @update:open="handleOpenChange" v-bind="$attrs">
     <!-- Trigger -->
     <CollapsibleTrigger
       :class="[
@@ -99,9 +87,7 @@ watch(
         'transition-colors duration-150 outline-none',
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
         'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
-        variant === 'sidebar'
-          ? 'px-3 py-0 min-h-9 rounded-none'
-          : 'px-2 py-2 rounded-default',
+        variant === 'sidebar' ? 'px-3 py-0 min-h-9 rounded-none' : 'px-2 py-2 rounded-default',
         triggerClass,
       ]"
     >
@@ -124,7 +110,7 @@ watch(
         <!-- OIcon registry name (kebab-case SVG icon) -->
         <OIcon
           v-if="icon && isOIcon"
-          :name="(icon as any)"
+          :name="icon as any"
           size="md"
           class="text-collapsible-icon shrink-0"
         />
@@ -144,11 +130,9 @@ watch(
             ]"
             >{{ label }}</span
           >
-          <span
-            v-if="caption"
-            class="text-xs text-collapsible-caption truncate"
-            >{{ caption }}</span
-          >
+          <span v-if="caption" class="text-xs text-collapsible-caption truncate">{{
+            caption
+          }}</span>
         </span>
 
         <!-- Right chevron — default variant only -->

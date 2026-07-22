@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    @update:open="(v) => { if (!v) cancelEdit() }"
+    @update:open="
+      (v) => {
+        if (!v) cancelEdit();
+      }
+    "
     :title="t('dashboard.columnOrder')"
     size="lg"
     :secondary-button-label="t('common.cancel')"
@@ -60,7 +64,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
-          <div class="cursor-move px-1 mr-2 flex items-center" data-test="dashboard-column-order-drag-handle">
+          <div
+            class="cursor-move px-1 mr-2 flex items-center"
+            data-test="dashboard-column-order-drag-handle"
+          >
             <OIcon
               name="drag-indicator"
               size="md"
@@ -69,10 +76,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column number -->
-          <div class="min-w-8 font-medium text-compact text-text-secondary" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
+          <div
+            class="min-w-8 font-medium text-compact text-text-secondary"
+            data-test="dashboard-column-order-column-number"
+          >
+            {{ index + 1 }}.
+          </div>
 
           <!-- Column name -->
-          <div class="flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap text-compact" data-test="dashboard-column-order-column-name">{{ column }}</div>
+          <div
+            class="flex-1 font-medium overflow-hidden text-ellipsis whitespace-nowrap text-compact"
+            data-test="dashboard-column-order-column-name"
+          >
+            {{ column }}
+          </div>
 
           <!-- Actions -->
           <div class="flex gap-0.5 ml-2" data-test="dashboard-column-order-column-actions">
@@ -120,7 +137,7 @@ export default defineComponent({
     ODialog,
     OIcon,
     OTooltip,
-},
+  },
   props: {
     open: {
       type: Boolean,
@@ -151,14 +168,10 @@ export default defineComponent({
     const initializeColumnOrder = () => {
       if (props.columnOrder && props.columnOrder.length > 0) {
         // Filter the column order to only include columns that are in availableColumns
-        const filtered = props.columnOrder.filter((col) =>
-          props.availableColumns.includes(col),
-        );
+        const filtered = props.columnOrder.filter((col) => props.availableColumns.includes(col));
 
         // Find columns in availableColumns that are not in columnOrder
-        const remaining = props.availableColumns.filter(
-          (col) => !filtered.includes(col),
-        );
+        const remaining = props.availableColumns.filter((col) => !filtered.includes(col));
 
         // Combine: ordered columns first, then remaining in their natural order
         editColumnOrder.value = [...filtered, ...remaining];

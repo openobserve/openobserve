@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="flex flex-wrap items-center gap-4"
-    data-test="rum-errors-filter-bar"
-  >
+  <div class="flex flex-wrap items-center gap-4" data-test="rum-errors-filter-bar">
     <OToggleGroup
       :model-value="status"
       type="single"
@@ -26,22 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label-position="left"
       @update:model-value="(v: any) => v && emit('update:status', v)"
     >
-      <OToggleGroupItem
-        value="all"
-        size="xs"
-        data-test="rum-errors-filter-status-all"
-        >{{ t("rum.all") }}</OToggleGroupItem
-      >
-      <OToggleGroupItem
-        value="new"
-        size="xs"
-        data-test="rum-errors-filter-status-new"
+      <OToggleGroupItem value="all" size="xs" data-test="rum-errors-filter-status-all">{{
+        t("rum.all")
+      }}</OToggleGroupItem>
+      <OToggleGroupItem value="new" size="xs" data-test="rum-errors-filter-status-new"
         >{{ t("rum.statusNew") }} · {{ counts.new }}</OToggleGroupItem
       >
-      <OToggleGroupItem
-        value="ongoing"
-        size="xs"
-        data-test="rum-errors-filter-status-ongoing"
+      <OToggleGroupItem value="ongoing" size="xs" data-test="rum-errors-filter-status-ongoing"
         >{{ t("rum.statusOngoing") }} · {{ counts.ongoing }}</OToggleGroupItem
       >
     </OToggleGroup>
@@ -53,22 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       label-position="left"
       @update:model-value="(v: any) => v && emit('update:type', v)"
     >
-      <OToggleGroupItem
-        value="all"
-        size="xs"
-        data-test="rum-errors-filter-type-all"
-        >{{ t("rum.all") }}</OToggleGroupItem
-      >
-      <OToggleGroupItem
-        value="unhandled"
-        size="xs"
-        data-test="rum-errors-filter-type-unhandled"
+      <OToggleGroupItem value="all" size="xs" data-test="rum-errors-filter-type-all">{{
+        t("rum.all")
+      }}</OToggleGroupItem>
+      <OToggleGroupItem value="unhandled" size="xs" data-test="rum-errors-filter-type-unhandled"
         >{{ t("rum.unhandled") }} · {{ counts.unhandled }}</OToggleGroupItem
       >
-      <OToggleGroupItem
-        value="handled"
-        size="xs"
-        data-test="rum-errors-filter-type-handled"
+      <OToggleGroupItem value="handled" size="xs" data-test="rum-errors-filter-type-handled"
         >{{ t("rum.handled") }} · {{ counts.handled }}</OToggleGroupItem
       >
     </OToggleGroup>

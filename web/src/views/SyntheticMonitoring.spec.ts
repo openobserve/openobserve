@@ -135,7 +135,7 @@ const baseStubs = {
     props: ["iconLeft", "dataTest"],
   },
   OIcon: {
-    template: '<span />',
+    template: "<span />",
     props: ["name", "size", "class"],
   },
   ODialog: {
@@ -159,7 +159,7 @@ const baseStubs = {
     inheritAttrs: true,
   },
   OSelect: {
-    template: '<select :data-test="$attrs[\'data-test\']" />',
+    template: "<select :data-test=\"$attrs['data-test']\" />",
     props: ["modelValue", "options", "size"],
   },
   OInput: {
@@ -169,16 +169,14 @@ const baseStubs = {
     emits: ["update:modelValue"],
   },
   OToggleGroup: {
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
     props: ["modelValue"],
   },
   OToggleGroupItem: {
-    template:
-      '<button :data-test="$attrs[\'data-test\']"><slot /></button>',
+    template: "<button :data-test=\"$attrs['data-test']\"><slot /></button>",
     props: ["value", "size", "iconLeft"],
     inheritAttrs: true,
   },
-
 };
 
 function mountPage() {
@@ -206,23 +204,17 @@ describe("SyntheticMonitoring", () => {
     it("should render the page shell with the new check button", () => {
       wrapper = mountPage();
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(true);
     });
 
     it("should render the sidebar folder list", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-folder-list"]').exists()).toBe(true);
     });
 
     it("should render the MonitorTable", () => {
       wrapper = mountPage();
-      expect(
-        wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetic-monitoring-monitors-table"]').exists()).toBe(true);
     });
   });
 

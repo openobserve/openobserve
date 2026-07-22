@@ -10,7 +10,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "reka-ui";
-import { ref, watch, watchEffect, useSlots, computed, inject, provide, nextTick, useAttrs } from "vue";
+import {
+  ref,
+  watch,
+  watchEffect,
+  useSlots,
+  computed,
+  inject,
+  provide,
+  nextTick,
+  useAttrs,
+} from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
@@ -88,9 +98,8 @@ function handleInteractOutside(e: Event) {
   // therefore sit outside the DrawerContent DOM subtree, so reka-ui's
   // DismissableLayer fires interactOutside for them — which would wrongly dismiss
   // the drawer before the click on the item can register.
-  const originalEvent = (
-    e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }
-  ).detail?.originalEvent;
+  const originalEvent = (e as CustomEvent & { detail?: { originalEvent?: PointerEvent } }).detail
+    ?.originalEvent;
   const target = originalEvent?.target as Element | null;
   if (
     target?.closest("[data-reka-popper-content-wrapper]") // reka-ui portals (ODropdown, OSelect, …)
@@ -140,16 +149,11 @@ const bodyPaddingClass = computed(() =>
 
 // The primary button is loading when the consumer says so OR a nested OForm is
 // mid-submit (auto). Kept as a computed so the disabled logic below picks it up.
-const primaryLoading = computed(
-  () => props.primaryButtonLoading || formSubmitting.value,
-);
+const primaryLoading = computed(() => props.primaryButtonLoading || formSubmitting.value);
 
 // Auto-disable all buttons when any one of them is loading
 const anyButtonLoading = computed(
-  () =>
-    primaryLoading.value ||
-    props.secondaryButtonLoading ||
-    props.neutralButtonLoading,
+  () => primaryLoading.value || props.secondaryButtonLoading || props.neutralButtonLoading,
 );
 
 const primaryEffectivelyDisabled = computed(
@@ -207,11 +211,11 @@ function handleOpenAutoFocus(event: Event) {
       const candidates = body.querySelectorAll<HTMLElement>(
         [
           'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="range"]):not([type="color"]):not([disabled])',
-          'textarea:not([disabled])',
-        ].join(', ')
+          "textarea:not([disabled])",
+        ].join(", "),
       );
       const firstField = Array.from(candidates).find(
-        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]')
+        (el) => !el.closest('.o-select, [role="combobox"], [role="listbox"], [data-no-autofocus]'),
       );
       if (firstField) {
         firstField.focus();
@@ -272,7 +276,13 @@ watchEffect((cleanup) => {
 });
 
 // ── Scroll shadow ────────────────────────────────────────────────────────────
-const { canScrollUp, canScrollDown, update: updateShadow, attach: attachShadow, detach: detachShadow } = useScrollShadow(bodyRef);
+const {
+  canScrollUp,
+  canScrollDown,
+  update: updateShadow,
+  attach: attachShadow,
+  detach: detachShadow,
+} = useScrollShadow(bodyRef);
 
 watch(internalOpen, (open) => {
   if (open) {
@@ -299,9 +309,7 @@ watch(internalOpen, (open) => {
         data-test="o-drawer-overlay"
         :class="[
           isContained ? 'absolute inset-0' : 'fixed inset-0',
-          seamless
-            ? 'bg-transparent pointer-events-none'
-            : 'bg-dialog-overlay',
+          seamless ? 'bg-transparent pointer-events-none' : 'bg-dialog-overlay',
           'data-[state=open]:animate-in data-[state=open]:fade-in-0',
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=open]:duration-120 data-[state=closed]:duration-120',
@@ -394,7 +402,10 @@ watch(internalOpen, (open) => {
             </div>
 
             <!-- #header-left sub-slot — grows to fill space if present -->
-            <div v-if="slots['header-left']" class="flex-1 min-w-0 flex items-center justify-start gap-2">
+            <div
+              v-if="slots['header-left']"
+              class="flex-1 min-w-0 flex items-center justify-start gap-2"
+            >
               <slot name="header-left" />
             </div>
 
@@ -454,7 +465,9 @@ watch(internalOpen, (open) => {
             bodyPaddingClass,
             canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
             canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollUp && canScrollDown && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            canScrollUp &&
+              canScrollDown &&
+              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
           ]"
         >
           <template v-if="!props.lazy || internalOpen">
@@ -474,10 +487,7 @@ watch(internalOpen, (open) => {
           ]"
         >
           <!-- ── Built-in footer buttons ──────────────────────────────────────── -->
-          <div
-            v-if="!slots.footer"
-            class="flex items-center justify-between gap-2"
-          >
+          <div v-if="!slots.footer" class="flex items-center justify-between gap-2">
             <!-- Left: neutral button -->
             <div>
               <OButton

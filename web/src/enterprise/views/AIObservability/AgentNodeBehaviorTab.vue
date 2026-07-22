@@ -116,9 +116,7 @@ import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import AgentSignalDetailPanel from "./AgentSignalDetailPanel.vue";
-import agentSignalsService, {
-  type AgentSignalRecord,
-} from "@/services/agent_signals";
+import agentSignalsService, { type AgentSignalRecord } from "@/services/agent_signals";
 
 const props = defineProps<{
   /** The clicked agent's resolved name (from the graph node identity). */
@@ -137,9 +135,7 @@ const disabledHint = ref("");
 const detailOpen = ref(false);
 const detailRow = ref<any>(null);
 
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier as string,
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier as string);
 
 /** Only this agent's signals — the drawer/page already resolve agent names the
  *  same way, so a name match is the scoping key (see design §4b id-vs-name note). */
@@ -187,10 +183,7 @@ const costSummary = computed(() => {
   };
 });
 
-const openDetail = (
-  signalType: "loop" | "failure",
-  row: Record<string, any>,
-) => {
+const openDetail = (signalType: "loop" | "failure", row: Record<string, any>) => {
   detailRow.value = { signalType, ...row };
   detailOpen.value = true;
 };

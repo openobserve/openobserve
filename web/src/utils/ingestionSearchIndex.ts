@@ -288,8 +288,6 @@ export function searchIngestionItems(query: string): SearchableItem[] {
     }
 
     // Check if query matches any of the keywords
-    return item.keywords.some((keyword) =>
-      keyword.toLowerCase().includes(searchTerm),
-    );
+    return item.keywords.some((keyword) => keyword.toLowerCase().includes(searchTerm));
   });
 }

@@ -1,53 +1,63 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import type { BrowserCheck, SyntheticCheckType, SyntheticsLocation, SyntheticsFolder, SyntheticsDevice } from '@/types/synthetics'
-import CheckDetails from './CheckDetails.vue'
-import CheckAuthNetwork from './CheckAuthNetwork.vue'
-import CheckSchedule from './CheckSchedule.vue'
-import CheckAlerts from './CheckAlerts.vue'
-import CheckLocations from './CheckLocations.vue'
-import CheckBrowserDevices from './CheckBrowserDevices.vue'
-import CheckRUM from './CheckRUM.vue'
-import CheckCapture from './CheckCapture.vue'
+import { computed } from "vue";
+import { useI18n } from "vue-i18n";
+import type {
+  BrowserCheck,
+  SyntheticCheckType,
+  SyntheticsLocation,
+  SyntheticsFolder,
+  SyntheticsDevice,
+} from "@/types/synthetics";
+import CheckDetails from "./CheckDetails.vue";
+import CheckAuthNetwork from "./CheckAuthNetwork.vue";
+import CheckSchedule from "./CheckSchedule.vue";
+import CheckAlerts from "./CheckAlerts.vue";
+import CheckLocations from "./CheckLocations.vue";
+import CheckBrowserDevices from "./CheckBrowserDevices.vue";
+import CheckRUM from "./CheckRUM.vue";
+import CheckCapture from "./CheckCapture.vue";
 
 const props = defineProps<{
-  check: BrowserCheck
-  checkType?: SyntheticCheckType | 'api'
-  locations?: SyntheticsLocation[]
-  browsers?: string[]
-  devices?: SyntheticsDevice[]
-  destinations?: string[]
-  folders?: SyntheticsFolder[]
-  validationErrors?: Record<string, string>
-}>()
+  check: BrowserCheck;
+  checkType?: SyntheticCheckType | "api";
+  locations?: SyntheticsLocation[];
+  browsers?: string[];
+  devices?: SyntheticsDevice[];
+  destinations?: string[];
+  folders?: SyntheticsFolder[];
+  validationErrors?: Record<string, string>;
+}>();
 
-const { t } = useI18n()
+const { t } = useI18n();
 
 // Browser/http take a full URL; tcp/tls/ssh take a bare host (the server
 // rejects URLs for those types — validate_host_target).
-const isHostTarget = computed(() => ['tcp', 'tls', 'ssh'].includes(props.checkType ?? 'browser'))
+const isHostTarget = computed(() => ["tcp", "tls", "ssh"].includes(props.checkType ?? "browser"));
 // Target field wording: browser keeps "Starting URL"; http is a plain "URL".
 const targetLabel = computed(() => {
-  if (isHostTarget.value) return t('synthetics.checkDetails.hostTarget')
-  if (props.checkType === 'http' || props.checkType === 'api') return t('synthetics.checkDetails.urlTarget')
-  return undefined
-})
+  if (isHostTarget.value) return t("synthetics.checkDetails.hostTarget");
+  if (props.checkType === "http" || props.checkType === "api")
+    return t("synthetics.checkDetails.urlTarget");
+  return undefined;
+});
 const targetPlaceholder = computed(() => {
-  if (isHostTarget.value) return t('synthetics.checkDetails.hostTargetPlaceholder')
-  if (props.checkType === 'http' || props.checkType === 'api') return t('synthetics.checkDetails.urlTargetPlaceholder')
-  return undefined
-})
+  if (isHostTarget.value) return t("synthetics.checkDetails.hostTargetPlaceholder");
+  if (props.checkType === "http" || props.checkType === "api")
+    return t("synthetics.checkDetails.urlTargetPlaceholder");
+  return undefined;
+});
 // Basic auth + variables only make sense where the probe sends them today.
-const showAuthNetwork = computed(() => ['browser', 'http', 'api'].includes(props.checkType ?? 'browser'))
+const showAuthNetwork = computed(() =>
+  ["browser", "http", "api"].includes(props.checkType ?? "browser"),
+);
 const emit = defineEmits<{
-  'update:check': [value: BrowserCheck]
-  'refresh:destinations': []
-}>()
+  "update:check": [value: BrowserCheck];
+  "refresh:destinations": [];
+}>();
 
 function handleUpdate(value: BrowserCheck) {
-  emit('update:check', value)
+  emit("update:check", value);
 }
 </script>
 

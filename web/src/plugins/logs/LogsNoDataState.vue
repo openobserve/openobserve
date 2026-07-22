@@ -66,28 +66,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-no-data-kubernetes-btn"
           @click="go('ingestFromKubernetes')"
         >
-          <img :src="getImageURL('images/common/kubernetes.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+          <img
+            :src="getImageURL('images/common/kubernetes.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("logs.noData.kubernetes") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          data-test="logs-no-data-aws-btn"
-          @click="go('AWSConfig')"
-        >
-          <img :src="getImageURL('images/ingestion/aws.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+        <EmptyStateIngestionChip data-test="logs-no-data-aws-btn" @click="go('AWSConfig')">
+          <img
+            :src="getImageURL('images/ingestion/aws.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("logs.noData.aws") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          data-test="logs-no-data-linux-btn"
-          @click="go('ingestFromLinux')"
-        >
-          <img :src="getImageURL('images/common/linux.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+        <EmptyStateIngestionChip data-test="logs-no-data-linux-btn" @click="go('ingestFromLinux')">
+          <img
+            :src="getImageURL('images/common/linux.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("logs.noData.linux") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip
           data-test="logs-no-data-windows-btn"
           @click="go('ingestFromWindows')"
         >
-          <img :src="getImageURL('images/common/windows.svg')" class="w-3.5 h-3.5 shrink-0 object-contain" alt="" />
+          <img
+            :src="getImageURL('images/common/windows.svg')"
+            class="w-3.5 h-3.5 shrink-0 object-contain"
+            alt=""
+          />
           {{ t("logs.noData.windows") }}
         </EmptyStateIngestionChip>
         <EmptyStateIngestionChip

@@ -17,15 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <OPageHeader
-        :back="{ onClick: () => router.back(), dataTest: 'back-button' }"
-      >
+      <OPageHeader :back="{ onClick: () => router.back(), dataTest: 'back-button' }">
         <template #title>
           <span class="font-bold">{{ t("rum.eventID") }}:</span>
-          <span
-            data-test="error-id"
-            :title="error.error_id"
-            class="pl-1 cursor-pointer"
+          <span data-test="error-id" :title="error.error_id" class="pl-1 cursor-pointer"
             >{{ error.error_id }}
             <OIcon
               size="xs"
@@ -39,10 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OPageHeader>
       <div class="flex items-center flex-nowrap my-1">
-        <div
-          data-test="error-header-error-type"
-          class="text-2xl font-bold"
-        >{{ error.type }}</div>
+        <div data-test="error-header-error-type" class="text-2xl font-bold">{{ error.type }}</div>
       </div>
       <div class="text-base pt-1 flex items-center">
         <div

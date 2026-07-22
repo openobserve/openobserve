@@ -42,11 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-1 min-h-0">
       <div
         class="flex overflow-hidden min-h-0"
-        :class="[
-          store.state.isAiChatEnabled && !isAddFunctionComponent
-            ? 'w-3/4'
-            : 'w-full',
-        ]"
+        :class="[store.state.isAiChatEnabled && !isAddFunctionComponent ? 'w-3/4' : 'w-full']"
       >
         <OSplitter
           v-model="splitterModel"
@@ -58,40 +54,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template v-slot:before>
             <div class="px-2 pt-2 pb-3 bg-card-glass-bg h-full flex flex-col min-h-0">
               <div class="pb-2 o2-input flex flex-col flex-1 min-h-0">
-                  <FullViewContainer
-                    name="function"
-                    v-model:is-expanded="expandState.functions"
-                    :label="(transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
-                    min-header-height="2.125rem"
+                <FullViewContainer
+                  name="function"
+                  v-model:is-expanded="expandState.functions"
+                  :label="
+                    (transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'
+                  "
+                  min-header-height="2.125rem"
+                />
+                <div v-show="expandState.functions" class="mb-1.5 relative flex-1 min-h-0">
+                  <!-- Unified Query Editor (with built-in AI bar) -->
+                  <unified-query-editor
+                    data-test="logs-vrl-function-editor"
+                    data-test-prefix="function-vrl"
+                    ref="editorRef"
+                    :languages="['vrl', 'javascript']"
+                    :default-language="transType === '1' ? 'javascript' : 'vrl'"
+                    :query="formData.function"
+                    :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
+                    :disable-ai="!store.state.zoConfig.ai_enabled"
+                    :disable-ai-reason="''"
+                    :ai-placeholder="t('function.askAIFunctionPlaceholder')"
+                    :ai-tooltip="t('function.enterFunctionPrompt')"
+                    editor-height="100%"
+                    @focus="functionEditorPlaceholderFlag = false"
+                    @blur="functionEditorPlaceholderFlag = true"
+                    @update:query="handleFunctionUpdate"
+                    @language-change="handleLanguageChange"
+                    @toggle-nlp-mode="handleToggleNlpMode"
+                    @generation-start="handleGenerationStart"
+                    @generation-end="handleGenerationEnd"
+                    @generation-success="handleGenerationSuccess"
                   />
-                  <div
-                    v-show="expandState.functions"
-                    class="mb-1.5 relative flex-1 min-h-0"
-                  >
-                    <!-- Unified Query Editor (with built-in AI bar) -->
-                    <unified-query-editor
-                      data-test="logs-vrl-function-editor"
-                      data-test-prefix="function-vrl"
-                      ref="editorRef"
-                      :languages="['vrl', 'javascript']"
-                      :default-language="transType === '1' ? 'javascript' : 'vrl'"
-                      :query="formData.function"
-                      :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
-                      :disable-ai="!store.state.zoConfig.ai_enabled"
-                      :disable-ai-reason="''"
-                      :ai-placeholder="t('function.askAIFunctionPlaceholder')"
-                      :ai-tooltip="t('function.enterFunctionPrompt')"
-                      editor-height="100%"
-                      @focus="functionEditorPlaceholderFlag = false"
-                      @blur="functionEditorPlaceholderFlag = true"
-                      @update:query="handleFunctionUpdate"
-                      @language-change="handleLanguageChange"
-                      @toggle-nlp-mode="handleToggleNlpMode"
-                      @generation-start="handleGenerationStart"
-                      @generation-end="handleGenerationEnd"
-                      @generation-success="handleGenerationSuccess"
-                    />
-                    <!-- Typewriter placeholder for an empty editor.
+                  <!-- Typewriter placeholder for an empty editor.
                          Deliberately NOT gated on `!forcedLanguage`: a forced
                          language is no reason to drop the placeholder. transType
                          is locked to the forced language (see the mounted hook),
@@ -100,34 +95,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          seeded `defaultCode`. Excluding forced hosts left the
                          pipeline Function node with a blank editor — it forces
                          vrl but passes no defaultCode. -->
-                    <div
-                      v-if="!formData.function && functionEditorPlaceholderFlag"
-                      class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+                  <div
+                    v-if="!formData.function && functionEditorPlaceholderFlag"
+                    class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
+                  >
+                    <span
+                      class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]"
+                      >{{ transType === "1" ? jsPlaceholder : vrlPlaceholder }}</span
                     >
-                      <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
-                        transType === '1' ? jsPlaceholder : vrlPlaceholder
-                      }}</span>
-                    </div>
                   </div>
-                  <div class="text-sm font-medium">
-                    <div v-if="vrlFunctionError">
-                      <FullViewContainer
-                        name="function"
-                        v-model:is-expanded="expandState.functionError"
-                        :label="transType === '1' ? t('function.jsErrorDetails') : t('function.errorDetails')"
-                        labelClass="text-status-error-text font-semibold"
-                      />
-                      <div
-                        v-if="expandState.functionError"
-                        data-test="function-error-details"
-                        class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
+                </div>
+                <div class="text-sm font-medium">
+                  <div v-if="vrlFunctionError">
+                    <FullViewContainer
+                      name="function"
+                      v-model:is-expanded="expandState.functionError"
+                      :label="
+                        transType === '1'
+                          ? t('function.jsErrorDetails')
+                          : t('function.errorDetails')
+                      "
+                      labelClass="text-status-error-text font-semibold"
+                    />
+                    <div
+                      v-if="expandState.functionError"
+                      data-test="function-error-details"
+                      class="px-2 pb-2 border-l-4 border-status-negative bg-surface-subtle"
+                    >
+                      <pre
+                        class="my-0 text-status-error-text whitespace-pre-wrap"
+                        style="font-family: var(--font-mono); font-size: var(--text-compact)"
+                        >{{ vrlFunctionError }}</pre
                       >
-                        <pre class="my-0 text-status-error-text whitespace-pre-wrap" style="font-family: var(--font-mono); font-size: var(--text-compact);">{{
-                          vrlFunctionError
-                        }}</pre>
-                      </div>
                     </div>
                   </div>
+                </div>
               </div>
             </div>
           </template>
@@ -147,10 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
-        :class="[
-          'w-1/4 max-w-full min-w-19',
-          heightOffset ? '[--ai-chat-offset:4.6875rem]' : '',
-        ]"
+        :class="['w-1/4 max-w-full min-w-19', heightOffset ? '[--ai-chat-offset:4.6875rem]' : '']"
       >
         <O2AIChat
           class="h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
@@ -160,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </div>  
+  </div>
   <confirm-dialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -200,10 +199,7 @@ import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceho
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
-import {
-  makeAddFunctionSchema,
-  type AddFunctionForm,
-} from "./AddFunction.schema";
+import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -250,9 +246,7 @@ export default defineComponent({
   components: {
     OSplitter,
     OForm,
-    UnifiedQueryEditor: defineAsyncComponent(
-      () => import("@/components/QueryEditor.vue"),
-    ),
+    UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
     FunctionsToolbar,
     FullViewContainer,
     TestFunction,
@@ -266,7 +260,8 @@ export default defineComponent({
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);    const disableColor: any = ref("");
+    const addJSTransformForm: any = ref(null);
+    const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
       function: "",
@@ -319,8 +314,7 @@ export default defineComponent({
       // An already-JS function keeps the JS option even where JS isn't offered
       // (e.g. a build that lost the entitlement), so editing it renders the right
       // language instead of a radio group with nothing selected.
-      const editingJsFunction =
-        String((props.modelValue as any)?.transType ?? "0") === "1";
+      const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
 
       if (isJsAllowed.value || editingJsFunction) {
         options.push({ label: t("function.javascript"), value: "1" });
@@ -349,12 +343,8 @@ export default defineComponent({
     });
 
     // Reactive, read-only views of the form-owned fields.
-    const nameValue = addFunctionForm.useStore((s: any) =>
-      String(s.values.name ?? ""),
-    );
-    const transType = addFunctionForm.useStore((s: any) =>
-      String(s.values.transType ?? "0"),
-    );
+    const nameValue = addFunctionForm.useStore((s: any) => String(s.values.name ?? ""));
+    const transType = addFunctionForm.useStore((s: any) => String(s.values.transType ?? "0"));
 
     // What TestFunction consumes: the live form-owned name/transType combined
     // with the non-form Monaco body + params held in `formData`.
@@ -367,8 +357,9 @@ export default defineComponent({
     const streamTypes = ["logs", "metrics", "traces"];
 
     const isFunctionDataChanged = ref(false);
-    const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))
-
+    const isAddFunctionComponent = computed(() =>
+      router.currentRoute.value.path.includes("functions"),
+    );
 
     watch(
       () => nameValue.value + formData.value.function,
@@ -449,14 +440,8 @@ export default defineComponent({
 
       try {
         const res = beingUpdated.value
-          ? await jsTransformService.update(
-              store.state.selectedOrganization.identifier,
-              payload,
-            )
-          : await jsTransformService.create(
-              store.state.selectedOrganization.identifier,
-              payload,
-            );
+          ? await jsTransformService.update(store.state.selectedOrganization.identifier, payload)
+          : await jsTransformService.create(store.state.selectedOrganization.identifier, payload);
 
         const _formData: any = { ...payload };
         formData.value = { ...defaultValue() };
@@ -486,7 +471,7 @@ export default defineComponent({
       });
       track("Button Click", {
         button: "Save Function",
-        page: "Add Function"
+        page: "Add Function",
       });
     };
 
@@ -531,7 +516,7 @@ export default defineComponent({
       }
       track("Button Click", {
         button: "Cancel Function",
-        page: "Add Function"
+        page: "Add Function",
       });
     };
 
@@ -543,14 +528,14 @@ export default defineComponent({
       confirmDialogMeta.value.data = null;
     };
     const openChat = (val: boolean) => {
-        store.dispatch("setIsAiChatEnabled", val);
+      store.dispatch("setIsAiChatEnabled", val);
     };
 
     const sendToAiChat = (value: any) => {
       //this is for when user in pipeline add function page and click on ai chat button
       //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
       //so to force trigger we do this
-      aiChatInputContext.value = '';
+      aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
       });
@@ -565,13 +550,11 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle language change
-    const handleLanguageChange = (
-      newLanguage: 'sql' | 'promql' | 'vrl' | 'javascript',
-    ) => {
+    const handleLanguageChange = (newLanguage: "sql" | "promql" | "vrl" | "javascript") => {
       // transType is form-owned — write it straight to the form; the useStore
       // reads above make the editor + tooltip react.
-      const tt = newLanguage === 'javascript' ? '1' : '0';
-      addFunctionForm.setFieldValue('transType', tt);
+      const tt = newLanguage === "javascript" ? "1" : "0";
+      addFunctionForm.setFieldValue("transType", tt);
     };
 
     /**
@@ -598,13 +581,12 @@ export default defineComponent({
     /**
      * Handle successful generation from UnifiedQueryEditor
      */
-    const handleGenerationSuccess = (payload: {type: string, message: string}) => {
+    const handleGenerationSuccess = (payload: { type: string; message: string }) => {
       // Function code is already updated via @update:query handler
     };
 
     // Unified Query Editor: Handle Ask AI
-    const handleAskAI = async (naturalLanguage: string, language: 'vrl' | 'javascript') => {
-
+    const handleAskAI = async (naturalLanguage: string, language: "vrl" | "javascript") => {
       // Enable AI chat if not already enabled
       if (!store.state.isAiChatEnabled) {
         openChat(true);
@@ -663,11 +645,7 @@ export default defineComponent({
     this.formData = { ...defaultValue(), ...this.modelValue };
     this.beingUpdated = this.isUpdated;
 
-    if (
-      this.modelValue &&
-      this.modelValue.name != undefined &&
-      this.modelValue.name != ""
-    ) {
+    if (this.modelValue && this.modelValue.name != undefined && this.modelValue.name != "") {
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;

@@ -3,7 +3,9 @@
     class="rich-text-input-wrapper py-1 px-2 pb-2 rounded-default transition-all duration-200 ease-in-out min-h-15 cursor-text bg-surface-base border border-border-default focus-within:border-transparent focus-within:shadow-[0_0_0_2px_var(--color-accent)]"
     :class="[
       disabled ? ['is-disabled', 'opacity-60', 'cursor-not-allowed'] : [],
-      borderless ? ['borderless', 'p-0', 'border-0!', 'bg-transparent!', 'shadow-none!', 'rounded-none'] : []
+      borderless
+        ? ['borderless', 'p-0', 'border-0!', 'bg-transparent!', 'shadow-none!', 'rounded-none']
+        : [],
     ]"
     @click="focusInput"
   >
@@ -27,18 +29,20 @@
       :style="{
         top: cardPosition.top + 'px',
         left: cardPosition.left + 'px',
-        transform: cardPosition.below ? 'none' : 'translateY(-100%)'
+        transform: cardPosition.below ? 'none' : 'translateY(-100%)',
       }"
       @click.stop
     >
-      <div class="card-content overflow-y-auto max-h-75 py-1 px-2 font-mono text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-body"
-        v-html="formatContent(detailCardContent)"></div>
+      <div
+        class="card-content overflow-y-auto max-h-75 py-1 px-2 font-mono text-2xs leading-[1.5] whitespace-pre-wrap break-words text-text-body"
+        v-html="formatContent(detailCardContent)"
+      ></div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, nextTick, PropType } from 'vue';
+import { defineComponent, ref, onMounted, watch, nextTick, PropType } from "vue";
 
 export interface ReferenceChip {
   id: string;
@@ -48,49 +52,49 @@ export interface ReferenceChip {
   preview: string; // First few chars
   fullContent: string; // Full content for backend
   charCount: number;
-  type: 'file' | 'context'; // Different types of references
+  type: "file" | "context"; // Different types of references
 }
 
 export default defineComponent({
-  name: 'RichTextInput',
+  name: "RichTextInput",
   props: {
     modelValue: {
       type: String,
-      default: ''
+      default: "",
     },
     placeholder: {
       type: String,
-      default: 'Write your prompt'
+      default: "Write your prompt",
     },
     disabled: {
       type: Boolean,
-      default: false
+      default: false,
     },
     theme: {
-      type: String as PropType<'light' | 'dark'>,
-      default: 'light'
+      type: String as PropType<"light" | "dark">,
+      default: "light",
     },
     // References to be displayed as chips
     references: {
       type: Array as PropType<ReferenceChip[]>,
-      default: () => []
+      default: () => [],
     },
     // Remove wrapper border/background (for embedding in other containers)
     borderless: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
-  emits: ['update:modelValue', 'keydown', 'submit', 'focus', 'blur', 'update:references'],
+  emits: ["update:modelValue", "keydown", "submit", "focus", "blur", "update:references"],
   setup(props, { emit }) {
     const editableDiv = ref<HTMLDivElement | null>(null);
     const isFocused = ref(false);
     const localReferences = ref<ReferenceChip[]>([...props.references]);
-    const lastEmittedValue = ref<string>(''); // Track last value we emitted
+    const lastEmittedValue = ref<string>(""); // Track last value we emitted
 
     // Detail card state
     const showDetailCard = ref(false);
-    const detailCardContent = ref('');
+    const detailCardContent = ref("");
     const cardPosition = ref({ top: 0, left: 0, below: false });
 
     // Helper to format JSON with syntax highlighting
@@ -99,44 +103,46 @@ export default defineComponent({
         const parsed = JSON.parse(content);
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
-        return formatted
-          .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (match) => {
-            let cls = 'json-number';
+        return formatted.replace(
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+          (match) => {
+            let cls = "json-number";
             if (/^"/.test(match)) {
               if (/:$/.test(match)) {
-                cls = 'json-key';
+                cls = "json-key";
               } else {
-                cls = 'json-string';
+                cls = "json-string";
               }
             } else if (/true|false/.test(match)) {
-              cls = 'json-boolean';
+              cls = "json-boolean";
             } else if (/null/.test(match)) {
-              cls = 'json-null';
+              cls = "json-null";
             }
             return `<span class="${cls}">${match}</span>`;
-          });
+          },
+        );
       } catch {
         // Not JSON, return plain text with line breaks preserved
-        return content.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+        return content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
       }
     };
 
     // Create chip element
     const createChipElement = (chip: ReferenceChip): HTMLElement => {
-      const chipWrapper = document.createElement('span');
-      chipWrapper.className = 'reference-chip';
-      chipWrapper.contentEditable = 'false';
-      chipWrapper.setAttribute('data-chip-id', chip.id);
-      chipWrapper.setAttribute('data-chip-type', chip.type);
+      const chipWrapper = document.createElement("span");
+      chipWrapper.className = "reference-chip";
+      chipWrapper.contentEditable = "false";
+      chipWrapper.setAttribute("data-chip-id", chip.id);
+      chipWrapper.setAttribute("data-chip-type", chip.type);
 
       // Preview text (first few chars + ellipsis)
-      const previewSpan = document.createElement('span');
-      previewSpan.className = 'chip-preview';
+      const previewSpan = document.createElement("span");
+      previewSpan.className = "chip-preview";
       previewSpan.textContent = chip.preview;
 
       // Character count and line numbers
-      const metaSpan = document.createElement('span');
-      metaSpan.className = 'chip-meta';
+      const metaSpan = document.createElement("span");
+      metaSpan.className = "chip-meta";
       if (chip.lineStart !== undefined && chip.lineEnd !== undefined) {
         metaSpan.textContent = `(${chip.charCount}) • ${chip.lineStart}-${chip.lineEnd}`;
       } else {
@@ -144,10 +150,10 @@ export default defineComponent({
       }
 
       // Remove button
-      const removeBtn = document.createElement('button');
-      removeBtn.className = 'chip-remove';
-      removeBtn.innerHTML = '×';
-      removeBtn.setAttribute('type', 'button');
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "chip-remove";
+      removeBtn.innerHTML = "×";
+      removeBtn.setAttribute("type", "button");
       removeBtn.onclick = (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -170,11 +176,12 @@ export default defineComponent({
           // Position card's bottom edge at chip's top edge (with gap)
           // Using transform: translateY(-100%) in CSS to shift card up by its own height
           let top = rect.top - 10; // 10px gap above chip
-          let left = rect.left + (rect.width / 2) - (cardWidth / 2);
+          let left = rect.left + rect.width / 2 - cardWidth / 2;
 
           // Check if there's enough space above
           // If card would go off top of screen, position below chip instead
-          if (rect.top < 310) { // Not enough space for max 300px card + gap
+          if (rect.top < 310) {
+            // Not enough space for max 300px card + gap
             top = rect.bottom + 10; // Position below chip
             cardPosition.value = { top, left, below: true };
           } else {
@@ -201,7 +208,7 @@ export default defineComponent({
       chipWrapper.appendChild(removeBtn);
 
       // Add a zero-width space after the chip to allow cursor positioning
-      const spacer = document.createTextNode('\u200B');
+      const spacer = document.createTextNode("\u200B");
       chipWrapper.appendChild(spacer);
 
       return chipWrapper;
@@ -212,7 +219,7 @@ export default defineComponent({
       if (!editableDiv.value) return;
 
       localReferences.value.push(chip);
-      emit('update:references', localReferences.value);
+      emit("update:references", localReferences.value);
 
       const chipElement = createChipElement(chip);
       const selection = window.getSelection();
@@ -222,10 +229,11 @@ export default defineComponent({
         range.deleteContents();
 
         // Add space before chip if needed
-        const textBefore = range.startContainer.textContent || '';
-        const needsSpaceBefore = textBefore.length > 0 && !textBefore.endsWith(' ') && !textBefore.endsWith('\n');
+        const textBefore = range.startContainer.textContent || "";
+        const needsSpaceBefore =
+          textBefore.length > 0 && !textBefore.endsWith(" ") && !textBefore.endsWith("\n");
         if (needsSpaceBefore) {
-          range.insertNode(document.createTextNode(' '));
+          range.insertNode(document.createTextNode(" "));
         }
 
         // Insert chip
@@ -236,7 +244,7 @@ export default defineComponent({
         range.setEndAfter(chipElement);
 
         // Add space after chip for cursor positioning
-        const spaceAfter = document.createTextNode(' ');
+        const spaceAfter = document.createTextNode(" ");
         range.insertNode(spaceAfter);
 
         // Position cursor after the space
@@ -249,7 +257,7 @@ export default defineComponent({
       } else {
         // Fallback: append to end
         editableDiv.value.appendChild(chipElement);
-        const spaceAfter = document.createTextNode(' ');
+        const spaceAfter = document.createTextNode(" ");
         editableDiv.value.appendChild(spaceAfter);
 
         // Position cursor at the end
@@ -276,25 +284,25 @@ export default defineComponent({
       const chipElement = editableDiv.value.querySelector(`[data-chip-id="${chipId}"]`);
       if (chipElement) {
         chipElement.remove();
-        localReferences.value = localReferences.value.filter(ref => ref.id !== chipId);
-        emit('update:references', localReferences.value);
+        localReferences.value = localReferences.value.filter((ref) => ref.id !== chipId);
+        emit("update:references", localReferences.value);
         handleInput();
       }
     };
 
     // Get plain text content (for display/editing)
     const getPlainText = (): string => {
-      if (!editableDiv.value) return '';
+      if (!editableDiv.value) return "";
 
-      let text = '';
+      let text = "";
       const walk = (node: Node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          text += node.textContent || '';
+          text += node.textContent || "";
         } else if (node.nodeType === Node.ELEMENT_NODE) {
           const element = node as HTMLElement;
-          if (element.classList.contains('reference-chip')) {
-            const chipId = element.getAttribute('data-chip-id');
-            const chip = localReferences.value.find(r => r.id === chipId);
+          if (element.classList.contains("reference-chip")) {
+            const chipId = element.getAttribute("data-chip-id");
+            const chip = localReferences.value.find((r) => r.id === chipId);
             if (chip) {
               text += `[${chip.filename}]`;
             }
@@ -304,24 +312,24 @@ export default defineComponent({
         }
       };
       editableDiv.value.childNodes.forEach(walk);
-      return text.replace(/\u200B/g, ''); // Remove zero-width spaces
+      return text.replace(/\u200B/g, ""); // Remove zero-width spaces
     };
 
     // Get message for backend (unwrap chips with full content)
     const getMessageForBackend = (): string => {
-      if (!editableDiv.value) return '';
+      if (!editableDiv.value) return "";
 
-      let message = '';
+      let message = "";
       const walk = (node: Node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          message += node.textContent || '';
+          message += node.textContent || "";
         } else if (node.nodeType === Node.ELEMENT_NODE) {
           const element = node as HTMLElement;
-          if (element.classList.contains('reference-chip')) {
-            const chipId = element.getAttribute('data-chip-id');
-            const chip = localReferences.value.find(r => r.id === chipId);
+          if (element.classList.contains("reference-chip")) {
+            const chipId = element.getAttribute("data-chip-id");
+            const chip = localReferences.value.find((r) => r.id === chipId);
             if (chip) {
-              message += `\n\n--- ${chip.filename} ${chip.lineStart && chip.lineEnd ? `(lines ${chip.lineStart}-${chip.lineEnd})` : ''} ---\n${chip.fullContent}\n--- end ---\n\n`;
+              message += `\n\n--- ${chip.filename} ${chip.lineStart && chip.lineEnd ? `(lines ${chip.lineStart}-${chip.lineEnd})` : ""} ---\n${chip.fullContent}\n--- end ---\n\n`;
             }
           } else {
             node.childNodes.forEach(walk);
@@ -329,14 +337,14 @@ export default defineComponent({
         }
       };
       editableDiv.value.childNodes.forEach(walk);
-      return message.replace(/\u200B/g, '').trim();
+      return message.replace(/\u200B/g, "").trim();
     };
 
     // Handle input changes from user
     const handleInput = () => {
       const plainText = getPlainText();
       lastEmittedValue.value = plainText; // Track what we emitted
-      emit('update:modelValue', plainText);
+      emit("update:modelValue", plainText);
 
       // Update empty state for placeholder visibility
       updateEmptyState();
@@ -346,7 +354,7 @@ export default defineComponent({
     const emitModelUpdate = () => {
       const plainText = getPlainText();
       lastEmittedValue.value = plainText; // Track what we emitted
-      emit('update:modelValue', plainText);
+      emit("update:modelValue", plainText);
       updateEmptyState();
     };
 
@@ -354,13 +362,13 @@ export default defineComponent({
     const updateEmptyState = () => {
       if (!editableDiv.value) return;
 
-      const hasContent = editableDiv.value.textContent?.trim() ||
-                        editableDiv.value.querySelector('.reference-chip');
+      const hasContent =
+        editableDiv.value.textContent?.trim() || editableDiv.value.querySelector(".reference-chip");
 
       if (hasContent) {
-        editableDiv.value.classList.remove('is-empty');
+        editableDiv.value.classList.remove("is-empty");
       } else {
-        editableDiv.value.classList.add('is-empty');
+        editableDiv.value.classList.add("is-empty");
 
         // When becoming empty, reset cursor to start position if focused
         if (isFocused.value) {
@@ -381,15 +389,15 @@ export default defineComponent({
 
     // Handle keydown events
     const handleKeyDown = (e: KeyboardEvent) => {
-      emit('keydown', e);
+      emit("keydown", e);
 
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        emit('submit');
+        emit("submit");
       }
 
       // Handle backspace on chips
-      if (e.key === 'Backspace') {
+      if (e.key === "Backspace") {
         const selection = window.getSelection();
         if (selection && selection.rangeCount > 0) {
           const range = selection.getRangeAt(0);
@@ -398,9 +406,9 @@ export default defineComponent({
           // Check if we're right after a chip
           if (container.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
             const prevSibling = container.previousSibling;
-            if (prevSibling && (prevSibling as HTMLElement).classList?.contains('reference-chip')) {
+            if (prevSibling && (prevSibling as HTMLElement).classList?.contains("reference-chip")) {
               e.preventDefault();
-              const chipId = (prevSibling as HTMLElement).getAttribute('data-chip-id');
+              const chipId = (prevSibling as HTMLElement).getAttribute("data-chip-id");
               if (chipId) {
                 removeChip(chipId);
               }
@@ -413,7 +421,7 @@ export default defineComponent({
     // Handle paste events
     const handlePaste = (e: ClipboardEvent) => {
       e.preventDefault();
-      const text = e.clipboardData?.getData('text/plain') || '';
+      const text = e.clipboardData?.getData("text/plain") || "";
 
       // Insert as plain text
       const selection = window.getSelection();
@@ -430,12 +438,12 @@ export default defineComponent({
     // Focus and blur handlers
     const handleFocus = () => {
       isFocused.value = true;
-      emit('focus');
+      emit("focus");
     };
 
     const handleBlur = () => {
       isFocused.value = false;
-      emit('blur');
+      emit("blur");
     };
 
     // Focus the input
@@ -449,8 +457,9 @@ export default defineComponent({
 
         // Only move cursor to end if we weren't already focused AND have content
         if (!wasAlreadyFocused) {
-          const isEmpty = !editableDiv.value.textContent?.trim() &&
-                          !editableDiv.value.querySelector('.reference-chip');
+          const isEmpty =
+            !editableDiv.value.textContent?.trim() &&
+            !editableDiv.value.querySelector(".reference-chip");
 
           if (!isEmpty) {
             // Has content - move cursor to end
@@ -482,7 +491,7 @@ export default defineComponent({
           const start = preSelectionRange.toString().length;
           savedSelection = {
             start,
-            end: start + range.toString().length
+            end: start + range.toString().length,
           };
         }
       }
@@ -507,11 +516,19 @@ export default defineComponent({
           while (!stop && (node = nodeStack.pop())) {
             if (node.nodeType === Node.TEXT_NODE) {
               const nextCharCount = charCount + (node.textContent?.length || 0);
-              if (!foundStart && savedSelection.start >= charCount && savedSelection.start <= nextCharCount) {
+              if (
+                !foundStart &&
+                savedSelection.start >= charCount &&
+                savedSelection.start <= nextCharCount
+              ) {
                 range.setStart(node, savedSelection.start - charCount);
                 foundStart = true;
               }
-              if (foundStart && savedSelection.end >= charCount && savedSelection.end <= nextCharCount) {
+              if (
+                foundStart &&
+                savedSelection.end >= charCount &&
+                savedSelection.end <= nextCharCount
+              ) {
                 range.setEnd(node, savedSelection.end - charCount);
                 stop = true;
               }
@@ -533,36 +550,43 @@ export default defineComponent({
     // Clear all content
     const clear = () => {
       if (!editableDiv.value) return;
-      editableDiv.value.innerHTML = '';
+      editableDiv.value.innerHTML = "";
       localReferences.value = [];
-      emit('update:references', []);
+      emit("update:references", []);
       emitModelUpdate(); // Use emitModelUpdate for programmatic clear
     };
 
     // Watch for external reference changes
-    watch(() => props.references, (newRefs) => {
-      localReferences.value = [...newRefs];
-    }, { deep: true });
+    watch(
+      () => props.references,
+      (newRefs) => {
+        localReferences.value = [...newRefs];
+      },
+      { deep: true },
+    );
 
     // Watch for model value changes from parent
-    watch(() => props.modelValue, (newValue) => {
-      if (!editableDiv.value) return;
+    watch(
+      () => props.modelValue,
+      (newValue) => {
+        if (!editableDiv.value) return;
 
-      // CRITICAL: Never update while user is focused (actively typing)
-      // This is the #1 cause of cursor jumping
-      if (isFocused.value) return;
+        // CRITICAL: Never update while user is focused (actively typing)
+        // This is the #1 cause of cursor jumping
+        if (isFocused.value) return;
 
-      // Skip if this is the same value we just emitted (circular update from v-model)
-      if (newValue === lastEmittedValue.value) return;
+        // Skip if this is the same value we just emitted (circular update from v-model)
+        if (newValue === lastEmittedValue.value) return;
 
-      const currentText = getPlainText();
+        const currentText = getPlainText();
 
-      // Skip if content is already the same
-      if (currentText === newValue) return;
+        // Skip if content is already the same
+        if (currentText === newValue) return;
 
-      // Update content
-      setContent(newValue, false);
-    });
+        // Update content
+        setContent(newValue, false);
+      },
+    );
 
     onMounted(() => {
       // Initialize empty state
@@ -576,16 +600,16 @@ export default defineComponent({
       const handleClickOutside = (event: MouseEvent) => {
         const target = event.target as HTMLElement;
         // Close detail card if clicking outside of chip and card
-        if (!target.closest('.reference-chip') && !target.closest('.chip-detail-card')) {
+        if (!target.closest(".reference-chip") && !target.closest(".chip-detail-card")) {
           showDetailCard.value = false;
         }
       };
 
-      document.addEventListener('click', handleClickOutside);
+      document.addEventListener("click", handleClickOutside);
 
       // Cleanup on unmount
       return () => {
-        document.removeEventListener('click', handleClickOutside);
+        document.removeEventListener("click", handleClickOutside);
       };
     });
 
@@ -609,7 +633,7 @@ export default defineComponent({
       cardPosition,
       formatContent,
     };
-  }
+  },
 });
 </script>
 

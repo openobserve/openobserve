@@ -19,7 +19,6 @@ import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 node.style.height = "1024px";
@@ -47,19 +46,15 @@ describe("SyntaxGuide", () => {
   afterEach(() => {
     wrapper.unmount();
     // Clean up any portaled ODropdown content attached to document body.
+    document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((menu) => menu.remove());
     document
-      .querySelectorAll('[data-test="syntax-guide-menu"]')
-      .forEach((menu) => menu.remove());
-    document
-      .querySelectorAll('[data-reka-popper-content-wrapper]')
+      .querySelectorAll("[data-reka-popper-content-wrapper]")
       .forEach((menu) => menu.remove());
   });
 
   describe("Component Rendering", () => {
     it("should render the syntax guide button", () => {
-      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(true);
     });
 
     it("should render button with help icon", () => {
@@ -146,9 +141,7 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const link = document.querySelector(
-        'a[href="https://openobserve.ai/docs/example-queries/"]',
-      );
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
       expect(link).toBeTruthy();
       expect(link?.getAttribute("target")).toBe("_blank");
     });
@@ -189,14 +182,10 @@ describe("SyntaxGuide", () => {
       // Check for specific SQL mode content
       const text = document.body.textContent || "";
       expect(text).toContain("SELECT * FROM stream WHERE match_all('error')");
-      expect(text).toContain(
-        "SELECT * FROM stream WHERE str_match(fieldname, 'error')",
-      );
+      expect(text).toContain("SELECT * FROM stream WHERE str_match(fieldname, 'error')");
       expect(text).toContain("SELECT * FROM stream WHERE code=200");
       expect(text).toContain("SELECT * FROM stream WHERE stream='stderr'");
-      expect(text).toContain(
-        "SELECT extract_ip(log) FROM stream WHERE code=200",
-      );
+      expect(text).toContain("SELECT extract_ip(log) FROM stream WHERE code=200");
     });
 
     it("should contain link to documentation in SQL mode", async () => {
@@ -204,9 +193,7 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const link = document.querySelector(
-        'a[href="https://openobserve.ai/docs/example-queries/"]',
-      );
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
       expect(link).toBeTruthy();
       expect(link?.getAttribute("target")).toBe("_blank");
     });
@@ -293,12 +280,8 @@ describe("SyntaxGuide", () => {
   describe("Menu theme class", () => {
     afterEach(() => {
       store.state.theme = "dark"; // restore shared store default
-      document
-        .querySelectorAll('[data-test="syntax-guide-menu"]')
-        .forEach((m) => m.remove());
-      document
-        .querySelectorAll('[data-reka-popper-content-wrapper]')
-        .forEach((m) => m.remove());
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
     });
 
     it("should style the menu with tokens, not a theme-light class, when store theme is light", async () => {
@@ -344,9 +327,7 @@ describe("SyntaxGuide", () => {
         const menu = document.querySelector('[data-test="syntax-guide-menu"]');
         const classes = [...(menu?.classList ?? [])].sort().join(" ");
         w.unmount();
-        document
-          .querySelectorAll('[data-test="syntax-guide-menu"]')
-          .forEach((m) => m.remove());
+        document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
         return classes;
       };
 
@@ -382,12 +363,8 @@ describe("SyntaxGuide", () => {
 
   describe("extract_ip query function example only in SQL mode", () => {
     afterEach(() => {
-      document
-        .querySelectorAll('[data-test="syntax-guide-menu"]')
-        .forEach((m) => m.remove());
-      document
-        .querySelectorAll('[data-reka-popper-content-wrapper]')
-        .forEach((m) => m.remove());
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
     });
 
     it("should contain extract_ip example in SQL mode", async () => {
@@ -413,12 +390,8 @@ describe("SyntaxGuide", () => {
 
   describe("sqlmode prop toggle between modes", () => {
     afterEach(() => {
-      document
-        .querySelectorAll('[data-test="syntax-guide-menu"]')
-        .forEach((m) => m.remove());
-      document
-        .querySelectorAll('[data-reka-popper-content-wrapper]')
-        .forEach((m) => m.remove());
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
     });
 
     it("should switch button class from normal-mode to sql-mode dynamically", async () => {
@@ -442,12 +415,8 @@ describe("SyntaxGuide", () => {
 
   describe("Documentation link present in both modes", () => {
     afterEach(() => {
-      document
-        .querySelectorAll('[data-test="syntax-guide-menu"]')
-        .forEach((m) => m.remove());
-      document
-        .querySelectorAll('[data-reka-popper-content-wrapper]')
-        .forEach((m) => m.remove());
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
     });
 
     it("normal mode: docs link opens in new tab", async () => {
@@ -456,9 +425,7 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const link = document.querySelector(
-        'a[href="https://openobserve.ai/docs/example-queries/"]',
-      );
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
       expect(link?.getAttribute("target")).toBe("_blank");
     });
 
@@ -468,9 +435,7 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const link = document.querySelector(
-        'a[href="https://openobserve.ai/docs/example-queries/"]',
-      );
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
       expect(link?.getAttribute("target")).toBe("_blank");
     });
   });

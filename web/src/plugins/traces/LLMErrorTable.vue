@@ -34,19 +34,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Padding lives on the header only, so the table spans edge-to-edge
          (no left/right/bottom inset) and sits flush within the card. -->
-    <div
-      class="flex items-baseline justify-between mb-2 px-4 pt-4"
-    >
+    <div class="flex items-baseline justify-between mb-2 px-4 pt-4">
       <div>
-        <div
-          class="text-sm font-semibold text-text-heading"
-        >
+        <div class="text-sm font-semibold text-text-heading">
           {{ displayTitle }}
         </div>
-        <div
-          v-if="displaySubtitle"
-          class="text-2xs leading-normal mt-[0.1rem]"
-        >
+        <div v-if="displaySubtitle" class="text-2xs leading-normal mt-[0.1rem]">
           {{ displaySubtitle }}
         </div>
       </div>
@@ -96,11 +89,7 @@ import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import {
-  type LLMPanelDef,
-  renderPanelSql,
-  panelI18nKey,
-} from "./config/llmInsightsPanels";
+import { type LLMPanelDef, renderPanelSql, panelI18nKey } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 // Shared in-memory cache (module singleton) — survives this table's remount on
@@ -133,9 +122,7 @@ const { t } = useI18n();
 
 // Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
 const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
-const displaySubtitle = computed(() =>
-  t(`${panelI18nKey(props.panel.id)}.subtitle`),
-);
+const displaySubtitle = computed(() => t(`${panelI18nKey(props.panel.id)}.subtitle`));
 
 const store = useStore();
 const { executeQuery } = useLLMStreamQuery();

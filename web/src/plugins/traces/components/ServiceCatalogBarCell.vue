@@ -64,7 +64,5 @@ const props = defineProps<{
   inline?: boolean;
 }>();
 
-const ratio = computed(() =>
-  props.max > 0 ? Math.min(1, props.value / props.max) : 0,
-);
+const ratio = computed(() => (props.max > 0 ? Math.min(1, props.value / props.max) : 0));
 </script>

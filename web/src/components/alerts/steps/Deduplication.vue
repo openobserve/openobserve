@@ -15,108 +15,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="step-deduplication w-full h-full overflow-auto mx-auto"
-  >
+  <div class="step-deduplication w-full h-full overflow-auto mx-auto">
     <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE <OForm>
          and provides FORM_CONTEXT_KEY. The fields below bind by nested `name=`
          (deduplication.fingerprint_fields / .time_window_minutes) into that
          form; flushDedup writes the derived `enabled` + sanitized time window
          back into it (payload parity). -->
     <div>
-    <div
-      class="step-content rounded-default min-h-full bg-surface-overlay border border-border-default"
-    >
       <div
-        class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default"
+        class="step-content rounded-default min-h-full bg-surface-overlay border border-border-default"
       >
-        <div class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
-        <span
-          class="section-header-title text-compact font-semibold text-text-heading"
-        >{{
-          t("alerts.steps.deduplication")
-        }}</span>
-      </div>
-      <div class="px-3 py-2">
-        <!-- Fingerprint Fields -->
-        <div class="mb-4">
-          <div class="font-semibold pb-2 flex items-center">
-            {{ t("alerts.deduplication.fingerprintFields") }}
-            <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
-              <OTooltip
-                :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
-                side="right"
-              />
-            </OIcon>
-          </div>
+        <div
+          class="section-header flex items-center gap-0 py-2.5 px-3 border-b border-border-default"
+        >
           <div
-            class="text-sm mb-2 text-text-secondary"
-          >
-            {{ t("alerts.deduplication.fingerprintFieldsHint") }}
-          </div>
-          <div class="relative">
-            <OFormSelect
-              name="deduplication.fingerprint_fields"
-              :options="props.columns || []"
-              multiple
-              creatable
-              data-test="alert-dedup-fingerprint-fields"
-              class="max-w-150 min-w-75"
-              :helpText="t('alerts.deduplication.fingerprintFieldsHelp')"
-              @update:model-value="onFingerprintChange"
-              @create="addFingerprintField"
-            />
-            <OTooltip
-              v-if="fingerprintFields?.length > 0"
-              :content="fingerprintFields.join(', ')"
-              max-width="400px"
-            />
-          </div>
+            class="section-header-accent w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent"
+          />
+          <span class="section-header-title text-compact font-semibold text-text-heading">{{
+            t("alerts.steps.deduplication")
+          }}</span>
         </div>
+        <div class="px-3 py-2">
+          <!-- Fingerprint Fields -->
+          <div class="mb-4">
+            <div class="font-semibold pb-2 flex items-center">
+              {{ t("alerts.deduplication.fingerprintFields") }}
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
+                <OTooltip
+                  :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
+                  side="right"
+                />
+              </OIcon>
+            </div>
+            <div class="text-sm mb-2 text-text-secondary">
+              {{ t("alerts.deduplication.fingerprintFieldsHint") }}
+            </div>
+            <div class="relative">
+              <OFormSelect
+                name="deduplication.fingerprint_fields"
+                :options="props.columns || []"
+                multiple
+                creatable
+                data-test="alert-dedup-fingerprint-fields"
+                class="max-w-150 min-w-75"
+                :helpText="t('alerts.deduplication.fingerprintFieldsHelp')"
+                @update:model-value="onFingerprintChange"
+                @create="addFingerprintField"
+              />
+              <OTooltip
+                v-if="fingerprintFields?.length > 0"
+                :content="fingerprintFields.join(', ')"
+                max-width="400px"
+              />
+            </div>
+          </div>
 
-        <!-- Time Window -->
-        <div class="mb-4">
-          <div class="font-semibold pb-2 flex items-center">
-            {{ t("alerts.deduplication.timeWindow") }}
-            <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
-              <OTooltip
-                :content="t('alerts.deduplication.timeWindowTooltip')"
-                side="right"
-              />
-            </OIcon>
-          </div>
-          <div
-            class="text-sm mb-2 text-text-secondary"
-          >
-            {{ t("alerts.deduplication.timeWindowHint") }}
-          </div>
-          <div class="flex items-center">
-            <div class="w-52.5 ml-0">
-              <OFormInput
-                name="deduplication.time_window_minutes"
-                type="number"
-                min="1"
-                data-test="alert-dedup-time-window"
-                :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-                @update:model-value="onTimeWindowChange"
-              />
+          <!-- Time Window -->
+          <div class="mb-4">
+            <div class="font-semibold pb-2 flex items-center">
+              {{ t("alerts.deduplication.timeWindow") }}
+              <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
+                <OTooltip :content="t('alerts.deduplication.timeWindowTooltip')" side="right" />
+              </OIcon>
             </div>
-            <div
-              style="
-                min-width: 90px;
-                margin-left: 0 !important;
-                height: 28px;
-                font-weight: normal;
-              "
-              class="flex justify-center items-center bg-surface-subtle"
-            >
-              {{ t("alerts.minutes") }}
+            <div class="text-sm mb-2 text-text-secondary">
+              {{ t("alerts.deduplication.timeWindowHint") }}
+            </div>
+            <div class="flex items-center">
+              <div class="w-52.5 ml-0">
+                <OFormInput
+                  name="deduplication.time_window_minutes"
+                  type="number"
+                  min="1"
+                  data-test="alert-dedup-time-window"
+                  :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
+                  @update:model-value="onTimeWindowChange"
+                />
+              </div>
+              <div
+                style="
+                  min-width: 90px;
+                  margin-left: 0 !important;
+                  height: 28px;
+                  font-weight: normal;
+                "
+                class="flex justify-center items-center bg-surface-subtle"
+              >
+                {{ t("alerts.minutes") }}
+              </div>
             </div>
           </div>
         </div>
+        <!-- end px-3 py-2 -->
       </div>
-      <!-- end px-3 py-2 -->
-    </div>
     </div>
   </div>
 </template>
@@ -166,8 +157,7 @@ export default defineComponent({
 
     // Reactive view of the selected fingerprint fields (tooltip + enabled derive).
     const fingerprintFields = form.useStore(
-      (s: any) =>
-        (s.values?.deduplication?.fingerprint_fields ?? []) as string[],
+      (s: any) => (s.values?.deduplication?.fingerprint_fields ?? []) as string[],
     );
 
     // ── flushDedup — the single derive/sanitize step. Deferred to a microtask
@@ -180,18 +170,12 @@ export default defineComponent({
     const flushDedup = () => {
       Promise.resolve().then(() => {
         const d = (form.getFieldValue("deduplication") as any) ?? {};
-        const fields: string[] = Array.isArray(d.fingerprint_fields)
-          ? d.fingerprint_fields
-          : [];
+        const fields: string[] = Array.isArray(d.fingerprint_fields) ? d.fingerprint_fields : [];
         const enabled = fields.length > 0;
         const cleanWindow = sanitizeTimeWindow(d.time_window_minutes);
-        if (d.enabled !== enabled)
-          form.setFieldValue("deduplication.enabled", enabled);
+        if (d.enabled !== enabled) form.setFieldValue("deduplication.enabled", enabled);
         if (cleanWindow !== d.time_window_minutes)
-          form.setFieldValue(
-            "deduplication.time_window_minutes",
-            cleanWindow,
-          );
+          form.setFieldValue("deduplication.time_window_minutes", cleanWindow);
       });
     };
 
@@ -201,14 +185,9 @@ export default defineComponent({
     // @create only NOTIFIES (OSelect does not add the created term to the model),
     // so add it here — matching the pre-migration addFingerprintField.
     const addFingerprintField = (value: string) => {
-      const current =
-        (form.getFieldValue("deduplication.fingerprint_fields") as string[]) ??
-        [];
+      const current = (form.getFieldValue("deduplication.fingerprint_fields") as string[]) ?? [];
       if (!current.includes(value)) {
-        form.setFieldValue("deduplication.fingerprint_fields", [
-          ...current,
-          value,
-        ]);
+        form.setFieldValue("deduplication.fingerprint_fields", [...current, value]);
         flushDedup();
       }
     };

@@ -1,15 +1,18 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { useI18n } from 'vue-i18n'
-import OSkeleton from '@/lib/feedback/Skeleton/OSkeleton.vue'
+import { useI18n } from "vue-i18n";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
-const { t } = useI18n()
+const { t } = useI18n();
 
-withDefaults(defineProps<{
-  rows?: number
-}>(), {
-  rows: 5,
-})
+withDefaults(
+  defineProps<{
+    rows?: number;
+  }>(),
+  {
+    rows: 5,
+  },
+);
 </script>
 
 <template>
@@ -29,9 +32,7 @@ withDefaults(defineProps<{
           span: flex flex-col → title(text-xs) + desc(11px)
       Connector: h-px flex-1 shrink mt-5.5 mx-1 min-w-2
     -->
-    <div
-      class="flex items-start pt-0 px-4 pb-2 gap-1 shrink-0"
-    >
+    <div class="flex items-start pt-0 px-4 pb-2 gap-1 shrink-0">
       <!-- Step 1: Journey (active) -->
       <div class="flex items-center gap-2 py-1.5 px-2 shrink-0">
         <div style="width: 2rem; height: 2rem">
@@ -42,9 +43,7 @@ withDefaults(defineProps<{
         </div>
       </div>
       <!-- Connector line (mt-5.5=1.375rem) -->
-      <div
-        class="flex-1 h-px bg-border-default mt-5.5 mx-1 mb-0 min-w-2 shrink"
-      ></div>
+      <div class="flex-1 h-px bg-border-default mt-5.5 mx-1 mb-0 min-w-2 shrink"></div>
       <!-- Step 2: Configure (inactive) -->
       <div class="flex items-center gap-2 py-1.5 px-2 shrink-0">
         <div style="width: 2rem; height: 2rem">
@@ -58,16 +57,12 @@ withDefaults(defineProps<{
 
     <!-- ── Journey tab content (OStep panel) ── -->
     <div class="flex-1 overflow-y-auto flex flex-col min-h-0">
-
       <!--
         BrowserJourney Toolbar
         Real: flex items-center gap-4 mb-3 ml-5.5 px-3
         ml-5.5 = 1.375rem, px-3 = 0.75rem
       -->
-      <div
-        class="flex items-center gap-4 py-0 px-3"
-        style="margin: 0 0 0.75rem 1.375rem"
-      >
+      <div class="flex items-center gap-4 py-0 px-3" style="margin: 0 0 0.75rem 1.375rem">
         <!-- Select-all checkbox -->
         <div class="shrink-0" style="width: 1rem; height: 1rem">
           <OSkeleton type="rect" animation="wave" />

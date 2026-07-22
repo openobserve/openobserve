@@ -33,8 +33,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="rum-upload-source-maps-file-dropzone"
           class="border-2 border-dashed border-card-glass-border rounded-default p-8 text-center cursor-pointer transition-all duration-300 bg-surface-base hover:border-theme-accent dark:border-[color-mix(in_srgb,var(--color-white)_10%,transparent)] dark:hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]"
           :class="[
-            isDragging ? 'border-theme-accent! bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]! border-solid! dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]!' : '',
-            field.state.value ? 'p-6! text-left! border-solid! border-status-positive! bg-[color-mix(in_srgb,var(--color-status-positive)_2%,transparent)]! dark:bg-[color-mix(in_srgb,var(--color-status-positive)_5%,transparent)]!' : ''
+            isDragging
+              ? 'border-theme-accent! bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)]! border-solid! dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]!'
+              : '',
+            field.state.value
+              ? 'p-6! text-left! border-solid! border-status-positive! bg-[color-mix(in_srgb,var(--color-status-positive)_2%,transparent)]! dark:bg-[color-mix(in_srgb,var(--color-status-positive)_5%,transparent)]!'
+              : '',
           ]"
           @dragover.prevent="isDragging = true"
           @dragleave.prevent="isDragging = false"
@@ -63,7 +67,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon name="draft" size="lg" />
                 <div>
                   <div class="text-sm font-medium font-medium">{{ field.state.value.name }}</div>
-                  <div class="text-xs text-text-secondary">{{ formatFileSize(field.state.value.size) }}</div>
+                  <div class="text-xs text-text-secondary">
+                    {{ formatFileSize(field.state.value.size) }}
+                  </div>
                 </div>
               </div>
               <OButton
@@ -100,9 +106,7 @@ const props = withDefaults(defineProps<{ name?: string }>(), { name: "file" });
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[SourceMapDropzone] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[SourceMapDropzone] must be rendered inside <OForm>. No form context found.");
 }
 
 const isDragging = ref(false);

@@ -33,37 +33,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="monitor-runs h-full flex flex-col"
-    data-test="synthetics-monitor-runs"
-  >
+  <div class="monitor-runs h-full flex flex-col" data-test="synthetics-monitor-runs">
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
-    <OTabs
-      v-model="activeTab"
-      class="shrink-0 px-page-edge border-b border-border-default"
-    >
+    <OTabs v-model="activeTab" class="shrink-0 px-page-edge border-b border-border-default">
       <OTab name="overview" data-test="monitor-runs-tab-overview">
-        {{ t('synthetics.runs.tabOverview') }}
+        {{ t("synthetics.runs.tabOverview") }}
       </OTab>
-      <OTab v-if="isBrowser" name="steps" data-test="monitor-runs-tab-steps"> {{ t('synthetics.runs.tabSteps') }} </OTab>
+      <OTab v-if="isBrowser" name="steps" data-test="monitor-runs-tab-steps">
+        {{ t("synthetics.runs.tabSteps") }}
+      </OTab>
     </OTabs>
 
     <div class="flex-1 min-h-0">
       <OTabPanels v-model="activeTab" grow scroll="y" class="h-full min-h-0">
         <!-- ════════════ OVERVIEW ════════════ -->
         <OTabPanel name="overview">
-          <div
-            class="mx-auto py-2 flex flex-col gap-2"
-          >
+          <div class="mx-auto py-2 flex flex-col gap-2">
             <!-- Status Timeline — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
               <div class="px-page-edge">
                 <div
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
-                  <div
-                    class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
-                  >
+                  <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
                     <SkeletonBox width="100px" height="14px" rounded-default />
                     <span class="flex-1" />
                     <SkeletonBox width="45px" height="12px" rounded-default />
@@ -98,10 +90,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
-                  <div
-                    class="flex items-center gap-2 px-3.5 pt-2.5 pb-2"
-                  >
-                    <span class="font-bold text-sm text-text-heading">{{ t('synthetics.runs.statusTimeline') }}</span>
+                  <div class="flex items-center gap-2 px-3.5 pt-2.5 pb-2">
+                    <span class="font-bold text-sm text-text-heading">{{
+                      t("synthetics.runs.statusTimeline")
+                    }}</span>
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="flex items-center justify-center py-6 text-xs text-status-error-text">
@@ -115,14 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div class="px-page-edge">
-              <MonitorStatusTimeline
-                :segments="timelineSegments"
-                :fail-count="timelineFailCount"
-                :pass-count="timelinePassCount"
-                :mixed-count="timelineMixedCount"
-                :start-label="timelineStartLabel"
-                :end-label="timelineEndLabel"
-              />
+                <MonitorStatusTimeline
+                  :segments="timelineSegments"
+                  :fail-count="timelineFailCount"
+                  :pass-count="timelinePassCount"
+                  :mixed-count="timelineMixedCount"
+                  :start-label="timelineStartLabel"
+                  :end-label="timelineEndLabel"
+                />
               </div>
             </template>
 
@@ -143,370 +135,334 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div class="px-page-edge">
-              <div class="grid grid-cols-5 gap-2.5">
-                <div
-                  v-for="card in kpiCards"
-                  :key="card.key"
-                  class="card-container rounded-default flex flex-col px-2 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
-                  :data-test="`monitor-runs-kpi-${card.key}`"
-                >
-                  <div class="flex flex-col gap-1">
-                    <div
-                      class="kpi-label text-2xs font-semibold text-text-muted"
-                    >
-                      {{ card.label }}
-                      <span v-if="card.unit"> ({{ card.unit }}) </span>
-                    </div>
-                    <div class="flex items-baseline gap-[0.2rem]">
-                      <!-- Per-card error indicator -->
-                      <template v-if="kpiError">
-                        <span class="flex items-center gap-1 text-xs text-status-error-text">
-                          <OIcon name="error" size="xs" class="shrink-0" />
-                          {{ kpiError }}
-                        </span>
-                      </template>
-                      <template v-else>
-                        <span
-                          class="text-xl font-bold leading-none text-[var(--color-text-heading)]"
-                          :class="card.valueClass"
-                        >
-                          {{ card.value }}
-                        </span>
-                      </template>
+                <div class="grid grid-cols-5 gap-2.5">
+                  <div
+                    v-for="card in kpiCards"
+                    :key="card.key"
+                    class="card-container rounded-default flex flex-col px-2 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                    :data-test="`monitor-runs-kpi-${card.key}`"
+                  >
+                    <div class="flex flex-col gap-1">
+                      <div class="kpi-label text-2xs font-semibold text-text-muted">
+                        {{ card.label }}
+                        <span v-if="card.unit"> ({{ card.unit }}) </span>
+                      </div>
+                      <div class="flex items-baseline gap-[0.2rem]">
+                        <!-- Per-card error indicator -->
+                        <template v-if="kpiError">
+                          <span class="flex items-center gap-1 text-xs text-status-error-text">
+                            <OIcon name="error" size="xs" class="shrink-0" />
+                            {{ kpiError }}
+                          </span>
+                        </template>
+                        <template v-else>
+                          <span
+                            class="text-xl font-bold leading-none text-[var(--color-text-heading)]"
+                            :class="card.valueClass"
+                          >
+                            {{ card.value }}
+                          </span>
+                        </template>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
               </div>
             </template>
 
             <!-- Charts — gated on histogram query -->
             <template v-if="histogramLoading || !histogramHasLoadedOnce">
               <div class="px-page-edge">
-              <div class="grid grid-cols-2 gap-2">
-                <div
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
+                <div class="grid grid-cols-2 gap-2">
                   <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                   >
-                    <SkeletonBox width="110px" height="14px" rounded-default />
-                    <span class="flex-1" />
-                    <SkeletonBox width="80px" height="20px" rounded-default />
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <SkeletonBox width="110px" height="14px" rounded-default />
+                      <span class="flex-1" />
+                      <SkeletonBox width="80px" height="20px" rounded-default />
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="p-4">
+                      <SkeletonBox width="100%" height="160px" rounded-default />
+                    </div>
                   </div>
-                  <div class="border-t border-border-default" />
-                  <div class="p-4">
-                    <SkeletonBox width="100%" height="160px" rounded-default />
+                  <div
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  >
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <SkeletonBox width="120px" height="14px" rounded-default />
+                      <span class="flex-1" />
+                      <SkeletonBox width="90px" height="20px" rounded-default />
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="p-4">
+                      <SkeletonBox width="100%" height="160px" rounded-default />
+                    </div>
                   </div>
                 </div>
-                <div
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
-                  >
-                    <SkeletonBox width="120px" height="14px" rounded-default />
-                    <span class="flex-1" />
-                    <SkeletonBox width="90px" height="20px" rounded-default />
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="p-4">
-                    <SkeletonBox width="100%" height="160px" rounded-default />
-                  </div>
-                </div>
-              </div>
               </div>
             </template>
             <template v-else>
               <div class="px-page-edge">
-              <div class="grid grid-cols-2 gap-2">
-                <div
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
+                <div class="grid grid-cols-2 gap-2">
                   <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                   >
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t('synthetics.results.responseTime') }}
-                    </span>
-                    <span class="flex-1" />
-                    <OBadge v-if="!histogramError" variant="default" size="sm">
-                      p95 {{ p95Label }}
-                    </OBadge>
-                    <span
-                      v-else
-                      class="inline-flex items-center gap-1 text-xs text-status-error-text"
-                    >
-                      <OIcon name="error_outline" size="xs" />
-                      {{ t('synthetics.results.error') }}
-                    </span>
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <span class="font-bold text-sm text-text-heading">
+                        {{ t("synthetics.results.responseTime") }}
+                      </span>
+                      <span class="flex-1" />
+                      <OBadge v-if="!histogramError" variant="default" size="sm">
+                        p95 {{ p95Label }}
+                      </OBadge>
+                      <span
+                        v-else
+                        class="inline-flex items-center gap-1 text-xs text-status-error-text"
+                      >
+                        <OIcon name="error_outline" size="xs" />
+                        {{ t("synthetics.results.error") }}
+                      </span>
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="min-h-45 p-0">
+                      <ChartRenderer
+                        v-if="!histogramError"
+                        :data="{ options: responseChartOption }"
+                        height="180px"
+                      />
+                      <div
+                        v-else
+                        class="flex flex-col items-center justify-center h-45 gap-1 text-sm text-text-secondary"
+                      >
+                        <OIcon name="error_outline" size="sm" class="text-status-error-text" />
+                        <span>{{ histogramError }}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div class="border-t border-border-default" />
-                  <div class="min-h-45 p-0">
-                    <ChartRenderer
-                      v-if="!histogramError"
-                      :data="{ options: responseChartOption }"
-                      height="180px"
-                    />
-                    <div v-else class="flex flex-col items-center justify-center h-45 gap-1 text-sm text-text-secondary">
-                      <OIcon name="error_outline" size="sm" class="text-status-error-text" />
-                      <span>{{ histogramError }}</span>
+                  <div
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  >
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <span class="font-bold text-sm text-text-heading">
+                        {{ t("synthetics.runs.errorsOverTime") }}
+                      </span>
+                      <span class="flex-1" />
+                      <OBadge v-if="!histogramError" variant="error" size="sm">
+                        {{ t("synthetics.runs.failedCount", { count: failCount }) }}
+                      </OBadge>
+                      <span
+                        v-else
+                        class="inline-flex items-center gap-1 text-xs text-status-error-text"
+                      >
+                        <OIcon name="error_outline" size="xs" />
+                        {{ t("synthetics.results.error") }}
+                      </span>
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="min-h-45 p-0">
+                      <ChartRenderer
+                        v-if="!histogramError"
+                        :data="{ options: errorChartOption }"
+                        height="180px"
+                      />
+                      <div
+                        v-else
+                        class="flex flex-col items-center justify-center h-45 gap-1 text-sm text-text-secondary"
+                      >
+                        <OIcon name="error_outline" size="sm" class="text-status-error-text" />
+                        <span>{{ histogramError }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
-                  >
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t('synthetics.runs.errorsOverTime') }}
-                    </span>
-                    <span class="flex-1" />
-                    <OBadge v-if="!histogramError" variant="error" size="sm">
-                      {{ t('synthetics.runs.failedCount', { count: failCount }) }}
-                    </OBadge>
-                    <span
-                      v-else
-                      class="inline-flex items-center gap-1 text-xs text-status-error-text"
-                    >
-                      <OIcon name="error_outline" size="xs" />
-                      {{ t('synthetics.results.error') }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="min-h-45 p-0">
-                    <ChartRenderer
-                      v-if="!histogramError"
-                      :data="{ options: errorChartOption }"
-                      height="180px"
-                    />
-                    <div v-else class="flex flex-col items-center justify-center h-45 gap-1 text-sm text-text-secondary">
-                      <OIcon name="error_outline" size="sm" class="text-status-error-text" />
-                      <span>{{ histogramError }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
               </div>
             </template>
 
             <!-- Breakdown Cards — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
               <div class="px-page-edge">
-              <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
-                <div
-                  v-for="n in (isBrowser ? 3 : 2)"
-                  :key="n"
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
+                <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
                   <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
+                    v-for="n in isBrowser ? 3 : 2"
+                    :key="n"
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                   >
-                    <SkeletonBox
-                      width="16px"
-                      height="16px"
-                      :custom-radius="'4px'"
-                    />
-                    <SkeletonBox width="110px" height="14px" rounded-default />
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="px-2 py-2 flex flex-col">
-                    <div
-                      v-for="row in 3"
-                      :key="row"
-                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
-                    >
-                      <SkeletonBox
-                        width="16px"
-                        height="16px"
-                        :custom-radius="'4px'"
-                      />
-                      <SkeletonBox width="70px" height="12px" rounded-default />
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
+                      <SkeletonBox width="110px" height="14px" rounded-default />
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="px-2 py-2 flex flex-col">
                       <div
-                        class="flex-1 h-1.5 rounded-full bg-border-default opacity-30"
-                      />
-                      <SkeletonBox width="36px" height="12px" rounded-default />
+                        v-for="row in 3"
+                        :key="row"
+                        class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
+                      >
+                        <SkeletonBox width="16px" height="16px" :custom-radius="'4px'" />
+                        <SkeletonBox width="70px" height="12px" rounded-default />
+                        <div class="flex-1 h-1.5 rounded-full bg-border-default opacity-30" />
+                        <SkeletonBox width="36px" height="12px" rounded-default />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
               </div>
             </template>
             <!-- Breakdown Cards — runs query error state -->
             <template v-else-if="runsError">
               <div class="px-page-edge">
-              <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
-                <div
-                  v-for="dim in breakdownDimensions"
-                  :key="dim"
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
+                <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
                   <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
+                    v-for="dim in breakdownDimensions"
+                    :key="dim"
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                   >
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ dim === 'Browser' ? t('synthetics.runs.passRateByBrowser') : dim === 'DurationByLocation' ? t('synthetics.runs.durationByLocation') : dim === 'Location' ? t('synthetics.runs.passRateByLocation') : t('synthetics.runs.passRateByDevice') }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="flex items-center justify-center py-8 text-xs text-status-error-text">
-                    <span class="flex items-center gap-1">
-                      <OIcon name="error" size="xs" />
-                      {{ runsError }}
-                    </span>
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <span class="font-bold text-sm text-text-heading">
+                        {{
+                          dim === "Browser"
+                            ? t("synthetics.runs.passRateByBrowser")
+                            : dim === "DurationByLocation"
+                              ? t("synthetics.runs.durationByLocation")
+                              : dim === "Location"
+                                ? t("synthetics.runs.passRateByLocation")
+                                : t("synthetics.runs.passRateByDevice")
+                        }}
+                      </span>
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div
+                      class="flex items-center justify-center py-8 text-xs text-status-error-text"
+                    >
+                      <span class="flex items-center gap-1">
+                        <OIcon name="error" size="xs" />
+                        {{ runsError }}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
               </div>
             </template>
             <template v-else>
               <div class="px-page-edge">
-              <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
-                <div
-                  v-if="isBrowser"
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
+                <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
                   <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
+                    v-if="isBrowser"
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                   >
-                    <OIcon name="language" size="sm" class="text-primary-700" />
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t('synthetics.runs.passRateByBrowser') }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="px-2 py-2">
-                    <div
-                      v-for="b in browserBreakdown"
-                      :key="b.name"
-                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
-                    >
-                      <OIcon
-                        :name="b.icon"
-                        size="sm"
-                        class="text-text-secondary flex-none"
-                      />
-                      <span
-                        class="w-20 flex-none font-semibold text-xs text-text-body"
-                      >
-                        {{ b.name }}
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <OIcon name="language" size="sm" class="text-primary-700" />
+                      <span class="font-bold text-sm text-text-heading">
+                        {{ t("synthetics.runs.passRateByBrowser") }}
                       </span>
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="px-2 py-2">
                       <div
-                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
+                        v-for="b in browserBreakdown"
+                        :key="b.name"
+                        class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
                       >
-                        <!-- :style for dynamic bar width + computed color — inline required for per-breakdown values -->
+                        <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
+                        <span class="w-20 flex-none font-semibold text-xs text-text-body">
+                          {{ b.name }}
+                        </span>
                         <div
-                          class="h-full rounded-full"
-                          :style="{ width: b.barPct || b.pct, background: b.barColor }"
-                        />
+                          class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
+                        >
+                          <!-- :style for dynamic bar width + computed color — inline required for per-breakdown values -->
+                          <div
+                            class="h-full rounded-full"
+                            :style="{ width: b.barPct || b.pct, background: b.barColor }"
+                          />
+                        </div>
+                        <span
+                          class="font-mono tabular-nums font-bold text-xs w-12 text-right"
+                          :style="{ color: b.textColor }"
+                        >
+                          {{ b.pct }}
+                        </span>
                       </div>
-                      <span
-                        class="font-mono tabular-nums font-bold text-xs w-12 text-right"
-                        :style="{ color: b.textColor }"
-                      >
-                        {{ b.pct }}
+                    </div>
+                  </div>
+                  <div
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  >
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <OIcon name="location-on" size="sm" class="text-primary-700" />
+                      <span class="font-bold text-sm text-text-heading">
+                        {{ t("synthetics.runs.passRateByLocation") }}
                       </span>
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="px-2 py-2">
+                      <div
+                        v-for="l in locationBreakdown"
+                        :key="l.name"
+                        class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
+                      >
+                        <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
+                        <span class="w-27.5 flex-none font-semibold text-xs text-text-body">
+                          {{ l.name }}
+                        </span>
+                        <div
+                          class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
+                        >
+                          <div
+                            class="h-full rounded-full"
+                            :style="{ width: l.barPct || l.pct, background: l.barColor }"
+                          />
+                        </div>
+                        <span
+                          class="font-mono tabular-nums font-bold text-xs w-12 text-right"
+                          :style="{ color: l.textColor }"
+                        >
+                          {{ l.pct }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    v-if="!isBrowser"
+                    class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                  >
+                    <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
+                      <OIcon name="devices" size="sm" class="text-primary-700" />
+                      <span class="font-bold text-sm text-text-heading">
+                        {{ t("synthetics.runs.passRateByDevice") }}
+                      </span>
+                    </div>
+                    <div class="border-t border-border-default" />
+                    <div class="px-2 py-2">
+                      <div
+                        v-for="d in deviceBreakdown"
+                        :key="d.name"
+                        class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
+                      >
+                        <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
+                        <span class="w-20 flex-none font-semibold text-xs text-text-body">
+                          {{ d.name }}
+                        </span>
+                        <div
+                          class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
+                        >
+                          <div
+                            class="h-full rounded-full"
+                            :style="{ width: d.pct, background: d.barColor }"
+                          />
+                        </div>
+                        <span
+                          class="font-mono tabular-nums font-bold text-xs w-12 text-right"
+                          :style="{ color: d.textColor }"
+                        >
+                          {{ d.pct }}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
-                  >
-                    <OIcon
-                      name="location-on"
-                      size="sm"
-                      class="text-primary-700"
-                    />
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t('synthetics.runs.passRateByLocation') }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="px-2 py-2">
-                    <div
-                      v-for="l in locationBreakdown"
-                      :key="l.name"
-                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
-                    >
-                      <OIcon
-                        :name="l.icon"
-                        size="sm"
-                        class="text-text-secondary flex-none"
-                      />
-                      <span
-                        class="w-27.5 flex-none font-semibold text-xs text-text-body"
-                      >
-                        {{ l.name }}
-                      </span>
-                      <div
-                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
-                      >
-                        <div
-                          class="h-full rounded-full"
-                          :style="{ width: l.barPct || l.pct, background: l.barColor }"
-                        />
-                      </div>
-                      <span
-                        class="font-mono tabular-nums font-bold text-xs w-12 text-right"
-                        :style="{ color: l.textColor }"
-                      >
-                        {{ l.pct }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div
-                  v-if="!isBrowser"
-                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
-                >
-                  <div
-                    class="flex items-center gap-2 px-2 pt-2.5 pb-2"
-                  >
-                    <OIcon name="devices" size="sm" class="text-primary-700" />
-                    <span class="font-bold text-sm text-text-heading">
-                      {{ t('synthetics.runs.passRateByDevice') }}
-                    </span>
-                  </div>
-                  <div class="border-t border-border-default" />
-                  <div class="px-2 py-2">
-                    <div
-                      v-for="d in deviceBreakdown"
-                      :key="d.name"
-                      class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
-                    >
-                      <OIcon
-                        :name="d.icon"
-                        size="sm"
-                        class="text-text-secondary flex-none"
-                      />
-                      <span
-                        class="w-20 flex-none font-semibold text-xs text-text-body"
-                      >
-                        {{ d.name }}
-                      </span>
-                      <div
-                        class="flex-1 h-1.5 rounded-full bg-text-disabled/25! overflow-hidden min-w-10"
-                      >
-                        <div
-                          class="h-full rounded-full"
-                          :style="{ width: d.pct, background: d.barColor }"
-                        />
-                      </div>
-                      <span
-                        class="font-mono tabular-nums font-bold text-xs w-12 text-right"
-                        :style="{ color: d.textColor }"
-                      >
-                        {{ d.pct }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
               </div>
             </template>
 
@@ -584,7 +540,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <span class="flex-1" />
               <span class="text-xs text-text-secondary">
-                {{ t('synthetics.runs.filterCount', { current: filteredRuns.length, total: allRuns.length }) }}
+                {{
+                  t("synthetics.runs.filterCount", {
+                    current: filteredRuns.length,
+                    total: allRuns.length,
+                  })
+                }}
               </span>
             </div>
 
@@ -594,9 +555,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex items-center gap-2 px-2"
               data-test="monitor-runs-error-filter-badge"
             >
-              <span class="text-xs text-text-secondary"
-                >{{ t('synthetics.runs.filteringByErrorLabel') }}</span
-              >
+              <span class="text-xs text-text-secondary">{{
+                t("synthetics.runs.filteringByErrorLabel")
+              }}</span>
               <OBadge variant="error" size="sm" class="gap-1">
                 {{ errorFilter }}
                 <OButton
@@ -628,11 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @row-click="openRun"
               >
                 <template #cell-status="{ row }">
-                  <OBadge
-                    :variant="(row as VisibleRun).statusBadgeVariant"
-                    size="sm"
-                    dot
-                  >
+                  <OBadge :variant="(row as VisibleRun).statusBadgeVariant" size="sm" dot>
                     {{ (row as VisibleRun).statusLabel }}
                   </OBadge>
                 </template>
@@ -658,35 +615,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </template>
                 <template #cell-location="{ row }">
-                  <span
-                    class="inline-flex items-center gap-1 text-sm text-text-body"
-                  >
-                    <OIcon
-                      :name="locationIcon((row as VisibleRun).location)"
-                      size="sm"
-                    />
+                  <span class="inline-flex items-center gap-1 text-sm text-text-body">
+                    <OIcon :name="locationIcon((row as VisibleRun).location)" size="sm" />
                     {{ (row as VisibleRun).location }}
                   </span>
                 </template>
                 <template #cell-browser="{ row }">
-                  <span
-                    class="inline-flex items-center gap-1 text-sm text-text-body"
-                  >
-                    <OIcon
-                      :name="browserIcon((row as VisibleRun).browser)"
-                      size="sm"
-                    />
+                  <span class="inline-flex items-center gap-1 text-sm text-text-body">
+                    <OIcon :name="browserIcon((row as VisibleRun).browser)" size="sm" />
                     {{ (row as VisibleRun).browser }}
                   </span>
                 </template>
                 <template #cell-device="{ row }">
-                  <span
-                    class="inline-flex items-center gap-1 text-sm text-text-body"
-                  >
-                    <OIcon
-                      :name="deviceIconName((row as VisibleRun).device)"
-                      size="sm"
-                    />
+                  <span class="inline-flex items-center gap-1 text-sm text-text-body">
+                    <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
                     {{ deviceLabel((row as VisibleRun).device) }}
                   </span>
                 </template>
@@ -694,15 +636,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span
                     v-if="(row as VisibleRun).errorSnippet"
                     class="cursor-pointer"
-                    @click.stop="
-                      filterByError((row as VisibleRun).errorPattern)
-                    "
+                    @click.stop="filterByError((row as VisibleRun).errorPattern)"
                   >
-                    <OBadge
-                      variant="error-outline"
-                      size="sm"
-                      class="truncate max-w-50"
-                    >
+                    <OBadge variant="error-outline" size="sm" class="truncate max-w-50">
                       {{ (row as VisibleRun).errorSnippet }}
                     </OBadge>
                   </span>
@@ -767,27 +703,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </OTable>
             </OCard>
-
           </div>
         </OTabPanel>
 
         <!-- ════════════ STEPS ════════════ -->
         <!-- ════════════ STEPS ════════════ -->
         <OTabPanel name="steps">
-          <div
-            class="mx-auto flex flex-col gap-2"
-          >
+          <div class="mx-auto flex flex-col gap-2">
             <!-- Loading skeleton -->
             <template v-if="stepsLoading || !stepsHasLoadedOnce">
               <div class="grid grid-cols-2 gap-2">
-                <div class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden">
+                <div
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                >
                   <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                     <SkeletonBox width="100px" height="14px" rounded-default />
                   </div>
                   <div class="border-t border-border-default" />
                   <div class="p-4"><SkeletonBox width="100%" height="160px" rounded-default /></div>
                 </div>
-                <div class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden">
+                <div
+                  class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
+                >
                   <div class="flex items-center gap-2 px-2 pt-2.5 pb-2">
                     <SkeletonBox width="100px" height="14px" rounded-default />
                   </div>
@@ -802,12 +739,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Steps query error — compact inline indicator -->
             <template v-else-if="stepsError">
-              <div
-                class="px-2 flex items-center gap-2"
-                data-test="monitor-runs-steps-error"
-              >
+              <div class="px-2 flex items-center gap-2" data-test="monitor-runs-steps-error">
                 <OIcon name="error_outline" size="xs" class="text-status-error-text shrink-0" />
-                <span class="text-xs text-status-error-text truncate flex-1 min-w-0">{{ stepsError }}</span>
+                <span class="text-xs text-status-error-text truncate flex-1 min-w-0">{{
+                  stepsError
+                }}</span>
                 <OButton
                   variant="ghost"
                   size="xs"
@@ -815,7 +751,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="monitor-runs-steps-retry-btn"
                   @click="emit('refresh')"
                 >
-                  {{ t('synthetics.journey.retry') }}
+                  {{ t("synthetics.journey.retry") }}
                 </OButton>
               </div>
             </template>
@@ -850,11 +786,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- cell-failRate: Colored percentage + bar -->
                   <template #cell-failRate="{ row }">
                     <div class="flex flex-col gap-1">
-                      <span class="font-mono tabular-nums font-bold text-xs" :style="{ color: row.failColor }">
-                        {{ row.failRatePct }}%&ensp;<span class="font-normal text-[var(--color-text-muted)]">{{ row.failCount }}</span>
+                      <span
+                        class="font-mono tabular-nums font-bold text-xs"
+                        :style="{ color: row.failColor }"
+                      >
+                        {{ row.failRatePct }}%&ensp;<span
+                          class="font-normal text-[var(--color-text-muted)]"
+                          >{{ row.failCount }}</span
+                        >
                       </span>
-                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
-                        <div class="h-full rounded-full" :style="{ width: row.failRateBarPct, background: row.failBarColor }" />
+                      <div
+                        class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden"
+                      >
+                        <div
+                          class="h-full rounded-full"
+                          :style="{ width: row.failRateBarPct, background: row.failBarColor }"
+                        />
                       </div>
                     </div>
                   </template>
@@ -862,16 +809,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- cell-flakyRate: Colored percentage -->
                   <template #cell-flakyRate="{ row }">
                     <span class="font-mono tabular-nums text-xs" :style="{ color: row.flakyColor }">
-                      {{ row.flakyRatePct }}%&ensp;<span class="font-normal text-[var(--color-text-muted)]">{{ row.flakyCount }}</span>
+                      {{ row.flakyRatePct }}%&ensp;<span
+                        class="font-normal text-[var(--color-text-muted)]"
+                        >{{ row.flakyCount }}</span
+                      >
                     </span>
                   </template>
 
                   <!-- cell-avgDuration: Duration + bar -->
                   <template #cell-avgDuration="{ row }">
                     <div class="flex flex-col gap-1">
-                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.avgDuration }}</span>
-                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
-                        <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.durationBarPct }" />
+                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{
+                        row.avgDuration
+                      }}</span>
+                      <div
+                        class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden"
+                      >
+                        <div
+                          class="h-full rounded-full bg-[var(--color-primary-400)]"
+                          :style="{ width: row.durationBarPct }"
+                        />
                       </div>
                     </div>
                   </template>
@@ -879,9 +836,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- cell-p95Duration: Duration + bar -->
                   <template #cell-p95Duration="{ row }">
                     <div class="flex flex-col gap-1">
-                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.p95Duration }}</span>
-                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
-                        <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.p95DurationBarPct }" />
+                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{
+                        row.p95Duration
+                      }}</span>
+                      <div
+                        class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden"
+                      >
+                        <div
+                          class="h-full rounded-full bg-[var(--color-primary-400)]"
+                          :style="{ width: row.p95DurationBarPct }"
+                        />
                       </div>
                     </div>
                   </template>
@@ -889,37 +853,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- cell-maxDuration: Duration + bar -->
                   <template #cell-maxDuration="{ row }">
                     <div class="flex flex-col gap-1">
-                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{ row.maxDuration }}</span>
-                      <div class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden">
-                        <div class="h-full rounded-full bg-[var(--color-primary-400)]" :style="{ width: row.maxDurationBarPct }" />
+                      <span class="font-mono tabular-nums text-xs text-[var(--color-text-body)]">{{
+                        row.maxDuration
+                      }}</span>
+                      <div
+                        class="h-1.25 rounded-full bg-[var(--color-text-disabled)]/25! overflow-hidden"
+                      >
+                        <div
+                          class="h-full rounded-full bg-[var(--color-primary-400)]"
+                          :style="{ width: row.maxDurationBarPct }"
+                        />
                       </div>
                     </div>
                   </template>
 
                   <!-- Empty -->
                   <template #empty>
-                    <div class="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]">
-                      {{ t('synthetics.runs.noStepData') }}
+                    <div
+                      class="flex items-center justify-center py-12 text-sm text-[var(--color-text-secondary)]"
+                    >
+                      {{ t("synthetics.runs.noStepData") }}
                     </div>
                   </template>
                 </OTable>
               </OCard>
-
             </template>
           </div>
         </OTabPanel>
 
         <!-- ════════════ ERRORS ════════════ -->
         <OTabPanel name="errors">
-          <div
-            class="mx-auto px-2 py-2 pb-7 flex flex-col gap-2"
-          >
+          <div class="mx-auto px-2 py-2 pb-7 flex flex-col gap-2">
             <div class="flex items-center gap-2.5">
               <span class="font-bold text-sm text-text-heading">
-                {{ t('synthetics.runs.errorPatterns') }}
+                {{ t("synthetics.runs.errorPatterns") }}
               </span>
               <span class="text-xs text-text-secondary">
-                {{ t('synthetics.runs.errorPatternsWindowDesc', { window: windowLabel }) }}
+                {{ t("synthetics.runs.errorPatternsWindowDesc", { window: windowLabel }) }}
               </span>
             </div>
 
@@ -927,9 +897,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="grid grid-cols-[1fr_100px_160px_32px] gap-2.5 px-4 py-2 bg-surface-subtle border-b border-border-default text-2xs font-semibold text-text-secondary uppercase tracking-wide"
               >
-                <span>{{ t('synthetics.runs.errorPattern') }}</span>
-                <span>{{ t('synthetics.runs.count') }}</span>
-                <span>{{ t('synthetics.runs.lastSeen') }}</span>
+                <span>{{ t("synthetics.runs.errorPattern") }}</span>
+                <span>{{ t("synthetics.runs.count") }}</span>
+                <span>{{ t("synthetics.runs.lastSeen") }}</span>
                 <span />
               </div>
               <div
@@ -939,9 +909,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="monitor-runs-error-row"
                 @click="filterByErrorPattern(e.pattern)"
               >
-                <span
-                  class="font-mono tabular-nums text-xs text-text-body truncate"
-                >
+                <span class="font-mono tabular-nums text-xs text-text-body truncate">
                   {{ e.pattern }}
                 </span>
                 <span class="font-bold text-sm text-status-error-text">
@@ -950,11 +918,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="text-xs text-text-secondary">
                   {{ e.lastSeen }}
                 </span>
-                <OIcon
-                  name="filter_alt"
-                  size="sm"
-                  class="text-text-secondary"
-                />
+                <OIcon name="filter_alt" size="sm" class="text-text-secondary" />
               </div>
             </OCard>
           </div>
@@ -993,10 +957,7 @@ import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue"
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
-import {
-  deviceIconName,
-  deviceLabel,
-} from "@/composables/synthetics/syntheticResultsSchema";
+import { deviceIconName, deviceLabel } from "@/composables/synthetics/syntheticResultsSchema";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -1100,28 +1061,23 @@ function seedRand(seed: number) {
   };
 }
 /** Time range from the parent (microseconds). Updated on each refresh call. */
-const timeRangeMicros = ref<{ startTime: number; endTime: number } | null>(
-  null,
-);
+const timeRangeMicros = ref<{ startTime: number; endTime: number } | null>(null);
 
 /** Human-readable window label derived from the time range duration. */
 function formatWindowLabel(startMicros: number, endMicros: number): string {
   const diffMs = (endMicros - startMicros) / 1000;
   const hours = Math.round(diffMs / 3600000);
-  if (hours >= 48) return t('synthetics.runs.windowDays', { days: Math.round(hours / 24) });
-  if (hours >= 24) return t('synthetics.runs.window24h');
-  if (hours >= 2) return t('synthetics.runs.windowHours', { hours });
+  if (hours >= 48) return t("synthetics.runs.windowDays", { days: Math.round(hours / 24) });
+  if (hours >= 24) return t("synthetics.runs.window24h");
+  if (hours >= 2) return t("synthetics.runs.windowHours", { hours });
   const minutes = Math.round(diffMs / 60000);
-  if (minutes >= 60) return t('synthetics.runs.window1h');
-  return t('synthetics.runs.windowMinutes', { minutes });
+  if (minutes >= 60) return t("synthetics.runs.window1h");
+  return t("synthetics.runs.windowMinutes", { minutes });
 }
 const windowLabel = computed(() =>
   timeRangeMicros.value
-    ? formatWindowLabel(
-        timeRangeMicros.value.startTime,
-        timeRangeMicros.value.endTime,
-      )
-    : t('synthetics.runs.window24h'),
+    ? formatWindowLabel(timeRangeMicros.value.startTime, timeRangeMicros.value.endTime)
+    : t("synthetics.runs.window24h"),
 );
 const statusFilter = ref("all");
 const browserFilter = ref("all");
@@ -1172,20 +1128,25 @@ async function handleEmptyStateAction(id: string) {
     runTriggerLoading.value = true;
     const dismiss = toast({
       variant: "loading",
-      message: t('synthetics.toast.triggeringSingle', { name: props.monitorName }),
+      message: t("synthetics.toast.triggeringSingle", { name: props.monitorName }),
       timeout: 0,
     });
     try {
       await syntheticsService.run(orgIdentifier.value, props.monitorId, {});
       dismiss();
-      toast({ variant: "success", message: t('synthetics.toast.triggerSuccessSingle', { name: props.monitorName }) });
+      toast({
+        variant: "success",
+        message: t("synthetics.toast.triggerSuccessSingle", { name: props.monitorName }),
+      });
       // Emit refresh so parent reloads data
       emit("refresh");
     } catch (err: any) {
       dismiss();
       toast({
         variant: "error",
-        message: err?.response?.data?.message || t('synthetics.toast.triggerFailedSingle', { name: props.monitorName }),
+        message:
+          err?.response?.data?.message ||
+          t("synthetics.toast.triggerFailedSingle", { name: props.monitorName }),
       });
     } finally {
       runTriggerLoading.value = false;
@@ -1206,7 +1167,7 @@ function uniqueValues(key: "browser" | "device" | "location"): string[] {
   return Array.from(vals).sort();
 }
 const browserOptions = computed<SelectOption[]>(() => [
-  { label: t('synthetics.filters.allBrowsers'), value: "all", icon: "language" },
+  { label: t("synthetics.filters.allBrowsers"), value: "all", icon: "language" },
   ...uniqueValues("browser").map((v) => ({
     label: v,
     value: v,
@@ -1214,7 +1175,7 @@ const browserOptions = computed<SelectOption[]>(() => [
   })),
 ]);
 const deviceOptions = computed<SelectOption[]>(() => [
-  { label: t('synthetics.filters.allDevices'), value: "all", icon: "devices" },
+  { label: t("synthetics.filters.allDevices"), value: "all", icon: "devices" },
   ...uniqueValues("device").map((v) => ({
     label: deviceLabel(v),
     value: v,
@@ -1222,7 +1183,7 @@ const deviceOptions = computed<SelectOption[]>(() => [
   })),
 ]);
 const locationOptions = computed<SelectOption[]>(() => [
-  { label: t('synthetics.filters.allLocations'), value: "all", icon: "location-on" },
+  { label: t("synthetics.filters.allLocations"), value: "all", icon: "location-on" },
   ...uniqueValues("location").map((v) => ({
     label: v,
     value: v,
@@ -1230,15 +1191,15 @@ const locationOptions = computed<SelectOption[]>(() => [
   })),
 ]);
 const durationOptions: SelectOption[] = [
-  { label: t('synthetics.filters.anyDuration'), value: "all" },
-  { label: t('synthetics.filters.durationFast'), value: "fast" },
-  { label: t('synthetics.filters.durationMid'), value: "mid" },
-  { label: t('synthetics.filters.durationSlow'), value: "slow" },
+  { label: t("synthetics.filters.anyDuration"), value: "all" },
+  { label: t("synthetics.filters.durationFast"), value: "fast" },
+  { label: t("synthetics.filters.durationMid"), value: "mid" },
+  { label: t("synthetics.filters.durationSlow"), value: "slow" },
 ];
 const actionOptions: SelectOption[] = [
-  { label: t('synthetics.filters.anyAction'), value: "all" },
-  { label: t('synthetics.filters.actionClick'), value: "click" },
-  { label: t('synthetics.filters.actionType'), value: "type" },
+  { label: t("synthetics.filters.anyAction"), value: "all" },
+  { label: t("synthetics.filters.actionClick"), value: "click" },
+  { label: t("synthetics.filters.actionType"), value: "type" },
 ];
 
 // ── Helper: map SyntheticRun to MockRun shape used by computed properties ─
@@ -1284,51 +1245,34 @@ const filteredRuns = computed(() => {
   return allRuns.value.filter((run) => {
     const s = statusFilter.value;
     if (s !== "all" && run.status !== s) return false;
-    if (browserFilter.value !== "all" && run.browser !== browserFilter.value)
-      return false;
-    if (deviceFilter.value !== "all" && run.device !== deviceFilter.value)
-      return false;
-    if (locationFilter.value !== "all" && run.location !== locationFilter.value)
-      return false;
+    if (browserFilter.value !== "all" && run.browser !== browserFilter.value) return false;
+    if (deviceFilter.value !== "all" && run.device !== deviceFilter.value) return false;
+    if (locationFilter.value !== "all" && run.location !== locationFilter.value) return false;
     if (durationFilter.value === "fast" && run.duration >= 5000) return false;
-    if (
-      durationFilter.value === "mid" &&
-      (run.duration < 5000 || run.duration > 15000)
-    )
+    if (durationFilter.value === "mid" && (run.duration < 5000 || run.duration > 15000))
       return false;
     if (durationFilter.value === "slow" && run.duration <= 15000) return false;
     if (s === "fail") {
-      if (
-        failedStepFilter.value !== "all" &&
-        run.failedStep !== failedStepFilter.value
-      )
+      if (failedStepFilter.value !== "all" && run.failedStep !== failedStepFilter.value)
         return false;
       if (
         locatorFilter.value &&
-        !(run.locator || "")
-          .toLowerCase()
-          .includes(locatorFilter.value.toLowerCase())
+        !(run.locator || "").toLowerCase().includes(locatorFilter.value.toLowerCase())
       )
         return false;
-      if (actionFilter.value !== "all" && run.action !== actionFilter.value)
-        return false;
+      if (actionFilter.value !== "all" && run.action !== actionFilter.value) return false;
     }
-    if (errorFilter.value && run.errorPattern !== errorFilter.value)
-      return false;
+    if (errorFilter.value && run.errorPattern !== errorFilter.value) return false;
     return true;
   });
 });
 
-const totalFails = computed(
-  () => allRuns.value.filter((r) => r.status === "fail").length,
-);
+const totalFails = computed(() => allRuns.value.filter((r) => r.status === "fail").length);
 
 const hasKpiData = computed(() => synthetics.kpi.value.totalRuns > 0);
 
 const p95Label = computed(() =>
-  effectiveP95Ms.value > 0
-    ? fmtDur(effectiveP95Ms.value)
-    : hasKpiData.value ? fmtDur(0) : "—",
+  effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : hasKpiData.value ? fmtDur(0) : "—",
 );
 const p95Ms = computed(() => effectiveP95Ms.value);
 const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
@@ -1346,39 +1290,34 @@ const kpiCards = computed<KpiCard[]>(() => {
     return [
       {
         key: "last-run",
-        label: t('synthetics.results.lastRun'),
+        label: t("synthetics.results.lastRun"),
         value: k.lastRunStatus
           ? k.lastRunStatus === "failed"
-            ? t('synthetics.results.failed')
-            : t('synthetics.results.passed')
+            ? t("synthetics.results.failed")
+            : t("synthetics.results.passed")
           : "—",
         valueClass:
-          k.lastRunStatus === "failed"
-            ? "text-status-error-text!"
-            : "text-status-success-text!",
+          k.lastRunStatus === "failed" ? "text-status-error-text!" : "text-status-success-text!",
       },
       {
         key: "pass-rate",
-        label: t('synthetics.runs.passRate'),
+        label: t("synthetics.runs.passRate"),
         value: k.totalRuns > 0 ? k.uptimePct.toFixed(1) + "%" : "—",
       },
       {
         key: "p95-duration",
-        label: t('synthetics.results.p95Duration'),
+        label: t("synthetics.results.p95Duration"),
         value: effectiveP95Ms.value > 0 ? fmtDur(effectiveP95Ms.value) : "—",
       },
       {
         key: "retry-rate",
-        label: t('synthetics.runs.retryRate'),
-        value:
-          k.totalRuns > 0
-            ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
-            : "0.0%",
+        label: t("synthetics.runs.retryRate"),
+        value: k.totalRuns > 0 ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%" : "0.0%",
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
       {
         key: "failed-runs",
-        label: t('synthetics.results.failedRuns'),
+        label: t("synthetics.results.failedRuns"),
         value: String(k.failedRuns),
         valueClass: k.failedRuns > 0 ? "text-status-error-text!" : undefined,
       },
@@ -1388,29 +1327,29 @@ const kpiCards = computed<KpiCard[]>(() => {
   const fallbackPassPct =
     allRuns.value.length > 0
       ? (
-          (allRuns.value.filter((r) => r.status === "pass").length /
-            allRuns.value.length) *
+          (allRuns.value.filter((r) => r.status === "pass").length / allRuns.value.length) *
           100
         ).toFixed(1) + "%"
       : "100%";
   const lastRun = allRuns.value[0];
   return [
-    { key: "pass-rate", label: t('synthetics.runs.passRate'), value: fallbackPassPct },
-    { key: "p95-duration", label: t('synthetics.results.p95Duration'), value: "—" },
-    { key: "retry-rate", label: t('synthetics.runs.retryRate'), value: "0.0%" },
+    { key: "pass-rate", label: t("synthetics.runs.passRate"), value: fallbackPassPct },
+    { key: "p95-duration", label: t("synthetics.results.p95Duration"), value: "—" },
+    { key: "retry-rate", label: t("synthetics.runs.retryRate"), value: "0.0%" },
     {
       key: "failed-runs",
-      label: t('synthetics.results.failedRuns'),
+      label: t("synthetics.results.failedRuns"),
       value: String(totalFails.value),
     },
     {
       key: "last-run",
-      label: t('synthetics.results.lastRun'),
-      value: lastRun?.status === "fail" ? t('synthetics.results.failed') : t('synthetics.results.passed'),
-      valueClass:
+      label: t("synthetics.results.lastRun"),
+      value:
         lastRun?.status === "fail"
-          ? "text-status-error-text!"
-          : "text-status-success-text!",
+          ? t("synthetics.results.failed")
+          : t("synthetics.results.passed"),
+      valueClass:
+        lastRun?.status === "fail" ? "text-status-error-text!" : "text-status-success-text!",
     },
   ];
 });
@@ -1458,11 +1397,7 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
     const executions = groupMap.get(runId)!;
     const allPass = executions.every((e) => e.status === "pass");
     const allFail = executions.every((e) => e.status === "fail");
-    const status: TimelineSegment["status"] = allPass
-      ? "all-pass"
-      : allFail
-        ? "all-fail"
-        : "mixed";
+    const status: TimelineSegment["status"] = allPass ? "all-pass" : allFail ? "all-fail" : "mixed";
 
     const color =
       status === "all-pass"
@@ -1475,10 +1410,14 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
     const failCount = executions.length - passCount;
     const title =
       status === "all-pass"
-        ? t('synthetics.runs.timelineAllPassed', { count: executions.length })
+        ? t("synthetics.runs.timelineAllPassed", { count: executions.length })
         : status === "all-fail"
-          ? t('synthetics.runs.timelineAllFailed', { count: executions.length })
-          : t('synthetics.runs.timelineMixed', { passed: passCount, failed: failCount, total: executions.length });
+          ? t("synthetics.runs.timelineAllFailed", { count: executions.length })
+          : t("synthetics.runs.timelineMixed", {
+              passed: passCount,
+              failed: failCount,
+              total: executions.length,
+            });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
       location: e.location,
@@ -1486,9 +1425,7 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
       device: e.device,
       status: e.status === "pass" ? "pass" : "fail",
       statusIcon: e.status === "pass" ? "check_circle" : "cancel",
-      errorSnippet: e.errorPattern
-        ? e.errorPattern.split(":")[0].substring(0, 50)
-        : null,
+      errorSnippet: e.errorPattern ? e.errorPattern.split(":")[0].substring(0, 50) : null,
     }));
 
     return {
@@ -1543,15 +1480,13 @@ const timelineStartLabel = computed(() => {
   return formatTimelineDate(timeRangeMicros.value.startTime / 1000);
 });
 const timelineEndLabel = computed(() => {
-  if (!timeRangeMicros.value) return t('synthetics.runs.timelineNow');
+  if (!timeRangeMicros.value) return t("synthetics.runs.timelineNow");
   return formatTimelineDate(timeRangeMicros.value.endTime / 1000);
 });
 
 // ── Breakdowns ───────────────────────────────────────────────────────────
 const breakdownDimensions = computed(() =>
-  isBrowser.value
-    ? ["Browser", "Location", "Device"]
-    : ["Location", "DurationByLocation"],
+  isBrowser.value ? ["Browser", "Location", "Device"] : ["Location", "DurationByLocation"],
 );
 
 interface BreakdownItem {
@@ -1643,12 +1578,12 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
       textColor: "var(--color-success-700)",
     };
   });
-  });
+});
 
 const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
   const groups = new Map<string, { totalMs: number; count: number }>();
   for (const run of allRuns.value) {
-    const key = run.location || 'Unknown';
+    const key = run.location || "Unknown";
     const g = groups.get(key) ?? { totalMs: 0, count: 0 };
     g.totalMs += run.duration;
     g.count++;
@@ -1656,12 +1591,12 @@ const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
   }
 
   function getIconForRegion(region: string): string {
-    const prefix = region.split('-')[0].toLowerCase();
-    if (prefix === 'aws') return 'img:' + awsSvgUrl;
-    if (prefix === 'gcp') return 'img:' + gcpSvgUrl;
-    if (/^[a-z]{2}-[a-z]+-\d+$/.test(region)) return 'img:' + awsSvgUrl;
-    if (/^[a-z]+-[a-z]+\d*$/.test(region)) return 'img:' + gcpSvgUrl;
-    return 'location-on';
+    const prefix = region.split("-")[0].toLowerCase();
+    if (prefix === "aws") return "img:" + awsSvgUrl;
+    if (prefix === "gcp") return "img:" + gcpSvgUrl;
+    if (/^[a-z]{2}-[a-z]+-\d+$/.test(region)) return "img:" + awsSvgUrl;
+    if (/^[a-z]+-[a-z]+\d*$/.test(region)) return "img:" + gcpSvgUrl;
+    return "location-on";
   }
 
   const entries = Array.from(groups.entries()).map(([name, g]) => ({
@@ -1674,41 +1609,62 @@ const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
     name,
     icon: getIconForRegion(name),
     pct: fmtDur(avgMs),
-    barPct: Math.round((avgMs / maxAvg) * 100) + '%',
-    barColor: 'var(--color-primary-500)',
-    textColor: 'var(--color-text-body)',
+    barPct: Math.round((avgMs / maxAvg) * 100) + "%",
+    barColor: "var(--color-primary-500)",
+    textColor: "var(--color-text-body)",
   }));
 });
 
 // ── Status filter options ────────────────────────────────────────────────
 const statusOptions = [
-  { key: "all", label: t('synthetics.filters.all'), dot: "var(--color-text-secondary)" },
-  { key: "pass", label: t('synthetics.results.passed'), dot: "var(--color-status-success-text)" },
-  { key: "fail", label: t('synthetics.results.failed'), dot: "var(--color-status-error-text)" },
+  { key: "all", label: t("synthetics.filters.all"), dot: "var(--color-text-secondary)" },
+  { key: "pass", label: t("synthetics.results.passed"), dot: "var(--color-status-success-text)" },
+  { key: "fail", label: t("synthetics.results.failed"), dot: "var(--color-status-error-text)" },
 ];
 
 // ── Mock fallback data (used by Overview/Errors tabs when no real data) ────
 function stepNames(): string[] {
   return [
-    "Open homepage", "Open search", "Search query", "Submit search",
-    "Search results", "Results shown", "Open first product", "Product page",
-    "Add to cart", "Go to checkout", "Fill card number", "Place order",
+    "Open homepage",
+    "Open search",
+    "Search query",
+    "Submit search",
+    "Search results",
+    "Results shown",
+    "Open first product",
+    "Product page",
+    "Add to cart",
+    "Go to checkout",
+    "Fill card number",
+    "Place order",
   ];
 }
 function stepMeta(): Record<string, { locator: string | null; browsers: string[] }> {
   return {
     "Open homepage": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
-    "Open search": { locator: 'css=[data-testid="search-icon"]', browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Open search": {
+      locator: 'css=[data-testid="search-icon"]',
+      browsers: ["Chromium", "Firefox", "WebKit"],
+    },
     "Search query": { locator: "css=#search", browsers: ["Chromium", "Firefox", "WebKit"] },
     "Submit search": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
     "Search results": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
     "Results shown": { locator: 'text="results for"', browsers: ["Chromium", "Firefox", "WebKit"] },
-    "Open first product": { locator: "testid=result-0", browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Open first product": {
+      locator: "testid=result-0",
+      browsers: ["Chromium", "Firefox", "WebKit"],
+    },
     "Product page": { locator: null, browsers: ["Chromium", "Firefox", "WebKit"] },
     "Add to cart": { locator: "css=.btn-add-to-cart", browsers: ["Chromium", "Firefox", "WebKit"] },
     "Go to checkout": { locator: "css=.btn-checkout", browsers: ["Chromium", "Firefox", "WebKit"] },
-    "Fill card number": { locator: "css=#card-number", browsers: ["Chromium", "Firefox", "WebKit"] },
-    "Place order": { locator: "testid=place-order-btn", browsers: ["Chromium", "Firefox", "WebKit"] },
+    "Fill card number": {
+      locator: "css=#card-number",
+      browsers: ["Chromium", "Firefox", "WebKit"],
+    },
+    "Place order": {
+      locator: "testid=place-order-btn",
+      browsers: ["Chromium", "Firefox", "WebKit"],
+    },
   };
 }
 function errorPatterns(): string[] {
@@ -1726,10 +1682,20 @@ function fmtAge(min: number): string {
   return Math.floor(h / 24) + "d ago";
 }
 interface MockRun {
-  id: number; runId: string; ageMin: number; scheduledTs: number;
-  timestamp: number; duration: number; status: "pass" | "fail";
-  location: string; browser: string; device: string; triggerType: string;
-  failedStep: string | null; locator: string | null; action: string | null;
+  id: number;
+  runId: string;
+  ageMin: number;
+  scheduledTs: number;
+  timestamp: number;
+  duration: number;
+  status: "pass" | "fail";
+  location: string;
+  browser: string;
+  device: string;
+  triggerType: string;
+  failedStep: string | null;
+  locator: string | null;
+  action: string | null;
   errorPattern: string | null;
   artifacts: { screenshot: boolean; replay: boolean; trace: boolean; rum: boolean };
 }
@@ -1758,15 +1724,24 @@ function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): M
       const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
       const locator = failedStep ? meta[failedStep].locator : null;
       runs.push({
-        id: idCounter++, runId,
+        id: idCounter++,
+        runId,
         ageMin: Math.round((baseTime - scheduledBase) / 60000),
-        scheduledTs: scheduledBase, timestamp: scheduledBase + Math.round(r() * 30000),
-        triggerType: "schedule", duration: dur, status: isFail ? "fail" : "pass",
+        scheduledTs: scheduledBase,
+        timestamp: scheduledBase + Math.round(r() * 30000),
+        triggerType: "schedule",
+        duration: dur,
+        status: isFail ? "fail" : "pass",
         location: locations[Math.floor(r() * locations.length)],
         browser: browsers[Math.floor(r() * browsers.length)],
         device: devices[r() < 0.7 ? 0 : r() < 0.85 ? 1 : 2],
-        failedStep, locator,
-        action: failedStep ? (["Place order", "Go to checkout", "Add to cart"].includes(failedStep) ? "click" : "type") : null,
+        failedStep,
+        locator,
+        action: failedStep
+          ? ["Place order", "Go to checkout", "Add to cart"].includes(failedStep)
+            ? "click"
+            : "type"
+          : null,
         errorPattern: isFail ? errs[errIdx] : null,
         artifacts: { screenshot: true, replay: r() < 0.7, trace: true, rum: r() < 0.9 },
       });
@@ -1776,7 +1751,11 @@ function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): M
 }
 
 // ── Error groups (Errors tab) ────────────────────────────────────────────
-interface ErrorGroup { pattern: string; count: number; lastSeen: string; }
+interface ErrorGroup {
+  pattern: string;
+  count: number;
+  lastSeen: string;
+}
 const errorGroups = computed<ErrorGroup[]>(() => {
   const errs = errorPatterns();
   const runs = allRuns.value;
@@ -1795,7 +1774,7 @@ const failedStepOptions = computed<SelectOption[]>(() => {
   const meta = stepMeta();
   const withLocator = stepNames().filter((n) => meta[n].locator);
   return [
-    { label: t('synthetics.filters.anyFailedStep'), value: "all" },
+    { label: t("synthetics.filters.anyFailedStep"), value: "all" },
     ...withLocator.map((n) => ({ label: n, value: n })),
   ];
 });
@@ -1824,17 +1803,19 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       id: run.id,
       statusBadgeVariant: isFail ? "error-soft" : "success-soft",
       statusIcon: isFail ? "cancel" : "check_circle",
-      statusLabel: isFail ? t('synthetics.results.failed') : t('synthetics.results.passed'),
+      statusLabel: isFail ? t("synthetics.results.failed") : t("synthetics.results.passed"),
       scheduledTs: run.scheduledTs,
       lastRunTs: run.timestamp,
-      triggerType: run.triggerType === "manual" ? t('synthetics.runs.triggerManual') : t('synthetics.runs.triggerSchedule'),
+      triggerType:
+        run.triggerType === "manual"
+          ? t("synthetics.runs.triggerManual")
+          : t("synthetics.runs.triggerSchedule"),
       duration: fmtDur(run.duration),
       location: run.location,
       browser: run.browser,
       device: run.device,
       errorSnippet: run.errorPattern
-        ? run.errorPattern.split(":")[0] +
-          (run.failedStep ? " · " + run.failedStep : "")
+        ? run.errorPattern.split(":")[0] + (run.failedStep ? " · " + run.failedStep : "")
         : null,
       errorPattern: run.errorPattern,
     };
@@ -1843,37 +1824,47 @@ const visibleRuns = computed<VisibleRun[]>(() => {
 
 const runColumns = computed<OTableColumnDef[]>(() => {
   const cols: OTableColumnDef[] = [
-    { id: "status", header: t('synthetics.table.status'), accessorKey: "status", size: 60 },
+    { id: "status", header: t("synthetics.table.status"), accessorKey: "status", size: 60 },
     {
       id: "last_run_at",
-      header: t('synthetics.table.lastRunAt'),
+      header: t("synthetics.table.lastRunAt"),
       accessorKey: "lastRunTs",
       size: 100,
     },
     {
       id: "duration",
-      header: t('synthetics.results.duration'),
+      header: t("synthetics.results.duration"),
       accessorKey: "duration",
       size: 50,
     },
-    { id: "location", header: t('synthetics.results.location'), accessorKey: "location", size: 110 },
+    {
+      id: "location",
+      header: t("synthetics.results.location"),
+      accessorKey: "location",
+      size: 110,
+    },
   ];
   if (isBrowser.value) {
     cols.push(
-      { id: "browser", header: t('synthetics.results.steps.browser'), accessorKey: "browser", size: 100 },
-      { id: "device", header: t('synthetics.results.device'), accessorKey: "device", size: 90 },
+      {
+        id: "browser",
+        header: t("synthetics.results.steps.browser"),
+        accessorKey: "browser",
+        size: 100,
+      },
+      { id: "device", header: t("synthetics.results.device"), accessorKey: "device", size: 90 },
     );
   }
   cols.push(
     {
       id: "trigger_type",
-      header: t('synthetics.table.trigger'),
+      header: t("synthetics.table.trigger"),
       accessorKey: "triggerType",
       size: 90,
     },
     {
       id: "scheduled_at",
-      header: t('synthetics.table.scheduledAt'),
+      header: t("synthetics.table.scheduledAt"),
       accessorKey: "scheduledTs",
       size: 100,
     },
@@ -1950,7 +1941,8 @@ const stepTableRows = computed<StepTableRow[]>(() => {
       failBarColor: barColorForRate(failPct),
       flakyRatePct: flakyPct,
       flakyCount: g.flakyCount,
-      flakyColor: g.flakyRate >= 5 ? "var(--color-status-warning-text)" : "var(--color-text-secondary)",
+      flakyColor:
+        g.flakyRate >= 5 ? "var(--color-status-warning-text)" : "var(--color-text-secondary)",
       avgDuration: fmtDur(g.avgDurationMs),
       avgDurationMs: g.avgDurationMs,
       durationBarPct: Math.round((g.avgDurationMs / maxAvgDuration) * 100) + "%",
@@ -1965,20 +1957,53 @@ const stepTableRows = computed<StepTableRow[]>(() => {
 });
 
 const stepTableColumns: OTableColumnDef<StepTableRow>[] = [
-  { id: "name", header: t('synthetics.results.steps.stepName'), accessorKey: "name", meta: { isName: true } },
-  { id: "failRate", header: t('synthetics.results.steps.failRate'), accessorKey: "failRatePct", size: 110, meta: { align: "right" } },
-  { id: "flakyRate", header: t('synthetics.results.steps.flakyRate'), accessorKey: "flakyRatePct", size: 100, meta: { align: "right" } },
-  { id: "avgDuration", header: t('synthetics.results.steps.avgDuration'), accessorKey: "avgDurationMs", size: 100, meta: { align: "right" } },
-  { id: "p95Duration", header: t('synthetics.results.steps.p95Duration'), accessorKey: "p95DurationMs", size: 96, meta: { align: "right" } },
-  { id: "maxDuration", header: t('synthetics.results.steps.maxDuration'), accessorKey: "maxDurationMs", size: 100, meta: { align: "right" } },
+  {
+    id: "name",
+    header: t("synthetics.results.steps.stepName"),
+    accessorKey: "name",
+    meta: { isName: true },
+  },
+  {
+    id: "failRate",
+    header: t("synthetics.results.steps.failRate"),
+    accessorKey: "failRatePct",
+    size: 110,
+    meta: { align: "right" },
+  },
+  {
+    id: "flakyRate",
+    header: t("synthetics.results.steps.flakyRate"),
+    accessorKey: "flakyRatePct",
+    size: 100,
+    meta: { align: "right" },
+  },
+  {
+    id: "avgDuration",
+    header: t("synthetics.results.steps.avgDuration"),
+    accessorKey: "avgDurationMs",
+    size: 100,
+    meta: { align: "right" },
+  },
+  {
+    id: "p95Duration",
+    header: t("synthetics.results.steps.p95Duration"),
+    accessorKey: "p95DurationMs",
+    size: 96,
+    meta: { align: "right" },
+  },
+  {
+    id: "maxDuration",
+    header: t("synthetics.results.steps.maxDuration"),
+    accessorKey: "maxDurationMs",
+    size: 100,
+    meta: { align: "right" },
+  },
 ];
 
 // ── Chart options ────────────────────────────────────────────────────────
 function cssVar(name: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
-  return (
-    getComputedStyle(document.body).getPropertyValue(name).trim() || fallback
-  );
+  return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
 }
 
 const responseChartOption = computed(() => {
@@ -1989,9 +2014,7 @@ const responseChartOption = computed(() => {
 
   let seriesData: [number, number][];
   if (synthetics.buckets.value.length > 0) {
-    seriesData = synthetics.buckets.value.map(
-      (b) => [b.tsMs, b.p95Ms] as [number, number],
-    );
+    seriesData = synthetics.buckets.value.map((b) => [b.tsMs, b.p95Ms] as [number, number]);
   } else {
     const rB = seedRand(31);
     const bucketCount = 24;
@@ -2041,7 +2064,7 @@ const responseChartOption = computed(() => {
               lineStyle: { color: p95Color, type: "dashed" as const },
               data: [{ yAxis: p95Ms.value }],
               label: {
-                formatter: t('synthetics.runs.chartP95', { value: p95Label.value }),
+                formatter: t("synthetics.runs.chartP95", { value: p95Label.value }),
                 color: p95Color,
                 fontSize: 10,
               },
@@ -2091,7 +2114,7 @@ const errorChartOption = computed(() => {
     grid: { left: 44, right: 16, top: 16, bottom: 28 },
     tooltip: {
       trigger: "axis" as const,
-      valueFormatter: (val: number) => t('synthetics.runs.chartFailures', { count: val }),
+      valueFormatter: (val: number) => t("synthetics.runs.chartFailures", { count: val }),
     },
     xAxis: {
       type: "category" as const,

@@ -3,14 +3,18 @@
     <div
       v-if="
         !(
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery && dashboardPanelData.data.queryType == 'sql'
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+            .customQuery && dashboardPanelData.data.queryType == 'sql'
         )
       "
       class="pl-3 flex flex-row"
     >
-      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
+      <div
+        class="text-sm whitespace-nowrap min-w-32.5 flex items-center"
+        data-test="dashboard-filter-layout-label"
+      >
+        {{ t("panel.filters") }}
+      </div>
       <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
       <div
         class="m-1.25 flex-wrap droppable scroll flex"
@@ -54,10 +58,7 @@ export default defineComponent({
 
   setup(props) {
     const route = useRoute();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
     const {
       dashboardPanelData,
@@ -70,9 +71,8 @@ export default defineComponent({
     const showAddMenu = ref(false);
 
     const topLevelGroup = computed(() => {
-      return dashboardPanelData?.data?.queries?.[
-        dashboardPanelData?.layout?.currentQueryIndex || 0
-      ]?.fields?.filter;
+      return dashboardPanelData?.data?.queries?.[dashboardPanelData?.layout?.currentQueryIndex || 0]
+        ?.fields?.filter;
     });
 
     /**
@@ -95,9 +95,7 @@ export default defineComponent({
     const addFilter = (filterType: string) => {
       showAddMenu.value = false;
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
 
       if (filterType === "condition") {
         const firstOption = schemaOptions.value[0];
@@ -176,20 +174,13 @@ export default defineComponent({
 
     const removeGroup = (index: number) => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
       currentQuery.fields?.filter?.splice(index, 1);
     };
 
-    const handleLogicalOperatorChange = (
-      index: number,
-      newOperator: string,
-    ) => {
+    const handleLogicalOperatorChange = (index: number, newOperator: string) => {
       const currentQuery =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ];
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
       const item = currentQuery.fields?.filter.conditions[index];
 
       if (item) {
@@ -246,18 +237,13 @@ export default defineComponent({
       return filteredVars.map((it: any) => {
         let value;
         const operator =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields?.filter?.conditions?.[index]?.operator || null;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            ?.filter?.conditions?.[index]?.operator || null;
 
         if (operator === "Contains" || operator === "Not Contains") {
-          value = it.multiSelect
-            ? "(" + "$" + "{" + it.name + "}" + ")"
-            : "$" + it.name;
+          value = it.multiSelect ? "(" + "$" + "{" + it.name + "}" + ")" : "$" + it.name;
         } else {
-          value = it.multiSelect
-            ? "(" + "$" + "{" + it.name + "}" + ")"
-            : "$" + it.name;
+          value = it.multiSelect ? "(" + "$" + "{" + it.name + "}" + ")" : "$" + it.name;
         }
 
         return {
@@ -268,12 +254,10 @@ export default defineComponent({
     };
 
     const schemaOptions = computed(() =>
-      selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map(
-        (field: any) => ({
-          label: field.name,
-          value: field.name,
-        }),
-      ),
+      selectedStreamFieldsBasedOnUserDefinedSchema?.value?.map((field: any) => ({
+        label: field.name,
+        value: field.name,
+      })),
     );
 
     return {
@@ -295,4 +279,3 @@ export default defineComponent({
   },
 });
 </script>
-

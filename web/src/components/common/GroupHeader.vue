@@ -25,11 +25,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
   </div>
 </template>
-  
+
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
 import { computed, defineComponent } from "vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "GroupHeader",
@@ -39,23 +39,22 @@ export default defineComponent({
       type: String,
       default: "",
     },
-    iconPath:{
+    iconPath: {
       type: String,
       default: "",
     },
     showIcon: {
       type: Boolean,
       default: true,
-    }
+    },
   },
   setup(props) {
     const icon = computed(() => {
-      return getImageURL(props.iconPath)
-    })
+      return getImageURL(props.iconPath);
+    });
     return {
       icon,
     };
   },
 });
 </script>
-

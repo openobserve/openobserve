@@ -75,7 +75,7 @@ export default defineComponent({
           const dismissedDate = new Date(timestamp);
           const currentDate = new Date();
           const daysSinceDismissal = Math.floor(
-            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24)
+            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24),
           );
 
           // Show again if more than DISMISS_DURATION_DAYS have passed
@@ -111,4 +111,3 @@ export default defineComponent({
   },
 });
 </script>
-

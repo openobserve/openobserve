@@ -49,15 +49,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="workflow-step-io-container"
         class="flex gap-2 flex-1 min-h-0"
         :class="{
-          'bg-surface-subtle p-3 h-screen max-h-screen items-stretch':
-            isFullscreen,
+          'bg-surface-subtle p-3 h-screen max-h-screen items-stretch': isFullscreen,
         }"
       >
         <!-- Input -->
         <div class="flex flex-col h-full min-w-0 w-1/2">
-          <div
-            class="text-text-body text-sm mb-2 font-bold flex items-center justify-between"
-          >
+          <div class="text-text-body text-sm mb-2 font-bold flex items-center justify-between">
             <div>{{ t("workflow.test.stepResult.input") }}</div>
             <div class="flex items-center gap-1">
               <OButton
@@ -66,10 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="fullscreenTitle"
                 @click="toggleFullscreen"
               >
-                <OIcon
-                  :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                  size="xs"
-                />
+                <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
               </OButton>
               <OButton
                 variant="outline"
@@ -107,9 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Output -->
         <div class="flex flex-col h-full min-w-0 w-1/2">
-          <div
-            class="text-text-body text-sm mb-2 font-bold flex items-center justify-between"
-          >
+          <div class="text-text-body text-sm mb-2 font-bold flex items-center justify-between">
             <div>{{ t("workflow.test.stepResult.output") }}</div>
             <div class="flex items-center gap-1">
               <OButton
@@ -118,10 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="fullscreenTitle"
                 @click="toggleFullscreen"
               >
-                <OIcon
-                  :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'"
-                  size="xs"
-                />
+                <OIcon :name="isFullscreen ? 'fullscreen-exit' : 'fullscreen'" size="xs" />
               </OButton>
               <OButton
                 variant="outline"
@@ -221,9 +210,7 @@ const nodeId = computed(() => workflowObj.testRun.resultDrawer.nodeId);
 const result = computed<any>(() => workflowObj.testRun.result);
 
 const node = computed<any>(() =>
-  (workflowObj.currentSelectedWorkflow?.nodes || []).find(
-    (n: any) => n.id === nodeId.value,
-  ),
+  (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === nodeId.value),
 );
 
 // Title = node type + its detail (e.g. "Function - error_fn"), capped at 30 chars.

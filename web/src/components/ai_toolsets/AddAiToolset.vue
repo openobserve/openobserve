@@ -24,17 +24,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-
     <!-- Inline page form. The form is created in setup() via useOForm (headless)
          so this owner can read `kind`/arrays/skill content reactively to drive
          the v-if/v-for below; it's handed to <OForm :form="form">. The Save
          button lives inside <OForm> as type="submit", so Enter + click both
          submit natively (no form-id). -->
-    <OForm
-      id="add-ai-toolset-form"
-      :form="form"
-      v-slot="{ isSubmitting }"
-    >
+    <OForm id="add-ai-toolset-form" :form="form" v-slot="{ isSubmitting }">
       <div style="height: calc(100vh - 120px)" class="overflow-auto">
         <div class="max-w-2xl mx-4 mt-4">
           <!-- Name -->
@@ -102,11 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <!-- Headers — form-owned dynamic array-field (mcp.headers[i].*) -->
             <div class="mb-2 text-sm font-medium">{{ t("aiToolset.headers") }}</div>
-            <div
-              v-for="(header, idx) in mcpHeaders"
-              :key="idx"
-              class="flex items-end gap-2 mb-2"
-            >
+            <div v-for="(header, idx) in mcpHeaders" :key="idx" class="flex items-end gap-2 mb-2">
               <OFormInput
                 :name="`mcp.headers[${idx}].key`"
                 :label="t('aiToolset.headerKey')"
@@ -120,17 +111,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #icon-right>
                   <OIcon
-                    :name="header.visible ? 'visibility-off' : 'visibility'" size="sm"
+                    :name="header.visible ? 'visibility-off' : 'visibility'"
+                    size="sm"
                     class="cursor-pointer"
                     @click="toggleHeaderVisible(idx)"
                   />
                 </template>
               </OFormInput>
-              <OButton
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                @click="removeHeader(idx)"
-              >
+              <OButton variant="ghost-destructive" size="icon-xs-sq" @click="removeHeader(idx)">
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
@@ -146,9 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("aiToolset.cliConfig") }}
               </div>
               <div class="flex items-center gap-1">
-                <span class="text-xs text-text-muted"
-                  >{{ t("aiToolset.presets") }}:</span
-                >
+                <span class="text-xs text-text-muted">{{ t("aiToolset.presets") }}:</span>
                 <OTag
                   v-for="preset in CLI_PRESETS"
                   :key="preset.id"
@@ -228,17 +214,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #icon-right>
                   <OIcon
-                    :name="env.visible ? 'visibility-off' : 'visibility'" size="sm"
+                    :name="env.visible ? 'visibility-off' : 'visibility'"
+                    size="sm"
                     class="cursor-pointer"
                     @click="toggleEnvVisible(idx)"
                   />
                 </template>
               </OFormInput>
-              <OButton
-                variant="ghost-destructive"
-                size="icon-xs-sq"
-                @click="removeEnvVar(idx)"
-              >
+              <OButton variant="ghost-destructive" size="icon-xs-sq" @click="removeEnvVar(idx)">
                 <OIcon name="delete" size="xs" />
               </OButton>
             </div>
@@ -252,11 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mb-2 text-sm font-medium">
               {{ t("aiToolset.credentialFiles") }}
             </div>
-            <div
-              v-for="(cred, idx) in cliCredFiles"
-              :key="'cred-' + idx"
-              class="mb-4"
-            >
+            <div v-for="(cred, idx) in cliCredFiles" :key="'cred-' + idx" class="mb-4">
               <div class="flex items-center gap-2 mb-1">
                 <OFormInput
                   :name="`cli.credFiles[${idx}].key`"
@@ -284,13 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:query="(v: string) => setCredValue(idx, v)"
               />
             </div>
-            <OButton
-              variant="outline"
-              size="sm"
-              class="mb-4"
-              @click="addCredFile"
-              icon-left="add"
-            >
+            <OButton variant="outline" size="sm" class="mb-4" @click="addCredFile" icon-left="add">
               {{ t("aiToolset.addCredFile") }}
             </OButton>
           </template>
@@ -302,9 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="text-base font-medium font-semibold mb-2">
               {{ t("aiToolset.skillConfig") }}
             </div>
-            <div class="mb-1 text-xs text-text-muted">
-              {{ t("aiToolset.skillContent") }} *
-            </div>
+            <div class="mb-1 text-xs text-text-muted">{{ t("aiToolset.skillContent") }} *</div>
             <query-editor
               data-test="ai-toolset-skill-content"
               editor-id="skill-content-editor"
@@ -313,10 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :query="skillContent"
               @update:query="(v: string) => setSkillContent(v)"
             />
-            <div
-              v-if="skillContentError"
-              class="text-error-500 text-xs -mt-3 mb-4"
-            >
+            <div v-if="skillContentError" class="text-error-500 text-xs -mt-3 mb-4">
               {{ t("aiToolset.skillContentRequired") }}
             </div>
           </template>
@@ -352,13 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineAsyncComponent,
-  defineComponent,
-  ref,
-  computed,
-  onMounted,
-} from "vue";
+import { defineAsyncComponent, defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -381,9 +343,7 @@ import {
   type AddAiToolsetForm,
 } from "./AddAiToolset.schema";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 export default defineComponent({
   name: "AddAiToolset",
@@ -502,9 +462,7 @@ export default defineComponent({
       } catch (err: any) {
         const msg =
           err?.response?.data?.message ||
-          (isEditing.value
-            ? t("aiToolset.updateFailed")
-            : t("aiToolset.createFailed"));
+          (isEditing.value ? t("aiToolset.updateFailed") : t("aiToolset.createFailed"));
         toast({ variant: "error", message: msg });
       }
     };
@@ -542,10 +500,7 @@ export default defineComponent({
     // after the first submit (R3 timing), cleared live as content is typed.
     // (Monaco isn't an OForm* field that auto-renders its error.)
     const skillContentError = computed(
-      () =>
-        submitted.value &&
-        selectedKind.value === "skill" &&
-        !(skillContent.value ?? "").trim(),
+      () => submitted.value && selectedKind.value === "skill" && !(skillContent.value ?? "").trim(),
     );
 
     // -----------------------------------------------------------------------
@@ -598,20 +553,17 @@ export default defineComponent({
       form.pushFieldValue("mcp.headers", { key: "", value: "", visible: false });
     const removeHeader = (i: number) => form.removeFieldValue("mcp.headers", i);
     const toggleHeaderVisible = (i: number) => {
-      const cur = !!(form.state.values as AddAiToolsetForm).mcp?.headers?.[i]
-        ?.visible;
+      const cur = !!(form.state.values as AddAiToolsetForm).mcp?.headers?.[i]?.visible;
       form.setFieldValue(`mcp.headers[${i}].visible`, !cur, {
         dontUpdateMeta: true,
       });
     };
 
     // CLI env vars
-    const addEnvVar = () =>
-      form.pushFieldValue("cli.env", { key: "", value: "", visible: false });
+    const addEnvVar = () => form.pushFieldValue("cli.env", { key: "", value: "", visible: false });
     const removeEnvVar = (i: number) => form.removeFieldValue("cli.env", i);
     const toggleEnvVisible = (i: number) => {
-      const cur = !!(form.state.values as AddAiToolsetForm).cli?.env?.[i]
-        ?.visible;
+      const cur = !!(form.state.values as AddAiToolsetForm).cli?.env?.[i]?.visible;
       form.setFieldValue(`cli.env[${i}].visible`, !cur, {
         dontUpdateMeta: true,
       });
@@ -619,10 +571,8 @@ export default defineComponent({
 
     // CLI credential files — `key` is an OFormInput; `value` is a Monaco editor
     // bridged into the form (no OForm* equivalent).
-    const addCredFile = () =>
-      form.pushFieldValue("cli.credFiles", { key: "", value: "" });
-    const removeCredFile = (i: number) =>
-      form.removeFieldValue("cli.credFiles", i);
+    const addCredFile = () => form.pushFieldValue("cli.credFiles", { key: "", value: "" });
+    const removeCredFile = (i: number) => form.removeFieldValue("cli.credFiles", i);
     const setCredValue = (i: number, value: string) =>
       form.setFieldValue(`cli.credFiles[${i}].value`, value, {
         dontUpdateMeta: true,
@@ -673,9 +623,10 @@ export default defineComponent({
               value: v as string,
               visible: false,
             })),
-            credFiles: Object.entries(data.credential_files || {}).map(
-              ([k, v]) => ({ key: k, value: v as string }),
-            ),
+            credFiles: Object.entries(data.credential_files || {}).map(([k, v]) => ({
+              key: k,
+              value: v as string,
+            })),
           };
         } else if (toolset.kind === "skill") {
           record.skill = { content: data.content || "" };

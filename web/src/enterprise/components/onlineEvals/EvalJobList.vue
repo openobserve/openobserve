@@ -1,8 +1,5 @@
 ﻿<template>
-  <EvalListShell
-    data-test="eval-job"
-    :show-empty="false"
-  >
+  <EvalListShell data-test="eval-job" :show-empty="false">
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -88,11 +85,7 @@
         </template>
 
         <template #cell-status="{ row }">
-          <OTag
-            type="evalStatus"
-            :value="statusOf(row)"
-            :label="statusLabel(statusOf(row))"
-          />
+          <OTag type="evalStatus" :value="statusOf(row)" :label="statusLabel(statusOf(row))" />
         </template>
 
         <template #cell-stream="{ row }">
@@ -166,10 +159,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import type {
-  EvalJob,
-  EvalJobStatus,
-} from "@/services/online-evals.service";
+import type { EvalJob, EvalJobStatus } from "@/services/online-evals.service";
 import { statusOf, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -236,71 +226,73 @@ const statusOptions = computed(() => [
   { label: t("onlineEvals.jobStatus.archived"), value: "archived" },
 ]);
 
-const columns = computed(() => [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: 56,
-    meta: { align: "left" },
-  },
-  {
-    id: "name",
-    header: t("onlineEvals.job.columns.name"),
-    accessorKey: "name",
-    sortable: true,
-    size: COL.name,
-    // `flex` (not `autoWidth`): fills leftover width on load AND stays
-    // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "status",
-    header: t("onlineEvals.job.columns.status"),
-    accessorFn: (row: EvalJob) => statusOf(row),
-    sortable: true,
-    size: COL.status,
-    meta: { align: "left" },
-  },
-  {
-    id: "stream",
-    header: t("onlineEvals.job.columns.stream"),
-    accessorKey: "stream",
-    sortable: true,
-    size: COL.streamName,
-    meta: { align: "left" },
-  },
-  {
-    id: "scorers",
-    header: t("onlineEvals.job.columns.scorers"),
-    accessorFn: (row: EvalJob) => (row.scorers || []).length,
-    sortable: true,
-    size: COL.count,
-    meta: { align: "right" },
-  },
-  {
-    id: "created",
-    header: t("onlineEvals.job.columns.created"),
-    accessorFn: (row: EvalJob) => rowCreated(row),
-    sortable: true,
-    size: COL.createdAt,
-    meta: { align: "left" },
-  },
-  {
-    id: "actions",
-    header: t("onlineEvals.job.columns.actions"),
-    sortable: false,
-    isAction: true,
-    size: 100,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
-  },
-].map((c: any) => ({
-  ...c,
-  // Every column except the row index, the name (row identity) and the
-  // actions column is offered in OTable's "Manage columns" chooser.
-  hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
-})));
+const columns = computed(() =>
+  [
+    {
+      id: "#",
+      header: "#",
+      accessorKey: "#",
+      sortable: false,
+      size: 56,
+      meta: { align: "left" },
+    },
+    {
+      id: "name",
+      header: t("onlineEvals.job.columns.name"),
+      accessorKey: "name",
+      sortable: true,
+      size: COL.name,
+      // `flex` (not `autoWidth`): fills leftover width on load AND stays
+      // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "status",
+      header: t("onlineEvals.job.columns.status"),
+      accessorFn: (row: EvalJob) => statusOf(row),
+      sortable: true,
+      size: COL.status,
+      meta: { align: "left" },
+    },
+    {
+      id: "stream",
+      header: t("onlineEvals.job.columns.stream"),
+      accessorKey: "stream",
+      sortable: true,
+      size: COL.streamName,
+      meta: { align: "left" },
+    },
+    {
+      id: "scorers",
+      header: t("onlineEvals.job.columns.scorers"),
+      accessorFn: (row: EvalJob) => (row.scorers || []).length,
+      sortable: true,
+      size: COL.count,
+      meta: { align: "right" },
+    },
+    {
+      id: "created",
+      header: t("onlineEvals.job.columns.created"),
+      accessorFn: (row: EvalJob) => rowCreated(row),
+      sortable: true,
+      size: COL.createdAt,
+      meta: { align: "left" },
+    },
+    {
+      id: "actions",
+      header: t("onlineEvals.job.columns.actions"),
+      sortable: false,
+      isAction: true,
+      size: 100,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 2 },
+    },
+  ].map((c: any) => ({
+    ...c,
+    // Every column except the row index, the name (row identity) and the
+    // actions column is offered in OTable's "Manage columns" chooser.
+    hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+  })),
+);
 
 const filteredRows = computed(() =>
   statusFilter.value
@@ -314,9 +306,7 @@ const numberedRows = useNumberedRows(filteredRows);
 // dropdown. Drives OEmptyState's `:filtered` so the body switches between
 // the first-run preset ("Create your first eval job") and the auto
 // "No evaluation jobs match these filters" + Clear-filters card.
-const hasFilters = computed(
-  () => !!props.search?.trim() || !!statusFilter.value,
-);
+const hasFilters = computed(() => !!props.search?.trim() || !!statusFilter.value);
 
 // Wire OEmptyState's action ids back into the existing emit contract.
 // `create` mirrors a click on the OPageHeader's "New job" button;
@@ -351,6 +341,11 @@ function formatDateShort(value: number) {
 }
 
 useShortcuts([
-  { id: "evalJobsRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+  {
+    id: "evalJobsRefresh",
+    handler: () => {
+      if (!isInputFocused()) emit("refresh");
+    },
+  },
 ]);
 </script>

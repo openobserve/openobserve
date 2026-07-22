@@ -17,15 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="h-full overflow-hidden flex flex-col">
     <template v-if="isLoading.length">
-      <div
-        class="pb-4 flex items-center justify-center text-center pt-1 h-[calc(100vh-11.875rem)]"
-      >
+      <div class="pb-4 flex items-center justify-center text-center pt-1 h-[calc(100vh-11.875rem)]">
         <div>
-          <OSpinner
-            size="md"
-            class="mx-auto block"
-            data-test="rum-loading-indicator"
-          />
+          <OSpinner size="md" class="mx-auto block" data-test="rum-loading-indicator" />
           <div class="text-center w-full">
             {{ t("rum.loadingMsg") }}
           </div>
@@ -43,20 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #tabs>
           <OTabs v-model="activeTab" align="left" @change="changeTab">
-            <OTab
-              v-for="tab in tabs"
-              :key="tab.value"
-              :name="tab.value"
-              :label="tab.label"
-            />
+            <OTab v-for="tab in tabs" :key="tab.value" :name="tab.value" :label="tab.label" />
           </OTabs>
         </template>
       </OPageHeader>
       <router-view v-slot="{ Component }">
         <template v-if="$route.meta.keepAlive">
-          <keep-alive
-            class="flex-1 min-h-0 flex flex-col"
-          >
+          <keep-alive class="flex-1 min-h-0 flex flex-col">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
@@ -111,12 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon="bolt"
               href="https://openobserve.ai/frontend-monitoring/#quick-implementation"
               data-test="rum-empty-quickstart-btn"
-            >{{ t("rum.emptyState.quickImpl") }}</EmptyStateIngestionChip>
+              >{{ t("rum.emptyState.quickImpl") }}</EmptyStateIngestionChip
+            >
             <EmptyStateIngestionChip
               icon="menu-book"
               href="https://openobserve.ai/blog/frontend-monitoring-basics/"
               data-test="rum-empty-blog-btn"
-            >{{ t("rum.emptyState.blogPost") }}</EmptyStateIngestionChip>
+              >{{ t("rum.emptyState.blogPost") }}</EmptyStateIngestionChip
+            >
           </div>
         </template>
       </OEmptyState>
@@ -125,15 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onActivated,
-  onMounted,
-  ref,
-  watch,
-  onUpdated,
-} from "vue";
+import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
@@ -221,10 +202,7 @@ onMounted(async () => {
   };
 
   if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
-    activeTab.value =
-      routeNameMapping[
-        router.currentRoute.value.name?.toString() || "placeholder"
-      ];
+    activeTab.value = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
   } else {
     activeTab.value = "performance";
   }
@@ -233,8 +211,7 @@ onMounted(async () => {
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
   const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
-  if (!ignoreRoutes.includes(routeName.value as string))
-    changeTab(activeTab.value);
+  if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
 });
 
 onUpdated(async () => {
@@ -251,9 +228,7 @@ onUpdated(async () => {
 
     if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
       activeTab.value =
-        routeNameMapping[
-          router.currentRoute.value.name?.toString() || "placeholder"
-        ];
+        routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
     } else {
       activeTab.value = "performance";
     }
@@ -262,8 +237,7 @@ onUpdated(async () => {
     // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
     const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
-    if (!ignoreRoutes.includes(routeName.value as string))
-      changeTab(activeTab.value);
+    if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
   }
 });
 
@@ -288,10 +262,7 @@ const updateTabOnRouteChange = () => {
     rumPerformanceApis: "performance",
     SourceMaps: "source_maps",
   };
-  const tab =
-    routeNameMapping[
-      router.currentRoute.value.name?.toString() || "placeholder"
-    ];
+  const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
   if (tab !== activeTab.value && tab !== undefined) {
     activeTab.value = tab;
   }
@@ -314,8 +285,7 @@ const checkIfRumEnabled = async () => {
 
     getStream("_sessionreplay", "logs", false)
       .then((response: any) => {
-        if (response?.name === "_sessionreplay")
-          isSessionReplayEnabled.value = true;
+        if (response?.name === "_sessionreplay") isSessionReplayEnabled.value = true;
         else isSessionReplayEnabled.value = false;
       })
       .finally(() => {
@@ -358,10 +328,7 @@ const changeTab = (tab: string | number) => {
   if (tab === "error_tracking") {
     router.push({
       name: "ErrorTracking",
-      query: getQueryParams(
-        performanceState.data.datetime,
-        errorTrackingState.data.editorValue,
-      ),
+      query: getQueryParams(performanceState.data.datetime, errorTrackingState.data.editorValue),
     });
     return;
   }
@@ -369,10 +336,7 @@ const changeTab = (tab: string | number) => {
   if (tab === "sessions") {
     router.push({
       name: "Sessions",
-      query: getQueryParams(
-        performanceState.data.datetime,
-        sessionState.data.editorValue,
-      ),
+      query: getQueryParams(performanceState.data.datetime, sessionState.data.editorValue),
     });
     return;
   }
@@ -415,9 +379,7 @@ const getSessionReplayFields = () => {
           name: "_sessionreplay",
         };
         stream.schema.forEach((field: any) => {
-          performanceState.data.streams["_sessionreplay"]["schema"][
-            field.name
-          ] = field;
+          performanceState.data.streams["_sessionreplay"]["schema"][field.name] = field;
         });
       })
       .finally(() => {
@@ -437,8 +399,7 @@ const getRumDataFields = () => {
           name: "_rumdata",
         };
         stream.schema.forEach((field: any) => {
-          performanceState.data.streams["_rumdata"]["schema"][field.name] =
-            field;
+          performanceState.data.streams["_rumdata"]["schema"][field.name] = field;
         });
       })
       .finally(() => {

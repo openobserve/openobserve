@@ -71,9 +71,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
         }
       },
     };
-    const xAxisLabelRotation = hasTimestampField
-      ? 0
-      : panelSchema.config?.axis_label_rotate || 0;
+    const xAxisLabelRotation = hasTimestampField ? 0 : panelSchema.config?.axis_label_rotate || 0;
     options.xAxis[0].axisLabel = {
       rotate: xAxisLabelRotation,
     };
@@ -81,9 +79,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
     options.xAxis[0].nameGap = dynamicXAxisNameGap;
 
     // get the unique value of the first xAxis's key
-    options.xAxis[0].data = Array.from(
-      new Set(getAxisDataFromKey(xAxisKeys[0])),
-    );
+    options.xAxis[0].data = Array.from(new Set(getAxisDataFromKey(xAxisKeys[0])));
   } else if (
     panelSchema.type !== "line" &&
     panelSchema.type !== "area" &&
@@ -109,8 +105,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
         if (ctx.hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name?.findIndex(
-            (it: any) =>
-              it.seriesName == ctx.hoveredSeriesState?.value?.hoveredSeriesName,
+            (it: any) => it.seriesName == ctx.hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
           // if hovered series index is not -1 then take it to very first position
@@ -129,9 +124,7 @@ export function applyLineAreaScatterBarChart(ctx: SQLContext): void {
           if (it.data != null) {
             // check if the series is the current series being hovered
             // if have than bold it
-            if (
-              it?.seriesName == ctx.hoveredSeriesState?.value?.hoveredSeriesName
-            )
+            if (it?.seriesName == ctx.hoveredSeriesState?.value?.hoveredSeriesName)
               hoverText.push(
                 `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
                   getUnitValue(

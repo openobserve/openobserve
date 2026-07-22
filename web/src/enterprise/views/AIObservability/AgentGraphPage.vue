@@ -23,96 +23,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     :scroll="false"
   >
-      <template #actions>
-        <date-time
-          ref="dateTimeRef"
-          auto-apply
-          menu-align="end"
-          :default-type="searchObj.data.datetime.type"
-          :default-absolute-time="{
-            startTime: searchObj.data.datetime.startTime ?? 0,
-            endTime: searchObj.data.datetime.endTime ?? 0,
-          }"
-          :default-relative-time="
-            searchObj.data.datetime.relativeTimePeriod ?? '15m'
-          "
-          data-test="ai-agent-graph-date-time"
-          class="h-8"
-          @on:date-change="onDateChange"
-        />
-        <!-- Last-refresh + refresh control, consistent with LLM Insights /
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        menu-align="end"
+        :default-type="searchObj.data.datetime.type"
+        :default-absolute-time="{
+          startTime: searchObj.data.datetime.startTime ?? 0,
+          endTime: searchObj.data.datetime.endTime ?? 0,
+        }"
+        :default-relative-time="searchObj.data.datetime.relativeTimePeriod ?? '15m'"
+        data-test="ai-agent-graph-date-time"
+        class="h-8"
+        @on:date-change="onDateChange"
+      />
+      <!-- Last-refresh + refresh control, consistent with LLM Insights /
              Sessions / Agent Behavior page headers. -->
-        <div
-          class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
-        >
-          <ORefreshButton
-            :last-run-at="graphLastRunAt"
-            :loading="isGraphLoading"
-            :disabled="isGraphLoading"
-            data-test="ai-agent-graph-refresh-btn"
-            @click="refresh"
-          />
-        </div>
-      </template>
+      <div
+        class="inline-flex items-center border border-border-default rounded-default px-1 h-8 overflow-hidden"
+      >
+        <ORefreshButton
+          :last-run-at="graphLastRunAt"
+          :loading="isGraphLoading"
+          :disabled="isGraphLoading"
+          data-test="ai-agent-graph-refresh-btn"
+          @click="refresh"
+        />
+      </div>
+    </template>
 
     <!-- Scope control — same Stream/Agent pattern as LLM Insights, so the two
          AI pages read as one product. Stream tab picks a trace stream; Agent
          tab picks a discovered agent and the graph follows its source_stream.
          Lives in OPageLayout's #subnav (which draws the full-bleed divider). -->
     <template #subnav>
-    <div class="flex items-center gap-3 px-page-edge py-2">
-      <OToggleGroup
-        :model-value="filterMode"
-        type="single"
-        data-test="agent-graph-filter-mode"
-        @update:model-value="onFilterModeChange"
-      >
-        <OToggleGroupItem value="agent" size="sm">{{
-          t("aiObservability.agentGraph.agent")
-        }}</OToggleGroupItem>
-        <OToggleGroupItem value="stream" size="sm">{{
-          t("aiObservability.agentGraph.stream")
-        }}</OToggleGroupItem>
-      </OToggleGroup>
+      <div class="flex items-center gap-3 px-page-edge py-2">
+        <OToggleGroup
+          :model-value="filterMode"
+          type="single"
+          data-test="agent-graph-filter-mode"
+          @update:model-value="onFilterModeChange"
+        >
+          <OToggleGroupItem value="agent" size="sm">{{
+            t("aiObservability.agentGraph.agent")
+          }}</OToggleGroupItem>
+          <OToggleGroupItem value="stream" size="sm">{{
+            t("aiObservability.agentGraph.stream")
+          }}</OToggleGroupItem>
+        </OToggleGroup>
 
-      <div
-        v-if="filterMode === 'stream'"
-        data-test="agent-graph-stream-selector"
-        class="w-56 shrink-0"
-      >
-        <OSelect
-          v-model="activeStream"
-          :label="t('aiObservability.agentGraph.stream')"
-          label-position="inside"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
-          labelKey="label"
-          valueKey="value"
-          class="w-full rounded-default"
-        />
+        <div
+          v-if="filterMode === 'stream'"
+          data-test="agent-graph-stream-selector"
+          class="w-56 shrink-0"
+        >
+          <OSelect
+            v-model="activeStream"
+            :label="t('aiObservability.agentGraph.stream')"
+            label-position="inside"
+            :options="availableStreams.map((s) => ({ label: s, value: s }))"
+            labelKey="label"
+            valueKey="value"
+            class="w-full rounded-default"
+          />
+        </div>
+        <div v-else data-test="agent-graph-agent-selector" class="w-56 shrink-0">
+          <SkeletonBox v-if="!agentsLoaded" width="100%" height="2.125rem" :rounded="true" />
+          <OSelect
+            v-else
+            v-model="activeAgentKey"
+            :label="t('aiObservability.agentGraph.agent')"
+            label-position="inside"
+            :options="agentSelectOptions"
+            labelKey="label"
+            valueKey="value"
+            class="w-full rounded-default"
+          />
+        </div>
       </div>
-      <div
-        v-else
-        data-test="agent-graph-agent-selector"
-        class="w-56 shrink-0"
-      >
-        <SkeletonBox
-          v-if="!agentsLoaded"
-          width="100%"
-          height="2.125rem"
-          :rounded="true"
-        />
-        <OSelect
-          v-else
-          v-model="activeAgentKey"
-          :label="t('aiObservability.agentGraph.agent')"
-          label-position="inside"
-          :options="agentSelectOptions"
-          labelKey="label"
-          valueKey="value"
-          class="w-full rounded-default"
-        />
-      </div>
-    </div>
     </template>
 
     <ServiceGraph
@@ -151,9 +140,7 @@ const store = useStore();
 const { searchObj } = useTraces();
 const { getStreams } = useStreams();
 
-const ServiceGraph = defineAsyncComponent(
-  () => import("@/plugins/traces/ServiceGraph.vue"),
-);
+const ServiceGraph = defineAsyncComponent(() => import("@/plugins/traces/ServiceGraph.vue"));
 
 const DEFAULT_RELATIVE = "15m";
 
@@ -167,12 +154,8 @@ const activeStream = ref<string>("default");
 // { refresh, loading, lastRunAt }.
 const graphRef = ref<any>(null);
 const isRefreshing = ref(false);
-const graphLastRunAt = computed<number | null>(
-  () => graphRef.value?.lastRunAt ?? null,
-);
-const isGraphLoading = computed(
-  () => isRefreshing.value || graphRef.value?.loading || false,
-);
+const graphLastRunAt = computed<number | null>(() => graphRef.value?.lastRunAt ?? null);
+const isGraphLoading = computed(() => isRefreshing.value || graphRef.value?.loading || false);
 
 async function refresh() {
   if (isRefreshing.value) return;
@@ -224,9 +207,7 @@ const effectiveStream = computed(() =>
     : activeStream.value,
 );
 
-function onFilterModeChange(
-  mode: boolean | AcceptableValue | AcceptableValue[],
-) {
+function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
   if (mode === "stream" || mode === "agent") filterMode.value = mode;
 }
 
@@ -245,10 +226,7 @@ async function loadStreams() {
       list?: { name: string }[];
     };
     availableStreams.value = (res?.list ?? []).map((s) => s.name);
-    if (
-      availableStreams.value.length &&
-      !availableStreams.value.includes(activeStream.value)
-    ) {
+    if (availableStreams.value.length && !availableStreams.value.includes(activeStream.value)) {
       activeStream.value = availableStreams.value[0];
     }
   } catch {
@@ -260,11 +238,7 @@ async function loadAgents() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const { startTime, endTime } = effectiveWindow();
-    const res = await genAiAgentMappingService.listAgents(
-      org,
-      startTime,
-      endTime,
-    );
+    const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
     agents.value = res.agents ?? [];
     if (!activeAgentKey.value && agents.value.length) {
       activeAgentKey.value = agentKey(agents.value[0]);
@@ -302,13 +276,8 @@ function onDateChange(value: any) {
 }
 
 onMounted(() => {
-  if (
-    searchObj.data.datetime.type === "relative" ||
-    !searchObj.data.datetime.startTime
-  ) {
-    applyRelative(
-      searchObj.data.datetime.relativeTimePeriod || DEFAULT_RELATIVE,
-    );
+  if (searchObj.data.datetime.type === "relative" || !searchObj.data.datetime.startTime) {
+    applyRelative(searchObj.data.datetime.relativeTimePeriod || DEFAULT_RELATIVE);
   }
   loadStreams();
   loadAgents();

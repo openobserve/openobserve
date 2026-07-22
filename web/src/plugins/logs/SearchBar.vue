@@ -15,15 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="logs-search-bar-component"
-    id="searchBarComponent"
-  >
-    <div class="flex m-0! p-1.5! items-center! w-full overflow-hidden border-b solid border-b-card-glass-border">
-      <div
-        ref="toolbarLeftRef"
-        class="flex items-center gap-1 flex-nowrap flex-1 min-w-0"
-      >
+  <div class="logs-search-bar-component" id="searchBarComponent">
+    <div
+      class="flex m-0! p-1.5! items-center! w-full overflow-hidden border-b solid border-b-card-glass-border"
+    >
+      <div ref="toolbarLeftRef" class="flex items-center gap-1 flex-nowrap flex-1 min-w-0">
         <!-- Collapsible region — clips its overflow so the More button (a
              shrink-0 sibling below) always stays visible. Pinned items hide via
              the pinBudget computation before they would clip. `flex-initial`
@@ -31,277 +27,278 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              sits right after the pinned items instead of being pushed to the
              far right; it still shrinks + clips when content overflows. -->
         <div class="flex items-center gap-1 flex-nowrap flex-initial min-w-0 overflow-hidden">
-        <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
-        <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
-          <template #trigger>
-            <OButton
-              data-test="logs-view-mode-dropdown-btn"
-              size="xs"
-              variant="outline"
-              icon-right="chevron-down"
+          <!-- View Mode: Dropdown when very narrow, Toggle Group otherwise -->
+          <ODropdown v-if="toolbarToggleAsDropdown" side="bottom" align="start">
+            <template #trigger>
+              <OButton
+                data-test="logs-view-mode-dropdown-btn"
+                size="xs"
+                variant="outline"
+                icon-right="chevron-down"
+              >
+                <OIcon :name="currentToggleOption.icon" size="sm" class="shrink-0" />
+                {{ currentToggleOption.label }}
+              </OButton>
+            </template>
+            <ODropdownItem
+              v-for="opt in toggleViewOptions"
+              :key="opt.value"
+              :data-test="`logs-view-mode-${opt.value}-item`"
+              :disabled="opt.disabled"
+              @select="onLogsVisualizeToggleUpdate(opt.value)"
             >
-              <OIcon :name="currentToggleOption.icon" size="sm" class="shrink-0" />
-              {{ currentToggleOption.label }}
-            </OButton>
-          </template>
-          <ODropdownItem
-            v-for="opt in toggleViewOptions"
-            :key="opt.value"
-            :data-test="`logs-view-mode-${opt.value}-item`"
-            :disabled="opt.disabled"
-            @select="onLogsVisualizeToggleUpdate(opt.value)"
-          >
-            <template #icon-left><OIcon :name="opt.icon" size="sm" /></template>
-            {{ opt.label }}
-          </ODropdownItem>
-        </ODropdown>
+              <template #icon-left><OIcon :name="opt.icon" size="sm" /></template>
+              {{ opt.label }}
+            </ODropdownItem>
+          </ODropdown>
 
-        <OToggleGroup
-          v-else
-          :model-value="searchObj.meta.logsVisualizeToggle"
-          @update:model-value="onLogsVisualizeToggleUpdate($event)"
-        >
-          <OToggleGroupItem
-            data-test="logs-logs-toggle"
-            value="logs"
-            size="sm"
-            :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
+          <OToggleGroup
+            v-else
+            :model-value="searchObj.meta.logsVisualizeToggle"
+            @update:model-value="onLogsVisualizeToggleUpdate($event)"
           >
-            <template #icon-left>
-              <OIcon name="search" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!toolbarToggleIconOnly">{{ t("common.search") }}</span>
-          </OToggleGroupItem>
+            <OToggleGroupItem
+              data-test="logs-logs-toggle"
+              value="logs"
+              size="sm"
+              :tooltip="toolbarToggleIconOnly ? t('common.search') : undefined"
+            >
+              <template #icon-left>
+                <OIcon name="search" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!toolbarToggleIconOnly">{{ t("common.search") }}</span>
+            </OToggleGroupItem>
 
-          <OToggleGroupItem
-            v-if="store.state.zoConfig.timechart_enabled"
-            data-test="logs-visualize-toggle"
-            :disabled="isVisualizeDisabled"
-            :tooltip="isVisualizeDisabled ? t('search.enableSqlModeOrSelectSingleStream') : toolbarToggleIconOnly ? t('search.visualize') : undefined"
-            value="visualize"
-            size="sm"
+            <OToggleGroupItem
+              v-if="store.state.zoConfig.timechart_enabled"
+              data-test="logs-visualize-toggle"
+              :disabled="isVisualizeDisabled"
+              :tooltip="
+                isVisualizeDisabled
+                  ? t('search.enableSqlModeOrSelectSingleStream')
+                  : toolbarToggleIconOnly
+                    ? t('search.visualize')
+                    : undefined
+              "
+              value="visualize"
+              size="sm"
+            >
+              <template #icon-left>
+                <OIcon name="timeline" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!toolbarToggleIconOnly">{{ t("search.visualize") }}</span>
+            </OToggleGroupItem>
+
+            <OToggleGroupItem
+              data-test="logs-build-toggle"
+              value="build"
+              size="sm"
+              :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
+            >
+              <template #icon-left>
+                <OIcon name="build" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
+            </OToggleGroupItem>
+
+            <OToggleGroupItem
+              v-if="config.isEnterprise == 'true'"
+              data-test="logs-patterns-toggle"
+              value="patterns"
+              size="sm"
+              :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
+            >
+              <template #icon-left>
+                <OIcon name="layers" size="sm" class="shrink-0" />
+              </template>
+              <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
+            </OToggleGroupItem>
+          </OToggleGroup>
+          <!-- reset filters button — moves into More menu at very narrow widths -->
+          <OButton
+            v-if="!toolbarMoveResetToMenu"
+            data-test="logs-search-bar-reset-filters-btn"
+            size="xs"
+            variant="outline"
+            @click="resetFilters"
           >
-            <template #icon-left>
-              <OIcon name="timeline" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!toolbarToggleIconOnly">{{ t("search.visualize") }}</span>
-          </OToggleGroupItem>
+            <OIcon name="restart-alt" size="sm" />
+            <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
+            <OTooltip :content="t('search.resetFilters')" />
+          </OButton>
 
-          <OToggleGroupItem
-            data-test="logs-build-toggle"
-            value="build"
-            size="sm"
-            :tooltip="toolbarToggleIconOnly ? t('search.buildQuery') : undefined"
-          >
-            <template #icon-left>
-              <OIcon name="build" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!toolbarToggleIconOnly">{{ t("search.buildQuery") }}</span>
-          </OToggleGroupItem>
-
-          <OToggleGroupItem
-            v-if="config.isEnterprise == 'true'"
-            data-test="logs-patterns-toggle"
-            value="patterns"
-            size="sm"
-            :tooltip="toolbarToggleIconOnly ? t('search.showPatternsLabel') : undefined"
-          >
-            <template #icon-left>
-              <OIcon name="layers" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!toolbarToggleIconOnly">{{ t("search.showPatternsLabel") }}</span>
-          </OToggleGroupItem>
-        </OToggleGroup>
-        <!-- reset filters button — moves into More menu at very narrow widths -->
-        <OButton
-          v-if="!toolbarMoveResetToMenu"
-          data-test="logs-search-bar-reset-filters-btn"
-          size="xs"
-          variant="outline"
-          @click="resetFilters"
-        >
-          <OIcon name="restart-alt" size="sm" />
-          <span v-if="!shouldHideToolbarButtonText">{{ t("common.reset") }}</span>
-          <OTooltip :content="t('search.resetFilters')" />
-        </OButton>
-
-        <!-- ── Pinned toolbar controls ──────────────────────────────────
+          <!-- ── Pinned toolbar controls ──────────────────────────────────
              Items pinned out of the More menu render here in fixed order.
              They collapse back into the menu on narrow widths (see
              showPinned*/pin* computeds). -->
 
-        <!-- Histogram (pinned by default — see useToolbarPins) -->
-        <OButton
-          v-if="showPinnedHistogram"
-          data-test="logs-search-bar-histogram-btn"
-          size="xs"
-          variant="outline"
-          class="gap-1.5"
-          @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
-        >
-          <OSwitch
-            v-model="searchObj.meta.showHistogram"
-            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
-            @click.stop
-          />
-          <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
-          <OTooltip :content="searchObj.meta.showHistogram ? t('search.hideHistogram') : t('search.showHistogramLabel')" shortcut-id="logsToggleHistogram" />
-        </OButton>
+          <!-- Histogram (pinned by default — see useToolbarPins) -->
+          <OButton
+            v-if="showPinnedHistogram"
+            data-test="logs-search-bar-histogram-btn"
+            size="xs"
+            variant="outline"
+            class="gap-1.5"
+            @click="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
+          >
+            <OSwitch
+              v-model="searchObj.meta.showHistogram"
+              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+              @click.stop
+            />
+            <OIcon name="bar-chart" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+            <OTooltip
+              :content="
+                searchObj.meta.showHistogram
+                  ? t('search.hideHistogram')
+                  : t('search.showHistogramLabel')
+              "
+              shortcut-id="logsToggleHistogram"
+            />
+          </OButton>
 
-        <!-- SQL Mode (pinned) -->
-        <OButton
-          v-if="showPinnedSqlMode"
-          data-test="logs-search-bar-sql-mode-pinned-btn"
-          size="xs"
-          variant="outline"
-          class="gap-1.5"
-          @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
-        >
-          <OSwitch
-            :model-value="searchObj.meta.sqlMode"
-            :disabled="isSqlModeDisabled"
-            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
-            @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
-          />
-          <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
-          <OTooltip :content="t('search.sqlModeLabel')" />
-        </OButton>
+          <!-- SQL Mode (pinned) -->
+          <OButton
+            v-if="showPinnedSqlMode"
+            data-test="logs-search-bar-sql-mode-pinned-btn"
+            size="xs"
+            variant="outline"
+            class="gap-1.5"
+            @click="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+          >
+            <OSwitch
+              :model-value="searchObj.meta.sqlMode"
+              :disabled="isSqlModeDisabled"
+              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+              @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+            />
+            <OIcon name="code" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+            <OTooltip :content="t('search.sqlModeLabel')" />
+          </OButton>
 
-        <!-- Quick Mode (pinned) -->
-        <OButton
-          v-if="showPinnedQuickMode"
-          data-test="logs-search-bar-quick-mode-pinned-btn"
-          size="xs"
-          variant="outline"
-          class="gap-1.5"
-          @click="handleQuickMode"
-        >
-          <OSwitch
-            :model-value="searchObj.meta.quickMode"
-            :size="toolbarToggleIconOnly ? 'sm' : 'md'"
-            @click.stop="handleQuickMode"
-          />
-          <!-- child-mode OTooltip attaches to its previous sibling, so this one
+          <!-- Quick Mode (pinned) -->
+          <OButton
+            v-if="showPinnedQuickMode"
+            data-test="logs-search-bar-quick-mode-pinned-btn"
+            size="xs"
+            variant="outline"
+            class="gap-1.5"
+            @click="handleQuickMode"
+          >
+            <OSwitch
+              :model-value="searchObj.meta.quickMode"
+              :size="toolbarToggleIconOnly ? 'sm' : 'md'"
+              @click.stop="handleQuickMode"
+            />
+            <!-- child-mode OTooltip attaches to its previous sibling, so this one
                gives the switch its own tooltip (the button-level tooltip below
                only covers the bolt icon). -->
-          <OTooltip :content="t('search.quickModeLabel')" :side-offset="2" />
-          <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
-          <OTooltip :content="t('search.quickModeLabel')" />
-        </OButton>
-
-        <!-- Saved Views (pinned) — button group styled to match the function
-             selector for visual consistency: open-list dropdown trigger + create. -->
-        <OButtonGroup
-          v-if="showPinnedSavedViews"
-          data-test="logs-search-bar-saved-views-pinned"
-          class="p-0 element-box-shadow border border-button-outline-border"
-        >
-          <!-- A real dropdown, not a modal: one click to open, one click to
-               apply. The heavyweight list dialog stays reachable via Manage. -->
-          <ODropdown
-            :open="savedViewsDropdownOpen"
-            side="bottom"
-            align="start"
-            @update:open="onSavedViewsDropdownOpenChange"
-          >
-            <template #trigger>
-              <OButton
-                data-test="logs-search-bar-saved-views-pinned-list-btn"
-                variant="ghost"
-                size="icon-toolbar"
-              >
-                <OIcon name="saved-search" size="sm" />
-                <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
-                <OTooltip
-                  :content="t('search.listSavedViews')"
-                  :side-offset="2"
-                />
-              </OButton>
-            </template>
-            <ODropdownGroup :label="t('search.savedViewsLabel')">
-              <div
-                v-if="searchObj.loadingSavedView"
-                class="flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary"
-              >
-                <OSpinner size="xs" />
-                {{ t("confirmDialog.loading") }}
-              </div>
-              <template v-else-if="sortedSavedViews.length">
-                <ODropdownItem
-                  v-for="view in sortedSavedViews"
-                  :key="view.view_id"
-                  :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
-                  @select="applySavedView(view)"
-                >
-                  <template #icon-left>
-                    <OIcon
-                      :name="
-                        favoriteViews.includes(view.view_id)
-                          ? 'favorite'
-                          : 'saved-search'
-                      "
-                      size="sm"
-                      :class="
-                        favoriteViews.includes(view.view_id)
-                          ? 'text-favorite'
-                          : ''
-                      "
-                    />
-                  </template>
-                  <span class="truncate max-w-56">{{ view.view_name }}</span>
-                  <template #icon-right>
-                    <OButton
-                      variant="ghost"
-                      size="icon-xs-sq"
-                      icon-left="edit"
-                      class="ms-auto"
-                      :title="t('search.updateSavedViewWithCurrent')"
-                      :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
-                      @click.stop.prevent="quickUpdateSavedView(view)"
-                    />
-                  </template>
-                </ODropdownItem>
-              </template>
-              <ODropdownItem v-else disabled>
-                {{ t("search.savedViewsNotFound") }}
-              </ODropdownItem>
-            </ODropdownGroup>
-            <ODropdownSeparator />
-            <ODropdownItem
-              icon-left="save"
-              data-test="logs-search-bar-saved-views-menu-create"
-              @select="fnSavedView"
-            >
-              {{ t("search.createSavedView") }}
-            </ODropdownItem>
-            <ODropdownItem
-              icon-left="settings"
-              data-test="logs-search-bar-saved-views-menu-manage"
-              @select="openSavedViewsList"
-            >
-              {{ t("search.manageSavedViews") }}
-            </ODropdownItem>
-          </ODropdown>
-          <OButton
-            data-test="logs-search-bar-saved-views-pinned-create-btn"
-            variant="ghost"
-            size="icon-toolbar"
-            @click="fnSavedView"
-          >
-            <OIcon name="save" size="sm" />
-            <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+            <OTooltip :content="t('search.quickModeLabel')" :side-offset="2" />
+            <OIcon name="bolt" :size="toolbarToggleIconOnly ? 'xs' : 'sm'" class="shrink-0" />
+            <OTooltip :content="t('search.quickModeLabel')" />
           </OButton>
-        </OButtonGroup>
 
-        <!-- Syntax Guide (pinned) — icon+label, becomes icon-only at narrow widths -->
-        <SyntaxGuide
-          v-if="showPinnedSyntaxGuide"
-          :sqlmode="searchObj.meta.sqlMode"
-          :toolbar="true"
-          :label="pinSyntaxGuideIconOnly ? '' : t('search.syntaxGuideLabel')"
-          data-test="logs-search-bar-syntax-guide-pinned-btn"
-        />
+          <!-- Saved Views (pinned) — button group styled to match the function
+             selector for visual consistency: open-list dropdown trigger + create. -->
+          <OButtonGroup
+            v-if="showPinnedSavedViews"
+            data-test="logs-search-bar-saved-views-pinned"
+            class="p-0 element-box-shadow border border-button-outline-border"
+          >
+            <!-- A real dropdown, not a modal: one click to open, one click to
+               apply. The heavyweight list dialog stays reachable via Manage. -->
+            <ODropdown
+              :open="savedViewsDropdownOpen"
+              side="bottom"
+              align="start"
+              @update:open="onSavedViewsDropdownOpenChange"
+            >
+              <template #trigger>
+                <OButton
+                  data-test="logs-search-bar-saved-views-pinned-list-btn"
+                  variant="ghost"
+                  size="icon-toolbar"
+                >
+                  <OIcon name="saved-search" size="sm" />
+                  <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+                  <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
+                </OButton>
+              </template>
+              <ODropdownGroup :label="t('search.savedViewsLabel')">
+                <div
+                  v-if="searchObj.loadingSavedView"
+                  class="flex items-center gap-2 px-3 py-1.5 text-sm text-text-secondary"
+                >
+                  <OSpinner size="xs" />
+                  {{ t("confirmDialog.loading") }}
+                </div>
+                <template v-else-if="sortedSavedViews.length">
+                  <ODropdownItem
+                    v-for="view in sortedSavedViews"
+                    :key="view.view_id"
+                    :data-test="`logs-search-bar-saved-views-menu-apply-${view.view_name}`"
+                    @select="applySavedView(view)"
+                  >
+                    <template #icon-left>
+                      <OIcon
+                        :name="favoriteViews.includes(view.view_id) ? 'favorite' : 'saved-search'"
+                        size="sm"
+                        :class="favoriteViews.includes(view.view_id) ? 'text-favorite' : ''"
+                      />
+                    </template>
+                    <span class="truncate max-w-56">{{ view.view_name }}</span>
+                    <template #icon-right>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        icon-left="edit"
+                        class="ms-auto"
+                        :title="t('search.updateSavedViewWithCurrent')"
+                        :data-test="`logs-search-bar-saved-views-menu-update-${view.view_name}`"
+                        @click.stop.prevent="quickUpdateSavedView(view)"
+                      />
+                    </template>
+                  </ODropdownItem>
+                </template>
+                <ODropdownItem v-else disabled>
+                  {{ t("search.savedViewsNotFound") }}
+                </ODropdownItem>
+              </ODropdownGroup>
+              <ODropdownSeparator />
+              <ODropdownItem
+                icon-left="save"
+                data-test="logs-search-bar-saved-views-menu-create"
+                @select="fnSavedView"
+              >
+                {{ t("search.createSavedView") }}
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="settings"
+                data-test="logs-search-bar-saved-views-menu-manage"
+                @select="openSavedViewsList"
+              >
+                {{ t("search.manageSavedViews") }}
+              </ODropdownItem>
+            </ODropdown>
+            <OButton
+              data-test="logs-search-bar-saved-views-pinned-create-btn"
+              variant="ghost"
+              size="icon-toolbar"
+              @click="fnSavedView"
+            >
+              <OIcon name="save" size="sm" />
+              <OTooltip :content="t('search.createSavedView')" :side-offset="6" />
+            </OButton>
+          </OButtonGroup>
 
+          <!-- Syntax Guide (pinned) — icon+label, becomes icon-only at narrow widths -->
+          <SyntaxGuide
+            v-if="showPinnedSyntaxGuide"
+            :sqlmode="searchObj.meta.sqlMode"
+            :toolbar="true"
+            :label="pinSyntaxGuideIconOnly ? '' : t('search.syntaxGuideLabel')"
+            data-test="logs-search-bar-syntax-guide-pinned-btn"
+          />
         </div>
         <!-- this is the button group responsible for showing all the utilities -->
         <ODropdown class="flex-shrink-0" side="bottom" align="start">
@@ -313,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
             >
-              {{ t('search.menuMore') }}
+              {{ t("search.menuMore") }}
             </OButton>
           </template>
 
@@ -322,10 +319,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- SQL Mode — toggles the same flag used for SQL auto-detection -->
             <ODropdownItem
               data-test="logs-search-bar-menu-sql-mode-toggle-btn"
-              @select.prevent="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+              @select.prevent="
+                !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
+              "
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="code" size="sm" />
                 </span>
               </template>
@@ -337,13 +338,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :disabled="isSqlModeDisabled"
                     size="md"
                     data-test="logs-search-bar-sql-mode-toggle"
-                    @click.stop="!isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)"
+                    @click.stop="
+                      !isSqlModeDisabled && (searchObj.meta.sqlMode = !searchObj.meta.sqlMode)
+                    "
                   />
                   <OButton
                     data-test="logs-search-bar-menu-pin-sql-mode-btn"
                     variant="ghost-neutral"
                     size="icon-sm"
-                    :title="isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    :title="
+                      isPinned('sqlMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                    "
                     @click.stop="togglePin('sqlMode')"
                   >
                     <OIcon :name="isPinned('sqlMode') ? 'keep' : 'keep-outline'" size="sm" />
@@ -359,7 +364,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="resetFilters"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="restart-alt" size="sm" />
                 </span>
               </template>
@@ -372,7 +379,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="searchObj.meta.showHistogram = !searchObj.meta.showHistogram"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="bar-chart" size="sm" />
                 </span>
               </template>
@@ -389,7 +398,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-bar-menu-pin-histogram-btn"
                     variant="ghost-neutral"
                     size="icon-sm"
-                    :title="isPinned('histogram') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    :title="
+                      isPinned('histogram')
+                        ? t('search.unpinFromToolbar')
+                        : t('search.pinToToolbar')
+                    "
                     @click.stop="togglePin('histogram')"
                   >
                     <OIcon :name="isPinned('histogram') ? 'keep' : 'keep-outline'" size="sm" />
@@ -404,7 +417,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select.prevent="handleQuickMode"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="bolt" size="sm" />
                 </span>
               </template>
@@ -421,7 +436,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-bar-menu-pin-quick-mode-btn"
                     variant="ghost-neutral"
                     size="icon-sm"
-                    :title="isPinned('quickMode') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    :title="
+                      isPinned('quickMode')
+                        ? t('search.unpinFromToolbar')
+                        : t('search.pinToToolbar')
+                    "
                     @click.stop="togglePin('quickMode')"
                   >
                     <OIcon :name="isPinned('quickMode') ? 'keep' : 'keep-outline'" size="sm" />
@@ -433,12 +452,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Function Editor -->
             <ODropdownItem
               data-test="logs-search-bar-menu-transform-editor-toggle-btn"
-              @select.prevent="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
+              @select.prevent="
+                searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor
+              "
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0 font-mono text-compact italic font-bold text-accent">fx</span>
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0 font-mono text-compact italic font-bold text-accent"
+                  >fx</span
+                >
               </template>
-              {{ t('search.functionEditorLabel') }}
+              {{ t("search.functionEditorLabel") }}
               <template #icon-right>
                 <span class="ml-auto flex items-center gap-1">
                   <OSwitch
@@ -451,7 +475,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="logs-search-bar-menu-pin-function-editor-btn"
                     variant="ghost-neutral"
                     size="icon-sm"
-                    :title="isPinned('functionEditor') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                    :title="
+                      isPinned('functionEditor')
+                        ? t('search.unpinFromToolbar')
+                        : t('search.pinToToolbar')
+                    "
                     @click.stop="togglePin('functionEditor')"
                   >
                     <OIcon :name="isPinned('functionEditor') ? 'keep' : 'keep-outline'" size="sm" />
@@ -470,7 +498,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="logs-search-bar-menu-pin-saved-views-btn"
                 variant="ghost-neutral"
                 size="icon-sm"
-                :title="isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+                :title="
+                  isPinned('savedViews') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+                "
                 @click.stop="togglePin('savedViews')"
               >
                 <OIcon :name="isPinned('savedViews') ? 'keep' : 'keep-outline'" size="sm" />
@@ -481,7 +511,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="openSavedViewsList"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="format-list-bulleted" size="sm" />
                 </span>
               </template>
@@ -494,7 +526,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="fnSavedView"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="add" size="sm" />
                 </span>
               </template>
@@ -518,7 +552,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-neutral"
               size="icon-sm"
               class="ml-auto"
-              :title="isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')"
+              :title="
+                isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
+              "
               @click.stop="togglePin('syntaxGuide')"
             >
               <OIcon :name="isPinned('syntaxGuide') ? 'keep' : 'keep-outline'" size="sm" />
@@ -547,7 +583,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <ODropdown
           side="bottom"
           align="start"
-          @update:open="(open) => { if (!open) showDownloadSubmenu = false; }"
+          @update:open="
+            (open) => {
+              if (!open) showDownloadSubmenu = false;
+            }
+          "
         >
           <template #trigger>
             <OButton
@@ -562,7 +602,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <!-- Share Link -->
-          <div v-if="shouldMoveShareToMenu" class="p-2" data-test="logs-search-bar-menu-share-link-btn">
+          <div
+            v-if="shouldMoveShareToMenu"
+            class="p-2"
+            data-test="logs-search-bar-menu-share-link-btn"
+          >
             <share-button
               :url="shareURL"
               variant="outline"
@@ -582,7 +626,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="showSearchHistoryfn"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="history" size="sm" />
                 </span>
               </template>
@@ -601,9 +647,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @mouseenter="!isDownloadDisabled && (showDownloadSubmenu = true)"
               @mouseleave="showDownloadSubmenu = false"
               class="relative flex items-center gap-2 py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] cursor-pointer select-none hover:bg-interactive-hover-bg search-download-item before:content-[''] before:absolute before:top-0 before:right-full before:w-2.5 before:h-full"
-              :class="{ 'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled }"
+              :class="{
+                'cursor-not-allowed! text-text-muted hover:bg-transparent!': isDownloadDisabled,
+              }"
             >
-              <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+              <span
+                class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+              >
                 <OIcon size="sm" name="download" />
               </span>
               <span class="flex-1 whitespace-nowrap">{{ t("search.downloadTable") }}</span>
@@ -618,7 +668,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="button"
                   data-test="search-download-csv-btn"
                   class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
-                  @click="downloadLogs(searchObj.data.queryResults.hits, 'csv'); showDownloadSubmenu = false"
+                  @click="
+                    downloadLogs(searchObj.data.queryResults.hits, 'csv');
+                    showDownloadSubmenu = false;
+                  "
                 >
                   <OIcon name="grid-on" size="sm" />
                   <span class="flex-1">{{ t("search.downloadCSV") }}</span>
@@ -627,7 +680,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   type="button"
                   data-test="search-download-json-btn"
                   class="flex items-center gap-2.5 w-full py-1.5 px-3 text-[var(--text-sm)] [line-height:1.2] text-left bg-transparent border-0 cursor-pointer text-text-body hover:bg-interactive-hover-bg"
-                  @click="downloadLogs(searchObj.data.queryResults.hits, 'json'); showDownloadSubmenu = false"
+                  @click="
+                    downloadLogs(searchObj.data.queryResults.hits, 'json');
+                    showDownloadSubmenu = false;
+                  "
                 >
                   <OIcon name="data-object" size="sm" />
                   <span class="flex-1">{{ t("search.downloadJSON") }}</span>
@@ -641,7 +697,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="toggleCustomDownloadDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <img
                     :src="customRangeIcon"
                     :alt="t('logs.searchBar.customRangeAlt')"
@@ -665,7 +723,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="createScheduleJob"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <img
                     :src="createScheduledSearchIcon"
                     :alt="t('logs.searchBar.createScheduledSearchAlt')"
@@ -684,7 +744,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @select="routeToSearchSchedule"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <img
                     :src="listScheduledSearchIcon"
                     :alt="t('logs.searchBar.listScheduledSearchAlt')"
@@ -708,38 +770,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             :label="t('search.menuGroupInspect')"
           >
-            <ODropdownItem
-              data-test="search-inspect-btn"
-              @select="openSearchInspectDialog"
-            >
+            <ODropdownItem data-test="search-inspect-btn" @select="openSearchInspectDialog">
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="troubleshoot" size="sm" />
                 </span>
               </template>
-              <span data-test="search-inspect-label">{{ t('search.searchInspect') }}</span>
+              <span data-test="search-inspect-label">{{ t("search.searchInspect") }}</span>
             </ODropdownItem>
           </ODropdownGroup>
 
           <ODropdownSeparator />
 
-          <ODropdownGroup
-            v-if="searchObj.meta.sqlMode"
-            :label="t('search.menuGroupExplain')"
-          >
+          <ODropdownGroup v-if="searchObj.meta.sqlMode" :label="t('search.menuGroupExplain')">
             <ODropdownItem
               data-test="logs-search-bar-explain-query-menu-btn"
-              :disabled="
-                !searchObj.data.query || searchObj.data.query.trim() === ''
-              "
+              :disabled="!searchObj.data.query || searchObj.data.query.trim() === ''"
               @select="openExplainDialog"
             >
               <template #icon-left>
-                <span class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0">
+                <span
+                  class="inline-flex items-center justify-center w-7 h-7 rounded-default bg-section-header-bg text-text-secondary shrink-0"
+                >
                   <OIcon name="lightbulb" size="sm" />
                 </span>
               </template>
-              {{ t('search.explainQuery') }}
+              {{ t("search.explainQuery") }}
             </ODropdownItem>
           </ODropdownGroup>
         </ODropdown>
@@ -781,12 +839,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
             data-test="logs-search-bar-date-time-dropdown"
-            :queryRangeRestrictionMsg="
-              searchObj.data.datetime.queryRangeRestrictionMsg
-            "
-            :queryRangeRestrictionInHour="
-              searchObj.data.datetime.queryRangeRestrictionInHour
-            "
+            :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
+            :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
             :disable="disable"
@@ -804,11 +858,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 store.state.zoConfig.super_cluster_enabled
               "
             >
-              <ODropdown
-                side="bottom"
-                align="start"
-                data-test="logs-search-bar-region-btn"
-              >
+              <ODropdown side="bottom" align="start" data-test="logs-search-bar-region-btn">
                 <template #trigger>
                   <OButton
                     variant="outline"
@@ -820,10 +870,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon name="arrow-drop-down" size="sm" class="ml-1" />
                   </OButton>
                 </template>
-                <div
-                  class="p-2 min-w-60"
-                  data-test="logs-search-bar-region-menu"
-                >
+                <div class="p-2 min-w-60" data-test="logs-search-bar-region-menu">
                   <OInput
                     clearable
                     class="mb-1.5! indexlist-search-input mx-2 mt-2"
@@ -848,10 +895,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchObj.meta.logsVisualizeToggle === 'build'
               "
             >
-              <div
-                v-if="config.isEnterprise == 'true'"
-                class="flex items-center"
-              >
+              <div v-if="config.isEnterprise == 'true'" class="flex items-center">
                 <OButton
                   v-if="visualizeSearchRequestTraceIds.length > 0"
                   data-test="logs-search-bar-visualize-cancel-btn"
@@ -878,11 +922,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  :size="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'md'
-                      : 'sm-toolbar'
-                  "
+                  :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
                   class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -909,16 +949,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon-xs"
                       :class="[
-                        !(
-                          isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                        ) &&
+                        !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : !(
-                                isNaturalLanguageDetected &&
-                                !searchObj.meta.nlpMode
-                              )
+                          : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                             ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
                         'rounded-s-none! rounded-e-default!',
@@ -928,26 +963,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <ODropdownItem
-                    v-if="
-                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                    "
+                    v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
-                      config.isEnterprise == 'true' &&
-                      !!visualizeSearchRequestTraceIds.length
+                      config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length
                     "
                     @select="handleRunQueryFn(true)"
                   >
-                    <template #icon-left
-                      ><OIcon name="refresh" size="sm"
-                    /></template>
+                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
-                  <p
-                    v-else
-                    class="text-xs text-text-secondary text-center px-3 py-2"
-                  >
+                  <p v-else class="text-xs text-text-secondary text-center px-3 py-2">
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
                 </ODropdown>
@@ -981,11 +1008,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       !searchObj.meta.nlpMode &&
                       !searchObj.data.stream.selectedStream.length)
                   "
-                  :size="
-                    isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                      ? 'md'
-                      : 'sm-toolbar'
-                  "
+                  :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
                   class="p-0 h-[1.875rem]! element-box-shadow"
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1012,16 +1035,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       variant="ghost"
                       size="icon-xs"
                       :class="[
-                        !(
-                          isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                        ) &&
+                        !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                          : !(
-                                isNaturalLanguageDetected &&
-                                !searchObj.meta.nlpMode
-                              )
+                          : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                             ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                             : '',
                         'rounded-s-none! rounded-e-default!',
@@ -1031,26 +1049,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </OButton>
                   </template>
                   <ODropdownItem
-                    v-if="
-                      !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                    "
+                    v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                     data-test="logs-search-bar-refresh-btn"
                     data-cy="search-bar-visuzlie-hard-refresh-button"
                     :disabled="
-                      config.isEnterprise == 'true' &&
-                      !!visualizeSearchRequestTraceIds.length
+                      config.isEnterprise == 'true' && !!visualizeSearchRequestTraceIds.length
                     "
                     @select="handleRunQueryFn(true)"
                   >
-                    <template #icon-left
-                      ><OIcon name="refresh" size="sm"
-                    /></template>
+                    <template #icon-left><OIcon name="refresh" size="sm" /></template>
                     {{ t("search.refreshCacheAndRunQuery") }}
                   </ODropdownItem>
-                  <p
-                    v-else
-                    class="text-xs text-text-secondary text-center px-3 py-2"
-                  >
+                  <p v-else class="text-xs text-text-secondary text-center px-3 py-2">
                     {{ t("nlMode.noAdditionalOptions") }}
                   </p>
                 </ODropdown>
@@ -1059,10 +1069,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div v-else class="flex items-center">
               <!-- Cancel button for patterns tab -->
               <OButton
-                v-if="
-                  searchObj.meta.logsVisualizeToggle === 'patterns' &&
-                  patternsState.loading
-                "
+                v-if="searchObj.meta.logsVisualizeToggle === 'patterns' && patternsState.loading"
                 data-test="logs-search-bar-patterns-cancel-btn"
                 variant="ghost"
                 :title="t('search.cancel')"
@@ -1077,8 +1084,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   config.isEnterprise == 'true' &&
                   (!!searchObj.data.searchRequestTraceIds.length ||
                     !!searchObj.data.searchWebSocketTraceIds.length) &&
-                  (searchObj.loading == true ||
-                    searchObj.loadingHistogram == true)
+                  (searchObj.loading == true || searchObj.loadingHistogram == true)
                 "
                 data-test="logs-search-bar-refresh-btn"
                 data-cy="search-bar-refresh-button"
@@ -1105,11 +1111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     ? t('search.generateQueryTooltip')
                     : t('search.runQuery')
                 "
-                :size="
-                  isNaturalLanguageDetected && !searchObj.meta.nlpMode
-                    ? 'md'
-                    : 'sm-toolbar'
-                "
+                :size="isNaturalLanguageDetected && !searchObj.meta.nlpMode ? 'md' : 'sm-toolbar'"
                 class="p-0 h-[1.875rem]! element-box-shadow"
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1165,11 +1167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="h-[1.875rem]! w-px"
                 vertical
               />
-              <ODropdown
-                v-if="store.state.zoConfig.auto_query_enabled"
-                align="end"
-                side="bottom"
-              >
+              <ODropdown v-if="store.state.zoConfig.auto_query_enabled" align="end" side="bottom">
                 <template #trigger>
                   <OButton
                     variant="ghost"
@@ -1181,13 +1179,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         config.isEnterprise == 'true' &&
                         (!!searchObj.data.searchRequestTraceIds.length ||
                           !!searchObj.data.searchWebSocketTraceIds.length) &&
-                        (searchObj.loading == true ||
-                          searchObj.loadingHistogram == true))
+                        (searchObj.loading == true || searchObj.loadingHistogram == true))
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
-                        : !(
-                              isNaturalLanguageDetected &&
-                              !searchObj.meta.nlpMode
-                            )
+                        : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                           ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
                           : '',
                       store.state.zoConfig.auto_query_enabled
@@ -1206,15 +1200,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   data-test="logs-search-bar-refresh-btn"
                   data-cy="search-bar-refresh-button"
-                  :disabled="
-                    searchObj.loading == true ||
-                    searchObj.loadingHistogram == true
-                  "
+                  :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
                   @select="handleRunQueryFn(true)"
                 >
-                  <template #icon-left
-                    ><OIcon name="refresh" size="sm"
-                  /></template>
+                  <template #icon-left><OIcon name="refresh" size="sm" /></template>
                   {{ t("search.refreshCacheAndRunQuery") }}
                 </ODropdownItem>
                 <ODropdownSeparator
@@ -1234,9 +1223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <template #icon-left>
                     <OIcon
-                      :name="
-                        searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'
-                      "
+                      :name="searchObj.meta.liveMode ? 'autorenew' : 'sync-disabled'"
                       size="sm"
                       :class="searchObj.meta.liveMode ? 'text-accent' : ''"
                     />
@@ -1268,9 +1255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
-                :min-refresh-interval="
-                  store.state?.zoConfig?.min_auto_refresh_interval ?? 0
-                "
+                :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval ?? 0"
                 @update:model-value="onRefreshIntervalUpdate"
                 @trigger="$emit('onAutoIntervalTrigger')"
               />
@@ -1305,9 +1290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
-      <div
-        class="flex flex-col h-full w-full min-w-0"
-      >
+      <div class="flex flex-col h-full w-full min-w-0">
         <OSplitter
           class="h-full!"
           v-model="searchObj.config.fnSplitterModel"
@@ -1321,7 +1304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex flex-col overflow-hidden h-full relative"
               :class="{
                 'border-r-0 rounded-r-none': searchObj.data.transformType,
-                'fn-editor-open': showFunctionEditor
+                'fn-editor-open': showFunctionEditor,
               }"
             >
               <!-- Unified Query Editor (with built-in AI bar) -->
@@ -1334,14 +1317,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :debounce-time="100"
                 :nlp-mode="searchObj.meta.nlpMode"
                 :has-expand-button="!showFunctionEditor"
-                :show-ai-icon="
-                  config.isEnterprise == 'true' &&
-                  store.state.zoConfig.ai_enabled
-                "
-                :disable-ai="
-                  !searchObj.data.stream.selectedStream.length ||
-                  isSqlModeDisabled
-                "
+                :show-ai-icon="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                :disable-ai="!searchObj.data.stream.selectedStream.length || isSqlModeDisabled"
                 :disable-ai-reason="
                   !searchObj.data.stream.selectedStream.length
                     ? t('search.selectStreamForAI')
@@ -1385,9 +1362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <template v-if="showFunctionEditor">
                 <div class="relative h-full w-full">
-                  <div
-                    class="relative h-full"
-                  >
+                  <div class="relative h-full">
                     <!-- Unified Query Editor (with built-in AI bar) -->
                     <unified-query-editor
                       v-if="router.currentRoute.value.name === 'logs'"
@@ -1400,27 +1375,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :hide-nl-toggle="false"
                       :has-expand-button="true"
                       :disable-ai="isVrlEditorDisabled"
-                      :disable-ai-reason="
-                        isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''
-                      "
+                      :disable-ai-reason="isVrlEditorDisabled ? t('search.vrlOnlyForTable') : ''"
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :read-only="isVrlEditorDisabled"
                       editor-height="100%"
-                      @update:query="
-                        searchObj.data.tempFunctionContent = $event
-                      "
+                      @update:query="searchObj.data.tempFunctionContent = $event"
                       @update:nlp-mode="(val) => (vrlEditorNlpMode = val)"
                       @keydown="handleKeyDown"
-                      @focus="
-                        searchObj.meta.functionEditorPlaceholderFlag = false
-                      "
-                      @blur="
-                        searchObj.meta.functionEditorPlaceholderFlag = true
-                      "
+                      @focus="searchObj.meta.functionEditorPlaceholderFlag = false"
+                      @blur="searchObj.meta.functionEditorPlaceholderFlag = true"
                     />
                     <div
-                      v-if="!searchObj.data.tempFunctionContent && searchObj.meta.functionEditorPlaceholderFlag && !isVrlEditorDisabled"
+                      v-if="
+                        !searchObj.data.tempFunctionContent &&
+                        searchObj.meta.functionEditorPlaceholderFlag &&
+                        !isVrlEditorDisabled
+                      "
                       class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
@@ -1432,10 +1403,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="vrl-editor-disabled-warning"
                     >
                       <OIcon name="warning" size="md" class="mx-2" />
-                      <span
-                        class="text-status-error-text p-2 font-semibold"
-                        >{{ t('search.vrlOnlyForTableWarning') }}</span
-                      >
+                      <span class="text-status-error-text p-2 font-semibold">{{
+                        t("search.vrlOnlyForTableWarning")
+                      }}</span>
                     </div>
                   </div>
                 </div>
@@ -1493,42 +1463,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="customDownloadDialog = false"
       @click:primary="downloadRangeData"
     >
-    <div class="flex flex-col gap-y-2">
-      <p>{{ t("search.customDownloadMessage") }}</p>
-      <OInput
-        type="number"
-        data-test="custom-download-initial-number-input"
-        v-model="downloadCustomInitialNumber"
-        :label="t('search.initialNumber')"
-        min="1"
-      />
-      <OSelect
-        data-test="custom-download-range-select"
-        v-model="downloadCustomRange"
-        :options="downloadCustomRangeOptions"
-        :label="t('search.range')"
-        class="py-2"
-      />
-      <div>
-        <div
-          class="text-sm font-semibold leading-tight pr-2 text-text-label"
-        >{{ t("search.fileType") }}</div>
-        <OButtonGroup
-          data-test="custom-download-file-type-button-group"
-          class="file-type-button-group mt-1"
-        >
-          <OButton
-            v-for="option in downloadCustomFileTypeOptions"
-            :key="option.value"
-            :data-test="`custom-download-file-type-${option.value}-btn`"
-            :active="downloadCustomFileType === option.value"
-            variant="outline"
-            size="sm"
-            @click="downloadCustomFileType = option.value"
-            >{{ option.label }}</OButton
+      <div class="flex flex-col gap-y-2">
+        <p>{{ t("search.customDownloadMessage") }}</p>
+        <OInput
+          type="number"
+          data-test="custom-download-initial-number-input"
+          v-model="downloadCustomInitialNumber"
+          :label="t('search.initialNumber')"
+          min="1"
+        />
+        <OSelect
+          data-test="custom-download-range-select"
+          v-model="downloadCustomRange"
+          :options="downloadCustomRangeOptions"
+          :label="t('search.range')"
+          class="py-2"
+        />
+        <div>
+          <div class="text-sm font-semibold leading-tight pr-2 text-text-label">
+            {{ t("search.fileType") }}
+          </div>
+          <OButtonGroup
+            data-test="custom-download-file-type-button-group"
+            class="file-type-button-group mt-1"
           >
-        </OButtonGroup>
-      </div>
+            <OButton
+              v-for="option in downloadCustomFileTypeOptions"
+              :key="option.value"
+              :data-test="`custom-download-file-type-${option.value}-btn`"
+              :active="downloadCustomFileType === option.value"
+              variant="outline"
+              size="sm"
+              @click="downloadCustomFileType = option.value"
+              >{{ option.label }}</OButton
+            >
+          </OButtonGroup>
+        </div>
       </div>
     </ODialog>
     <ODialog
@@ -1578,8 +1548,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('search.functionPlaceholder')"
       :secondary-button-label="t('confirmDialog.cancel')"
       :primary-button-label="t('confirmDialog.ok')"
-      @click:secondary="store.state.savedFunctionDialog = false; functionUpdateConfirm = false"
-      @update:open="(open) => { if (!open) functionUpdateConfirm = false }"
+      @click:secondary="
+        store.state.savedFunctionDialog = false;
+        functionUpdateConfirm = false;
+      "
+      @update:open="
+        (open) => {
+          if (!open) functionUpdateConfirm = false;
+        }
+      "
     >
       <OForm id="saved-function-form" :form="savedFunctionForm">
         <!-- Form-owned create/update mode (OFormToggleGroup binds it to the
@@ -1591,8 +1568,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="functionOptions.length == 0"
           class="mb-3"
         >
-          <OToggleGroupItem value="update" size="sm">{{ t('common.update') }}</OToggleGroupItem>
-          <OToggleGroupItem value="create" size="sm">{{ t('common.create') }}</OToggleGroupItem>
+          <OToggleGroupItem value="update" size="sm">{{ t("common.update") }}</OToggleGroupItem>
+          <OToggleGroupItem value="create" size="sm">{{ t("common.create") }}</OToggleGroupItem>
         </OFormToggleGroup>
         <div v-if="savedFunctionMode == 'create'">
           <OFormInput
@@ -1644,11 +1621,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-left mb-1">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
-            <OTooltip side="right" align="center" max-width="300px">
-              <template #content>
-                <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
-              </template>
-            </OTooltip>
+          <OTooltip side="right" align="center" max-width="300px">
+            <template #content>
+              <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
+            </template>
+          </OTooltip>
         </div>
         <OInput
           type="number"
@@ -1678,7 +1655,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="searchInspectDialog = false"
       @click:primary="navigateToSearchInspect"
     >
-      <div class="text-left mb-1">{{ t('search.traceIdLabel') }}</div>
+      <div class="text-left mb-1">{{ t("search.traceIdLabel") }}</div>
       <OInput
         v-model="searchInspectTraceId"
         :placeholder="t('search.enterTraceIdPlaceholder')"
@@ -1719,13 +1696,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="saved-views-list-dialog"
     >
       <div>
-          <div data-test="logs-search-saved-view-list" class="flex">
-            <div
-              class="flex flex-col"
-              :class="localSavedViews.length > 0 ? 'border-r border-card-glass-border' : ''"
-              :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
-            >
-              <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
+        <div data-test="logs-search-saved-view-list" class="flex">
+          <div
+            class="flex flex-col"
+            :class="localSavedViews.length > 0 ? 'border-r border-card-glass-border' : ''"
+            :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
+          >
+            <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1747,10 +1724,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :placeholder="t('search.searchSavedView')"
                     />
                   </div>
-                  <div
-                    v-if="searchObj.loadingSavedView == true"
-                    class="w-full p-2"
-                  >
+                  <div v-if="searchObj.loadingSavedView == true" class="w-full p-2">
                     <div class="text-sm font-medium font-bold">
                       <OSpinner size="xs" />
                       {{ t("confirmDialog.loading") }}
@@ -1779,24 +1753,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="icon-sm"
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="
-                        handleFavoriteSavedView(
-                          row,
-                          favoriteViews.includes(row.view_id),
-                        )
+                        handleFavoriteSavedView(row, favoriteViews.includes(row.view_id))
                       "
                     >
                       <OIcon
-                        :name="
-                          favoriteViews.includes(row.view_id)
-                            ? 'favorite'
-                            : 'favorite-border'
-                        "
+                        :name="favoriteViews.includes(row.view_id) ? 'favorite' : 'favorite-border'"
                         size="xs"
-                        :class="
-                          favoriteViews.includes(row.view_id)
-                            ? 'text-favorite'
-                            : ''
-                        "
+                        :class="favoriteViews.includes(row.view_id) ? 'text-favorite' : ''"
                       />
                     </OButton>
                     <OButton
@@ -1822,24 +1785,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
                 <template #empty>
-                  <div
-                    v-if="searchObj.loadingSavedView == false"
-                    class="text-center p-2 w-full"
-                  >
-                    <span>{{
-                      t("search.savedViewsNotFound")
-                    }}</span>
+                  <div v-if="searchObj.loadingSavedView == false" class="text-center p-2 w-full">
+                    <span>{{ t("search.savedViewsNotFound") }}</span>
                   </div>
                 </template>
               </OTable>
-              </div>
             </div>
+          </div>
 
-            <div
-              class="flex flex-col w-[40%] ml-0 pl-3"
-              v-if="localSavedViews.length > 0"
-            >
-              <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
+          <div class="flex flex-col w-[40%] ml-0 pl-3" v-if="localSavedViews.length > 0">
+            <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
@@ -1904,9 +1859,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </template>
               </OTable>
-              </div>
             </div>
           </div>
+        </div>
       </div>
     </ODialog>
   </div>
@@ -1948,13 +1903,9 @@ import searchService from "@/services/search";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 // Lazy load CodeQueryEditor to avoid loading Monaco Editor eagerly
-const CodeQueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 // Unified QueryEditor for main query editor (with built-in AI bar)
-const UnifiedQueryEditor = defineAsyncComponent(
-  () => import("@/components/QueryEditor.vue"),
-);
+const UnifiedQueryEditor = defineAsyncComponent(() => import("@/components/QueryEditor.vue"));
 
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import useSqlSuggestions from "@/composables/useSuggestions";
@@ -1991,10 +1942,7 @@ import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useVrlPlaceholder } from "@/composables/useVrlPlaceholder";
-import {
-  logsUtils,
-  removeFieldFromWhereAST,
-} from "@/composables/useLogs/logsUtils";
+import { logsUtils, removeFieldFromWhereAST } from "@/composables/useLogs/logsUtils";
 import { searchState } from "@/composables/useLogs/searchState";
 import {
   getVisualizationConfig,
@@ -2014,10 +1962,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
-import {
-  hasFieldCondition,
-  removeFieldCondition,
-} from "@/plugins/logs/filterUtils";
+import { hasFieldCondition, removeFieldCondition } from "@/plugins/logs/filterUtils";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -2029,17 +1974,11 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
-import {
-  makeSavedViewSchema,
-  type SavedViewForm,
-} from "./SearchBar.SavedView.schema";
+import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
 import { sortSavedViews } from "./savedViewsSort";
-import {
-  makeSavedFunctionSchema,
-  type SavedFunctionForm,
-} from "./SearchBar.SavedFunction.schema";
+import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
 
 const defaultValue: any = () => {
   return {
@@ -2080,10 +2019,7 @@ const replaceExistingFieldCondition = (
   const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
+  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, newExpression);
   }
@@ -2159,10 +2095,7 @@ export default defineComponent({
     },
     updateSelectedValue() {
       // Update the selected value with the newly created value
-      if (
-        this.functionModel &&
-        !this.functionOptions.includes(this.functionModel)
-      ) {
+      if (this.functionModel && !this.functionOptions.includes(this.functionModel)) {
         this.functionOptions.push(this.functionModel);
       }
     },
@@ -2176,7 +2109,7 @@ export default defineComponent({
       if (this.searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: this.t('logs.searchBar.noStreamUpdateView'),
+          message: this.t("logs.searchBar.noStreamUpdateView"),
         });
         return;
       }
@@ -2192,33 +2125,28 @@ export default defineComponent({
       this.customDownloadDialog = true;
     },
     confirmUpdateSavedViews() {
-      this.updateSavedViews(
-        this.updateViewObj.view_id,
-        this.updateViewObj.view_name,
-      );
+      this.updateSavedViews(this.updateViewObj.view_id, this.updateViewObj.view_name);
       return;
     },
     downloadRangeData() {
       let initNumber = parseInt(this.downloadCustomInitialNumber);
       if (initNumber < 0) {
         toast({
-          message: this.t('logs.searchBar.initialNumberPositive'),
+          message: this.t("logs.searchBar.initialNumberPositive"),
           variant: "warning",
         });
         return;
       }
       if (!this.searchObj?.data?.customDownloadQueryObj?.query) {
         toast({
-          message: this.t('logs.searchBar.runQueryBeforeDownload'),
+          message: this.t("logs.searchBar.runQueryBeforeDownload"),
           variant: "warning",
         });
         return;
       }
       // const queryReq = this.buildSearch();
-      this.searchObj.data.customDownloadQueryObj.query.from =
-        initNumber == 0 ? 0 : initNumber - 1;
-      this.searchObj.data.customDownloadQueryObj.query.size =
-        this.downloadCustomRange;
+      this.searchObj.data.customDownloadQueryObj.query.from = initNumber == 0 ? 0 : initNumber - 1;
+      this.searchObj.data.customDownloadQueryObj.query.size = this.downloadCustomRange;
       searchService
         .search(
           {
@@ -2234,7 +2162,7 @@ export default defineComponent({
             this.downloadLogs(res.data.hits, this.downloadCustomFileType);
           } else {
             toast({
-              message: this.t('logs.searchBar.noDataToDownload'),
+              message: this.t("logs.searchBar.noDataToDownload"),
               variant: "warning",
             });
           }
@@ -2296,37 +2224,29 @@ export default defineComponent({
       isActionsEnabled,
       checkTimestampAlias,
     } = logsUtils();
-    const {
-      getSavedViews,
-      setSelectedStreams,
-      onStreamChange,
-      getQueryData,
-      cancelQuery,
-    } = useSearchBar();
+    const { getSavedViews, setSelectedStreams, onStreamChange, getQueryData, cancelQuery } =
+      useSearchBar();
     const { loadStreamLists, extractFields } = useStreamFields();
     const { cancelPatterns } = usePatterns();
 
-    const {
-      refreshData,
-      handleRunQuery,
-      getJobData,
-      routeToSearchSchedule,
-      getHistogramTitle,
-    } = useLogs();
+    const { refreshData, handleRunQuery, getJobData, routeToSearchSchedule, getHistogramTitle } =
+      useLogs();
 
-    const { isStreamExists, isStreamFetched, getStreams, getStream } =
-      useStreams();
+    const { isStreamExists, isStreamFetched, getStreams, getStream } = useStreams();
     const queryEditorRef = ref(null);
     const syntaxGuideRef = ref(null);
 
-    const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
-      useSqlEditorDiagnostics({
-        queryEditorRef,
-        sqlMode: computed(() => searchObj.meta.sqlMode),
-        query: computed(() => searchObj.data.query ?? ""),
-        streamName: computed(() => searchObj.data.stream.selectedStream?.[0]),
-        externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
-      });
+    const {
+      onFocus: _sqlOnFocus,
+      onBlur: _sqlOnBlur,
+      onQueryChange: _sqlOnQueryChange,
+    } = useSqlEditorDiagnostics({
+      queryEditorRef,
+      sqlMode: computed(() => searchObj.meta.sqlMode),
+      query: computed(() => searchObj.data.query ?? ""),
+      streamName: computed(() => searchObj.data.stream.selectedStream?.[0]),
+      externalErrors: toRef(searchObj.data, "sqlSyntaxErrorRanges"),
+    });
 
     const onQueryEditorFocus = () => {
       searchObj.meta.queryEditorPlaceholderFlag = false;
@@ -2360,11 +2280,13 @@ export default defineComponent({
     // The dialog body unmounts on close + remounts on open; the form is created
     // here (owner pattern), so re-seed it to "create" mode on open. The
     // OFormToggleGroup changes the mode within the open session.
-    const savedFunctionDefaults = computed((): SavedFunctionForm => ({
-      isSavedFunctionAction: "create",
-      savedFunctionName: "",
-      savedFunctionSelectedName: "",
-    }));
+    const savedFunctionDefaults = computed(
+      (): SavedFunctionForm => ({
+        isSavedFunctionAction: "create",
+        savedFunctionName: "",
+        savedFunctionSelectedName: "",
+      }),
+    );
 
     // Owner-pattern form (Rule ③): SearchBar OWNS this <OForm> and its dialog
     // body needs the create/update mode to drive a v-if. We create the form here
@@ -2405,7 +2327,7 @@ export default defineComponent({
       if (!isFocused.value || !fullscreenRect.value) return {};
       const { left, width, top } = fullscreenRect.value;
       return {
-        position: 'fixed' as const,
+        position: "fixed" as const,
         left: `${left}px`,
         width: `${width}px`,
         top: `${top}px`,
@@ -2478,11 +2400,13 @@ export default defineComponent({
     // savedViewSchema).
     const savedViewFormRef = ref<any>(null);
     const savedViewSchema = makeSavedViewSchema(t);
-    const savedViewDefaults = computed((): SavedViewForm => ({
-      isSavedViewAction: isSavedViewAction.value,
-      savedViewName: "",
-      savedViewSelectedName: "",
-    }));
+    const savedViewDefaults = computed(
+      (): SavedViewForm => ({
+        isSavedViewAction: isSavedViewAction.value,
+        savedViewName: "",
+        savedViewSelectedName: "",
+      }),
+    );
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");
@@ -2510,11 +2434,9 @@ export default defineComponent({
     const filteredTransformOptions = computed(() => {
       if (!searchObj.data.transformType) return [];
 
-      if (searchObj.data.transformType === "action")
-        return filteredActionOptions.value;
+      if (searchObj.data.transformType === "action") return filteredActionOptions.value;
 
-      if (searchObj.data.transformType === "function")
-        return filteredFunctionOptions.value;
+      if (searchObj.data.transformType === "function") return filteredFunctionOptions.value;
 
       return [];
     });
@@ -2552,9 +2474,9 @@ export default defineComponent({
     // Approximate rendered widths of left-section content at each collapse state:
     // Each threshold has a small buffer (+16px) so collapse fires before clipping.
     const shouldHideToolbarButtonText = computed(() => availableLeftWidth.value < 720);
-    const toolbarToggleIconOnly       = computed(() => availableLeftWidth.value < 568);
-    const toolbarMoveResetToMenu      = computed(() => availableLeftWidth.value < 248);
-    const toolbarToggleAsDropdown     = computed(() => availableLeftWidth.value < 176);
+    const toolbarToggleIconOnly = computed(() => availableLeftWidth.value < 568);
+    const toolbarMoveResetToMenu = computed(() => availableLeftWidth.value < 248);
+    const toolbarToggleAsDropdown = computed(() => availableLeftWidth.value < 176);
 
     // ── Pinned toolbar items ──────────────────────────────────────────────
     // Items pinned out of the "More" menu render as fixed-position toolbar
@@ -2627,29 +2549,43 @@ export default defineComponent({
 
     // Function editor lives on the right toolbar (next to the date picker), so it
     // is not part of the left-section budget.
-    const showPinnedHistogram      = computed(() => pinnedVisibility.value.histogram);
-    const showPinnedSqlMode        = computed(() => pinnedVisibility.value.sqlMode);
-    const showPinnedQuickMode      = computed(() => pinnedVisibility.value.quickMode);
+    const showPinnedHistogram = computed(() => pinnedVisibility.value.histogram);
+    const showPinnedSqlMode = computed(() => pinnedVisibility.value.sqlMode);
+    const showPinnedQuickMode = computed(() => pinnedVisibility.value.quickMode);
     const showPinnedFunctionEditor = computed(() => isPinned("functionEditor"));
-    const showPinnedSavedViews     = computed(() => pinnedVisibility.value.savedViews);
-    const showPinnedSyntaxGuide    = computed(() => pinnedVisibility.value.syntaxGuide);
-    const pinSyntaxGuideIconOnly   = computed(() => pinnedVisibility.value.syntaxGuideIconOnly);
+    const showPinnedSavedViews = computed(() => pinnedVisibility.value.savedViews);
+    const showPinnedSyntaxGuide = computed(() => pinnedVisibility.value.syntaxGuide);
+    const pinSyntaxGuideIconOnly = computed(() => pinnedVisibility.value.syntaxGuideIconOnly);
 
     // Computed label/icon for the toggle-group-as-dropdown trigger
     const toggleViewOptions = computed(() => [
-      { value: 'logs',      icon: 'search',   label: t('common.search'),          disabled: false },
+      { value: "logs", icon: "search", label: t("common.search"), disabled: false },
       ...(store.state.zoConfig.timechart_enabled
-        ? [{ value: 'visualize', icon: 'timeline', label: t('search.visualize'),
-            disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1 }]
+        ? [
+            {
+              value: "visualize",
+              icon: "timeline",
+              label: t("search.visualize"),
+              disabled: !searchObj.meta.sqlMode && searchObj.data.stream.selectedStream.length > 1,
+            },
+          ]
         : []),
-      { value: 'build',     icon: 'build',    label: t('search.buildQuery'),      disabled: false },
-      ...(config.isEnterprise === 'true'
-        ? [{ value: 'patterns', icon: 'layers', label: t('search.showPatternsLabel'), disabled: false }]
+      { value: "build", icon: "build", label: t("search.buildQuery"), disabled: false },
+      ...(config.isEnterprise === "true"
+        ? [
+            {
+              value: "patterns",
+              icon: "layers",
+              label: t("search.showPatternsLabel"),
+              disabled: false,
+            },
+          ]
         : []),
     ]);
-    const currentToggleOption = computed(() =>
-      toggleViewOptions.value.find((o) => o.value === searchObj.meta.logsVisualizeToggle)
-        ?? toggleViewOptions.value[0],
+    const currentToggleOption = computed(
+      () =>
+        toggleViewOptions.value.find((o) => o.value === searchObj.meta.logsVisualizeToggle) ??
+        toggleViewOptions.value[0],
     );
 
     const vrlEditorNlpMode = ref(false); // Track VRL editor's AI mode
@@ -2659,8 +2595,8 @@ export default defineComponent({
 
     const transformTypes = computed(() => {
       return [
-        { label: t('logs.searchBar.transformTypeFunction'), value: "function" },
-        { label: t('logs.searchBar.transformTypeAction'), value: "action" },
+        { label: t("logs.searchBar.transformTypeFunction"), value: "function" },
+        { label: t("logs.searchBar.transformTypeAction"), value: "action" },
       ];
     });
 
@@ -2721,7 +2657,7 @@ export default defineComponent({
         ) {
           if (!checkFnQuery(searchObj.data.tempFunctionContent)) {
             toast({
-              message: t('logs.searchBar.jobContextRemoved'),
+              message: t("logs.searchBar.jobContextRemoved"),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -2737,7 +2673,7 @@ export default defineComponent({
       (val) => {
         if (val == true && searchObj.meta.jobId != "") {
           toast({
-            message: t('logs.searchBar.histogramNotAvailableScheduled'),
+            message: t("logs.searchBar.histogramNotAvailableScheduled"),
             variant: "info",
           });
           searchObj.meta.showHistogram = false;
@@ -2776,8 +2712,7 @@ export default defineComponent({
 
     const transformsLabel = computed(() => {
       if (
-        searchObj.data.selectedTransform?.type ===
-          searchObj.data.transformType &&
+        searchObj.data.selectedTransform?.type === searchObj.data.transformType &&
         searchObj.data.transformType
       ) {
         return searchObj.data.selectedTransform.name;
@@ -2796,25 +2731,23 @@ export default defineComponent({
         searchObj.data.selectedTransform?.type === "action" &&
         searchObj.data.selectedTransform?.name
       ) {
-        return t('logs.searchBar.actionAppliedRunQuery', { name: searchObj.data.selectedTransform?.name });
+        return t("logs.searchBar.actionAppliedRunQuery", {
+          name: searchObj.data.selectedTransform?.name,
+        });
       }
 
-      return t('logs.searchBar.selectActionToApply');
+      return t("logs.searchBar.selectActionToApply");
     });
 
     const updateAutoComplete = (value) => {
       autoCompleteData.value.query = value;
-      autoCompleteData.value.cursorIndex =
-        queryEditorRef?.value?.getCursorIndex();
+      autoCompleteData.value.cursorIndex = queryEditorRef?.value?.getCursorIndex();
       autoCompleteData.value.fieldValues = props.fieldValues;
-      autoCompleteData.value.popup.open =
-        queryEditorRef?.value?.triggerAutoComplete;
+      autoCompleteData.value.popup.open = queryEditorRef?.value?.triggerAutoComplete;
       // [NEW] Pass stream context for IndexedDB value lookups
       autoCompleteData.value.org = store.state.selectedOrganization.identifier;
-      autoCompleteData.value.streamType =
-        searchObj.data.stream.streamType ?? "logs";
-      autoCompleteData.value.streamName =
-        searchObj.data.stream.selectedStream?.[0] ?? "";
+      autoCompleteData.value.streamType = searchObj.data.stream.streamType ?? "logs";
+      autoCompleteData.value.streamName = searchObj.data.stream.selectedStream?.[0] ?? "";
       getSuggestions();
     };
 
@@ -2824,8 +2757,7 @@ export default defineComponent({
 
       if (searchObj.data.transformType === "action") return "code";
 
-      if (!searchObj.data.transformType)
-        return "img:" + getImageURL("images/common/transform.svg");
+      if (!searchObj.data.transformType) return "img:" + getImageURL("images/common/transform.svg");
 
       return undefined;
     });
@@ -2855,9 +2787,7 @@ export default defineComponent({
       }
 
       if (parsedSQL?._next) {
-        columnNames = [
-          ...new Set([...columnNames, ...getColumnNames(parsedSQL._next)]),
-        ];
+        columnNames = [...new Set([...columnNames, ...getColumnNames(parsedSQL._next)])];
       }
 
       return columnNames;
@@ -2890,11 +2820,7 @@ export default defineComponent({
       // removed the SELECT/WITH prefix). Set sqlModeEditTransition so the
       // Index.vue watcher preserves the remaining filter expression instead of
       // clearing the editor.
-      if (
-        value.trim() !== "" &&
-        searchObj.meta.sqlMode === true &&
-        !isSqlQuery(value)
-      ) {
+      if (value.trim() !== "" && searchObj.meta.sqlMode === true && !isSqlQuery(value)) {
         searchObj.meta.sqlModeEditTransition = true;
         searchObj.meta.sqlMode = false;
       }
@@ -2920,26 +2846,20 @@ export default defineComponent({
           );
 
           for (const col of columnNames) {
-            if (
-              !searchObj.data.stream.interestingFieldList.includes(col) &&
-              col != "*"
-            ) {
+            if (!searchObj.data.stream.interestingFieldList.includes(col) && col != "*") {
               // searchObj.data.stream.interestingFieldList.push(col);
               const localInterestingFields: any = useLocalInterestingFields();
               let localFields: any = {};
               if (localInterestingFields.value != null) {
                 localFields = localInterestingFields.value;
               }
-              for (const stream of searchObj.data.stream
-                ?.selectedStreamFields || []) {
+              for (const stream of searchObj.data.stream?.selectedStreamFields || []) {
                 if (
                   stream.name == col &&
                   !searchObj.data.stream.interestingFieldList.includes(col) &&
                   col !== store.state.zoConfig?.timestamp_column
                 ) {
-                  const interestingFieldsCopy = [
-                    ...searchObj.data.stream.interestingFieldList,
-                  ];
+                  const interestingFieldsCopy = [...searchObj.data.stream.interestingFieldList];
 
                   searchObj.data.stream.interestingFieldList.push(col);
 
@@ -2948,9 +2868,7 @@ export default defineComponent({
                   }
 
                   localFields[
-                    searchObj.organizationIdentifier +
-                      "_" +
-                      searchObj.data.stream.selectedStream[0]
+                    searchObj.organizationIdentifier + "_" + searchObj.data.stream.selectedStream[0]
                   ] = interestingFieldsCopy;
                 }
               }
@@ -2963,11 +2881,8 @@ export default defineComponent({
             store.state.zoConfig?.timestamp_column,
           );
 
-          for (const item of searchObj.data.stream?.selectedStreamFields ||
-            []) {
-            if (
-              searchObj.data.stream.interestingFieldList.includes(item.name)
-            ) {
+          for (const item of searchObj.data.stream?.selectedStreamFields || []) {
+            if (searchObj.data.stream.interestingFieldList.includes(item.name)) {
               item.isInterestingField = true;
             } else {
               item.isInterestingField = false;
@@ -2988,8 +2903,7 @@ export default defineComponent({
       if (value != "" && searchObj.meta.sqlMode === true) {
         const parsedSQL = fnParsedSQL();
         if (
-          (Object.hasOwn(parsedSQL, "from") ||
-            Object.hasOwn(parsedSQL, "select")) &&
+          (Object.hasOwn(parsedSQL, "from") || Object.hasOwn(parsedSQL, "select")) &&
           isStreamFetched(searchObj.data.stream.streamType) &&
           isStreamExists(value, searchObj.data.stream.streamType)
         ) {
@@ -3012,8 +2926,7 @@ export default defineComponent({
             //this condition is to handle the with queries so for WITH queries the table name is not present in the from array it will be there in the with array
             //the table which is there in from array is the temporary array
             const tableName: string = !parsedQuery.with
-              ? parsedQuery.from[0].table ||
-                parsedQuery.from[0].expr?.ast?.from?.[0]?.table
+              ? parsedQuery.from[0].table || parsedQuery.from[0].expr?.ast?.from?.[0]?.table
               : "";
             if (
               !searchObj.data.stream.selectedStream.includes(tableName) &&
@@ -3052,13 +2965,10 @@ export default defineComponent({
           }
         }
         //here we reset the job id if user change the query and move outside of the editor
-        if (
-          searchObj.meta.jobId != "" &&
-          searchObj.meta.queryEditorPlaceholderFlag == true
-        ) {
+        if (searchObj.meta.jobId != "" && searchObj.meta.queryEditorPlaceholderFlag == true) {
           if (!checkQuery(value)) {
             toast({
-              message: t('logs.searchBar.jobContextRemoved'),
+              message: t("logs.searchBar.jobContextRemoved"),
               variant: "info",
             });
             searchObj.meta.jobId = "";
@@ -3086,7 +2996,6 @@ export default defineComponent({
       emit("extractPatterns");
     }, 2500);
 
-
     let ignoreAutoTrigger = false;
     // Guard against the cascade that happens when we auto-clamp an absolute
     // range that exceeds queryRangeRestrictionInHour. The clamp path calls
@@ -3109,16 +3018,15 @@ export default defineComponent({
         // Convert hours to microseconds
         let newStartTime =
           parseInt(value.endTime) -
-          searchObj.data.datetime.queryRangeRestrictionInHour *
-            60 *
-            60 *
-            1000000;
+          searchObj.data.datetime.queryRangeRestrictionInHour * 60 * 60 * 1000000;
 
         if (parseInt(newStartTime) > parseInt(value.startTime)) {
           // User-visible warning so the silent rewrite isn't invisible.
           toast({
             variant: "warning",
-            message: t('logs.searchBar.rangeExceedsLimit', { hours: searchObj.data.datetime.queryRangeRestrictionInHour }),
+            message: t("logs.searchBar.rangeExceedsLimit", {
+              hours: searchObj.data.datetime.queryRangeRestrictionInHour,
+            }),
           });
 
           value.startTime = newStartTime;
@@ -3158,10 +3066,8 @@ export default defineComponent({
         type: value.relativeTimePeriod ? "relative" : "absolute",
         selectedDate: value?.selectedDate,
         selectedTime: value?.selectedTime,
-        queryRangeRestrictionMsg:
-          searchObj.data.datetime?.queryRangeRestrictionMsg || "",
-        queryRangeRestrictionInHour:
-          searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
+        queryRangeRestrictionMsg: searchObj.data.datetime?.queryRangeRestrictionMsg || "",
+        queryRangeRestrictionInHour: searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
       };
 
       await nextTick();
@@ -3235,8 +3141,7 @@ export default defineComponent({
     };
 
     const updateQuery = () => {
-      if (queryEditorRef.value?.setValue)
-        queryEditorRef.value.setValue(searchObj.data.query);
+      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(searchObj.data.query);
     };
 
     const downloadLogs = async (data, format) => {
@@ -3249,7 +3154,7 @@ export default defineComponent({
 
       if (!data || data.length === 0) {
         toast({
-          message: t('logs.searchBar.noDataToDownload'),
+          message: t("logs.searchBar.noDataToDownload"),
           variant: "warning",
         });
         return;
@@ -3290,19 +3195,17 @@ export default defineComponent({
         showDownloadMenu.value = false;
         toast({
           variant: "error",
-          message: t('logs.searchBar.errorDownloadingLogs'),
+          message: t("logs.searchBar.errorDownloadingLogs"),
         });
       }
     };
 
     onMounted(async () => {
-      searchObj.data.transformType =
-        router.currentRoute.value.query.transformType || "function";
+      searchObj.data.transformType = router.currentRoute.value.query.transformType || "function";
 
       if (
         router.currentRoute.value.query.transformType === "function" &&
-        (router.currentRoute.value.query.functionContent ||
-          searchObj.data.tempFunctionContent)
+        (router.currentRoute.value.query.functionContent || searchObj.data.tempFunctionContent)
       ) {
         const fnContent = router.currentRoute.value.query.functionContent
           ? b64DecodeUnicode(router.currentRoute.value.query.functionContent)
@@ -3314,7 +3217,6 @@ export default defineComponent({
 
       window.addEventListener("keydown", handleEscKey);
       window.addEventListener("resize", onWindowResize);
-
     });
 
     onUnmounted(() => {
@@ -3331,8 +3233,7 @@ export default defineComponent({
       updateEditorWidth();
 
       if (
-        (router.currentRoute.value.query.functionContent ||
-          searchObj.data.tempFunctionContent) &&
+        (router.currentRoute.value.query.functionContent || searchObj.data.tempFunctionContent) &&
         searchObj.data.transformType === "function"
       ) {
         const fnContent = router.currentRoute.value.query.functionContent
@@ -3369,7 +3270,7 @@ export default defineComponent({
       if (content.trim() == "") {
         toast({
           variant: "warning",
-          message: t('logs.searchBar.functionFieldRequired'),
+          message: t("logs.searchBar.functionFieldRequired"),
         });
         return;
       }
@@ -3407,7 +3308,7 @@ export default defineComponent({
             variant: "error",
             message:
               JSON.stringify(err.response.data["message"]) ||
-              t('logs.searchBar.functionCreationFailed'),
+              t("logs.searchBar.functionCreationFailed"),
             timeout: 5000,
           });
         }
@@ -3429,17 +3330,15 @@ export default defineComponent({
         .then(() => {
           toast({
             variant: "success",
-            message: t('logs.searchBar.functionUpdatedSuccess'),
+            message: t("logs.searchBar.functionUpdatedSuccess"),
           });
 
           const transformIndex = searchObj.data.transforms.findIndex(
             (obj) => obj.name === formData.value.name,
           );
           if (transformIndex !== -1) {
-            searchObj.data.transforms[transformIndex].name =
-              formData.value.name;
-            searchObj.data.transforms[transformIndex].function =
-              formData.value.function;
+            searchObj.data.transforms[transformIndex].name = formData.value.name;
+            searchObj.data.transforms[transformIndex].function = formData.value.function;
           }
 
           functionOptions.value = searchObj.data.transforms;
@@ -3452,7 +3351,7 @@ export default defineComponent({
             variant: "error",
             message:
               JSON.stringify(err.response.data["message"]) ||
-              t('logs.searchBar.functionUpdationFailed'),
+              t("logs.searchBar.functionUpdationFailed"),
             timeout: 5000,
           });
         });
@@ -3475,15 +3374,11 @@ export default defineComponent({
       searchObj.data.actionId = actionId.id;
     };
 
-    const populateFunctionImplementation = (
-      fnValue,
-      flag = false,
-      openEditor = true,
-    ) => {
+    const populateFunctionImplementation = (fnValue, flag = false, openEditor = true) => {
       if (flag) {
         toast({
           variant: "success",
-          message: t('logs.searchBar.functionAppliedSuccess', { name: fnValue.name }),
+          message: t("logs.searchBar.functionAppliedSuccess", { name: fnValue.name }),
         });
       }
 
@@ -3505,7 +3400,7 @@ export default defineComponent({
       if (content == "") {
         toast({
           variant: "error",
-          message: t('logs.searchBar.noFunctionDefinition'),
+          message: t("logs.searchBar.noFunctionDefinition"),
         });
         return;
       }
@@ -3557,7 +3452,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: t('logs.searchBar.noStreamSaveView'),
+          message: t("logs.searchBar.noStreamSaveView"),
         });
         return;
       }
@@ -3590,7 +3485,7 @@ export default defineComponent({
       if (searchObj.data.stream.selectedStream.length == 0) {
         toast({
           variant: "error",
-          message: t('logs.searchBar.noStreamUpdateView'),
+          message: t("logs.searchBar.noStreamUpdateView"),
         });
         return;
       }
@@ -3611,8 +3506,7 @@ export default defineComponent({
       }
 
       // Sync visualization data to URL
-      const currentVisualizationData =
-        getVisualizationConfig(dashboardPanelData);
+      const currentVisualizationData = getVisualizationConfig(dashboardPanelData);
       if (currentVisualizationData) {
         const encoded = encodeVisualizationConfig(currentVisualizationData);
         if (encoded) {
@@ -3633,10 +3527,7 @@ export default defineComponent({
       searchObj.shouldIgnoreWatcher = true;
       searchObj.meta.sqlMode = false;
       savedviewsService
-        .getViewDetail(
-          store.state.selectedOrganization.identifier,
-          item.view_id,
-        )
+        .getViewDetail(store.state.selectedOrganization.identifier, item.view_id)
         .then(async (res) => {
           if (res.status == 200) {
             store.dispatch("setSavedViewFlag", true);
@@ -3662,21 +3553,13 @@ export default defineComponent({
               store.dispatch("setTimezone", extractedObj.data.timezone);
             }
 
-            if (
-              !Object.prototype.hasOwnProperty.call(
-                extractedObj.data.stream,
-                "streamType",
-              )
-            ) {
+            if (!Object.prototype.hasOwnProperty.call(extractedObj.data.stream, "streamType")) {
               extractedObj.data.stream.streamType = "logs";
             }
 
             delete searchObj.data.queryResults.aggs;
 
-            if (
-              searchObj.data.stream.streamType ==
-              extractedObj.data.stream.streamType
-            ) {
+            if (searchObj.data.stream.streamType == extractedObj.data.stream.streamType) {
               // if (
               //   extractedObj.data.stream.selectedStream.value !=
               //   searchObj.data.stream.selectedStream.value
@@ -3686,9 +3569,7 @@ export default defineComponent({
               // }
               // ----- Here we are explicitly handling stream change for multistream -----
               let selectedStreams = [];
-              const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value,
-              );
+              const streamValues = searchObj.data.stream.streamLists.map((item) => item.value);
               if (typeof extractedObj.data.stream.selectedStream == "object") {
                 if (
                   Object.prototype.hasOwnProperty.call(
@@ -3696,13 +3577,9 @@ export default defineComponent({
                     "value",
                   )
                 ) {
-                  selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value,
-                  );
+                  selectedStreams.push(extractedObj.data.stream.selectedStream.value);
                 } else {
-                  selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream,
-                  );
+                  selectedStreams.push(...extractedObj.data.stream.selectedStream);
                 }
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
@@ -3711,10 +3588,7 @@ export default defineComponent({
                 (stream_str) => !streamValues.includes(stream_str),
               );
               if (streamNotExist.length > 0) {
-                let errMsg = t("search.streamNotExist").replace(
-                  "[STREAM_NAME]",
-                  streamNotExist,
-                );
+                let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
                 throw new Error(errMsg);
               }
               // extractedObj.data.stream.selectedStream = [];
@@ -3723,12 +3597,7 @@ export default defineComponent({
               delete extractedObj.data.stream.selectedStream;
               delete searchObj.data.stream.selectedStream;
               delete searchObj.meta.regions;
-              if (
-                Object.prototype.hasOwnProperty.call(
-                  extractedObj.meta,
-                  "regions",
-                )
-              ) {
+              if (Object.prototype.hasOwnProperty.call(extractedObj.meta, "regions")) {
                 searchObj.meta["regions"] = extractedObj.meta.regions;
               } else {
                 searchObj.meta["regions"] = [];
@@ -3737,8 +3606,7 @@ export default defineComponent({
               delete searchObj.data.stream.interestingFieldList;
               searchObj.data.stream.selectedStream = [];
               extractedObj.data.transforms = searchObj.data.transforms;
-              extractedObj.data.stream.functions =
-                searchObj.data.stream.functions;
+              extractedObj.data.stream.functions = searchObj.data.stream.functions;
               extractedObj.data.histogram = {
                 xData: [],
                 yData: [],
@@ -3753,9 +3621,7 @@ export default defineComponent({
 
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-                await restoreVisualizationData(
-                  extractedObj.data.visualizationData,
-                );
+                await restoreVisualizationData(extractedObj.data.visualizationData);
               }
               // await nextTick();
               if (extractedObj.data.tempFunctionContent != "") {
@@ -3767,12 +3633,10 @@ export default defineComponent({
                   false,
                   extractedObj.meta.showTransformEditor, // Use saved view's editor state
                 );
-                searchObj.data.tempFunctionContent =
-                  extractedObj.data.tempFunctionContent;
+                searchObj.data.tempFunctionContent = extractedObj.data.tempFunctionContent;
                 searchObj.meta.functionEditorPlaceholderFlag = false;
                 searchObj.data.transformType = "function";
-                if (showFunctionEditor.value)
-                  searchObj.meta.showTransformEditor = true;
+                if (showFunctionEditor.value) searchObj.meta.showTransformEditor = true;
               } else {
                 populateFunctionImplementation(
                   {
@@ -3798,18 +3662,13 @@ export default defineComponent({
 
               // Get max query range for all selected streams and take the minimum
               // Preference: stream max query range > global max query range
-              const globalMaxQueryRange =
-                store.state.zoConfig.max_query_range || 0;
+              const globalMaxQueryRange = store.state.zoConfig.max_query_range || 0;
               let effectiveMaxQueryRange = -1;
 
               if (selectedStreams && selectedStreams.length > 0) {
                 // Fetch all stream data in parallel
                 const streamDataPromises = selectedStreams.map((streamName) =>
-                  getStream(
-                    streamName,
-                    searchObj.data.stream.streamType,
-                    false,
-                  ),
+                  getStream(streamName, searchObj.data.stream.streamType, false),
                 );
 
                 try {
@@ -3817,10 +3676,7 @@ export default defineComponent({
 
                   // Extract max_query_range from each stream's settings
                   const streamMaxQueryRanges = streamDataList
-                    .map(
-                      (streamData) =>
-                        streamData?.settings?.max_query_range || 0,
-                    )
+                    .map((streamData) => streamData?.settings?.max_query_range || 0)
                     .filter((range) => range > 0); // Only consider positive values
 
                   // If we have stream-specific max query ranges, find the minimum (stream takes preference)
@@ -3832,8 +3688,7 @@ export default defineComponent({
                   }
                 } catch (error) {
                   // On error, fall back to global max query range
-                  effectiveMaxQueryRange =
-                    globalMaxQueryRange > 0 ? globalMaxQueryRange : -1;
+                  effectiveMaxQueryRange = globalMaxQueryRange > 0 ? globalMaxQueryRange : -1;
                 }
               } else if (globalMaxQueryRange > 0) {
                 // No selected streams, use global max query range
@@ -3847,27 +3702,21 @@ export default defineComponent({
                 searchObj.data.datetime?.endTime
               ) {
                 // Calculate time difference in hours
-                const startTimeMicros = parseInt(
-                  searchObj.data.datetime.startTime,
-                );
+                const startTimeMicros = parseInt(searchObj.data.datetime.startTime);
                 const endTimeMicros = parseInt(searchObj.data.datetime.endTime);
-                const timeDiffInHours =
-                  (endTimeMicros - startTimeMicros) / (60 * 60 * 1000000);
+                const timeDiffInHours = (endTimeMicros - startTimeMicros) / (60 * 60 * 1000000);
 
                 // Check if time difference exceeds effective max query range
                 if (timeDiffInHours > effectiveMaxQueryRange) {
                   // Adjust to current time - maxQueryRange
                   const currentTimeMicros = Date.now() * 1000; // Convert milliseconds to microseconds
-                  const maxQueryRangeMicros =
-                    effectiveMaxQueryRange * 60 * 60 * 1000000;
+                  const maxQueryRangeMicros = effectiveMaxQueryRange * 60 * 60 * 1000000;
 
-                  const adjustedStartTime =
-                    currentTimeMicros - maxQueryRangeMicros;
+                  const adjustedStartTime = currentTimeMicros - maxQueryRangeMicros;
                   const adjustedEndTime = currentTimeMicros;
 
                   // Get the current datetime type
-                  const currentType =
-                    searchObj.data.datetime.type || "relative";
+                  const currentType = searchObj.data.datetime.type || "relative";
 
                   // Build the complete datetime object with all required fields
                   const updatedDateTime = buildDateTimeObject(
@@ -3882,14 +3731,11 @@ export default defineComponent({
 
                   if (currentType === "relative") {
                     // For relative type, update relativeTimePeriod
-                    searchObj.data.datetime.relativeTimePeriod =
-                      updatedDateTime.relativeTimePeriod;
+                    searchObj.data.datetime.relativeTimePeriod = updatedDateTime.relativeTimePeriod;
                   } else if (currentType === "absolute") {
                     // For absolute type, update selectedDate and selectedTime
-                    searchObj.data.datetime.selectedDate =
-                      updatedDateTime.selectedDate;
-                    searchObj.data.datetime.selectedTime =
-                      updatedDateTime.selectedTime;
+                    searchObj.data.datetime.selectedDate = updatedDateTime.selectedDate;
+                    searchObj.data.datetime.selectedTime = updatedDateTime.selectedTime;
                     searchObj.data.datetime.relativeTimePeriod = null;
                   }
                 }
@@ -3913,16 +3759,10 @@ export default defineComponent({
             } else {
               // ----- Here we are explicitly handling stream change -----
               resetStreamData();
-              searchObj.data.stream.streamType =
-                extractedObj.data.stream.streamType;
+              searchObj.data.stream.streamType = extractedObj.data.stream.streamType;
 
               delete searchObj.meta.regions;
-              if (
-                Object.prototype.hasOwnProperty.call(
-                  extractedObj.meta,
-                  "regions",
-                )
-              ) {
+              if (Object.prototype.hasOwnProperty.call(extractedObj.meta, "regions")) {
                 searchObj.meta["regions"] = extractedObj.meta.regions;
               } else {
                 searchObj.meta["regions"] = [];
@@ -3940,13 +3780,9 @@ export default defineComponent({
                     "value",
                   )
                 ) {
-                  selectedStreams.push(
-                    extractedObj.data.stream.selectedStream.value,
-                  );
+                  selectedStreams.push(extractedObj.data.stream.selectedStream.value);
                 } else {
-                  selectedStreams.push(
-                    ...extractedObj.data.stream.selectedStream,
-                  );
+                  selectedStreams.push(...extractedObj.data.stream.selectedStream);
                 }
               } else {
                 selectedStreams.push(extractedObj.data.stream.selectedStream);
@@ -3968,30 +3804,20 @@ export default defineComponent({
 
               // Restore visualization data if available
               if (extractedObj.data.visualizationData) {
-                await restoreVisualizationData(
-                  extractedObj.data.visualizationData,
-                );
+                await restoreVisualizationData(extractedObj.data.visualizationData);
               }
 
-              const streamData = await getStreams(
-                searchObj.data.stream.streamType,
-                true,
-              );
+              const streamData = await getStreams(searchObj.data.stream.streamType, true);
               searchObj.data.streamResults = streamData;
               await loadStreamLists();
               searchObj.data.stream.selectedStream = [selectedStreams];
 
-              const streamValues = searchObj.data.stream.streamLists.map(
-                (item) => item.value,
-              );
+              const streamValues = searchObj.data.stream.streamLists.map((item) => item.value);
               const streamNotExist = selectedStreams.filter(
                 (stream_str) => !streamValues.includes(stream_str),
               );
               if (streamNotExist.length > 0) {
-                let errMsg = t("search.streamNotExist").replace(
-                  "[STREAM_NAME]",
-                  streamNotExist,
-                );
+                let errMsg = t("search.streamNotExist").replace("[STREAM_NAME]", streamNotExist);
                 throw new Error(errMsg);
               }
               // await nextTick();
@@ -4004,8 +3830,7 @@ export default defineComponent({
                   false,
                   extractedObj.meta.showTransformEditor, // Use saved view's editor state
                 );
-                searchObj.data.tempFunctionContent =
-                  extractedObj.data.tempFunctionContent;
+                searchObj.data.tempFunctionContent = extractedObj.data.tempFunctionContent;
                 searchObj.meta.functionEditorPlaceholderFlag = false;
               } else {
                 populateFunctionImplementation(
@@ -4035,10 +3860,7 @@ export default defineComponent({
             }
 
             // Only reset function content if there's no function in the saved view
-            if (
-              searchObj.meta.toggleFunction == false &&
-              !extractedObj.data.tempFunctionContent
-            ) {
+            if (searchObj.meta.toggleFunction == false && !extractedObj.data.tempFunctionContent) {
               searchObj.config.fnSplitterModel = 100;
               resetFunctionContent();
             }
@@ -4046,7 +3868,7 @@ export default defineComponent({
             updateEditorWidth();
 
             toast({
-              message: t('logs.searchBar.viewAppliedSuccess', { name: item.view_name }),
+              message: t("logs.searchBar.viewAppliedSuccess", { name: item.view_name }),
               variant: "success",
             });
             setTimeout(async () => {
@@ -4074,17 +3896,13 @@ export default defineComponent({
                 searchObj.data.stream.selectedStream,
               )
             ) {
-              searchObj.data.stream.selectedFields =
-                extractedObj.data.resultGrid.colOrder[
-                  searchObj.data.stream.selectedStream
-                ].filter(
-                  (_field) =>
-                    _field !==
-                    (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
-                );
+              searchObj.data.stream.selectedFields = extractedObj.data.resultGrid.colOrder[
+                searchObj.data.stream.selectedStream
+              ].filter(
+                (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+              );
             } else {
-              searchObj.data.stream.selectedFields =
-                extractedObj.data.stream.selectedFields;
+              searchObj.data.stream.selectedFields = extractedObj.data.stream.selectedFields;
             }
 
             if (
@@ -4094,12 +3912,8 @@ export default defineComponent({
                 searchObj.data.stream.selectedStream,
               )
             ) {
-              searchObj.data.resultGrid.colSizes[
-                searchObj.data.stream.selectedStream
-              ] =
-                extractedObj.data.resultGrid.colSizes[
-                  searchObj.data.stream.selectedStream
-                ];
+              searchObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream] =
+                extractedObj.data.resultGrid.colSizes[searchObj.data.stream.selectedStream];
             }
           } else {
             searchObj.shouldIgnoreWatcher = false;
@@ -4114,7 +3928,7 @@ export default defineComponent({
           searchObj.shouldIgnoreWatcher = false;
           store.dispatch("setSavedViewFlag", false);
           toast({
-            message: t('logs.searchBar.errorApplyingSavedView'),
+            message: t("logs.searchBar.errorApplyingSavedView"),
             variant: "error",
           });
           console.log("Error while applying saved view", err);
@@ -4137,33 +3951,22 @@ export default defineComponent({
     const deleteSavedViews = async () => {
       try {
         savedviewsService
-          .delete(
-            store.state.selectedOrganization.identifier,
-            deleteViewID.value,
-          )
+          .delete(store.state.selectedOrganization.identifier, deleteViewID.value)
           .then((res) => {
             //remove it from localstorage as well
-            const localStoredSavedViews = JSON.parse(
-              localStorage.getItem("savedViews") || "[]",
-            );
+            const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
             delete localStoredSavedViews[deleteViewID.value];
             favoriteViews.value.forEach((item: any) => {
               //remove it from favorite views list because we dont need to show it in the favorite views list
               if (item == deleteViewID.value) {
-                favoriteViews.value.splice(
-                  favoriteViews.value.indexOf(item),
-                  1,
-                );
+                favoriteViews.value.splice(favoriteViews.value.indexOf(item), 1);
               }
             });
             //remove it from local saved views list because we dont need to show it in the local saved views list
             localSavedViews.value = localSavedViews.value.filter(
               (item: any) => item.view_id !== deleteViewID.value,
             );
-            localStorage.setItem(
-              "savedViews",
-              JSON.stringify(localStoredSavedViews),
-            );
+            localStorage.setItem("savedViews", JSON.stringify(localStoredSavedViews));
             //we are deleting the local storage item and also we are removing the item from the favoriteViews array
             if (res.status == 200) {
               toast({
@@ -4220,10 +4023,7 @@ export default defineComponent({
         }
 
         // Include visualization data if in visualization mode
-        if (
-          searchObj.meta.logsVisualizeToggle === "visualize" &&
-          dashboardPanelData
-        ) {
+        if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
           const visualizationData = getVisualizationConfig(dashboardPanelData);
           if (visualizationData) {
             savedSearchObj.data.visualizationData = visualizationData;
@@ -4243,7 +4043,7 @@ export default defineComponent({
       try {
         if (viewName.trim() == "") {
           toast({
-            message: t('logs.searchBar.provideValidViewName'),
+            message: t("logs.searchBar.provideValidViewName"),
             variant: "warning",
           });
           return;
@@ -4259,12 +4059,7 @@ export default defineComponent({
           .then((res) => {
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
-              if (
-                Object.prototype.hasOwnProperty.call(
-                  searchObj.data,
-                  "savedViews",
-                ) === false
-              ) {
+              if (Object.prototype.hasOwnProperty.call(searchObj.data, "savedViews") === false) {
                 searchObj.data.savedViews = [];
               }
               searchObj.data.savedViews.push({
@@ -4296,7 +4091,7 @@ export default defineComponent({
       } catch (e: any) {
         isSavedViewAction.value = "create";
         toast({
-          message: t('logs.searchBar.errorSavingView', { e }),
+          message: t("logs.searchBar.errorSavingView", { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4311,7 +4106,7 @@ export default defineComponent({
         };
 
         const dismiss = toast({
-          message: t('logs.searchBar.updatingSavedView'),
+          message: t("logs.searchBar.updatingSavedView"),
           variant: "loading",
           timeout: 0,
         });
@@ -4356,7 +4151,7 @@ export default defineComponent({
       } catch (e: any) {
         isSavedViewAction.value = "create";
         toast({
-          message: t('logs.searchBar.errorSavingView', { e }),
+          message: t("logs.searchBar.errorSavingView", { e }),
           variant: "error",
         });
         console.log("Error while saving view", e);
@@ -4373,10 +4168,7 @@ export default defineComponent({
       // especially when the user performs multi-select on streams and shares the URL.
       delete queryObj?.type;
       const queryString = Object.entries(queryObj)
-        .map(
-          ([key, value]) =>
-            `${encodeURIComponent(key)}=${encodeURIComponent(value)}`,
-        )
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
         .join("&");
 
       let url = window.location.origin + window.location.pathname;
@@ -4395,11 +4187,7 @@ export default defineComponent({
 
     function getFieldList(stream, streamFields, interestingFields) {
       searchObj.data.streamResults.list.forEach((item) => {
-        if (
-          item.name == stream &&
-          Object.hasOwn(item, "schema") &&
-          item.schema.length > 0
-        ) {
+        if (item.name == stream && Object.hasOwn(item, "schema") && item.schema.length > 0) {
           streamFields = item.schema;
         }
       });
@@ -4411,15 +4199,10 @@ export default defineComponent({
     function buildStreamQuery(stream, fieldList, isQuickMode) {
       const selectFields =
         fieldList.length > 0 && isQuickMode
-          ? fieldList
-              .map((field) => quoteSqlIdentifierIfNeeded(field))
-              .join(",")
+          ? fieldList.map((field) => quoteSqlIdentifierIfNeeded(field)).join(",")
           : "*";
 
-      return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace(
-        "[FIELD_LIST]",
-        selectFields,
-      );
+      return QUERY_TEMPLATE.replace("[STREAM_NAME]", stream).replace("[FIELD_LIST]", selectFields);
     }
 
     const resetFilters = () => {
@@ -4447,16 +4230,11 @@ export default defineComponent({
           const queries = searchObj.data.stream.selectedStream
             .map((stream) => {
               // Destructure for better readability
-              const { selectedStreamFields, interestingFieldList } =
-                searchObj.data.stream;
+              const { selectedStreamFields, interestingFieldList } = searchObj.data.stream;
               const { quickMode } = searchObj.meta;
 
               // Generate the field list for the current stream
-              const fieldList = getFieldList(
-                stream,
-                selectedStreamFields,
-                interestingFieldList,
-              );
+              const fieldList = getFieldList(stream, selectedStreamFields, interestingFieldList);
 
               // Ensure fieldList is valid before building the query
               if (!fieldList || fieldList.length === 0) {
@@ -4499,8 +4277,7 @@ export default defineComponent({
     const showDownloadSubmenu = ref(false);
     const isDownloadDisabled = computed(
       () =>
-        !searchObj.data.stream.selectedStream?.length ||
-        !searchObj.data.queryResults?.hits?.length,
+        !searchObj.data.stream.selectedStream?.length || !searchObj.data.queryResults?.hits?.length,
     );
     const downloadCustomFileTypeOptions = ref([
       { label: "CSV", value: "csv" },
@@ -4557,9 +4334,7 @@ export default defineComponent({
 
             let favoriteViewsList = localSavedViews.value;
             if (favoriteViewsList.length > 0) {
-              favoriteViewsList = favoriteViewsList.filter(
-                (item) => item.view_id != row.view_id,
-              );
+              favoriteViewsList = favoriteViewsList.filter((item) => item.view_id != row.view_id);
               // for (const [key, item] of favoriteViewsList.entries()) {
               //   console.log(item, key);
               //   if (item.view_id == row.view_id) {
@@ -4575,7 +4350,7 @@ export default defineComponent({
       if (!flag) {
         if (favoriteViews.value.length >= 10) {
           toast({
-            message: t('logs.searchBar.maxViewsLimit'),
+            message: t("logs.searchBar.maxViewsLimit"),
             variant: "warning",
           });
           return;
@@ -4588,14 +4363,14 @@ export default defineComponent({
 
         useLocalSavedView(localSavedView);
         toast({
-          message: t('logs.searchBar.viewAddedFavorites'),
+          message: t("logs.searchBar.viewAddedFavorites"),
           variant: "success",
         });
       } else {
         // alert(favoriteViews.value.length)
         // moveItemsToTop(localSavedView, favoriteViews.value);
         toast({
-          message: t('logs.searchBar.viewRemovedFavorites'),
+          message: t("logs.searchBar.viewRemovedFavorites"),
           variant: "success",
         });
       }
@@ -4640,10 +4415,7 @@ export default defineComponent({
 
     const toggleLiveMode = () => {
       searchObj.meta.liveMode = !searchObj.meta.liveMode;
-      localStorage.setItem(
-        "oo_toggle_auto_run",
-        String(searchObj.meta.liveMode),
-      );
+      localStorage.setItem("oo_toggle_auto_run", String(searchObj.meta.liveMode));
     };
 
     const handleHistogramMode = () => {};
@@ -4663,10 +4435,7 @@ export default defineComponent({
         searchObj.meta.logsVisualizeToggle == "patterns" ||
         searchObj.meta.logsVisualizeToggle == "build"
       ) {
-        emit(
-          "handleRunQueryFn",
-          typeof clear_cache === "boolean" ? clear_cache : false,
-        );
+        emit("handleRunQueryFn", typeof clear_cache === "boolean" ? clear_cache : false);
       } else {
         handleRunQuery(typeof clear_cache === "boolean" ? clear_cache : false);
       }
@@ -4706,10 +4475,7 @@ export default defineComponent({
       }
 
       // confirm with user on toggle from visualize to logs
-      if (
-        value == "logs" &&
-        searchObj.meta.logsVisualizeToggle == "visualize"
-      ) {
+      if (value == "logs" && searchObj.meta.logsVisualizeToggle == "visualize") {
         // cancel all the visualize queries
         cancelVisualizeQueries();
 
@@ -4726,14 +4492,10 @@ export default defineComponent({
           getQueryData();
           searchObj.meta.logsVisualizeDirtyFlag = false;
         }
-      } else if (
-        value == "logs" &&
-        searchObj.meta.logsVisualizeToggle == "patterns"
-      ) {
+      } else if (value == "logs" && searchObj.meta.logsVisualizeToggle == "patterns") {
         // Switching from patterns to logs - check if we need to fetch logs
         const hasLogs =
-          searchObj.data?.queryResults?.hits &&
-          searchObj.data.queryResults.hits.length > 0;
+          searchObj.data?.queryResults?.hits && searchObj.data.queryResults.hits.length > 0;
 
         // console.log("[SearchBar] Switching patterns ? logs, hasLogs:", hasLogs);
 
@@ -4761,10 +4523,7 @@ export default defineComponent({
       } else if (value == "visualize") {
         // validate query
         // return if query is empty and stream is not selected
-        if (
-          searchObj.data.query === "" &&
-          searchObj?.data?.stream?.selectedStream?.length === 0
-        ) {
+        if (searchObj.data.query === "" && searchObj?.data?.stream?.selectedStream?.length === 0) {
           showErrorNotification(t("search.queryEmptyToVisualize"));
           return;
         }
@@ -4778,11 +4537,7 @@ export default defineComponent({
         }
 
         // if multiple sql, then do not allow to visualize
-        if (
-          logsPageQuery &&
-          Array.isArray(logsPageQuery) &&
-          logsPageQuery.length > 1
-        ) {
+        if (logsPageQuery && Array.isArray(logsPageQuery) && logsPageQuery.length > 1) {
           showErrorNotification(t("search.multipleSqlNotAllowed"));
           return;
         }
@@ -4809,10 +4564,7 @@ export default defineComponent({
         // mode with default histogram/count fields and carry over WHERE clause.
         if (searchObj.meta.sqlMode) {
           // Generate query using buildSearch if query is empty or doesn't have SELECT
-          if (
-            !searchObj.data.query ||
-            searchObj.data.query.toLowerCase().indexOf("select") < 0
-          ) {
+          if (!searchObj.data.query || searchObj.data.query.toLowerCase().indexOf("select") < 0) {
             const queryBuild = buildSearch();
             const builtQuery = queryBuild?.query?.sql ?? "";
             if (builtQuery) {
@@ -4827,20 +4579,12 @@ export default defineComponent({
 
         // Quick mode logic only relevant for SQL mode
         if (searchObj.meta.sqlMode) {
-          const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(
-            searchObj.data.query || "",
-          );
-          const shouldEnableQuickMode =
-            !searchObj.meta.sqlMode || isSelectAllQuery;
+          const isSelectAllQuery = /^\s*select\s+\*\s+from\s+/i.test(searchObj.data.query || "");
+          const shouldEnableQuickMode = !searchObj.meta.sqlMode || isSelectAllQuery;
           const isQuickModeDisabled = !searchObj.meta.quickMode;
-          const isQuickModeConfigEnabled =
-            store.state.zoConfig.quick_mode_enabled === true;
+          const isQuickModeConfigEnabled = store.state.zoConfig.quick_mode_enabled === true;
 
-          if (
-            shouldEnableQuickMode &&
-            isQuickModeDisabled &&
-            isQuickModeConfigEnabled
-          ) {
+          if (shouldEnableQuickMode && isQuickModeDisabled && isQuickModeConfigEnabled) {
             searchObj.meta.quickMode = true;
           }
         }
@@ -4850,8 +4594,7 @@ export default defineComponent({
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
         const hasLogs =
-          searchObj.data?.queryResults?.hits &&
-          searchObj.data.queryResults.hits.length > 0;
+          searchObj.data?.queryResults?.hits && searchObj.data.queryResults.hits.length > 0;
 
         if (hasLogs) {
           searchObj.data.histogram.chartParams.title = getHistogramTitle(false);
@@ -4862,12 +4605,8 @@ export default defineComponent({
       window.dispatchEvent(new Event("resize"));
     };
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "logs",
-    );
-    const { dashboardPanelData } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "logs");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     // [START] cancel running queries
 
@@ -4915,20 +4654,14 @@ export default defineComponent({
     const disable = ref(false);
 
     watch(variablesAndPanelsDataLoadingState, () => {
-      const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState?.panels,
-      );
+      const panelsValues = Object.values(variablesAndPanelsDataLoadingState?.panels);
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
     const iconRight = computed(() => {
       return (
         "img:" +
-        getImageURL(
-          isDark.value
-            ? "images/common/function_dark.svg"
-            : "images/common/function.svg",
-        )
+        getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
       );
     });
     const functionToggleIcon = computed(() => {
@@ -4952,7 +4685,7 @@ export default defineComponent({
         ) {
           toast({
             variant: "error",
-            message: t('logs.searchBar.selectStreamBeforeSchedule'),
+            message: t("logs.searchBar.selectStreamBeforeSchedule"),
           });
           return;
         }
@@ -5049,7 +4782,7 @@ export default defineComponent({
 
     const updateActionSelection = (item: any) => {
       toast({
-        message: t('logs.searchBar.actionAppliedSuccess', { name: item?.name }),
+        message: t("logs.searchBar.actionAppliedSuccess", { name: item?.name }),
         variant: "success",
       });
     };
@@ -5128,9 +4861,7 @@ export default defineComponent({
     // [END] explain query functionality
 
     // [START] query editor placeholder overlay
-    const _streamFields = computed(
-      () => searchObj.data.stream.selectedStreamFields ?? [],
-    );
+    const _streamFields = computed(() => searchObj.data.stream.selectedStreamFields ?? []);
     const _fieldValues = computed(() => props.fieldValues ?? {});
     const _sqlMode = computed(() => searchObj.meta.sqlMode);
     const _noStream = computed(() => !searchObj.data.stream.selectedStream.length);
@@ -5151,9 +4882,7 @@ export default defineComponent({
       t("search.askAIPlaceholderRotation.three"),
       t("search.askAIPlaceholderRotation.four"),
     ]);
-    const { placeholder: aiQueryPlaceholder } = useTypewriterPlaceholder(
-      aiQueryPlaceholderPrompts,
-    );
+    const { placeholder: aiQueryPlaceholder } = useTypewriterPlaceholder(aiQueryPlaceholderPrompts);
     // [END] typewriter placeholder for AI query input
 
     return {
@@ -5364,10 +5093,7 @@ export default defineComponent({
   },
   computed: {
     isVisualizeDisabled() {
-      return (
-        !this.searchObj.meta.sqlMode &&
-        this.searchObj.data.stream.selectedStream.length > 1
-      );
+      return !this.searchObj.meta.sqlMode && this.searchObj.data.stream.selectedStream.length > 1;
     },
     isSqlModeDisabled() {
       return (
@@ -5385,10 +5111,10 @@ export default defineComponent({
       return this.searchObj.meta.showTransformEditor;
     },
     confirmMessage() {
-      return this.t('logs.searchBar.confirmUpdateFunction');
+      return this.t("logs.searchBar.confirmUpdateFunction");
     },
     confirmMessageSavedView() {
-      return this.t('logs.searchBar.confirmUpdateSavedViewMsg');
+      return this.t("logs.searchBar.confirmUpdateSavedViewMsg");
     },
     resetFunction() {
       return this.searchObj.data.tempFunctionName;
@@ -5411,15 +5137,9 @@ export default defineComponent({
           this.searchObj.data.editorValue = this.searchObj.data.query;
         } else {
           let unionType: string = "";
-          if (
-            currentQuery[0]
-              .replace("union all", "UNION ALL")
-              .includes("UNION ALL")
-          ) {
+          if (currentQuery[0].replace("union all", "UNION ALL").includes("UNION ALL")) {
             unionType = "UNION ALL";
-          } else if (
-            currentQuery[0].replace("union", "UNION").includes("UNION")
-          ) {
+          } else if (currentQuery[0].replace("union", "UNION").includes("UNION")) {
             unionType = "UNION";
           }
 
@@ -5444,15 +5164,10 @@ export default defineComponent({
             }
 
             if (this.searchObj.meta.sqlMode == true) {
-              if (
-                unionType == "" &&
-                this.searchObj.data.stream.selectedStream.length > 1
-              ) {
+              if (unionType == "" && this.searchObj.data.stream.selectedStream.length > 1) {
                 const parsedSQL = this.fnParsedSQL();
                 const streamPrefix: string =
-                  parsedSQL.from[0].as != null
-                    ? parsedSQL.from[0].as
-                    : parsedSQL.from[0].table;
+                  parsedSQL.from[0].as != null ? parsedSQL.from[0].as : parsedSQL.from[0].table;
                 filter = `"${streamPrefix}".${filter}`;
               }
 
@@ -5464,28 +5179,16 @@ export default defineComponent({
                 // In append mode (SearchResult include/exclude), skip the
                 // field-level replace so multiple values for the same field
                 // coexist with AND.
-                const appendOnlySQL =
-                  this.searchObj.data.stream.addToFilterMode === "append";
-                const fieldNameSQL = appendOnlySQL
-                  ? null
-                  : getFieldFromExpression(filter);
+                const appendOnlySQL = this.searchObj.data.stream.addToFilterMode === "append";
+                const fieldNameSQL = appendOnlySQL ? null : getFieldFromExpression(filter);
                 if (fieldNameSQL && hasFieldCondition(query, fieldNameSQL)) {
-                  query = replaceExistingFieldCondition(
-                    query,
-                    fieldNameSQL,
-                    filter,
-                  );
+                  query = replaceExistingFieldCondition(query, fieldNameSQL, filter);
                 } else {
                   // Find the earliest clause that ends the WHERE conditions.
                   // Standard SQL clause order: WHERE ? GROUP BY ? HAVING ? ORDER BY ? LIMIT.
                   // We must insert the new filter before whichever comes first so it
                   // stays inside the WHERE clause rather than after GROUP BY / ORDER BY.
-                  const terminatingClauses = [
-                    "group by",
-                    "having",
-                    "order by",
-                    "limit",
-                  ];
+                  const terminatingClauses = ["group by", "having", "order by", "limit"];
                   const lowerQuery = query.toLowerCase();
                   let firstClause: string | null = null;
                   let firstIndex = Infinity;
@@ -5497,17 +5200,9 @@ export default defineComponent({
                     }
                   }
                   if (firstClause) {
-                    const [beforeClause, afterClause] = queryIndexSplit(
-                      query,
-                      firstClause,
-                    );
+                    const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
                     query =
-                      beforeClause.trim() +
-                      " AND " +
-                      filter +
-                      " " +
-                      firstClause +
-                      afterClause;
+                      beforeClause.trim() + " AND " + filter + " " + firstClause + afterClause;
                   } else {
                     query = query + " AND " + filter;
                   }
@@ -5515,12 +5210,7 @@ export default defineComponent({
               } else {
                 // Find the earliest clause to insert WHERE before.
                 // SQL clause order: FROM → WHERE → GROUP BY → HAVING → ORDER BY → LIMIT
-                const terminatingClauses = [
-                  "group by",
-                  "having",
-                  "order by",
-                  "limit",
-                ];
+                const terminatingClauses = ["group by", "having", "order by", "limit"];
                 const lowerQuery = query.toLowerCase();
                 let firstClause: string | null = null;
                 let firstIndex = Infinity;
@@ -5532,34 +5222,19 @@ export default defineComponent({
                   }
                 }
                 if (firstClause) {
-                  const [beforeClause, afterClause] = queryIndexSplit(
-                    query,
-                    firstClause,
-                  );
+                  const [beforeClause, afterClause] = queryIndexSplit(query, firstClause);
                   query =
-                    beforeClause.trim() +
-                    " where " +
-                    filter +
-                    " " +
-                    firstClause +
-                    afterClause;
+                    beforeClause.trim() + " where " + filter + " " + firstClause + afterClause;
                 } else {
                   query = query + " where " + filter;
                 }
               }
               currentQuery[0] = query;
             } else {
-              const appendOnly =
-                this.searchObj.data.stream.addToFilterMode === "append";
-              const fieldName = appendOnly
-                ? null
-                : getFieldFromExpression(filter);
+              const appendOnly = this.searchObj.data.stream.addToFilterMode === "append";
+              const fieldName = appendOnly ? null : getFieldFromExpression(filter);
               if (fieldName && hasFieldCondition(currentQuery[0], fieldName)) {
-                currentQuery[0] = replaceExistingFieldCondition(
-                  currentQuery[0],
-                  fieldName,
-                  filter,
-                );
+                currentQuery[0] = replaceExistingFieldCondition(currentQuery[0], fieldName, filter);
               } else {
                 currentQuery[0].length == 0
                   ? (currentQuery[0] = filter)
@@ -5581,10 +5256,7 @@ export default defineComponent({
           this.searchObj.data.stream.addToFilterMode = "replace";
           if (this.queryEditorRef?.setValue)
             this.queryEditorRef.setValue(this.searchObj.data.query);
-          if (
-            this.store.state.zoConfig.auto_query_enabled &&
-            this.searchObj.meta.liveMode
-          ) {
+          if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
             this.$emit("searchdata");
           }
         }
@@ -5607,25 +5279,16 @@ export default defineComponent({
           }
         } catch (e) {
           console.log("Error removing field condition from SQL:", e);
-          newValue = removeFieldCondition(
-            this.searchObj.data.editorValue,
-            fieldName,
-          );
+          newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
         }
       } else {
-        newValue = removeFieldCondition(
-          this.searchObj.data.editorValue,
-          fieldName,
-        );
+        newValue = removeFieldCondition(this.searchObj.data.editorValue, fieldName);
       }
       this.searchObj.data.editorValue = newValue;
       this.searchObj.data.query = newValue;
       this.searchObj.data.stream.removeFilterField = "";
       if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
-      if (
-        this.store.state.zoConfig.auto_query_enabled &&
-        this.searchObj.meta.liveMode
-      ) {
+      if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
         this.$emit("searchdata");
       }
     },
@@ -5641,10 +5304,7 @@ export default defineComponent({
     resetFunction(newVal) {
       if (newVal == "" && store && !store?.state?.savedViewFlag) {
         this.resetFunctionContent();
-        if (
-          this.store.state.zoConfig?.auto_query_enabled &&
-          this.searchObj.meta.liveMode
-        ) {
+        if (this.store.state.zoConfig?.auto_query_enabled && this.searchObj.meta.liveMode) {
           this.$emit("searchdata");
         }
       }
@@ -5736,7 +5396,8 @@ export default defineComponent({
 }
 
 /* Hide the redundant total-count chip on the left — "of N" on the right already shows it */
-.saved-view-table :deep([data-test="o2-table-pagination-bottom"] [data-test="o2-table-pagination-actions"]) {
+.saved-view-table
+  :deep([data-test="o2-table-pagination-bottom"] [data-test="o2-table-pagination-actions"]) {
   display: none;
 }
 

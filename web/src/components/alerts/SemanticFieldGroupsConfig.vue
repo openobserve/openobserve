@@ -120,10 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="emitUpdate"
         />
       </div>
-      <div
-        v-if="localFingerprintFields.length === 0"
-        class="text-status-error-text text-xs mt-2"
-      >
+      <div v-if="localFingerprintFields.length === 0" class="text-status-error-text text-xs mt-2">
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
     </div>
@@ -263,8 +260,7 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    (group) =>
-      normalizeCategoryName(group.group || "Other") === selectedCategory.value,
+    (group) => normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
 });
 
@@ -286,10 +282,7 @@ const addGroup = () => {
 };
 
 // Update group by filtered index - find actual index in localGroups
-const updateGroupByFilter = (
-  filteredIndex: number,
-  updatedGroup: SemanticGroup,
-) => {
+const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
   const group = filteredGroups.value[filteredIndex];
   const actualIndex = localGroups.value.findIndex(
     (g) => g.id === group.id && g.display === group.display,
@@ -311,9 +304,7 @@ const removeGroupByFilter = (filteredIndex: number) => {
     localGroups.value.splice(actualIndex, 1);
 
     // Remove from fingerprint fields if present
-    localFingerprintFields.value = localFingerprintFields.value.filter(
-      (id) => id !== removedId,
-    );
+    localFingerprintFields.value = localFingerprintFields.value.filter((id) => id !== removedId);
 
     emitUpdate();
   }
@@ -361,9 +352,7 @@ onMounted(async () => {
 
   if (props.scrollToGroupId) {
     // Find and switch to the category that contains the requested group
-    const targetGroup = localGroups.value.find(
-      (g) => g.id === props.scrollToGroupId,
-    );
+    const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
     if (targetGroup) {
       selectedCategory.value = targetGroup.group || "Other";
       await nextTick(); // wait for filteredGroups to re-render
@@ -380,17 +369,11 @@ onMounted(async () => {
     if (el) {
       // Scroll within the nearest scrollable parent to avoid pushing
       // ancestor containers (main page layout) out of view
-      const scrollParent = el.closest(
-        ".overflow-y-auto",
-      ) as HTMLElement | null;
+      const scrollParent = el.closest(".overflow-y-auto") as HTMLElement | null;
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
-        const offset =
-          elRect.top -
-          parentRect.top -
-          parentRect.height / 2 +
-          elRect.height / 2;
+        const offset = elRect.top - parentRect.top - parentRect.height / 2 + elRect.height / 2;
         scrollParent.scrollBy({ top: offset, behavior: "smooth" });
       } else {
         el.scrollIntoView({ behavior: "smooth", block: "center" });

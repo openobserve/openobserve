@@ -66,9 +66,7 @@ describe("AzureMarketplaceSetup", () => {
 
     router = createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: "/", name: "home", component: { template: "<div>Home</div>" } },
-      ],
+      routes: [{ path: "/", name: "home", component: { template: "<div>Home</div>" } }],
     });
 
     (organizationsService.list as any).mockResolvedValue({
@@ -139,12 +137,8 @@ describe("AzureMarketplaceSetup", () => {
     const wrapper = mountSetup();
     await flushPromises();
 
-    expect(
-      wrapper.find('[data-test="azure-marketplace-org-name"]').exists(),
-    ).toBe(true);
-    expect(
-      wrapper.find('[data-test="azure-marketplace-create-link-btn"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="azure-marketplace-org-name"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="azure-marketplace-create-link-btn"]').exists()).toBe(true);
   });
 
   it("should display processing state", async () => {
@@ -264,9 +258,7 @@ describe("AzureMarketplaceSetup", () => {
   // Real-OForm validation wiring (playbook §5 / R22): mount the real OForm and
   // prove the Zod schema — not a button-disabled gate — blocks an empty submit.
   describe("OForm schema validation (real forms)", () => {
-    const mountSelectOrg = async (
-      orgs: { identifier: string; name: string }[] = [],
-    ) => {
+    const mountSelectOrg = async (orgs: { identifier: string; name: string }[] = []) => {
       sessionStorage.setItem("azure_marketplace_token", "test_token");
       (organizationsService.list as any).mockResolvedValue({
         data: { data: orgs },
@@ -309,9 +301,7 @@ describe("AzureMarketplaceSetup", () => {
     });
 
     it("link form: blocks submit + does NOT link when no org is selected", async () => {
-      const wrapper = await mountSelectOrg([
-        { identifier: "org1", name: "Org 1" },
-      ]);
+      const wrapper = await mountSelectOrg([{ identifier: "org1", name: "Org 1" }]);
       const linkForm = wrapper.findAllComponents({ name: "OForm" })[1];
 
       await (linkForm.vm as any).form.handleSubmit();
@@ -326,9 +316,7 @@ describe("AzureMarketplaceSetup", () => {
         data: { success: true },
       });
 
-      const wrapper = await mountSelectOrg([
-        { identifier: "org1", name: "Org 1" },
-      ]);
+      const wrapper = await mountSelectOrg([{ identifier: "org1", name: "Org 1" }]);
       const linkForm = wrapper.findAllComponents({ name: "OForm" })[1];
 
       (linkForm.vm as any).form.setFieldValue("selectedOrg", "org1");
@@ -336,10 +324,7 @@ describe("AzureMarketplaceSetup", () => {
       await flushPromises();
 
       expect((linkForm.vm as any).form.state.isValid).toBe(true);
-      expect(azureMarketplace.linkSubscription).toHaveBeenCalledWith(
-        "org1",
-        "test_token",
-      );
+      expect(azureMarketplace.linkSubscription).toHaveBeenCalledWith("org1", "test_token");
     });
   });
 });

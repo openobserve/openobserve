@@ -40,16 +40,11 @@
           </OButton>
         </template>
         <div class="logs-table-list min-w-45">
-          <slot name="field-dropdown"
-:field="key"
-:value="value[key]" />
+          <slot name="field-dropdown" :field="key" :value="value[key]" />
         </div>
       </ODropdown>
 
-      <span
-        class="pl-2.5"
-        :data-test="`json-preview-key-${key}`"
-      >
+      <span class="pl-2.5" :data-test="`json-preview-key-${key}`">
         <span class="log-key">{{ key }}</span
         ><span class="log-separator">: </span
         ><span
@@ -153,4 +148,3 @@ export default {
   },
 };
 </script>
-

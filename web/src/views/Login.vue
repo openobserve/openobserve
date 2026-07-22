@@ -45,11 +45,7 @@ import config from "@/aws-exports";
 import configService from "@/services/config";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import {
-  getUserInfo,
-  getDecodedUserInfo,
-  checkCallBackValues,
-} from "@/utils/zincutils";
+import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import {
@@ -108,10 +104,7 @@ export default defineComponent({
           const localOrg: any = useLocalOrganization();
           let tempDefaultOrg = {};
           let localOrgFlag = false;
-          if (
-            localOrg.value != null &&
-            localOrg.value.user_email !== store.state.userInfo.email
-          ) {
+          if (localOrg.value != null && localOrg.value.user_email !== store.state.userInfo.email) {
             localOrg.value = null;
             useLocalOrganization("");
           }
@@ -119,13 +112,7 @@ export default defineComponent({
           store.dispatch("setOrganizations", res.data.data);
 
           orgOptions.value = res.data.data.map(
-            (data: {
-              id: any;
-              name: any;
-              type: any;
-              identifier: any;
-              UserObj: any;
-            }) => {
+            (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
               let optiondata: any = {
                 label: data.name,
                 id: data.id,
@@ -147,9 +134,7 @@ export default defineComponent({
                 res.data.data.length == 1
               ) {
                 localOrgFlag = true;
-                selectedOrg.value = localOrg.value
-                  ? localOrg.value
-                  : optiondata;
+                selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
                 useLocalOrganization(selectedOrg.value);
                 store.dispatch("setSelectedOrganization", selectedOrg.value);
               }
@@ -170,10 +155,7 @@ export default defineComponent({
           //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
           if (
             config.isCloud == "true" &&
-            checkCallBackValues(
-              router.currentRoute.value.hash,
-              "new_user_login",
-            ) == "true"
+            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }
@@ -225,7 +207,7 @@ export default defineComponent({
      * Helper to get cookie value by name
      */
     const getCookie = (name: string): string | null => {
-      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
       return match ? decodeURIComponent(match[2]) : null;
     };
 
@@ -240,7 +222,7 @@ export default defineComponent({
         router.push({ path: "/marketplace/aws/setup" });
         return;
       }
-       // Check for Azure Marketplace token - redirect to setup if present
+      // Check for Azure Marketplace token - redirect to setup if present
       const azureMarketplaceToken = window.sessionStorage.getItem("azure_marketplace_token");
       if (azureMarketplaceToken) {
         router.push({ path: "/marketplace/azure/register" });
@@ -324,10 +306,7 @@ export default defineComponent({
             this.user.last_name = token.family_name ? token.family_name : "";
           }
           const sessionUserInfo = getDecodedUserInfo();
-          this.userInfo =
-            sessionUserInfo !== null
-              ? JSON.parse(sessionUserInfo as string)
-              : null;
+          this.userInfo = sessionUserInfo !== null ? JSON.parse(sessionUserInfo as string) : null;
 
           if (
             (this.userInfo !== null &&
@@ -367,8 +346,8 @@ export default defineComponent({
             const dismiss = toast({
               variant: "loading",
               message: "Please wait while creating new user...",
-                          timeout: 0,
-});
+              timeout: 0,
+            });
 
             usersService.addNewUser(this.user).then((_res) => {
               this.store.dispatch("login", {
@@ -394,12 +373,11 @@ export default defineComponent({
           toast({
             variant: "loading",
             message: "Error while verifying user...",
-                      timeout: 0,
-});
+            timeout: 0,
+          });
           if (error.status === 403) this.signout();
         });
     },
   },
 });
 </script>
-

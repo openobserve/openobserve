@@ -35,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-col items-center justify-center gap-3 min-h-80 px-page-edge"
     >
       <OSpinner size="lg" />
-      <OText variant="meta">{{
-        t("dashboard.addDashboardFromGitHub.loading")
-      }}</OText>
+      <OText variant="meta">{{ t("dashboard.addDashboardFromGitHub.loading") }}</OText>
     </div>
 
     <!-- Error -->
@@ -57,9 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else class="flex flex-col">
       <!-- Toolbar — sticks flush to the top; its opaque bg covers cards that
            scroll underneath. Keeps the drawer's own scroll shadow. -->
-      <div
-        class="sticky top-0 z-20 flex flex-col gap-2 bg-dialog-bg px-page-edge pt-3 pb-2"
-      >
+      <div class="sticky top-0 z-20 flex flex-col gap-2 bg-dialog-bg px-page-edge pt-3 pb-2">
         <OSearchInput
           v-model="searchQuery"
           :placeholder="t('dashboard.addDashboardFromGitHub.searchPlaceholder')"
@@ -70,11 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Fixed-height meta row: 'available' pinned right, 'selected' badge
              appears to its left so neither the search nor the count ever shifts. -->
         <div class="flex items-center justify-end gap-2 min-h-6 whitespace-nowrap">
-          <OTag
-            v-if="selectedDashboards.length"
-            variant="primary-soft"
-            size="xs"
-          >
+          <OTag v-if="selectedDashboards.length" variant="primary-soft" size="xs">
             {{
               t("dashboard.addDashboardFromGitHub.selectedCount", {
                 count: selectedDashboards.length,
@@ -116,12 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon="getCategoryInfo(items[0]).icon"
               size="sm"
             />
-            <OText variant="label" class="font-semibold">{{
-              categoryLabel(category)
-            }}</OText>
-            <OTag variant="default-soft" size="xs">{{
-              items.length
-            }}</OTag>
+            <OText variant="label" class="font-semibold">{{ categoryLabel(category) }}</OText>
+            <OTag variant="default-soft" size="xs">{{ items.length }}</OTag>
           </div>
 
           <!-- 2-column card grid for this group -->
@@ -143,10 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown.enter.prevent="toggleDashboard(dashboard)"
               @keydown.space.prevent="toggleDashboard(dashboard)"
             >
-              <span
-                class="flex-1 min-w-0 truncate text-sm font-medium text-text-heading"
-                >{{ dashboard.displayName }}</span
-              >
+              <span class="flex-1 min-w-0 truncate text-sm font-medium text-text-heading">{{
+                dashboard.displayName
+              }}</span>
               <OCheckbox
                 :model-value="isSelected(dashboard)"
                 size="sm"
@@ -346,9 +333,7 @@ export default defineComponent({
     };
 
     const toggleDashboard = (dashboard: GitHubDashboard) => {
-      const index = selectedDashboards.value.findIndex(
-        (d) => d.name === dashboard.name,
-      );
+      const index = selectedDashboards.value.findIndex((d) => d.name === dashboard.name);
       if (index > -1) {
         selectedDashboards.value.splice(index, 1);
       } else {
@@ -363,10 +348,12 @@ export default defineComponent({
       const parser = new DOMParser();
       const doc = parser.parseFromString(xmlText, "application/xml");
       const prefixes = Array.from(doc.querySelectorAll("CommonPrefixes Prefix"));
-      return prefixes.map((el) => {
-        const full = el.textContent || "";
-        return full.replace(S3_PREFIX, "").replace(/\/$/, "");
-      }).filter(Boolean);
+      return prefixes
+        .map((el) => {
+          const full = el.textContent || "";
+          return full.replace(S3_PREFIX, "").replace(/\/$/, "");
+        })
+        .filter(Boolean);
     };
 
     const parseS3Files = (xmlText: string, folderPath: string): string[] => {
@@ -395,16 +382,12 @@ export default defineComponent({
         }
 
         // Fetch folder list from S3 using List Objects v2 API (requires s3:ListBucket)
-        const response = await fetch(
-          `${S3_BASE}/?list-type=2&prefix=${S3_PREFIX}&delimiter=/`,
-        );
+        const response = await fetch(`${S3_BASE}/?list-type=2&prefix=${S3_PREFIX}&delimiter=/`);
         if (!response.ok)
           throw new Error(t("dashboard.addDashboardFromGitHub.fetchDashboardsError"));
 
         const xmlText = await response.text();
-        const folderNames = parseS3Folders(xmlText).filter(
-          (name) => !name.startsWith("."),
-        );
+        const folderNames = parseS3Folders(xmlText).filter((name) => !name.startsWith("."));
 
         const dashboardList = folderNames
           .map((name) => ({
@@ -456,8 +439,14 @@ export default defineComponent({
         }));
 
         // Auto-select the default folder; preserve existing selection if still valid
-        if (!selectedFolderObj.value || !folderOptions.value.some((o) => o.value === selectedFolderObj.value)) {
-          selectedFolderObj.value = sorted.find((f: any) => f.folderId === 'default')?.folderId ?? sorted[0]?.folderId ?? null;
+        if (
+          !selectedFolderObj.value ||
+          !folderOptions.value.some((o) => o.value === selectedFolderObj.value)
+        ) {
+          selectedFolderObj.value =
+            sorted.find((f: any) => f.folderId === "default")?.folderId ??
+            sorted[0]?.folderId ??
+            null;
         }
       } catch (err) {
         console.error("Error loading folders:", err);
@@ -493,10 +482,7 @@ export default defineComponent({
                 }
               }
             } catch (err) {
-              console.error(
-                `Failed to fetch JSON files for ${dashboard.name}:`,
-                err,
-              );
+              console.error(`Failed to fetch JSON files for ${dashboard.name}:`, err);
             }
           }
         }
@@ -519,8 +505,7 @@ export default defineComponent({
     };
 
     const confirmAdd = async () => {
-      if (selectedDashboards.value.length === 0 || !selectedFolderObj.value)
-        return;
+      if (selectedDashboards.value.length === 0 || !selectedFolderObj.value) return;
 
       importing.value = true;
       try {
@@ -536,8 +521,7 @@ export default defineComponent({
             try {
               // Check cache first
               const cacheKey = `${dashboard.folderPath}/${jsonFile}`;
-              const jsonCache =
-                store.state.githubDashboardGallery.dashboardJsonCache;
+              const jsonCache = store.state.githubDashboardGallery.dashboardJsonCache;
               let dashboardJson;
 
               if (jsonCache[cacheKey]) {
@@ -564,8 +548,7 @@ export default defineComponent({
                 });
               }
 
-              const dashboardTitle =
-                dashboardJson.title || jsonFile.replace(".json", "");
+              const dashboardTitle = dashboardJson.title || jsonFile.replace(".json", "");
 
               // Check if dashboard already exists in the selected folder
               const dashboardsResponse = await dashboardsService.list(
@@ -579,10 +562,9 @@ export default defineComponent({
                 "",
               );
 
-              const existingDashboard =
-                dashboardsResponse.data?.dashboards?.find(
-                  (d: any) => d.title === dashboardTitle,
-                );
+              const existingDashboard = dashboardsResponse.data?.dashboards?.find(
+                (d: any) => d.title === dashboardTitle,
+              );
 
               if (existingDashboard) {
                 // Delete existing dashboard before importing
@@ -591,11 +573,7 @@ export default defineComponent({
                   existingDashboard?.dashboard_id ||
                   existingDashboard?.id;
                 if (existingDashboardId) {
-                  await dashboardsService.delete(
-                    orgId,
-                    existingDashboardId,
-                    folderId,
-                  );
+                  await dashboardsService.delete(orgId, existingDashboardId, folderId);
                   await new Promise((resolve) => setTimeout(resolve, 500));
                 }
               }
@@ -640,9 +618,7 @@ export default defineComponent({
           toast({
             variant: "error",
             message: t("dashboard.addDashboardFromGitHub.importFailed", {
-              error:
-                errors[0] ||
-                t("dashboard.addDashboardFromGitHub.unknownError"),
+              error: errors[0] || t("dashboard.addDashboardFromGitHub.unknownError"),
             }),
             timeout: 5000,
           });
@@ -718,26 +694,71 @@ function getCategoryInfo(dashboard: { name: string }): {
   category: string;
 } {
   const n = dashboard.name.toLowerCase();
-  if (n.includes("aws") || n.includes("amazon") || n.includes("ec2") || n.includes("s3") || n.includes("rds") || n.includes("elb") || n.includes("lambda"))
-    return { icon: "cloud",         variant: "orange-soft",  category: "aws" };
+  if (
+    n.includes("aws") ||
+    n.includes("amazon") ||
+    n.includes("ec2") ||
+    n.includes("s3") ||
+    n.includes("rds") ||
+    n.includes("elb") ||
+    n.includes("lambda")
+  )
+    return { icon: "cloud", variant: "orange-soft", category: "aws" };
   if (n.includes("cloudwatch"))
-    return { icon: "cloud",         variant: "orange-soft",  category: "cloudwatch" };
+    return { icon: "cloud", variant: "orange-soft", category: "cloudwatch" };
   if (n.includes("gcp") || n.includes("google") || n.includes("bigquery") || n.includes("pubsub"))
-    return { icon: "cloud",         variant: "blue-soft",    category: "googleCloud" };
+    return { icon: "cloud", variant: "blue-soft", category: "googleCloud" };
   if (n.includes("azure") || n.includes("microsoft"))
-    return { icon: "cloud",         variant: "cyan-soft",    category: "azure" };
-  if (n.includes("kubernetes") || n.includes("k8s") || n.includes("kube") || n.includes("pod") || n.includes("helm") || n.includes("container") || n.includes("docker"))
-    return { icon: "hub",           variant: "indigo-soft",  category: "kubernetes" };
-  if (n.includes("postgres") || n.includes("mysql") || n.includes("mongo") || n.includes("redis") || n.includes("elastic") || n.includes("cassandra") || n.includes("database") || n.includes("db"))
-    return { icon: "database",      variant: "purple-soft",  category: "database" };
-  if (n.includes("nginx") || n.includes("apache") || n.includes("haproxy") || n.includes("istio") || n.includes("envoy") || n.includes("traefik"))
-    return { icon: "dns",           variant: "teal-soft",    category: "networking" };
-  if (n.includes("security") || n.includes("audit") || n.includes("threat") || n.includes("waf") || n.includes("firewall"))
-    return { icon: "shield",        variant: "error-soft",   category: "security" };
-  if (n.includes("monitor") || n.includes("alert") || n.includes("metric") || n.includes("prometheus") || n.includes("opentelemetry") || n.includes("otel"))
+    return { icon: "cloud", variant: "cyan-soft", category: "azure" };
+  if (
+    n.includes("kubernetes") ||
+    n.includes("k8s") ||
+    n.includes("kube") ||
+    n.includes("pod") ||
+    n.includes("helm") ||
+    n.includes("container") ||
+    n.includes("docker")
+  )
+    return { icon: "hub", variant: "indigo-soft", category: "kubernetes" };
+  if (
+    n.includes("postgres") ||
+    n.includes("mysql") ||
+    n.includes("mongo") ||
+    n.includes("redis") ||
+    n.includes("elastic") ||
+    n.includes("cassandra") ||
+    n.includes("database") ||
+    n.includes("db")
+  )
+    return { icon: "database", variant: "purple-soft", category: "database" };
+  if (
+    n.includes("nginx") ||
+    n.includes("apache") ||
+    n.includes("haproxy") ||
+    n.includes("istio") ||
+    n.includes("envoy") ||
+    n.includes("traefik")
+  )
+    return { icon: "dns", variant: "teal-soft", category: "networking" };
+  if (
+    n.includes("security") ||
+    n.includes("audit") ||
+    n.includes("threat") ||
+    n.includes("waf") ||
+    n.includes("firewall")
+  )
+    return { icon: "shield", variant: "error-soft", category: "security" };
+  if (
+    n.includes("monitor") ||
+    n.includes("alert") ||
+    n.includes("metric") ||
+    n.includes("prometheus") ||
+    n.includes("opentelemetry") ||
+    n.includes("otel")
+  )
     return { icon: "monitor-heart", variant: "success-soft", category: "observability" };
   if (n.includes("storage") || n.includes("disk") || n.includes("blob"))
-    return { icon: "storage",       variant: "amber-soft",   category: "storage" };
-  return   { icon: "dashboard",     variant: "primary-soft", category: "dashboard" };
+    return { icon: "storage", variant: "amber-soft", category: "storage" };
+  return { icon: "dashboard", variant: "primary-soft", category: "dashboard" };
 }
 </script>

@@ -149,7 +149,7 @@ describe("LoadingProgress", () => {
 
   it("should validate percentage is between 0 and 100", () => {
     const validator = LoadingProgress.props.loadingProgressPercentage.validator;
-    
+
     expect(validator(0)).toBe(true);
     expect(validator(50)).toBe(true);
     expect(validator(100)).toBe(true);

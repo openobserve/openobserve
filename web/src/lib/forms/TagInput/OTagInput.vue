@@ -25,8 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="tag-input-label"
         class="absolute top-4 left-3 text-base pointer-events-none transition-all duration-300 bg-transparent px-1 -ml-1 group-focus-within:text-theme-accent ease-[cubic-bezier(0.25,0.8,0.5,1)] origin-top-left"
         :class="hasContent ? '-translate-y-2 scale-75 text-theme-accent' : 'text-text-secondary'"
-      >{{ label }}</label>
-      <div data-test="tags-and-input" class="flex flex-wrap items-start gap-1 mt-1.25 w-full overflow-hidden">
+        >{{ label }}</label
+      >
+      <div
+        data-test="tags-and-input"
+        class="flex flex-wrap items-start gap-1 mt-1.25 w-full overflow-hidden"
+      >
         <OTag
           v-for="(tag, index) in modelValue"
           :key="index"
@@ -79,9 +83,7 @@ const props = withDefaults(defineProps<Props>(), {
   label: "",
 });
 
-const hasContent = computed(
-  () => props.modelValue.length > 0 || inputValue.value.length > 0,
-);
+const hasContent = computed(() => props.modelValue.length > 0 || inputValue.value.length > 0);
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string[]): void;

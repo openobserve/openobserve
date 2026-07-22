@@ -33,14 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </span>
 
     <span class="relative flex-1 min-w-0">
-      <span class="block text-sm font-semibold truncate text-text-heading">{{
-        label
-      }}</span>
-      <span
-        v-if="sublabel"
-        class="block text-xs truncate text-text-secondary"
-        >{{ sublabel }}</span
-      >
+      <span class="block text-sm font-semibold truncate text-text-heading">{{ label }}</span>
+      <span v-if="sublabel" class="block text-xs truncate text-text-secondary">{{ sublabel }}</span>
     </span>
 
     <OIcon

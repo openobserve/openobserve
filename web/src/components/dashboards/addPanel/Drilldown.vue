@@ -20,9 +20,7 @@
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
       :key="JSON.stringify(data) + index"
     >
-      <div
-        class="flex justify-between mb-1.25"
-      >
+      <div class="flex justify-between mb-1.25">
         <div
           @click="onDrilldownClick(index)"
           class="cursor-pointer pl-2.5 w-62.5 truncate"
@@ -45,7 +43,7 @@
       @click="addNewDrilldown"
       data-test="dashboard-addpanel-config-drilldown-add-btn"
     >
-      + {{ t('common.add') }}
+      + {{ t("common.add") }}
     </OButton>
     <DrilldownPopUp
       :key="drilldownPopUpKey"
@@ -70,9 +68,7 @@ import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, OButton,
-    OIcon,
-},
+  components: { DrilldownPopUp, OButton, OIcon },
   props: ["variablesData"],
   setup() {
     const { t } = useI18n();
@@ -84,13 +80,8 @@ export default defineComponent({
     // saved folder/dashboard/tab are loaded into the form on the first edit.
     const drilldownPopUpKey = ref(0);
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
 
     onBeforeMount(() => {
       // Ensure that the drilldown object is initialized in config

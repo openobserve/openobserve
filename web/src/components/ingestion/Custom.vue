@@ -16,61 +16,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <DataSourceSidebarLayout
-    v-model="tabs"
-    :splitter-width="250"
-  >
+  <DataSourceSidebarLayout v-model="tabs" :splitter-width="250">
     <template #tabs>
-            <ORouteTab
-              name="ingestLogs"
-              data-test="ingestion-custom-tab-ingestLogs"
-              :to="{
-                name: 'ingestLogs',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.logsLabel')"
-            />
-            <ORouteTab
-              name="ingestMetrics"
-              data-test="ingestion-custom-tab-ingestMetrics"
-              :to="{
-                name: 'ingestMetrics',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.metricsLabel')"
-            />
-            <ORouteTab
-              name="ingestTraces"
-              data-test="ingestion-custom-tab-ingestTraces"
-              :to="{
-                name: 'ingestTraces',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.tracesLabel')"
-            />
+      <ORouteTab
+        name="ingestLogs"
+        data-test="ingestion-custom-tab-ingestLogs"
+        :to="{
+          name: 'ingestLogs',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.logsLabel')"
+      />
+      <ORouteTab
+        name="ingestMetrics"
+        data-test="ingestion-custom-tab-ingestMetrics"
+        :to="{
+          name: 'ingestMetrics',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.metricsLabel')"
+      />
+      <ORouteTab
+        name="ingestTraces"
+        data-test="ingestion-custom-tab-ingestTraces"
+        :to="{
+          name: 'ingestTraces',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.tracesLabel')"
+      />
     </template>
 
-      <div class="overflow-hidden h-full">
-        <router-view
-          :title="tabs"
-          :currOrgIdentifier="currOrgIdentifier"
-          :currUserEmail="currentUserEmail"
-          @copy-to-clipboard-fn="copyToClipboardFn"
-        >
-        </router-view>
-      </div>
+    <div class="overflow-hidden h-full">
+      <router-view
+        :title="tabs"
+        :currOrgIdentifier="currOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
+      >
+      </router-view>
+    </div>
   </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
-import ORouteTab from '@/lib/navigation/Tabs/ORouteTab.vue'
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
 import { useI18n } from "vue-i18n";
@@ -94,9 +91,7 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router: any = useRouter();
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const metricRoutes = [
       "prometheus",
       "vmagent",
@@ -107,8 +102,17 @@ export default defineComponent({
     const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
     const rumRoutes = ["frontendMonitoring"];
     const logRoutes = [
-      "curl", "fluentbit", "fluentd", "kinesisfirehose", "vector",
-      "filebeat", "gcpLogs", "logstash", "syslogNg", "loongcollector", "ingestLogsFromOtel",
+      "curl",
+      "fluentbit",
+      "fluentd",
+      "kinesisfirehose",
+      "vector",
+      "filebeat",
+      "gcpLogs",
+      "logstash",
+      "syslogNg",
+      "loongcollector",
+      "ingestLogsFromOtel",
     ];
     const tabs = ref(
       logRoutes.includes(router.currentRoute.value.name as string)
@@ -117,19 +121,14 @@ export default defineComponent({
           ? "ingestMetrics"
           : traceRoutes.includes(router.currentRoute.value.name as string)
             ? "ingestTraces"
-            : "ingestLogs"
+            : "ingestLogs",
     );
 
     onBeforeMount(() => {
       // Parent container routes: navigating to these redirects to their first child.
       // Leaf child routes (tracesOTLP, ingestTracesFromOtel, logRoutes members, etc.)
       // are intentionally excluded here — they just set the active tab below.
-      const ingestRoutes = [
-        "ingestLogs",
-        "ingestTraces",
-        "ingestMetrics",
-        "rumMonitoring",
-      ];
+      const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics", "rumMonitoring"];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
@@ -209,4 +208,3 @@ export default defineComponent({
   },
 });
 </script>
-

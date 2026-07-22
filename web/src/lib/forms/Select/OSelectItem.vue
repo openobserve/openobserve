@@ -2,7 +2,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SelectItemProps, SelectItemSlots } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
+import {
+  SELECT_VALUE_MAP_KEY,
+  SELECT_PARENT_DATA_TEST_KEY,
+  NULL_VALUE_SENTINEL,
+} from "./OSelect.types";
 import { SelectItem, SelectItemText } from "reka-ui";
 import { computed, inject, onMounted, onUnmounted } from "vue";
 

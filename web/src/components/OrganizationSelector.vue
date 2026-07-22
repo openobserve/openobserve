@@ -65,9 +65,7 @@ const filtered = computed<OrgOption[]>(() => {
   if (!searchQuery.value) return props.organizations;
   const q = searchQuery.value.toLowerCase();
   return props.organizations.filter(
-    (o) =>
-      o.label?.toLowerCase().includes(q) ||
-      o.identifier?.toLowerCase().includes(q),
+    (o) => o.label?.toLowerCase().includes(q) || o.identifier?.toLowerCase().includes(q),
   );
 });
 
@@ -141,13 +139,11 @@ const onSearchKeydown = (e: KeyboardEvent) => {
   if (!len) return;
   if (e.key === "ArrowDown") {
     e.preventDefault();
-    highlightedIndex.value =
-      highlightedIndex.value < len - 1 ? highlightedIndex.value + 1 : 0;
+    highlightedIndex.value = highlightedIndex.value < len - 1 ? highlightedIndex.value + 1 : 0;
     nextTick(scrollHighlightedIntoView);
   } else if (e.key === "ArrowUp") {
     e.preventDefault();
-    highlightedIndex.value =
-      highlightedIndex.value > 0 ? highlightedIndex.value - 1 : len - 1;
+    highlightedIndex.value = highlightedIndex.value > 0 ? highlightedIndex.value - 1 : len - 1;
     nextTick(scrollHighlightedIntoView);
   } else if (e.key === "Enter") {
     e.preventDefault();
@@ -166,9 +162,7 @@ watch(open, async (isOpen) => {
   virtualizer.value.measure();
   // Highlight the current org (fallback to first) and center it in view so it
   // never lands stuck at the bottom edge.
-  const activeIdx = filtered.value.findIndex(
-    (o) => o.identifier === props.current?.identifier,
-  );
+  const activeIdx = filtered.value.findIndex((o) => o.identifier === props.current?.identifier);
   highlightedIndex.value = activeIdx >= 0 ? activeIdx : 0;
   nextTick(() => scrollHighlightedIntoView("center"));
   const input = document.querySelector(
@@ -188,8 +182,7 @@ watch(filtered, (list) => {
   });
 });
 
-const isSelected = (org: OrgOption) =>
-  org.identifier === props.current?.identifier;
+const isSelected = (org: OrgOption) => org.identifier === props.current?.identifier;
 
 // Selection reuses the same tokens OSelect uses, so the menu is visually
 // consistent with every other dropdown in the app.
@@ -216,15 +209,9 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           :class="open ? 'ring-1 ring-inset ring-primary-300' : ''"
         >
           <template #icon-left>
-            <OIcon
-              name="domain"
-              size="sm"
-              class="opacity-60 shrink-0"
-            />
+            <OIcon name="domain" size="sm" class="opacity-60 shrink-0" />
           </template>
-          <span class="truncate flex-1 min-w-0 text-left">{{
-            current?.label || ""
-          }}</span>
+          <span class="truncate flex-1 min-w-0 text-left">{{ current?.label || "" }}</span>
           <template #icon-right>
             <OIcon
               name="arrow-drop-down"
@@ -236,14 +223,9 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
         </OButton>
       </template>
 
-      <div
-        data-test="organization-menu-list"
-        class="flex flex-col w-94 max-w-[98vw]"
-      >
+      <div data-test="organization-menu-list" class="flex flex-col w-94 max-w-[98vw]">
         <!-- Header: title + count -->
-        <div
-          class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5"
-        >
+        <div class="flex items-center justify-between gap-2 px-3 pt-2 pb-1.5">
           <span class="text-compact font-semibold text-text-heading">
             {{ t("organization.header") }}
           </span>
@@ -252,9 +234,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
             class="shrink-0 text-2xs font-semibold leading-none px-2 py-1 rounded-full bg-select-item-hover-bg text-text-secondary"
           >
             {{
-              searchQuery
-                ? `${filtered.length} of ${organizations.length}`
-                : organizations.length
+              searchQuery ? `${filtered.length} of ${organizations.length}` : organizations.length
             }}
           </span>
         </div>
@@ -271,11 +251,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           />
         </div>
 
-        <div
-          v-if="filtered.length"
-          class="mx-3 h-px bg-select-content-border"
-          aria-hidden="true"
-        />
+        <div v-if="filtered.length" class="mx-3 h-px bg-select-content-border" aria-hidden="true" />
 
         <!-- Virtualized list -->
         <div
@@ -336,9 +312,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
                 @click.stop="copyId(row.org)"
               >
                 <OIcon
-                  :name="
-                    copiedId === row.org.identifier ? 'check' : 'content-copy'
-                  "
+                  :name="copiedId === row.org.identifier ? 'check' : 'content-copy'"
                   size="xs"
                 />
               </button>

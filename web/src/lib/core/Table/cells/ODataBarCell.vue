@@ -66,7 +66,8 @@ const barClass = computed(
     <span
       class="tabular-nums whitespace-nowrap leading-none"
       :class="num === null ? 'text-text-body text-xs' : ''"
-    >{{ text }}</span>
+      >{{ text }}</span
+    >
     <div
       v-if="widthPct > 0"
       class="h-0.75 rounded-full opacity-80 pointer-events-none transition-[width] duration-300"

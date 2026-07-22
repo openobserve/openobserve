@@ -1,8 +1,5 @@
 ﻿<template>
-  <EvalListShell
-    data-test="scorer"
-    :show-empty="false"
-  >
+  <EvalListShell data-test="scorer" :show-empty="false">
     <template #table>
       <OTable
         v-model:selected-ids="selectedIds"
@@ -82,8 +79,18 @@
               preset="no-scorers"
               :filtered="hasFilters"
               :actions="[
-                { id: 'create', icon: 'add', titleKey: 'emptyState.noScorers.action', descriptionKey: 'emptyState.noScorers.actionDesc' },
-                { id: 'import', icon: 'upload-file', titleKey: 'emptyState.noScorers.import', descriptionKey: 'emptyState.noScorers.importDesc' },
+                {
+                  id: 'create',
+                  icon: 'add',
+                  titleKey: 'emptyState.noScorers.action',
+                  descriptionKey: 'emptyState.noScorers.actionDesc',
+                },
+                {
+                  id: 'import',
+                  icon: 'upload-file',
+                  titleKey: 'emptyState.noScorers.import',
+                  descriptionKey: 'emptyState.noScorers.importDesc',
+                },
               ]"
               data-test="scorer-empty-state"
               @action="onEmptyAction"
@@ -109,10 +116,7 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OTag
-            type="scorerType"
-            :value="scorerTypeOf(row)"
-          />
+          <OTag type="scorerType" :value="scorerTypeOf(row)" />
         </template>
 
         <template #cell-produces="{ row }">
@@ -227,71 +231,73 @@ const typeOptions = computed(() => [
   { label: t("onlineEvals.scorer.badgeRemote"), value: "remote" },
 ]);
 
-const columns = computed(() => [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: 56,
-    meta: { align: "left" },
-  },
-  {
-    id: "name",
-    header: t("onlineEvals.scorer.columns.name"),
-    accessorKey: "name",
-    sortable: true,
-    size: COL.name,
-    // `flex` (not `autoWidth`): fills leftover width on load AND stays
-    // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "type",
-    header: t("onlineEvals.scorer.columns.type"),
-    accessorFn: (row: Scorer) => scorerTypeOf(row),
-    sortable: true,
-    size: COL.type,
-    meta: { align: "left" },
-  },
-  {
-    id: "produces",
-    header: t("onlineEvals.scorer.columns.produces"),
-    accessorFn: (row: Scorer) => producesLabel(row),
-    sortable: true,
-    size: COL.template,
-    meta: { align: "left" },
-  },
-  {
-    id: "version",
-    header: t("onlineEvals.scorer.columns.version"),
-    accessorKey: "version",
-    sortable: true,
-    size: COL.version,
-    meta: { align: "right" },
-  },
-  {
-    id: "usedBy",
-    header: t("onlineEvals.scorer.columns.usedBy"),
-    accessorFn: (row: Scorer) => usedByCount(row),
-    sortable: true,
-    size: COL.count,
-    meta: { align: "right" },
-  },
-  {
-    id: "actions",
-    header: t("onlineEvals.scorer.columns.actions"),
-    sortable: false,
-    isAction: true,
-    size: 140,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
-  },
-].map((c: any) => ({
-  ...c,
-  // Every column except the row index, the name (row identity) and the
-  // actions column is offered in OTable's "Manage columns" chooser.
-  hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
-})));
+const columns = computed(() =>
+  [
+    {
+      id: "#",
+      header: "#",
+      accessorKey: "#",
+      sortable: false,
+      size: 56,
+      meta: { align: "left" },
+    },
+    {
+      id: "name",
+      header: t("onlineEvals.scorer.columns.name"),
+      accessorKey: "name",
+      sortable: true,
+      size: COL.name,
+      // `flex` (not `autoWidth`): fills leftover width on load AND stays
+      // resizable — matches Dashboards/AlertList; `autoWidth` has no resize grip.
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "type",
+      header: t("onlineEvals.scorer.columns.type"),
+      accessorFn: (row: Scorer) => scorerTypeOf(row),
+      sortable: true,
+      size: COL.type,
+      meta: { align: "left" },
+    },
+    {
+      id: "produces",
+      header: t("onlineEvals.scorer.columns.produces"),
+      accessorFn: (row: Scorer) => producesLabel(row),
+      sortable: true,
+      size: COL.template,
+      meta: { align: "left" },
+    },
+    {
+      id: "version",
+      header: t("onlineEvals.scorer.columns.version"),
+      accessorKey: "version",
+      sortable: true,
+      size: COL.version,
+      meta: { align: "right" },
+    },
+    {
+      id: "usedBy",
+      header: t("onlineEvals.scorer.columns.usedBy"),
+      accessorFn: (row: Scorer) => usedByCount(row),
+      sortable: true,
+      size: COL.count,
+      meta: { align: "right" },
+    },
+    {
+      id: "actions",
+      header: t("onlineEvals.scorer.columns.actions"),
+      sortable: false,
+      isAction: true,
+      size: 140,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+    },
+  ].map((c: any) => ({
+    ...c,
+    // Every column except the row index, the name (row identity) and the
+    // actions column is offered in OTable's "Manage columns" chooser.
+    hideable: c.id !== "#" && c.id !== "name" && !c.isAction,
+  })),
+);
 
 const filteredRows = computed(() =>
   typeFilter.value
@@ -320,9 +326,7 @@ const showNoProvidersState = computed(
 // filter widgets stay visible). OEmptyState lives inside the table's
 // #empty slot and switches between the first-run and "Clear filters"
 // variants via `:filtered`.
-const hasFilters = computed(
-  () => !!props.search?.trim() || !!typeFilter.value,
-);
+const hasFilters = computed(() => !!props.search?.trim() || !!typeFilter.value);
 
 function onEmptyAction(id?: string) {
   if (id === "create") emit("create");
@@ -334,9 +338,7 @@ function onEmptyAction(id?: string) {
 }
 
 function producesLabel(row: Scorer) {
-  const id = String(
-    valueOf(row, "producesScoreConfigId", "produces_score_config_id") || "",
-  );
+  const id = String(valueOf(row, "producesScoreConfigId", "produces_score_config_id") || "");
   if (!id) return "";
   const cfg = props.scoreConfigs.find((c) => entityId(c) === id);
   return cfg?.name || id;
@@ -358,6 +360,11 @@ function usedByText(row: Scorer) {
 }
 
 useShortcuts([
-  { id: "scorersRefresh", handler: () => { if (!isInputFocused()) emit("refresh"); } },
+  {
+    id: "scorersRefresh",
+    handler: () => {
+      if (!isInputFocused()) emit("refresh");
+    },
+  },
 ]);
 </script>

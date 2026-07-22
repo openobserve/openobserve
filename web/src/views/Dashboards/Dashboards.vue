@@ -17,99 +17,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <OPageLayout bleed
+  <OPageLayout
+    bleed
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
     icon="dashboard"
     :subtitle="t('dashboard.subtitle')"
-    :main-panel="false"  >
-      <template #actions>
-        <!-- Org home dashboard shortcut: shows which dashboard is pinned to
+    :main-panel="false"
+  >
+    <template #actions>
+      <!-- Org home dashboard shortcut: shows which dashboard is pinned to
              the home page and jumps straight to it. -->
-        <OButton
-          v-if="homeDashboard"
-          variant="outline"
-          size="sm"
-          icon-left="keep"
-          class="max-w-60"
-          data-test="dashboard-home-shortcut"
-          @click="openHomeDashboard"
+      <OButton
+        v-if="homeDashboard"
+        variant="outline"
+        size="sm"
+        icon-left="keep"
+        class="max-w-60"
+        data-test="dashboard-home-shortcut"
+        @click="openHomeDashboard"
+      >
+        <span class="truncate">{{ homeDashboard.label }}</span>
+      </OButton>
+      <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
+      <!-- import dashboard button with dropdown -->
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="dashboard-import"
+            icon-left="upload-file"
+            icon-right="expand-more"
+          >
+            {{ t(`dashboard.import`) }}
+          </OButton>
+        </template>
+        <ODropdownItem @select="importDashboard" data-test="dashboard-import-custom">
+          <div class="flex flex-col">
+            <span>{{ t("dashboard.importCustom") }}</span>
+            <span class="text-xs text-dropdown-item-text opacity-60">{{
+              t("dashboard.importCustomDesc")
+            }}</span>
+          </div>
+        </ODropdownItem>
+        <ODropdownItem
+          @select="showAddDashboardFromGitHub = true"
+          data-test="dashboard-import-templates"
         >
-          <span class="truncate">{{ homeDashboard.label }}</span>
-        </OButton>
-        <OTooltip
-          v-if="homeDashboard"
-          side="bottom"
-          :content="t('dashboard.openHomeDashboard')"
-        />
-        <!-- import dashboard button with dropdown -->
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="dashboard-import"
-              icon-left="upload-file"
-              icon-right="expand-more"
-            >
-              {{ t(`dashboard.import`) }}
-            </OButton>
-          </template>
-          <ODropdownItem
-            @select="importDashboard"
-            data-test="dashboard-import-custom"
-          >
-            <div class="flex flex-col">
-              <span>{{ t('dashboard.importCustom') }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60"
-                >{{ t('dashboard.importCustomDesc') }}</span
-              >
-            </div>
-          </ODropdownItem>
-          <ODropdownItem
-            @select="showAddDashboardFromGitHub = true"
-            data-test="dashboard-import-templates"
-          >
-            <div class="flex flex-col">
-              <span>{{ t('dashboard.importTemplates') }}</span>
-              <span class="text-xs text-dropdown-item-text opacity-60"
-                >{{ t('dashboard.importTemplatesDesc') }}</span
-              >
-            </div>
-          </ODropdownItem>
-          <ODropdownSeparator />
-          <ODropdownItem
-            v-for="migration in migrationOptions"
-            :key="migration.key"
-            :data-test="`dashboard-migrate-${migration.key}`"
-            @select="openMigration(migration.url)"
-          >
-            <div class="flex items-center gap-2 w-full">
-              <div class="flex flex-col flex-1 min-w-0">
-                <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
-                <span class="text-xs text-dropdown-item-text opacity-60"
-                  >{{ t(`dashboard.${migration.descKey}`) }}</span
-                >
-              </div>
-              <OIcon
-                name="open-in-new"
-                size="xs"
-                class="shrink-0 text-dropdown-item-text opacity-60"
-              />
-            </div>
-          </ODropdownItem>
-        </ODropdown>
-        <!-- new dashboard button -->
-        <OButton
-          variant="primary"
-          size="sm"
-          icon-left="add"
-          data-test="dashboard-new"
-          @click="addDashboard"
+          <div class="flex flex-col">
+            <span>{{ t("dashboard.importTemplates") }}</span>
+            <span class="text-xs text-dropdown-item-text opacity-60">{{
+              t("dashboard.importTemplatesDesc")
+            }}</span>
+          </div>
+        </ODropdownItem>
+        <ODropdownSeparator />
+        <ODropdownItem
+          v-for="migration in migrationOptions"
+          :key="migration.key"
+          :data-test="`dashboard-migrate-${migration.key}`"
+          @select="openMigration(migration.url)"
         >
-          {{ t(`dashboard.add`) }}
-        </OButton>
-      </template>
+          <div class="flex items-center gap-2 w-full">
+            <div class="flex flex-col flex-1 min-w-0">
+              <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
+              <span class="text-xs text-dropdown-item-text opacity-60">{{
+                t(`dashboard.${migration.descKey}`)
+              }}</span>
+            </div>
+            <OIcon
+              name="open-in-new"
+              size="xs"
+              class="shrink-0 text-dropdown-item-text opacity-60"
+            />
+          </div>
+        </ODropdownItem>
+      </ODropdown>
+      <!-- new dashboard button -->
+      <OButton
+        variant="primary"
+        size="sm"
+        icon-left="add"
+        data-test="dashboard-new"
+        @click="addDashboard"
+      >
+        {{ t(`dashboard.add`) }}
+      </OButton>
+    </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
     <div class="flex-1 flex min-h-0">
@@ -126,7 +121,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Right: dashboards table -->
       <div class="flex-1 min-w-0 h-full">
         <div class="h-full bg-card-glass-bg">
-          <OTable class="w-full h-full"
+          <OTable
+            class="w-full h-full"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -155,9 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
-                      searchAcrossFolders
-                        ? t('dashboard.searchAcross')
-                        : t('dashboard.search')
+                      searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')
                     "
                     :clearable="searchAcrossFolders"
                     @clear="clearSearchHistory"
@@ -180,19 +174,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
                           :title="t('dashboard.searchThisFolderTitle')"
-                        >{{ t('dashboard.searchThisFolder') }}</OToggleGroupItem>
+                          >{{ t("dashboard.searchThisFolder") }}</OToggleGroupItem
+                        >
                         <OToggleGroupItem
                           value="all"
                           size="xs"
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
                           :title="t('dashboard.searchAllFoldersTitle')"
-                        >{{ t('dashboard.searchAllFolders') }}</OToggleGroupItem>
+                          >{{ t("dashboard.searchAllFolders") }}</OToggleGroupItem
+                        >
                       </OToggleGroup>
                     </template>
                   </OInput>
                 </div>
-
               </div>
             </template>
             <template #toolbar-trailing>
@@ -204,7 +199,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-list-refresh"
                 @click="getDashboards"
               >
-                <OTooltip side="bottom" :content="t('dashboard.reloadDashboards')" shortcut-id="dashboardsListRefresh" />
+                <OTooltip
+                  side="bottom"
+                  :content="t('dashboard.reloadDashboards')"
+                  shortcut-id="dashboardsListRefresh"
+                />
               </OButton>
             </template>
             <template #cell-name="{ row, value }">
@@ -214,12 +213,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
-                  :icon-left="
-                    isFavorite(row.id) ? 'favorite' : 'favorite-border'
-                  "
-                  :class="
-                    isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'
-                  "
+                  :icon-left="isFavorite(row.id) ? 'favorite' : 'favorite-border'"
+                  :class="isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'"
                   :title="
                     isFavorite(row.id)
                       ? t('dashboard.removeFromFavorites')
@@ -251,18 +246,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             <template #cell-identifier="{ value }">
-              <span
-                class="font-mono text-xs text-text-body"
-                :title="value"
-                >{{ value }}</span
-              >
+              <span class="font-mono text-xs text-text-body" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
-              <span
-                class="text-text-body"
-                :title="value"
-                >{{ value || "—" }}</span
-              >
+              <span class="text-text-body" :title="value">{{ value || "—" }}</span>
             </template>
             <template #cell-owner="{ value }">
               <OUserCell :value="value" />
@@ -285,9 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </button>
             </template>
             <template #cell-actions="{ row }">
-              <span
-                class="row-actions flex items-center justify-end gap-0.5"
-              >
+              <span class="row-actions flex items-center justify-end gap-0.5">
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
@@ -320,11 +305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Overflow menu (rightmost) — houses the low-frequency "set as
                      home" action so it doesn't clutter every row with an
                      always-on icon. Move/Duplicate/Delete stay inline. -->
-                <ODropdown
-                  v-if="row.actions == 'true'"
-                  side="bottom"
-                  align="end"
-                >
+                <ODropdown v-if="row.actions == 'true'" side="bottom" align="end">
                   <template #trigger>
                     <OButton
                       icon-left="more-vert"
@@ -341,9 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="toggleHome(row)"
                   >
                     <span>{{
-                      isHome(row.id)
-                        ? t("dashboard.removeFromHome")
-                        : t("dashboard.setAsHome")
+                      isHome(row.id) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
                     }}</span>
                   </ODropdownItem>
                 </ODropdown>
@@ -354,14 +333,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="hero"
                 :preset="activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'"
                 :title="
-                  showFavoritesOnly && !filterQuery
-                    ? t('dashboard.noFavoritesTitle')
-                    : undefined
+                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesTitle') : undefined
                 "
                 :description="
-                  showFavoritesOnly && !filterQuery
-                    ? t('dashboard.noFavoritesMessage')
-                    : undefined
+                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesMessage') : undefined
                 "
                 :filtered="!!filterQuery"
                 @action="
@@ -377,22 +352,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #bottom>
-              <div
-                class="flex w-full justify-between items-center py-1"
-              >
-                <div
-                  class="text-xs font-normal flex items-center shrink-0"
-                >
+              <div class="flex w-full justify-between items-center py-1">
+                <div class="text-xs font-normal flex items-center shrink-0">
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
-                <div
-                  v-if="selectedIds.length > 0"
-                  class="bulk-action-bar flex items-center gap-2"
-                >
-                  <span
-                    class="text-sm text-text-body mr-1"
-                    >{{ t('dashboard.dashboards.selected', { count: selectedIds.length }) }}</span
-                  >
+                <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
+                  <span class="text-sm text-text-body mr-1">{{
+                    t("dashboard.dashboards.selected", { count: selectedIds.length })
+                  }}</span>
                   <OButton
                     variant="outline"
                     size="sm-action"
@@ -400,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="moveMultipleDashboards"
                     icon-left="drive-file-move"
                   >
-                    {{ t('common.move') }}
+                    {{ t("common.move") }}
                   </OButton>
                   <OButton
                     variant="outline"
@@ -409,7 +376,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-list-export-dashboards-btn"
                     @click="multipleExportDashboard"
                   >
-                    {{ t('common.export') }}
+                    {{ t("common.export") }}
                   </OButton>
                   <OButton
                     variant="outline-destructive"
@@ -418,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-list-delete-dashboards-btn"
                     @click="openBulkDeleteDialog"
                   >
-                    {{ t('common.delete') }}
+                    {{ t("common.delete") }}
                   </OButton>
                 </div>
               </div>
@@ -428,92 +395,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-          <!-- add dashboard -->
-          <ODialog
-            v-model:open="showAddDashboardDialog"
-            size="md"
-            :title="t('dashboard.createdashboard')"
-            data-test="dashboard-add-dialog"
-            :secondary-button-label="t('dashboard.cancel')"
-            :primary-button-label="t('dashboard.save')"
-            form-id="add-dashboard-form"
-            @click:secondary="showAddDashboardDialog = false"
-          >
-            <AddDashboard
-              ref="addDashboardRef"
-              @close="showAddDashboardDialog = false"
-              @updated="updateDashboardList"
-              :activeFolderId="activeFolderId ?? undefined"
-            />
-          </ODialog>
+    <!-- add dashboard -->
+    <ODialog
+      v-model:open="showAddDashboardDialog"
+      size="md"
+      :title="t('dashboard.createdashboard')"
+      data-test="dashboard-add-dialog"
+      :secondary-button-label="t('dashboard.cancel')"
+      :primary-button-label="t('dashboard.save')"
+      form-id="add-dashboard-form"
+      @click:secondary="showAddDashboardDialog = false"
+    >
+      <AddDashboard
+        ref="addDashboardRef"
+        @close="showAddDashboardDialog = false"
+        @updated="updateDashboardList"
+        :activeFolderId="activeFolderId ?? undefined"
+      />
+    </ODialog>
 
-          <!-- add dashboard from GitHub gallery -->
-          <AddDashboardFromGitHub
-            v-model="showAddDashboardFromGitHub"
-            @added="getDashboards"
-          />
+    <!-- add dashboard from GitHub gallery -->
+    <AddDashboardFromGitHub v-model="showAddDashboardFromGitHub" @added="getDashboards" />
 
-          <!-- add/edit folder -->
-          <ODialog
-            v-model:open="showAddFolderDialog"
-            size="sm"
-            :title="
-              isFolderEditMode
-                ? t('dashboard.updateFolder')
-                : t('dashboard.newFolder')
-            "
-            data-test="dashboard-folder-dialog"
-            :secondary-button-label="t('dashboard.cancel')"
-            :primary-button-label="t('dashboard.save')"
-            form-id="add-folder-dashboards-form"
-            @click:secondary="showAddFolderDialog = false"
-          >
-            <AddFolder
-              ref="addFolderRef"
-              @update:modelValue="updateFolderList"
-              :edit-mode="isFolderEditMode"
-              :folder-id="selectedFolderToEdit ?? 'default'"
-            />
-          </ODialog>
+    <!-- add/edit folder -->
+    <ODialog
+      v-model:open="showAddFolderDialog"
+      size="sm"
+      :title="isFolderEditMode ? t('dashboard.updateFolder') : t('dashboard.newFolder')"
+      data-test="dashboard-folder-dialog"
+      :secondary-button-label="t('dashboard.cancel')"
+      :primary-button-label="t('dashboard.save')"
+      form-id="add-folder-dashboards-form"
+      @click:secondary="showAddFolderDialog = false"
+    >
+      <AddFolder
+        ref="addFolderRef"
+        @update:modelValue="updateFolderList"
+        :edit-mode="isFolderEditMode"
+        :folder-id="selectedFolderToEdit ?? 'default'"
+      />
+    </ODialog>
 
-          <!-- move dashboard to another folder -->
-          <MoveDashboardToAnotherFolder
-            v-model:open="showMoveDashboardDialog"
-            @updated="handleDashboardMoved"
-            :dashboard-ids="selectedDashboardIdToMove ?? undefined"
-            :activeFolderId="activeFolderToMove ?? undefined"
-            data-test="dashboard-move-to-another-folder-dialog"
-          />
+    <!-- move dashboard to another folder -->
+    <MoveDashboardToAnotherFolder
+      v-model:open="showMoveDashboardDialog"
+      @updated="handleDashboardMoved"
+      :dashboard-ids="selectedDashboardIdToMove ?? undefined"
+      :activeFolderId="activeFolderToMove ?? undefined"
+      data-test="dashboard-move-to-another-folder-dialog"
+    />
 
-          <!-- delete dashboard dialog -->
-          <ConfirmDialog
-            :title="t('dashboard.deleteDashboardConfirmTitle')"
-            data-test="dashboard-confirm-dialog"
-            :message="t('dashboard.deleteDashboardConfirmMsg')"
-            @update:ok="deleteDashboard"
-            @update:cancel="confirmDeleteDialog = false"
-            v-model="confirmDeleteDialog"
-          />
+    <!-- delete dashboard dialog -->
+    <ConfirmDialog
+      :title="t('dashboard.deleteDashboardConfirmTitle')"
+      data-test="dashboard-confirm-dialog"
+      :message="t('dashboard.deleteDashboardConfirmMsg')"
+      @update:ok="deleteDashboard"
+      @update:cancel="confirmDeleteDialog = false"
+      v-model="confirmDeleteDialog"
+    />
 
-          <!-- delete folder dialog -->
-          <ConfirmDialog
-            :title="t('dashboard.deleteFolder')"
-            data-test="dashboard-confirm-delete-folder-dialog"
-            :message="t('dashboard.deleteFolderMessage')"
-            @update:ok="deleteFolder"
-            @update:cancel="confirmDeleteFolderDialog = false"
-            v-model="confirmDeleteFolderDialog"
-          />
+    <!-- delete folder dialog -->
+    <ConfirmDialog
+      :title="t('dashboard.deleteFolder')"
+      data-test="dashboard-confirm-delete-folder-dialog"
+      :message="t('dashboard.deleteFolderMessage')"
+      @update:ok="deleteFolder"
+      @update:cancel="confirmDeleteFolderDialog = false"
+      v-model="confirmDeleteFolderDialog"
+    />
 
-          <!-- bulk delete dashboards dialog -->
-          <ConfirmDialog
-            :title="t('dashboard.deleteDashboardsConfirmTitle')"
-            data-test="dashboard-confirm-bulk-delete-dialog"
-            :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
-            @update:ok="bulkDeleteDashboards"
-            @update:cancel="confirmBulkDelete = false"
-            v-model="confirmBulkDelete"
-          />
+    <!-- bulk delete dashboards dialog -->
+    <ConfirmDialog
+      :title="t('dashboard.deleteDashboardsConfirmTitle')"
+      data-test="dashboard-confirm-bulk-delete-dialog"
+      :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
+      @update:ok="bulkDeleteDashboards"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
   </OPageLayout>
 </template>
 
@@ -580,10 +540,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
-import {
-  useFavoriteDashboards,
-  FAVORITES_FOLDER_ID,
-} from "@/composables/useFavoriteDashboards";
+import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -625,8 +582,7 @@ interface CaughtError {
   status?: number;
   response?: { status?: number; data?: { message?: string } };
 }
-const asCaughtError = (e: unknown): CaughtError =>
-  (e ?? {}) as CaughtError;
+const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
 
 export default defineComponent({
   name: "Dashboards",
@@ -686,11 +642,9 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
 
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
 
-    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } =
-      useHomeDashboard();
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard();
 
     // Per-user favorites — heart toggle on each row + a folder-independent
     // favorites view.
@@ -710,9 +664,7 @@ export default defineComponent({
     };
     // The favorites view is a rail location, not a toolbar filter: it is
     // active exactly when the Favorites pseudo-folder is selected.
-    const showFavoritesOnly = computed(
-      () => activeFolderId.value === FAVORITES_FOLDER_ID,
-    );
+    const showFavoritesOnly = computed(() => activeFolderId.value === FAVORITES_FOLDER_ID);
     const toggleFavorite = (row: any) => {
       const org = store.state.selectedOrganization?.identifier;
       const userId = store.state.userInfo?.email;
@@ -721,9 +673,7 @@ export default defineComponent({
       // undefined, so fall back to the active folder (default). Never store
       // the Favorites pseudo-folder as a real folder id.
       const folderId =
-        row.folder_id ||
-        (showFavoritesOnly.value ? "default" : activeFolderId.value) ||
-        "default";
+        row.folder_id || (showFavoritesOnly.value ? "default" : activeFolderId.value) || "default";
       toggleFavoriteSetting(org, userId, {
         dashboardId: row.id,
         folderId,
@@ -788,8 +738,7 @@ export default defineComponent({
     };
 
     // Listen for AI assistant dashboard mutations to auto-refresh the list
-    const { on: onDashboardEvent, off: offDashboardEvent } =
-      useAiDashboardEvents();
+    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const folderId = event.folderId || activeFolderId.value;
       if (folderId) {
@@ -879,10 +828,7 @@ export default defineComponent({
         },
       ];
 
-      if (
-        (searchAcrossFolders.value && searchQuery.value != "") ||
-        showFavoritesOnly.value
-      ) {
+      if ((searchAcrossFolders.value && searchQuery.value != "") || showFavoritesOnly.value) {
         baseColumns.splice(2, 0, {
           id: "folder",
           header: t("dashboard.folder"),
@@ -921,9 +867,7 @@ export default defineComponent({
       } else if (
         typeof route.query.folder === "string" &&
         route.query.folder !== "default" &&
-        store.state.organizationData.folders.find(
-          (it: any) => it.folderId === route.query.folder,
-        )
+        store.state.organizationData.folders.find((it: any) => it.folderId === route.query.folder)
       ) {
         activeFolderId.value = route.query.folder;
       } else if (favorites.value.length > 0) {
@@ -946,13 +890,9 @@ export default defineComponent({
         // titles) — cached folders resolve instantly.
         if (activeFolderId.value === FAVORITES_FOLDER_ID) {
           loading.value = false;
-          const favFolders = [
-            ...new Set(favorites.value.map((f: any) => f.folderId)),
-          ];
+          const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           Promise.all(
-            favFolders.map((fid) =>
-              getAllDashboardsByFolderId(store, fid).catch(() => null),
-            ),
+            favFolders.map((fid) => getAllDashboardsByFolderId(store, fid).catch(() => null)),
           );
           searchAcrossFolders.value = false;
           router.push({
@@ -967,21 +907,15 @@ export default defineComponent({
         // skip the skeleton for already-cached folders so we don't flash it
         // String() matches JS's own null→"null" key coercion (behavior-neutral).
         loading.value =
-          !store.state.organizationData.allDashboardList[
-            String(activeFolderId.value)
-          ];
+          !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
         try {
-          const response = await getAllDashboardsByFolderId(
-            store,
-            activeFolderId.value,
-          );
+          const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
 
           dashboardList.value = response || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
           showErrorNotification(
-            asCaughtError(error).message ||
-              t("dashboard.dashboards.failedToLoadFolder"),
+            asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder"),
           );
         } finally {
           loading.value = false;
@@ -1027,9 +961,7 @@ export default defineComponent({
               currentSearchAbortController.abort();
             }
             currentSearchAbortController = new AbortController();
-            const searchResults = await fetchSearchResults.execute(
-              searchQuery.value,
-            );
+            const searchResults = await fetchSearchResults.execute(searchQuery.value);
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
             // Latent bug preserved: `!x === "AbortError"` compares a boolean to a
@@ -1128,33 +1060,46 @@ export default defineComponent({
     };
 
     const migrationOptions = [
-      { key: "datadog",     url: "https://migration.openobserve.ai/datadog-to-o2",    labelKey: "migrateFromDatadog",     descKey: "migrateFromDatadogDesc" },
-      { key: "grafana",     url: "https://migration.openobserve.ai/grafana-to-o2",    labelKey: "migrateFromGrafana",     descKey: "migrateFromGrafanaDesc" },
-      { key: "kibana",      url: "https://migration.openobserve.ai/kibana-to-o2",     labelKey: "migrateFromKibana",      descKey: "migrateFromKibanaDesc" },
-      { key: "cloudwatch",  url: "https://migration.openobserve.ai/cloudwatch-to-o2", labelKey: "migrateFromCloudWatch",  descKey: "migrateFromCloudWatchDesc" },
+      {
+        key: "datadog",
+        url: "https://migration.openobserve.ai/datadog-to-o2",
+        labelKey: "migrateFromDatadog",
+        descKey: "migrateFromDatadogDesc",
+      },
+      {
+        key: "grafana",
+        url: "https://migration.openobserve.ai/grafana-to-o2",
+        labelKey: "migrateFromGrafana",
+        descKey: "migrateFromGrafanaDesc",
+      },
+      {
+        key: "kibana",
+        url: "https://migration.openobserve.ai/kibana-to-o2",
+        labelKey: "migrateFromKibana",
+        descKey: "migrateFromKibanaDesc",
+      },
+      {
+        key: "cloudwatch",
+        url: "https://migration.openobserve.ai/cloudwatch-to-o2",
+        labelKey: "migrateFromCloudWatch",
+        descKey: "migrateFromCloudWatchDesc",
+      },
     ];
 
     const openMigration = (url: string) => {
       window.open(url, "_blank", "noopener,noreferrer");
     };
 
-    const duplicateDashboard = async (
-      dashboardId: any,
-      folderId = activeFolderId.value,
-    ) => {
+    const duplicateDashboard = async (dashboardId: any, folderId = activeFolderId.value) => {
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.pleaseWait"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
 
       try {
         // Get the dashboard
-        const dashboard = await getDashboard(
-          store,
-          dashboardId,
-          folderId ?? "default",
-        );
+        const dashboard = await getDashboard(store, dashboardId, folderId ?? "default");
 
         // Duplicate the dashboard
         const data = JSON.parse(JSON.stringify(dashboard));
@@ -1174,7 +1119,9 @@ export default defineComponent({
 
         showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
-        showErrorNotification(asCaughtError(err).message ?? t("dashboard.dashboards.duplicationFailed"));
+        showErrorNotification(
+          asCaughtError(err).message ?? t("dashboard.dashboards.duplicationFailed"),
+        );
       }
 
       dismiss();
@@ -1199,8 +1146,8 @@ export default defineComponent({
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.loadingDashboards"),
-              timeout: 0,
-});
+        timeout: 0,
+      });
       loading.value = true;
       try {
         if (showFavoritesOnly.value) {
@@ -1209,9 +1156,7 @@ export default defineComponent({
           const org = store.state.selectedOrganization?.identifier;
           const userId = store.state.userInfo?.email;
           if (org && userId) await loadFavorites(org, userId);
-          const favFolders = [
-            ...new Set(favorites.value.map((f: any) => f.folderId)),
-          ];
+          const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           const fetched = await Promise.all(
             favFolders.map((fid) =>
               getAllDashboards(store, fid)
@@ -1230,17 +1175,12 @@ export default defineComponent({
               (f: any) =>
                 refreshed.has(f.folderId) &&
                 Array.isArray(lists[f.folderId]) &&
-                !lists[f.folderId].some(
-                  (b: any) => b.dashboardId === f.dashboardId,
-                ),
+                !lists[f.folderId].some((b: any) => b.dashboardId === f.dashboardId),
             )
             .map((f: any) => f.dashboardId);
           await pruneFavorites(stale);
         } else {
-          const response = await getAllDashboards(
-            store,
-            activeFolderId.value ?? "default",
-          );
+          const response = await getAllDashboards(store, activeFolderId.value ?? "default");
           // folderId is always truthy here, so getAllDashboards never returns
           // undefined; `?? []` only satisfies the type (fallback unreachable).
           dashboardList.value = response ?? [];
@@ -1282,10 +1222,7 @@ export default defineComponent({
       // hasn't been visited yet still shows via its stored label.
       if (showFavoritesOnly.value) {
         const folderNames = new Map(
-          (store.state.organizationData?.folders ?? []).map((f: any) => [
-            f.folderId,
-            f.name,
-          ]),
+          (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
         );
         const allLists = store.state.organizationData?.allDashboardList ?? {};
         return favorites.value.map((fav: any, index: number) => {
@@ -1301,18 +1238,14 @@ export default defineComponent({
             description: cached?.description ?? "",
             owner: cached?.owner ?? "",
             created_raw: cached?.created ?? "",
-            created: cached?.created
-              ? formatDate(cached.created, "YYYY-MM-DDTHH:mm:ss")
-              : "",
+            created: cached?.created ? formatDate(cached.created, "YYYY-MM-DDTHH:mm:ss") : "",
             actions: "true",
           };
         });
       }
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
-          store.state.organizationData?.allDashboardList[
-            String(activeFolderId.value)
-          ] ?? [],
+          store.state.organizationData?.allDashboardList[String(activeFolderId.value)] ?? [],
         );
         return dashboardList.map((board: Record<string, any>, index: number) =>
           mapDashboard(board, index),
@@ -1374,8 +1307,10 @@ export default defineComponent({
             if (org) useHomeDashboard().load(org);
           }
         } catch (err) {
-          showErrorNotification(asCaughtError(err).message ?? t("dashboard.dashboards.deletionFailed"), {
-          });
+          showErrorNotification(
+            asCaughtError(err).message ?? t("dashboard.dashboards.deletionFailed"),
+            {},
+          );
         }
       }
     };
@@ -1419,18 +1354,15 @@ export default defineComponent({
           await deleteFolderById(store, selectedFolderDelete.value);
 
           //check activeFolderId to be deleted
-          if (activeFolderId.value === selectedFolderDelete.value)
-            activeFolderId.value = "default";
+          if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
 
-          showPositiveNotification(t("dashboard.dashboards.folderDeletedSuccessfully"), {
-          });
+          showPositiveNotification(t("dashboard.dashboards.folderDeletedSuccessfully"), {});
         } catch (err) {
           showErrorNotification(
             asCaughtError(err).response?.data?.message ||
               asCaughtError(err).message ||
               t("dashboard.dashboards.folderDeletionFailed"),
-            {
-            },
+            {},
           );
         } finally {
           confirmDeleteFolderDialog.value = false;
@@ -1440,9 +1372,7 @@ export default defineComponent({
 
     const dynamicQueryModel = computed({
       get() {
-        return searchAcrossFolders.value
-          ? searchQuery.value
-          : filterQuery.value;
+        return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
       },
       set(value) {
         if (searchAcrossFolders.value) {
@@ -1471,16 +1401,12 @@ export default defineComponent({
           return [];
         }
 
-        const migratedDashboards = response.data.dashboards.map(
-          (dashboard: any) => ({
-            dashboard: convertDashboardSchemaVersion(
-              dashboard["v" + dashboard.version],
-            ),
-            hash: dashboard.hash.toString(),
-            folder_id: dashboard.folder_id,
-            folder_name: dashboard.folder_name,
-          }),
-        );
+        const migratedDashboards = response.data.dashboards.map((dashboard: any) => ({
+          dashboard: convertDashboardSchemaVersion(dashboard["v" + dashboard.version]),
+          hash: dashboard.hash.toString(),
+          folder_id: dashboard.folder_id,
+          folder_name: dashboard.folder_name,
+        }));
 
         return migratedDashboards;
       } catch (error) {
@@ -1514,9 +1440,7 @@ export default defineComponent({
     const filteredFolders = computed(() => {
       if (!folderSearchQuery.value) return store.state.organizationData.folders;
       return store.state.organizationData.folders?.filter((folder: any) =>
-        folder.name
-          .toLowerCase()
-          .includes(folderSearchQuery.value.toLowerCase()),
+        folder.name.toLowerCase().includes(folderSearchQuery.value.toLowerCase()),
       );
     });
 
@@ -1561,7 +1485,9 @@ export default defineComponent({
         );
         selectedIds.value = [];
       } catch (error) {
-        showErrorNotification(asCaughtError(error).message ?? t("dashboard.dashboards.errorExporting"));
+        showErrorNotification(
+          asCaughtError(error).message ?? t("dashboard.dashboards.errorExporting"),
+        );
       }
     };
 
@@ -1638,12 +1564,8 @@ export default defineComponent({
 
         // Handle response based on successful/unsuccessful arrays, merged
         // across the per-folder calls.
-        const successful = responses.flatMap(
-          (r: any) => r?.data?.successful ?? [],
-        );
-        const unsuccessful = responses.flatMap(
-          (r: any) => r?.data?.unsuccessful ?? [],
-        );
+        const successful = responses.flatMap((r: any) => r?.data?.successful ?? []);
+        const unsuccessful = responses.flatMap((r: any) => r?.data?.unsuccessful ?? []);
         if (responses.some((r: any) => r?.data)) {
           const successCount = successful.length;
           const failCount = unsuccessful.length;
@@ -1672,7 +1594,9 @@ export default defineComponent({
           // Fallback success message
           toast({
             variant: "success",
-            message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: idsToDelete.length }),
+            message: t("dashboard.dashboards.deletedSuccessfullyCount", {
+              count: idsToDelete.length,
+            }),
           });
         }
 
@@ -1680,9 +1604,7 @@ export default defineComponent({
         // Favorites view doesn't keep rows whose ids are gone. `unsuccessful`
         // entries may be plain ids or objects, so normalise before excluding.
         const failedIds = new Set(
-          unsuccessful.map((u: any) =>
-            typeof u === "string" ? u : (u?.dashboardId ?? u?.id),
-          ),
+          unsuccessful.map((u: any) => (typeof u === "string" ? u : (u?.dashboardId ?? u?.id))),
         );
         const deletedIds = idsToDelete.filter((id: string) => !failedIds.has(id));
 
@@ -1731,21 +1653,25 @@ export default defineComponent({
       confirmBulkDelete.value = false;
     };
 
-
-
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "dashboardsListAdd",
-        handler: () => { if (!isInputFocused()) addDashboard(); },
+        handler: () => {
+          if (!isInputFocused()) addDashboard();
+        },
       },
       {
         id: "dashboardsListImport",
-        handler: () => { if (!isInputFocused()) importDashboard(); },
+        handler: () => {
+          if (!isInputFocused()) importDashboard();
+        },
       },
       {
         id: "dashboardsListRefresh",
-        handler: () => { if (!isInputFocused()) getDashboards(); },
+        handler: () => {
+          if (!isInputFocused()) getDashboards();
+        },
       },
       {
         id: "dashboardsListFocusSearch",

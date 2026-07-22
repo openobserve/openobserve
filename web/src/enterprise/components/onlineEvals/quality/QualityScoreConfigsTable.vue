@@ -1,6 +1,9 @@
 <template>
   <section class="flex flex-col gap-2.5 min-h-0 flex-1" data-test="quality-score-configs-overview">
-    <div v-if="isLoading && rows.length === 0" class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-dialog-header-border rounded-default text-center text-text-secondary">
+    <div
+      v-if="isLoading && rows.length === 0"
+      class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-dialog-header-border rounded-default text-center text-text-secondary"
+    >
       <OSpinner size="sm" />
       <span>{{ t("onlineEvals.quality.loading") }}</span>
     </div>
@@ -10,11 +13,7 @@
       class="flex-1 min-h-0 flex items-center justify-center"
       data-test="quality-overview-empty"
     >
-      <OEmptyState
-        size="hero"
-        preset="no-score-configs"
-        @action="onEmptyAction"
-      />
+      <OEmptyState size="hero" preset="no-score-configs" @action="onEmptyAction" />
     </div>
 
     <!-- The previous "waiting for scores" empty card (allZeroScores) is
@@ -68,20 +67,20 @@
         </template>
 
         <template #cell-type="{ row }">
-          <OTag
-            v-if="shortType(row.dataType) !== '—'"
-            type="evalDataType"
-            :value="row.dataType"
-          />
+          <OTag v-if="shortType(row.dataType) !== '—'" type="evalDataType" :value="row.dataType" />
           <span v-else class="text-text-secondary">—</span>
         </template>
 
         <template #cell-totalScores="{ row }">
-          <span class="[font-variant-numeric:tabular-nums]">{{ formatCount(row.totalScores) }}</span>
+          <span class="[font-variant-numeric:tabular-nums]">{{
+            formatCount(row.totalScores)
+          }}</span>
         </template>
 
         <template #cell-coverage="{ row }">
-          <span v-if="row.coveragePct != null" class="[font-variant-numeric:tabular-nums]">{{ formatPct(row.coveragePct) }}</span>
+          <span v-if="row.coveragePct != null" class="[font-variant-numeric:tabular-nums]">{{
+            formatPct(row.coveragePct)
+          }}</span>
           <span v-else class="text-text-secondary">—</span>
         </template>
 
@@ -105,7 +104,10 @@
         </template>
 
         <template #cell-updated="{ row }">
-          <span v-if="row.lastUpdatedMs" class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]">
+          <span
+            v-if="row.lastUpdatedMs"
+            class="text-2xs text-text-secondary [font-variant-numeric:tabular-nums]"
+          >
             {{ relativeTime(row.lastUpdatedMs) }}
           </span>
           <span v-else class="text-text-secondary">—</span>
@@ -167,77 +169,79 @@ const filteredRows = computed(() => {
 });
 
 function sparkClass(status: string): string {
-  if (status === 'unhealthy' || status === 'warn') return 'text-status-warning-text';
-  if (status === 'healthy') return 'text-status-success-text';
-  if (status === 'noData') return 'text-text-secondary opacity-[0.55]';
-  return 'text-text-secondary';
+  if (status === "unhealthy" || status === "warn") return "text-status-warning-text";
+  if (status === "healthy") return "text-status-success-text";
+  if (status === "noData") return "text-text-secondary opacity-[0.55]";
+  return "text-text-secondary";
 }
 
-const columns = computed(() => [
-  {
-    id: "status",
-    header: "",
-    accessorKey: "status",
-    sortable: false,
-    size: 40,
-    // Fixed-width status dot — no resize grip (OTable reads `resizable`).
-    resizable: false,
-    meta: { align: "center" },
-  },
-  {
-    id: "name",
-    header: t("onlineEvals.quality.overview.columns.scoreConfig"),
-    accessorKey: "name",
-    sortable: true,
-    size: COL.name,
-    // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
-    meta: { align: "left", flex: true },
-  },
-  {
-    id: "type",
-    header: t("onlineEvals.quality.overview.columns.type"),
-    accessorKey: "dataType",
-    sortable: true,
-    size: COL.type,
-    meta: { align: "left" },
-  },
-  {
-    id: "totalScores",
-    header: t("onlineEvals.quality.overview.columns.totalScores"),
-    accessorKey: "totalScores",
-    sortable: true,
-    size: COL.count,
-    meta: { align: "right" },
-  },
-  {
-    id: "coverage",
-    header: t("onlineEvals.quality.overview.columns.coverage"),
-    accessorKey: "coveragePct",
-    sortable: true,
-    size: 110,
-    meta: { align: "right" },
-  },
-  {
-    id: "trend",
-    header: t("onlineEvals.quality.overview.columns.trend"),
-    sortable: false,
-    size: 120,
-    meta: { align: "left" },
-  },
-  {
-    id: "updated",
-    header: t("onlineEvals.quality.overview.columns.updated"),
-    accessorKey: "lastUpdatedMs",
-    sortable: true,
-    size: COL.date,
-    meta: { align: "left" },
-  },
-].map((c: any) => ({
-  ...c,
-  // Offer every column except the name and the leading status dot in the
-  // "Manage columns" chooser.
-  hideable: c.id !== "name" && c.id !== "status",
-})));
+const columns = computed(() =>
+  [
+    {
+      id: "status",
+      header: "",
+      accessorKey: "status",
+      sortable: false,
+      size: 40,
+      // Fixed-width status dot — no resize grip (OTable reads `resizable`).
+      resizable: false,
+      meta: { align: "center" },
+    },
+    {
+      id: "name",
+      header: t("onlineEvals.quality.overview.columns.scoreConfig"),
+      accessorKey: "name",
+      sortable: true,
+      size: COL.name,
+      // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "type",
+      header: t("onlineEvals.quality.overview.columns.type"),
+      accessorKey: "dataType",
+      sortable: true,
+      size: COL.type,
+      meta: { align: "left" },
+    },
+    {
+      id: "totalScores",
+      header: t("onlineEvals.quality.overview.columns.totalScores"),
+      accessorKey: "totalScores",
+      sortable: true,
+      size: COL.count,
+      meta: { align: "right" },
+    },
+    {
+      id: "coverage",
+      header: t("onlineEvals.quality.overview.columns.coverage"),
+      accessorKey: "coveragePct",
+      sortable: true,
+      size: 110,
+      meta: { align: "right" },
+    },
+    {
+      id: "trend",
+      header: t("onlineEvals.quality.overview.columns.trend"),
+      sortable: false,
+      size: 120,
+      meta: { align: "left" },
+    },
+    {
+      id: "updated",
+      header: t("onlineEvals.quality.overview.columns.updated"),
+      accessorKey: "lastUpdatedMs",
+      sortable: true,
+      size: COL.date,
+      meta: { align: "left" },
+    },
+  ].map((c: any) => ({
+    ...c,
+    // Offer every column except the name and the leading status dot in the
+    // "Manage columns" chooser.
+    hideable: c.id !== "name" && c.id !== "status",
+  })),
+);
 
 function shortType(type: ScoreConfigRow["dataType"]): string {
   if (type === "numeric") return "Num";
@@ -290,4 +294,3 @@ function relativeTime(timestampMs: number): string {
   return `${mo}mo ago`;
 }
 </script>
-

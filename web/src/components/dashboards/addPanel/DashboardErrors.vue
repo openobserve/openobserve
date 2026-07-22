@@ -23,31 +23,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex items-center gap-2 px-2 py-2 cursor-pointer overflow-hidden bg-section-header-bg hover:bg-surface-subtle-hover"
         @click="onDropDownClick"
       >
-        <OIcon
-          :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'"
-          size="sm"
-          class="mr-1"
-        />
+        <OIcon :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm" class="mr-1" />
         <span class="text-sm font-semibold text-status-error-text">
           Errors ({{ props.errors.errors.length }})
         </span>
       </div>
     </div>
-    <div
-      class="flex overflow-hidden"
-      :style="!showErrors ? 'height: 0px;' : 'height: auto;'"
-    >
+    <div class="flex overflow-hidden" :style="!showErrors ? 'height: 0px;' : 'height: auto;'">
       <div class="flex flex-col">
         <div data-test="dashboard-error">
-          <ul
-            data-test="dashboard-errors-list"
-            class="list-disc list-inside px-3"
-          >
+          <ul data-test="dashboard-errors-list" class="list-disc list-inside px-3">
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
               class="text-status-error-text py-1"
-             
               data-test="dashboard-errors-list-item"
             >
               {{ item }}

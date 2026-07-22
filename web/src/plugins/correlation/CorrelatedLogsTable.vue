@@ -35,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :has-pending-changes="hasPendingChanges"
               :show-apply-button="true"
               :filter-label="t('correlation.logs.filtersLabel')"
-              :unstable-dimension-tooltip="
-                t('correlation.logs.unstableDimension')
-              "
+              :unstable-dimension-tooltip="t('correlation.logs.unstableDimension')"
               @update:dimension="handleDimensionUpdate"
               @apply="handleApplyFilters"
             />
@@ -57,22 +55,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Column Visibility Dropdown -->
           <div class="pr-4">
-            <ODropdown
-              side="bottom"
-              align="end"
-              data-test="column-visibility-dropdown"
-            >
+            <ODropdown side="bottom" align="end" data-test="column-visibility-dropdown">
               <template #trigger>
-                <OButton
-                  variant="outline"
-                  size="sm"
-                  :disabled="!hasResults"
-                >
+                <OButton variant="outline" size="sm" :disabled="!hasResults">
                   <template v-if="true">
-                    <OIcon name="view-column"
-size="sm"
-class="mr-1" />
-                    {{ t('search.showHideColumns') }}
+                    <OIcon name="view-column" size="sm" class="mr-1" />
+                    {{ t("search.showHideColumns") }}
                   </template>
                 </OButton>
               </template>
@@ -81,7 +69,12 @@ class="mr-1" />
                 <ODropdownItem
                   class="border-b border-solid border-card-glass-border"
                   data-test="select-all-columns"
-                  @select="(e) => { e.preventDefault(); toggleSelectAll(); }"
+                  @select="
+                    (e) => {
+                      e.preventDefault();
+                      toggleSelectAll();
+                    }
+                  "
                 >
                   <template #icon-left>
                     <span @click.stop>
@@ -93,7 +86,7 @@ class="mr-1" />
                     </span>
                   </template>
                   <span class="font-semibold">
-                    {{ areAllColumnsSelected ? t('common.deselectAll') : t('common.selectAll') }}
+                    {{ areAllColumnsSelected ? t("common.deselectAll") : t("common.selectAll") }}
                   </span>
                 </ODropdownItem>
 
@@ -106,9 +99,17 @@ class="mr-1" />
                   @dragstart="handleDragStart($event, index)"
                   @dragover.prevent
                   @drop="handleDrop($event, index)"
-                  :class="['group cursor-grab transition-colors duration-200 hover:bg-interactive-hover-bg', { 'opacity-50 cursor-grabbing!': draggedIndex === index }]"
+                  :class="[
+                    'group cursor-grab transition-colors duration-200 hover:bg-interactive-hover-bg',
+                    { 'opacity-50 cursor-grabbing!': draggedIndex === index },
+                  ]"
                   :data-test="`column-item-${field}`"
-                  @select="(e) => { e.preventDefault(); toggleColumnVisibility(field); }"
+                  @select="
+                    (e) => {
+                      e.preventDefault();
+                      toggleColumnVisibility(field);
+                    }
+                  "
                 >
                   <template #icon-left>
                     <span @click.stop>
@@ -228,9 +229,7 @@ class="mr-1" />
             data-test="table-skeleton"
           >
             <!-- Loading indicator -->
-            <div
-              class="flex items-center justify-center gap-3 max-md:flex-col"
-            >
+            <div class="flex items-center justify-center gap-3 max-md:flex-col">
               <OSpinner size="sm" />
               <span class="text-sm opacity-70">
                 {{ t("correlation.logs.loading") }}
@@ -244,9 +243,7 @@ class="mr-1" />
             class="flex flex-col items-center justify-center h-full py-20"
             data-test="error-state"
           >
-            <p
-              class="text-base opacity-70 max-w-md text-center"
-            >
+            <p class="text-base opacity-70 max-w-md text-center">
               {{ error || t("correlation.logs.errorDetails") }}
             </p>
           </div>
@@ -273,7 +270,10 @@ class="mr-1" />
           data-test="correlated-logs-pagination"
         >
           <span class="opacity-60">
-            {{ (currentPage - 1) * displayPageSize + 1 }}–{{ Math.min(currentPage * displayPageSize, searchResults.length) }} of {{ searchResults.length }}
+            {{ (currentPage - 1) * displayPageSize + 1 }}–{{
+              Math.min(currentPage * displayPageSize, searchResults.length)
+            }}
+            of {{ searchResults.length }}
           </span>
           <OPagination
             :model-value="currentPage"
@@ -328,11 +328,7 @@ const props = defineProps<CorrelatedLogsProps>();
 // Emits
 const emit = defineEmits<{
   sendToAiChat: [value: any];
-  addSearchTerm: [
-    field: string | number,
-    fieldValue: string | number | boolean,
-    action: string,
-  ];
+  addSearchTerm: [field: string | number, fieldValue: string | number | boolean, action: string];
 }>();
 
 // Composables
@@ -369,7 +365,7 @@ const jsonPreviewStreamName = computed(() => {
   if (props.sourceStream) {
     return props.sourceStream;
   }
-  return '';
+  return "";
 });
 
 const TIMESTAMP_COL_WIDTH = 225;
@@ -422,24 +418,20 @@ const loadColumnState = () => {
 // Save column state to localStorage
 const saveColumnState = () => {
   try {
-    localStorage.setItem(
-      STORAGE_KEY_COLUMNS,
-      JSON.stringify(Array.from(visibleColumns.value))
-    );
+    localStorage.setItem(STORAGE_KEY_COLUMNS, JSON.stringify(Array.from(visibleColumns.value)));
     localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(columnOrder.value));
   } catch (error) {
     console.warn("[CorrelatedLogsTable] Failed to save column state:", error);
   }
 };
 
-
 // Load state and key fields config on component mount
 onMounted(async () => {
   loadColumnState();
   try {
     const keyFieldsConfig = await loadKeyFields();
-   let _defaultLogFields = keyFieldsConfig?.["logs"]?.fields ?? [];
-   defaultLogFields.value = _defaultLogFields;
+    let _defaultLogFields = keyFieldsConfig?.["logs"]?.fields ?? [];
+    defaultLogFields.value = _defaultLogFields;
   } catch {
     defaultLogFields.value = [];
   }
@@ -473,7 +465,7 @@ watch(
       saveColumnState();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 watch(
@@ -483,7 +475,7 @@ watch(
       saveColumnState();
     }
   },
-  { deep: true }
+  { deep: true },
 );
 
 // Pending dimensions - for the apply button pattern
@@ -504,17 +496,11 @@ const matchedDimensions = computed(() => props.matchedDimensions);
 const additionalDimensions = computed(() => props.additionalDimensions || {});
 const availableDimensions = computed(() => props.availableDimensions || {});
 const ftsFields = computed(() => props.ftsFields || []);
-const hideViewRelatedButton = computed(
-  () => props.hideViewRelatedButton ?? false,
-);
-const hideSearchTermActions = computed(
-  () => props.hideSearchTermActions ?? false,
-);
+const hideViewRelatedButton = computed(() => props.hideViewRelatedButton ?? false);
+const hideSearchTermActions = computed(() => props.hideSearchTermActions ?? false);
 
 // Track which dimensions are unstable (for UI styling)
-const unstableDimensionKeys = computed(
-  () => new Set(Object.keys(additionalDimensions.value)),
-);
+const unstableDimensionKeys = computed(() => new Set(Object.keys(additionalDimensions.value)));
 
 // Track if there are pending changes that haven't been applied
 const hasPendingChanges = computed(() => {
@@ -576,8 +562,7 @@ const getFilterOptions = (
   uniqueValues.add(SELECT_ALL_VALUE);
 
   // Get the original value from matched or additional dimensions
-  const originalValue =
-    matchedDimensions.value[key] || additionalDimensions.value[key];
+  const originalValue = matchedDimensions.value[key] || additionalDimensions.value[key];
 
   // Always include original value if it exists and is not SELECT_ALL_VALUE
   if (originalValue && originalValue !== SELECT_ALL_VALUE) {
@@ -586,11 +571,7 @@ const getFilterOptions = (
 
   // Include current value if it's different from original and SELECT_ALL_VALUE
   // This preserves previously selected values in the dropdown
-  if (
-    currentValue &&
-    currentValue !== SELECT_ALL_VALUE &&
-    currentValue !== originalValue
-  ) {
+  if (currentValue && currentValue !== SELECT_ALL_VALUE && currentValue !== originalValue) {
     uniqueValues.add(currentValue);
   }
 
@@ -664,9 +645,7 @@ const orderedFields = computed(() => {
 
 // Check if all columns (except timestamp) are selected
 const areAllColumnsSelected = computed(() => {
-  const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
-  );
+  const selectableFields = availableFields.value.filter((field) => field !== "_timestamp");
   if (selectableFields.length === 0) return false;
 
   return selectableFields.every((field) => visibleColumns.value.has(field));
@@ -674,9 +653,7 @@ const areAllColumnsSelected = computed(() => {
 
 // Check if some columns are selected (for indeterminate state)
 const areSomeColumnsSelected = computed(() => {
-  const selectableFields = availableFields.value.filter(
-    (field) => field !== "_timestamp"
-  );
+  const selectableFields = availableFields.value.filter((field) => field !== "_timestamp");
   if (selectableFields.length === 0) return false;
 
   return selectableFields.some((field) => visibleColumns.value.has(field));
@@ -689,7 +666,9 @@ const initializeVisibleColumns = (fields: string[]) => {
   if (fields.length === 0) return;
 
   const defaults = new Set<string>();
-  const timestampField = fields.find((f) => f === (store.state.zoConfig.timestamp_column || "_timestamp"));
+  const timestampField = fields.find(
+    (f) => f === (store.state.zoConfig.timestamp_column || "_timestamp"),
+  );
   if (timestampField) defaults.add(timestampField);
 
   for (const keyField of defaultLogFields.value) {
@@ -704,9 +683,9 @@ watch(
   availableFields,
   (fields) => {
     if (fields.length === 0) return;
-    
+
     // Check for <=1 since _timestamp is also stored in localStorage as a default column
-    if(visibleColumns.value.size <= 1) initializeVisibleColumns(fields);
+    if (visibleColumns.value.size <= 1) initializeVisibleColumns(fields);
 
     // Initialize column order if not set
     if (columnOrder.value.length === 0) {
@@ -732,9 +711,7 @@ watch(defaultLogFields, (keyFields) => {
 
 // Filter out hidden columns, respecting custom order
 const visibleFields = computed(() => {
-  return orderedFields.value.filter((field) =>
-    visibleColumns.value.has(field),
-  );
+  return orderedFields.value.filter((field) => visibleColumns.value.has(field));
 });
 
 // Compute per-column max cap based on container width and number of visible columns.
@@ -751,10 +728,7 @@ const DEFAULT_LONG_TEXT_FIELDS: string[] = [];
 
 // Measures a field's content width and returns the capped size plus whether the
 // raw measurement exceeded maxCap (used to build the dynamic long-text list).
-const getColumnWidth = (
-  field: string,
-  maxCap: number,
-): { width: number; exceededCap: boolean } => {
+const getColumnWidth = (field: string, maxCap: number): { width: number; exceededCap: boolean } => {
   if (field === "_timestamp" || field === "source") {
     return { width: 150, exceededCap: false };
   }
@@ -829,8 +803,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
   const fields = visibleFields.value;
 
   // Check if only timestamp is visible - if so, add source column
-  const hasOnlyTimestamp =
-    fields.length === 1 && fields[0] === "_timestamp";
+  const hasOnlyTimestamp = fields.length === 1 && fields[0] === "_timestamp";
 
   const columns = fields.map((field) => {
     // Special handling for timestamp column
@@ -918,7 +891,10 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
     lastCol &&
     longTextFields.value.includes(lastCol.name as string)
   ) {
-    lastCol.size = Math.min(columnMaxCap.value, Math.max(150, (lastCol.size ?? 150) + (containerWidth.value - totalWidth)));
+    lastCol.size = Math.min(
+      columnMaxCap.value,
+      Math.max(150, (lastCol.size ?? 150) + (containerWidth.value - totalWidth)),
+    );
   }
 
   // Always leave 12px clearance on the last resizable column so the resize
@@ -942,11 +918,7 @@ const showingDefaultColumns = computed(() => {
 const formatTimestamp = (timestamp: number): string => {
   // Convert microseconds to milliseconds
   const ms = Math.floor(timestamp / 1000);
-  return timestampToTimezoneDate(
-    ms,
-    store.state.timezone || "UTC",
-    "yyyy-MM-dd HH:mm:ss.SSS",
-  );
+  return timestampToTimezoneDate(ms, store.state.timezone || "UTC", "yyyy-MM-dd HH:mm:ss.SSS");
 };
 
 // Compute selected fields from the columns
@@ -965,13 +937,7 @@ watch(
  * Event Handlers
  */
 // Handle dimension update from DimensionFiltersBar - updates pending state only
-const handleDimensionUpdate = ({
-  key,
-  value,
-}: {
-  key: string;
-  value: string;
-}) => {
+const handleDimensionUpdate = ({ key, value }: { key: string; value: string }) => {
   pendingFilters.value[key] = value;
 };
 
@@ -981,8 +947,7 @@ const handleApplyFilters = () => {
   updateFilters(pendingFilters.value);
 };
 
-const handleRowClick = () => {
-};
+const handleRowClick = () => {};
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
@@ -1005,7 +970,6 @@ const handleAddSearchTerm = (
 };
 
 const handleAddFieldToTable = (field: string) => {
-
   // Add the field to visible columns if it's not already visible
   if (!visibleColumns.value.has(field)) {
     visibleColumns.value.add(field);
@@ -1148,19 +1112,12 @@ const handleViewTrace = (log: any) => {
       to,
       refresh,
       org_identifier: store.state.selectedOrganization.identifier,
-      trace_id:
-        log[
-          store.state.organizationData.organizationSettings
-            .trace_id_field_name
-        ],
+      trace_id: log[store.state.organizationData.organizationSettings.trace_id_field_name],
       reload: "true",
     },
   };
 
-  query["span_id"] =
-    log[
-      store.state.organizationData.organizationSettings.span_id_field_name
-    ];
+  query["span_id"] = log[store.state.organizationData.organizationSettings.span_id_field_name];
 
   router.push(query);
 };
@@ -1183,18 +1140,43 @@ onBeforeUnmount(() => {
 // Watch for prop changes
 watch(
   () => props.timeRange,
-  () => {
-  },
+  () => {},
   { deep: true },
 );
 
 // ── Chip row ───────────────────────────────────────────────────────────────
 
 const LABEL_ACRONYMS = new Set([
-  "aws", "ecs", "gcp", "iam", "vpc", "rds", "s3", "ec2",
-  "id", "url", "uri", "ip", "dns", "ssl", "tls", "tcp", "udp",
-  "api", "cpu", "gpu", "ram", "ssd", "hdd", "io",
-  "k8s", "faas", "otel", "sql", "http", "https",
+  "aws",
+  "ecs",
+  "gcp",
+  "iam",
+  "vpc",
+  "rds",
+  "s3",
+  "ec2",
+  "id",
+  "url",
+  "uri",
+  "ip",
+  "dns",
+  "ssl",
+  "tls",
+  "tcp",
+  "udp",
+  "api",
+  "cpu",
+  "gpu",
+  "ram",
+  "ssd",
+  "hdd",
+  "io",
+  "k8s",
+  "faas",
+  "otel",
+  "sql",
+  "http",
+  "https",
 ]);
 const titleCaseWord = (w: string) => {
   if (!w) return w;
@@ -1204,8 +1186,7 @@ const titleCaseWord = (w: string) => {
 };
 const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
 
-const dimensionDisplayLabel = (key: string): string =>
-  titleCase(key.replace(/[-_.]/g, " "));
+const dimensionDisplayLabel = (key: string): string => titleCase(key.replace(/[-_.]/g, " "));
 
 const toChipString = (v: unknown): string | null => {
   if (v == null) return null;
@@ -1215,9 +1196,10 @@ const toChipString = (v: unknown): string | null => {
 };
 
 const chipDimensionSource = computed<Record<string, string>>(() => {
-  const src = props.chipDimensions && Object.keys(props.chipDimensions).length > 0
-    ? props.chipDimensions
-    : { ...(props.matchedDimensions ?? {}), ...(props.additionalDimensions ?? {}) };
+  const src =
+    props.chipDimensions && Object.keys(props.chipDimensions).length > 0
+      ? props.chipDimensions
+      : { ...(props.matchedDimensions ?? {}), ...(props.additionalDimensions ?? {}) };
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(src)) {
     const s = toChipString(v);
@@ -1232,20 +1214,24 @@ const subjectSemanticIds = computed<Set<string>>(() => {
   if (!props.matchedSetId) return new Set();
   const canonical = resolveSetId(props.matchedSetId);
   const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
-  return specs?.length ? new Set(specs.flatMap((s: SubjectButtonSpec) => s.semanticIds)) : new Set();
+  return specs?.length
+    ? new Set(specs.flatMap((s: SubjectButtonSpec) => s.semanticIds))
+    : new Set();
 });
 
 const unifiedChips = computed<DimensionChip[]>(() =>
   Object.keys(chipDimensionSource.value)
     .filter((key) => !subjectSemanticIds.value.has(key))
-    .map((key) => ({
-      key,
-      label: dimensionDisplayLabel(key),
-      value: chipDimensionSource.value[key],
-      kind: "context" as DimensionChip["kind"],
-    } as DimensionChip)),
+    .map(
+      (key) =>
+        ({
+          key,
+          label: dimensionDisplayLabel(key),
+          value: chipDimensionSource.value[key],
+          kind: "context" as DimensionChip["kind"],
+        }) as DimensionChip,
+    ),
 );
-
 </script>
 
 <style scoped>

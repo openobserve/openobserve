@@ -14,7 +14,9 @@
     >
       <template #title>
         <span data-test="job-form-title">
-          {{ mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle") }}
+          {{
+            mode === "create" ? t("onlineEvals.job.createTitle") : t("onlineEvals.job.editTitle")
+          }}
         </span>
       </template>
       <template #actions>
@@ -30,182 +32,235 @@
         />
       </template>
 
-    <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2 max-[68.75rem]:flex-col">
-      <div class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2 max-[68.75rem]:flex-auto">
-        <!-- Target -->
-        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
-          <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
-            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
-            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.targetSection") }}</span>
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-          <div class="job-field">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
-              {{ t("onlineEvals.job.nameLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
-            </label>
-            <OFormInput
-              name="name"
-              :placeholder="t('onlineEvals.job.namePlaceholder')"
-              size="sm"
-              :disabled="mode === 'edit'"
-              data-test="job-form-name-input"
-            />
-          </div>
-
-          <div class="job-field">
-            <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
-              {{ t("onlineEvals.job.streamLabel") }}
-              <span class="text-status-error-text ml-0.5">*</span>
-              <OIcon v-if="mode === 'edit'" name="lock" size="xs" class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))" />
-            </label>
-            <OFormSelect
-              name="stream"
-              :options="streamOptions"
-              :placeholder="t('onlineEvals.job.streamPlaceholder')"
-              size="md"
-              :disabled="mode === 'edit'"
-              data-test="job-form-stream-select"
-            />
-          </div>
-
-          <div class="job-field job-field--desc">
-            <label class="job-field__label">{{ t("onlineEvals.job.descriptionLabel") }}</label>
-            <OFormTextarea
-              name="description"
-              :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
-              size="sm"
-              :rows="3"
-              data-test="job-form-description-input"
-            />
-          </div>
-          </div>
-        </section>
-
-        <!-- Scorers + Filter + Mapping -->
-        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
-          <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
-            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
-            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.scorersSection") }}</span>
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-          <JobScorerPicker
-            :model-value="formValues.scorerIds"
-            :scorers="scorers"
-            @update:model-value="form.setFieldValue('scorerIds', $event)"
-          />
-
-          <JobFilterBuilder name-prefix="filterGroup" />
-
-          <JobInputMapping
-            :selected-scorers="selectedScorers"
-            :input-mappings="inputMappings"
-            @update:input-mappings="inputMappings = $event"
-          />
-          </div>
-        </section>
-
-        <!-- Sampling -->
-        <section class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0">
-          <div class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))">
-            <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
-            <span class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)">{{ t("onlineEvals.job.stepper.sampling") }}</span>
-          </div>
-          <div class="flex flex-col gap-3 py-3.5 px-4">
-          <div class="job-field-row grid grid-cols-2 max-[68.75rem]:grid-cols-1 gap-3.5">
-            <div class="job-field">
-              <label class="job-field__label">{{ t("onlineEvals.job.samplingModeLabel") }}</label>
-              <OFormSelect
-                name="samplingMode"
-                :options="samplingModeOptions"
-                size="md"
-                data-test="job-form-sampling-mode-select"
-              />
-              <div class="job-field__help text-2xs text-(--color-text-secondary,var(--color-text-secondary)) mt-1">{{ t("onlineEvals.job.samplingHelp") }}</div>
+      <div class="job-form__body flex-1 min-h-0 overflow-hidden flex gap-2 max-[68.75rem]:flex-col">
+        <div
+          class="job-form__main flex-[6.5] min-w-0 min-h-0 overflow-auto flex flex-col gap-2 p-2 max-[68.75rem]:flex-auto"
+        >
+          <!-- Target -->
+          <section
+            class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0"
+          >
+            <div
+              class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))"
+            >
+              <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+              <span
+                class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)"
+                >{{ t("onlineEvals.job.targetSection") }}</span
+              >
             </div>
+            <div class="flex flex-col gap-3 py-3.5 px-4">
+              <div class="job-field">
+                <label
+                  class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1"
+                >
+                  {{ t("onlineEvals.job.nameLabel") }}
+                  <span class="text-status-error-text ml-0.5">*</span>
+                  <OIcon
+                    v-if="mode === 'edit'"
+                    name="lock"
+                    size="xs"
+                    class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))"
+                  />
+                </label>
+                <OFormInput
+                  name="name"
+                  :placeholder="t('onlineEvals.job.namePlaceholder')"
+                  size="sm"
+                  :disabled="mode === 'edit'"
+                  data-test="job-form-name-input"
+                />
+              </div>
 
-            <div class="job-field">
-              <label class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1">
-                {{ t("onlineEvals.job.samplingValueLabel") }}
-                <span v-if="formValues.samplingMode !== 'all'" class="text-status-error-text ml-0.5">*</span>
-              </label>
-              <OFormInput
-                name="samplingValue"
-                size="sm"
-                :disabled="formValues.samplingMode === 'all'"
-                data-test="job-form-sampling-value-input"
-              />
-              <div class="job-field__help">
-                {{ formValues.samplingMode === 'all'
-                  ? t("onlineEvals.job.samplingValueAllHelp")
-                  : t("onlineEvals.job.samplingValueHelp") }}
+              <div class="job-field">
+                <label
+                  class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1"
+                >
+                  {{ t("onlineEvals.job.streamLabel") }}
+                  <span class="text-status-error-text ml-0.5">*</span>
+                  <OIcon
+                    v-if="mode === 'edit'"
+                    name="lock"
+                    size="xs"
+                    class="ml-1.5 text-(--color-text-secondary,var(--color-text-secondary))"
+                  />
+                </label>
+                <OFormSelect
+                  name="stream"
+                  :options="streamOptions"
+                  :placeholder="t('onlineEvals.job.streamPlaceholder')"
+                  size="md"
+                  :disabled="mode === 'edit'"
+                  data-test="job-form-stream-select"
+                />
+              </div>
+
+              <div class="job-field job-field--desc">
+                <label class="job-field__label">{{ t("onlineEvals.job.descriptionLabel") }}</label>
+                <OFormTextarea
+                  name="description"
+                  :placeholder="t('onlineEvals.job.descriptionPlaceholder')"
+                  size="sm"
+                  :rows="3"
+                  data-test="job-form-description-input"
+                />
               </div>
             </div>
-          </div>
-          </div>
-        </section>
+          </section>
+
+          <!-- Scorers + Filter + Mapping -->
+          <section
+            class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0"
+          >
+            <div
+              class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))"
+            >
+              <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+              <span
+                class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)"
+                >{{ t("onlineEvals.job.scorersSection") }}</span
+              >
+            </div>
+            <div class="flex flex-col gap-3 py-3.5 px-4">
+              <JobScorerPicker
+                :model-value="formValues.scorerIds"
+                :scorers="scorers"
+                @update:model-value="form.setFieldValue('scorerIds', $event)"
+              />
+
+              <JobFilterBuilder name-prefix="filterGroup" />
+
+              <JobInputMapping
+                :selected-scorers="selectedScorers"
+                :input-mappings="inputMappings"
+                @update:input-mappings="inputMappings = $event"
+              />
+            </div>
+          </section>
+
+          <!-- Sampling -->
+          <section
+            class="bg-card-glass-bg border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default overflow-hidden shrink-0"
+          >
+            <div
+              class="flex items-center py-2.5 px-3 border-b border-(--color-border-default,var(--color-border-default))"
+            >
+              <div class="w-0.75 h-4 rounded-default mr-2 shrink-0 bg-theme-accent" />
+              <span
+                class="text-compact font-semibold tracking-[0.01em] text-(--color-text-heading,currentColor)"
+                >{{ t("onlineEvals.job.stepper.sampling") }}</span
+              >
+            </div>
+            <div class="flex flex-col gap-3 py-3.5 px-4">
+              <div class="job-field-row grid grid-cols-2 max-[68.75rem]:grid-cols-1 gap-3.5">
+                <div class="job-field">
+                  <label class="job-field__label">{{
+                    t("onlineEvals.job.samplingModeLabel")
+                  }}</label>
+                  <OFormSelect
+                    name="samplingMode"
+                    :options="samplingModeOptions"
+                    size="md"
+                    data-test="job-form-sampling-mode-select"
+                  />
+                  <div
+                    class="job-field__help text-2xs text-(--color-text-secondary,var(--color-text-secondary)) mt-1"
+                  >
+                    {{ t("onlineEvals.job.samplingHelp") }}
+                  </div>
+                </div>
+
+                <div class="job-field">
+                  <label
+                    class="flex items-center text-xs font-semibold text-(--color-text-heading,currentColor) mb-1"
+                  >
+                    {{ t("onlineEvals.job.samplingValueLabel") }}
+                    <span
+                      v-if="formValues.samplingMode !== 'all'"
+                      class="text-status-error-text ml-0.5"
+                      >*</span
+                    >
+                  </label>
+                  <OFormInput
+                    name="samplingValue"
+                    size="sm"
+                    :disabled="formValues.samplingMode === 'all'"
+                    data-test="job-form-sampling-value-input"
+                  />
+                  <div class="job-field__help">
+                    {{
+                      formValues.samplingMode === "all"
+                        ? t("onlineEvals.job.samplingValueAllHelp")
+                        : t("onlineEvals.job.samplingValueHelp")
+                    }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <JobPreviewPanel
+          :name="formValues.name"
+          :stream-type="formValues.streamType"
+          :mode="mode"
+          :stream="formValues.stream"
+          :filter-where="filterWhere"
+          :filter-ready="filterReady"
+        />
       </div>
 
-      <JobPreviewPanel
-        :name="formValues.name"
-        :stream-type="formValues.streamType"
-        :mode="mode"
-        :stream="formValues.stream"
-        :filter-where="filterWhere"
-        :filter-ready="filterReady"
-      />
-    </div>
-
-    <footer class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1">
-      <OButton
-        data-test="job-form-cancel-btn"
-        type="button"
-        variant="outline"
-        size="sm-action"
-        :disabled="isSubmitting"
-        @click="$emit('cancel')"
+      <footer
+        class="sticky bottom-0 flex items-center justify-end gap-2 px-5.5 py-3 bg-surface-base border-t border-border-default shrink-0 z-1"
       >
-        {{ t("onlineEvals.buttons.cancel") }}
-      </OButton>
-      <template v-if="mode === 'create'">
-        <!-- Both create actions submit through the form (so Enter + schema
-             validation apply); the click sets which one before the form submit
-             fires, and loading is form-driven (isSubmitting). -->
         <OButton
-          data-test="job-form-save-draft-btn"
-          type="submit"
+          data-test="job-form-cancel-btn"
+          type="button"
           variant="outline"
           size="sm-action"
-          :loading="isSubmitting && !activateOnSave"
-          :disabled="isSubmitting && activateOnSave"
-          @click="activateOnSave = false"
+          :disabled="isSubmitting"
+          @click="$emit('cancel')"
         >
-          {{ t("onlineEvals.buttons.saveAsDraft") }}
+          {{ t("onlineEvals.buttons.cancel") }}
         </OButton>
+        <template v-if="mode === 'create'">
+          <!-- Both create actions submit through the form (so Enter + schema
+             validation apply); the click sets which one before the form submit
+             fires, and loading is form-driven (isSubmitting). -->
+          <OButton
+            data-test="job-form-save-draft-btn"
+            type="submit"
+            variant="outline"
+            size="sm-action"
+            :loading="isSubmitting && !activateOnSave"
+            :disabled="isSubmitting && activateOnSave"
+            @click="activateOnSave = false"
+          >
+            {{ t("onlineEvals.buttons.saveAsDraft") }}
+          </OButton>
+          <OButton
+            data-test="job-form-save-activate-btn"
+            type="submit"
+            variant="primary"
+            size="sm-action"
+            :loading="isSubmitting && activateOnSave"
+            :disabled="isSubmitting && !activateOnSave"
+            @click="activateOnSave = true"
+          >
+            {{ t("onlineEvals.buttons.createAndActivate") }}
+          </OButton>
+        </template>
         <OButton
-          data-test="job-form-save-activate-btn"
+          v-else
+          data-test="job-form-save-btn"
           type="submit"
           variant="primary"
           size="sm-action"
-          :loading="isSubmitting && activateOnSave"
-          :disabled="isSubmitting && !activateOnSave"
-          @click="activateOnSave = true"
+          :loading="isSubmitting"
         >
-          {{ t("onlineEvals.buttons.createAndActivate") }}
+          {{ t("onlineEvals.buttons.save") }}
         </OButton>
-      </template>
-      <OButton
-        v-else
-        data-test="job-form-save-btn"
-        type="submit"
-        variant="primary"
-        size="sm-action"
-        :loading="isSubmitting"
-      >
-        {{ t("onlineEvals.buttons.save") }}
-      </OButton>
-    </footer>
+      </footer>
     </OPageLayout>
   </OForm>
 </template>
@@ -223,10 +278,7 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import useStreams from "@/composables/useStreams";
-import onlineEvalsService, {
-  type EvalJob,
-  type Scorer,
-} from "@/services/online-evals.service";
+import onlineEvalsService, { type EvalJob, type Scorer } from "@/services/online-evals.service";
 import {
   entityId,
   samplingModeOf,
@@ -292,9 +344,7 @@ const formValues = form.useStore((s: any) => s.values as JobForm);
 // form's `filterGroup` field (JobFilterBuilder renders FilterGroup in form mode
 // and writes structural changes straight to the form). Single source of truth,
 // no mirror ref. Drives the preview computeds below and the save payload.
-const filterGroup = form.useStore(
-  (s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup(),
-);
+const filterGroup = form.useStore((s: any) => s.values.filterGroup ?? createEmptyJobFilterGroup());
 // Input-mapping composite stays local non-form working state.
 const inputMappings = ref(initInputMappings(props.row));
 const scorerVersions = ref(initScorerVersions(props.row));
@@ -320,9 +370,7 @@ const filterWhere = computed<string>(() => {
 
 // Pauses the match-count query while a condition is half-filled (column picked
 // but value still empty), so we don't query on every keystroke / partial edit.
-const filterReady = computed<boolean>(() =>
-  isJobFilterComplete(filterGroup.value),
-);
+const filterReady = computed<boolean>(() => isJobFilterComplete(filterGroup.value));
 
 const selectedScorers = computed(() =>
   formValues.value.scorerIds
@@ -362,8 +410,14 @@ const samplingModeOptions = computed(() => [
   { label: t("onlineEvals.job.samplingModes.count"), value: "count" },
 ]);
 
-watch(() => formValues.value.scorerIds.slice(), () => syncMappings());
-watch(() => props.scorers, () => syncMappings());
+watch(
+  () => formValues.value.scorerIds.slice(),
+  () => syncMappings(),
+);
+watch(
+  () => props.scorers,
+  () => syncMappings(),
+);
 
 function initForm(row: EvalJob | null): JobForm {
   if (!row) {
@@ -446,9 +500,10 @@ async function onSubmit(value: JobForm) {
       scorers: value.scorerIds.map((id) => ({ id, version: scorerVersions.value[id] ?? null })),
       inputMapping: buildJobInputMappingPayload(value.scorerIds, inputMappings.value),
       samplingMode: value.samplingMode as any,
-      samplingValue: value.samplingMode === "all"
-        ? null
-        : parseJson(value.samplingValue ?? "", t("onlineEvals.job.samplingValueLabel")),
+      samplingValue:
+        value.samplingMode === "all"
+          ? null
+          : parseJson(value.samplingValue ?? "", t("onlineEvals.job.samplingValueLabel")),
     };
 
     if (props.mode === "edit" && props.row) {

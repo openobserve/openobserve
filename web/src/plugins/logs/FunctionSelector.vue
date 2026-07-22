@@ -64,9 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else>
           <div class="flex items-center gap-2 px-3 py-2">
             <div class="flex flex-col flex-1 min-w-0">
-              <span class="text-sm">{{
-                t("search.savedFunctionNotFound")
-              }}</span>
+              <span class="text-sm">{{ t("search.savedFunctionNotFound") }}</span>
             </div>
           </div>
         </div>
@@ -99,12 +97,15 @@ import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-const props = withDefaults(defineProps<{
-  functionOptions: { name: string; function: string }[];
-  hideToggle?: boolean;
-}>(), {
-  hideToggle: false,
-});
+const props = withDefaults(
+  defineProps<{
+    functionOptions: { name: string; function: string }[];
+    hideToggle?: boolean;
+  }>(),
+  {
+    hideToggle: false,
+  },
+);
 
 const emit = defineEmits(["select:function", "save:function"]);
 
@@ -113,7 +114,7 @@ const { t } = useI18n();
 const { searchObj } = searchState();
 
 const store = useStore();
-  const { isDark } = useTheme();
+const { isDark } = useTheme();
 
 const functionToggleIcon = computed(() => {
   return (
@@ -127,11 +128,7 @@ const functionToggleIcon = computed(() => {
 const iconRight = computed(() => {
   return (
     "img:" +
-    getImageURL(
-      isDark.value
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
+    getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
   );
 });
 
@@ -159,10 +156,7 @@ const selectedFunctionTooltip = computed(() => {
   return t("search.functionPlaceholder");
 });
 
-const applyFunction = (
-  item: { name: string; function: string },
-  flag = false,
-) => {
+const applyFunction = (item: { name: string; function: string }, flag = false) => {
   functionModel.value = false;
   emit("select:function", item, flag);
 };
@@ -176,4 +170,3 @@ const applyFunction = (
   border-radius: 0.375rem;
 }
 </style>
-

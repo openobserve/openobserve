@@ -83,7 +83,9 @@ describe("GroupHeader.vue", () => {
   describe("Title rendering", () => {
     it("renders the provided title text", () => {
       const wrapper = createWrapper({ title: "Cipher Keys" });
-      expect(wrapper.find('[data-test="common-group-header-title"]').text()).toContain("Cipher Keys");
+      expect(wrapper.find('[data-test="common-group-header-title"]').text()).toContain(
+        "Cipher Keys",
+      );
     });
 
     it("renders empty title text when title is empty string", () => {

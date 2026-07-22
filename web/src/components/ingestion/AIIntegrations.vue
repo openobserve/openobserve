@@ -15,21 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OSplitter
-    v-model="categorySplitterModel"
-    unit="px"
-    class="h-full"
-  >
+  <OSplitter v-model="categorySplitterModel" unit="px" class="h-full">
     <template v-slot:before>
       <div class="w-full h-full">
         <div class="h-full bg-surface-panel border-r border-border-default">
           <div class="overflow-y-auto h-full pt-1.5">
-            <OTabs
-              v-model="selectedCategory"
-              orientation="vertical"
-              dense
-              class="px-1"
-            >
+            <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
               <OTab
                 v-for="cat in aiCategories"
                 :key="cat.slug"
@@ -44,11 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:after>
-      <OSplitter
-        v-model="integrationSplitterModel"
-        unit="px"
-        class="h-full"
-      >
+      <OSplitter v-model="integrationSplitterModel" unit="px" class="h-full">
         <template v-slot:before>
           <div class="w-full h-full">
             <div class="h-full bg-surface-panel border-r border-border-default">
@@ -79,7 +66,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <template #icon>
                         <img
-                          v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
+                          v-if="
+                            (integration.logo || integration.logoDark) &&
+                            !failedLogos.has(integration.slug)
+                          "
                           :src="(isDark && integration.logoDark) || integration.logo"
                           :alt="`${integration.name} logo`"
                           class="w-4.5 h-4.5 rounded-default flex-none object-contain"
@@ -91,9 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           v-else
                           class="w-4.5 h-4.5 rounded-default flex-none grid place-items-center bg-theme-accent text-text-inverse text-3xs font-bold leading-none"
                           aria-hidden="true"
-                        >{{
-                          integration.name.charAt(0)
-                        }}</span>
+                          >{{ integration.name.charAt(0) }}</span
+                        >
                       </template>
                     </OTab>
                   </OTabs>
@@ -124,10 +113,10 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
-import OTab from '@/lib/navigation/Tabs/OTab.vue';
-import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "AIIntegrationsPage",
@@ -159,9 +148,7 @@ export default defineComponent({
         return currentIntegrations.value;
       }
       return currentIntegrations.value.filter((integration) =>
-        integration.name
-          .toLowerCase()
-          .includes(integrationFilter.value.toLowerCase()),
+        integration.name.toLowerCase().includes(integrationFilter.value.toLowerCase()),
       );
     });
 
@@ -204,9 +191,7 @@ export default defineComponent({
       } else {
         // Sync selectedCategory and selectedIntegration from current route
         for (const cat of aiCategories) {
-          const matchingIntegration = cat.integrations.find(
-            (i) => i.routeName === routeName,
-          );
+          const matchingIntegration = cat.integrations.find((i) => i.routeName === routeName);
           if (matchingIntegration) {
             selectedCategory.value = cat.slug;
             selectedIntegration.value = matchingIntegration.routeName;
@@ -220,11 +205,14 @@ export default defineComponent({
     // route. The route config redirect ("" → first integration) resolves to the
     // same route the user is already on, so Vue Router cancels it as a duplicate
     // navigation and the <router-view> can go blank.
-    watch(() => route.name, (newName) => {
-      if (newName === "ai-integrations") {
-        navigateToFirstIntegration(selectedCategory.value);
-      }
-    });
+    watch(
+      () => route.name,
+      (newName) => {
+        if (newName === "ai-integrations") {
+          navigateToFirstIntegration(selectedCategory.value);
+        }
+      },
+    );
 
     return {
       t,
@@ -244,4 +232,3 @@ export default defineComponent({
   },
 });
 </script>
-

@@ -15,26 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-default w-full h-full dark:bg-surface-base dark:border-border-default">
+  <OCard
+    class="flex flex-col shadow-none border border-card-glass-border bg-card-glass-bg rounded-default w-full h-full dark:bg-surface-base dark:border-border-default"
+  >
     <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="pt-2 text-base font-semibold leading-6 text-text-heading m-0">{{ t("billing.proPlanLabel") }}</h3>
+        <h3 class="pt-2 text-base font-semibold leading-6 text-text-heading m-0">
+          {{ t("billing.proPlanLabel") }}
+        </h3>
         <p class="mt-2 text-sm font-normal leading-4.5 text-text-secondary m-0">
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
-      <OTag
-        v-if="planType == planName"
-        type="billingTag"
-        value="subscribed"
-        class="mt-2"
-      />
+      <OTag v-if="planType == planName" type="billingTag" value="subscribed" class="mt-2" />
     </div>
 
     <OSeparator class="my-2" />
 
     <div class="px-3 py-2">
-      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">{{ t("billing.features") }}</h4>
+      <h4 class="text-compact font-semibold leading-[0.983rem] text-text-heading m-0">
+        {{ t("billing.features") }}
+      </h4>
       <p class="mb-3 mt-1 text-compact font-normal leading-4.5 text-text-secondary m-0">
         {{ t("billing.included") }}
       </p>
@@ -60,7 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="md"
             class="mr-2 text-status-positive check-icon"
           />
-          <div class="text-base leading-5.5 text-text-body" :class="{ 'ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-base leading-5.5 text-text-body" :class="{ 'ml-6': !feature.is_parent }">
+            {{ feature.name }}
+          </div>
         </div>
         <div
           v-if="feature.price !== ''"
@@ -80,11 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex justify-between p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
       <div v-if="billingProvider === 'aws'" class="w-full text-center">
-        <OTag
-          type="billingManagement"
-          value="aws"
-          class="inline-flex items-center gap-1"
-        >
+        <OTag type="billingManagement" value="aws" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
@@ -93,15 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           Billing is handled through your AWS account
         </div>
       </div>
-      <div
-        v-else-if="billingProvider === 'azure'"
-        class="w-full text-center"
-      >
-        <OTag
-          type="billingManagement"
-          value="azure"
-          class="inline-flex items-center gap-1"
-        >
+      <div v-else-if="billingProvider === 'azure'" class="w-full text-center">
+        <OTag type="billingManagement" value="azure" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
@@ -111,22 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
-      <div
-        v-else-if="subscriptionType === 'external-contract'"
-        class="w-full text-center"
-      >
-        <OTag
-          type="billingManagement"
-          value="contract"
-          class="inline-flex items-center gap-1"
-        >
+      <div v-else-if="subscriptionType === 'external-contract'" class="w-full text-center">
+        <OTag type="billingManagement" value="contract" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="description" size="xs" />
           </template>
         </OTag>
         <div class="text-xs text-text-secondary mt-2">
-          Billing is handled through your contract — contact your account
-          manager for changes
+          Billing is handled through your contract — contact your account manager for changes
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
@@ -139,13 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ btnCancelSubscription }}
       </OButton>
-      <OButton
-        v-else
-        variant="primary"
-        size="sm-action"
-        block
-        @click="onSubscribe"
-      >
+      <OButton v-else variant="primary" size="sm-action" block @click="onSubscribe">
         {{ btnSubscribe }}
       </OButton>
     </div>
@@ -164,13 +142,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 export default defineComponent({
   name: "proPlan",
   components: { OSeparator, OButton, OTag, OIcon, OCard },
-  props: [
-    "planType",
-    "billingProvider",
-    "subscriptionType",
-    "features",
-    "pricingError",
-  ],
+  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const planName = "pay-as-you-go";

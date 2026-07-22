@@ -19,9 +19,7 @@
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="
-          addSearchTerm(column.id, row[column.id], 'include')
-        "
+        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
         :data-test="`log-details-include-field-${row[column.id]}`"
         :title="t('logs.cellActions.includeTerm')"
       >
@@ -34,9 +32,7 @@
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="
-          addSearchTerm(column.id, row[column.id], 'exclude')
-        "
+        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
         :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
@@ -94,21 +90,12 @@ const props = defineProps({
 
 const { t } = useI18n();
 
-const emit = defineEmits([
-  "copy",
-  "addSearchTerm",
-  "addFieldToTable",
-  "sendToAiChat",
-]);
+const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
 const copyLogToClipboard = (value: any) => {
   emit("copy", value);
 };
-const addSearchTerm = (
-  field: string,
-  field_value: string | number | boolean,
-  action: string,
-) => {
+const addSearchTerm = (field: string, field_value: string | number | boolean, action: string) => {
   emit("addSearchTerm", field, field_value, action);
 };
 
@@ -118,9 +105,7 @@ const sendToAiChat = (value: any) => {
 };
 
 const isStreamField = computed(() => {
-  const field: any = props.selectedStreamFields?.find(
-    (item: any) => item.name === props.column.id,
-  );
+  const field: any = props.selectedStreamFields?.find((item: any) => item.name === props.column.id);
   return field?.isSchemaField ?? false;
 });
 </script>

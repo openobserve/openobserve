@@ -1,7 +1,9 @@
 ﻿<template>
   <div class="flex flex-col gap-2.5">
     <div class="flex flex-col gap-0.5">
-      <span class="text-xs font-semibold text-text-heading">{{ t("onlineEvals.job.inputMapping.title") }}</span>
+      <span class="text-xs font-semibold text-text-heading">{{
+        t("onlineEvals.job.inputMapping.title")
+      }}</span>
       <span class="text-2xs text-text-secondary">{{ t("onlineEvals.job.inputMapping.hint") }}</span>
     </div>
     <div
@@ -16,9 +18,13 @@
         :key="entityId(scorer)"
         class="border border-dialog-header-border rounded-default bg-card-bg overflow-hidden"
       >
-        <div class="flex items-center justify-between gap-3 py-2.5 px-3 border-b border-dialog-header-border">
+        <div
+          class="flex items-center justify-between gap-3 py-2.5 px-3 border-b border-dialog-header-border"
+        >
           <div class="flex flex-col gap-px min-w-0">
-            <strong class="text-compact font-semibold text-text-heading truncate">{{ scorer.name }}</strong>
+            <strong class="text-compact font-semibold text-text-heading truncate">{{
+              scorer.name
+            }}</strong>
             <small class="text-2xs text-text-secondary">{{
               t("onlineEvals.job.scorerPicker.meta", {
                 type: scorerTypeOf(scorer).replace("_", " "),
@@ -27,7 +33,11 @@
             }}</small>
           </div>
           <span class="shrink-0 text-2xs font-semibold text-text-secondary">
-            {{ t("onlineEvals.job.inputMapping.variableCount", { count: variablesFor(scorer).length }) }}
+            {{
+              t("onlineEvals.job.inputMapping.variableCount", {
+                count: variablesFor(scorer).length,
+              })
+            }}
           </span>
         </div>
         <div v-if="variablesFor(scorer).length" class="grid gap-1.5 py-2.5 px-3">
@@ -36,12 +46,17 @@
             :key="`${entityId(scorer)}-${variable}`"
             class="grid grid-cols-[minmax(130px,0.35fr)_minmax(0,1fr)] items-center gap-2.5"
           >
-            <code class="overflow-hidden py-1.25 px-2 rounded-default bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-label font-semibold text-2xs font-mono truncate">{{ formatTemplateVariable(variable) }}</code>
+            <code
+              class="overflow-hidden py-1.25 px-2 rounded-default bg-[color-mix(in_srgb,var(--color-text-secondary)_10%,transparent)] text-text-label font-semibold text-2xs font-mono truncate"
+              >{{ formatTemplateVariable(variable) }}</code
+            >
             <input
               class="w-full h-7 py-0 px-2.5 border border-input-border rounded-default bg-input-bg text-input-text font-normal text-xs font-mono outline-none transition-colors duration-120 focus:border-primary-600"
               :value="inputMappings[entityId(scorer)]?.[variable] || ''"
               :placeholder="defaultJobMappingValue(variable)"
-              @input="updateMapping(entityId(scorer), variable, ($event.target as HTMLInputElement).value)"
+              @input="
+                updateMapping(entityId(scorer), variable, ($event.target as HTMLInputElement).value)
+              "
             />
           </label>
         </div>
@@ -61,10 +76,7 @@ import { useI18n } from "vue-i18n";
 import type { Scorer } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf } from "../../utils/evalEntity";
 import { formatTemplateVariable } from "../../utils/evalFormat";
-import {
-  defaultJobMappingValue,
-  jobMappingVariablesForScorer,
-} from "../../utils/jobMappings";
+import { defaultJobMappingValue, jobMappingVariablesForScorer } from "../../utils/jobMappings";
 
 const props = defineProps<{
   selectedScorers: Scorer[];
@@ -91,4 +103,3 @@ function updateMapping(scorerId: string, variable: string, value: string) {
   });
 }
 </script>
-

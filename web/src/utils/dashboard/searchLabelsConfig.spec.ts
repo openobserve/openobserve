@@ -13,10 +13,7 @@
 // limitations under the License.
 
 import { describe, it, expect } from "vitest";
-import {
-  ORDERED_SECTION_IDS,
-  DEFAULT_EXPANDED_SECTIONS,
-} from "./searchLabelsConfig";
+import { ORDERED_SECTION_IDS, DEFAULT_EXPANDED_SECTIONS } from "./searchLabelsConfig";
 
 describe("searchLabelsConfig", () => {
   const EXPECTED_SECTIONS = [
@@ -81,9 +78,7 @@ describe("searchLabelsConfig", () => {
     });
 
     it("has no section set to false", () => {
-      const falseEntries = Object.entries(DEFAULT_EXPANDED_SECTIONS).filter(
-        ([, v]) => v === false,
-      );
+      const falseEntries = Object.entries(DEFAULT_EXPANDED_SECTIONS).filter(([, v]) => v === false);
       expect(falseEntries).toHaveLength(0);
     });
   });

@@ -10,7 +10,6 @@
     data-test="scorer-detail"
     @update:open="handleOpenChange"
   >
-
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="flex flex-col h-full min-h-0">
       <!-- ── Global window control ── -->
@@ -18,9 +17,7 @@
            and the Runs table share this one window. Placed above the cards
            (right-aligned) so it reads as a page-level control, not a per-tab
            filter. Refresh re-queries everything. -->
-      <div
-        class="flex items-center justify-end gap-2 px-5 pt-3"
-      >
+      <div class="flex items-center justify-end gap-2 px-5 pt-3">
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
@@ -56,21 +53,14 @@
           :key="card.label"
           class="rounded-default flex flex-col px-3.5 pt-2.5 pb-2.5 gap-1 bg-surface-base border border-border-default transition-shadow duration-200 hover:shadow-md"
         >
-          <div
-            class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary"
-          >
+          <div class="kpi-label text-2xs leading-normal font-semibold mb-1 text-text-secondary">
             {{ card.label }}
           </div>
           <div class="flex items-baseline gap-0.75">
-            <span
-              class="text-2xl font-bold leading-none text-text-secondary"
-            >
+            <span class="text-2xl font-bold leading-none text-text-secondary">
               {{ card.value }}
             </span>
-            <span
-              v-if="card.unit"
-              class="text-compact font-semibold text-text-secondary"
-            >
+            <span v-if="card.unit" class="text-compact font-semibold text-text-secondary">
               {{ card.unit }}
             </span>
           </div>
@@ -112,10 +102,7 @@
              refresh live in the global toolbar above the cards, so they're not
              duplicated here. Rendered once with v-show (not v-if) so it never
              remounts on tab switch. -->
-        <div
-          v-show="runsEnabled"
-          class="flex items-center justify-end gap-2 flex-wrap px-5"
-        >
+        <div v-show="runsEnabled" class="flex items-center justify-end gap-2 flex-wrap px-5">
           <div class="w-56 shrink-0">
             <OSelect
               v-model="agentKey"
@@ -144,9 +131,7 @@
               <template v-if="scorerType === 'llm_judge'">
                 <dt>{{ t("onlineEvals.scorer.detail.providerLabel") }}</dt>
                 <dd>
-                  <span v-if="provider">{{
-                    provider.name
-                  }}</span>
+                  <span v-if="provider">{{ provider.name }}</span>
                   <span v-else class="text-text-secondary italic">{{
                     t("onlineEvals.scorer.detail.providerUnknown")
                   }}</span>
@@ -171,22 +156,12 @@
             >
               {{ t("onlineEvals.scorer.detail.producesSection") }}
             </h4>
-            <div
-              v-if="producesConfig"
-              class="sd-produces"
-              data-test="scorer-detail-produces"
-            >
+            <div v-if="producesConfig" class="sd-produces" data-test="scorer-detail-produces">
               <OIcon name="rule" size="xs" />
-              <span class="sd-produces__name">{{
-                producesConfig.name
-              }}</span>
-              <span class="sd-produces__version"
-                >v{{ producesConfig.version }}</span
-              >
+              <span class="sd-produces__name">{{ producesConfig.name }}</span>
+              <span class="sd-produces__version">v{{ producesConfig.version }}</span>
               <span class="sd-produces__sep">·</span>
-              <span class="sd-produces__type">{{
-                dataTypeOf(producesConfig)
-              }}</span>
+              <span class="sd-produces__type">{{ dataTypeOf(producesConfig) }}</span>
             </div>
             <OEmptyState
               v-else
@@ -210,9 +185,7 @@
                 {{ t("onlineEvals.scorer.detail.variablesSuffix") }}
               </OTag>
             </h4>
-            <pre class="sd-code" data-test="scorer-detail-template">{{
-              row.template
-            }}</pre>
+            <pre class="sd-code" data-test="scorer-detail-template">{{ row.template }}</pre>
           </section>
 
           <section v-if="outputSchemaPretty" class="flex flex-col gap-2 px-5">
@@ -256,9 +229,7 @@
             <ul class="sd-versions">
               <li class="sd-versions__item sd-versions__item--active">
                 <div class="sd-versions__head">
-                  <span class="sd-versions__label"
-                    >v{{ row.version }}</span
-                  >
+                  <span class="sd-versions__label">v{{ row.version }}</span>
                   <OTag type="activeVersionFlag" value="active" />
                 </div>
                 <div v-if="updatedAt" class="sd-versions__meta">
@@ -292,38 +263,28 @@
             class="w-full"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="text-text-secondary">{{
-                relativeTime(row.timestampMs)
-              }}</span>
+              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
             </template>
             <template #cell-jobId="{ row }">
               <span>{{ jobNameFor(row.jobId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span
-                v-if="row.targetSpanId"
-                class="block truncate"
-                :title="row.targetSpanId"
-                >{{ row.targetSpanId }}</span
-              >
+              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
+                row.targetSpanId
+              }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span
-                v-if="row.targetTraceId"
-                class="block truncate"
-                :title="row.targetTraceId"
-                >{{ row.targetTraceId }}</span
-              >
+              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
+                row.targetTraceId
+              }}</span>
               <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span>{{
-                row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
-              }}</span>
+              <span>{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
             </template>
             <template #cell-status="{ row }">
               <OTag type="evalRunStatus" :value="row.status" />
@@ -354,11 +315,7 @@
                   <OIcon name="play-arrow" size="xs" />
                   <span>{{ job.name }}</span>
                   <span class="sd-used-list__meta">{{ job.status }}</span>
-                  <OIcon
-                    name="chevron-right"
-                    size="xs"
-                    class="sd-used-list__chevron"
-                  />
+                  <OIcon name="chevron-right" size="xs" class="sd-used-list__chevron" />
                 </OButton>
               </li>
             </ul>
@@ -385,18 +342,9 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
-import type {
-  EvalJob,
-  Provider,
-  Scorer,
-  ScoreConfig,
-} from "@/services/online-evals.service";
+import type { EvalJob, Provider, Scorer, ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
-import {
-  useScorerRuns,
-  type RunRow,
-  type ScorerRunsWindow,
-} from "../composables/useScorerRuns";
+import { useScorerRuns, type RunRow, type ScorerRunsWindow } from "../composables/useScorerRuns";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   ALL_AGENTS_VALUE,
@@ -419,25 +367,18 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 const store = useStore();
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier ?? "default",
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
 type TabId = "configuration" | "versions" | "runs" | "usedBy";
 const activeTab = ref<TabId>("configuration");
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
 
 const scorerType = computed<"llm_judge" | "remote">(() => {
-  const raw =
-    valueOf<string>(props.row, "scorerType", "scorer_type") ?? "llm_judge";
+  const raw = valueOf<string>(props.row, "scorerType", "scorer_type") ?? "llm_judge";
   return raw === "remote" ? "remote" : "llm_judge";
 });
 
@@ -449,28 +390,17 @@ const provider = computed<Provider | null>(() => {
   return props.providers.find((p) => p.id === providerId) ?? null;
 });
 
-const judgeModel = computed<string>(
-  () => params.value.model ?? params.value.judge_model ?? "",
-);
+const judgeModel = computed<string>(() => params.value.model ?? params.value.judge_model ?? "");
 
-const remoteEndpoint = computed<string>(
-  () => params.value.endpoint ?? params.value.url ?? "",
-);
+const remoteEndpoint = computed<string>(() => params.value.endpoint ?? params.value.url ?? "");
 
 const producesId = computed(
-  () =>
-    valueOf<string>(
-      props.row,
-      "producesScoreConfigId",
-      "produces_score_config_id",
-    ) ?? null,
+  () => valueOf<string>(props.row, "producesScoreConfigId", "produces_score_config_id") ?? null,
 );
 
 const producesConfig = computed<ScoreConfig | null>(() => {
   if (!producesId.value) return null;
-  return (
-    props.scoreConfigs.find((c) => entityId(c) === producesId.value) ?? null
-  );
+  return props.scoreConfigs.find((c) => entityId(c) === producesId.value) ?? null;
 });
 
 // Drawer open state — starts open (the parent mounts this only when a scorer is
@@ -568,20 +498,13 @@ const agentOptions = computed(() => [
 
 const selectedAgent = computed<AgentFilterSelection | null>(() => {
   if (agentKey.value === ALL_AGENTS_VALUE) return null;
-  return (
-    agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ??
-    null
-  );
+  return agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ?? null;
 });
 
 async function loadAgents() {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await genAiAgentMappingService.listAgents(
-      orgId.value,
-      startUs,
-      endUs,
-    );
+    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&
@@ -600,11 +523,7 @@ function syncDateWindow() {
   const picker = dateTimePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (
-    dt &&
-    typeof dt.startTime === "number" &&
-    typeof dt.endTime === "number"
-  ) {
+  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
     dateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
@@ -709,32 +628,30 @@ const runColumns = computed<OTableColumnDef<RunRow>[]>(() => [
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(
-  () => {
-    const k = kpis.value;
-    return [
-      {
-        label: t("onlineEvals.scorer.detail.kpis.totalRuns"),
-        value: formatCount(k.totalRuns),
-        unit: "",
-      },
-      {
-        label: t("onlineEvals.scorer.detail.kpis.successRate"),
-        value: k.successRate == null ? "—" : k.successRate.toFixed(1),
-        unit: k.successRate == null ? "" : "%",
-      },
-      {
-        label: t("onlineEvals.scorer.detail.kpis.avgLatency"),
-        ...splitLatency(k.avgLatencyMs),
-      },
-      {
-        label: t("onlineEvals.scorer.detail.kpis.usedBy"),
-        value: String(usedByJobs.value.length),
-        unit: "",
-      },
-    ];
-  },
-);
+const kpiCards = computed<{ label: string; value: string; unit: string }[]>(() => {
+  const k = kpis.value;
+  return [
+    {
+      label: t("onlineEvals.scorer.detail.kpis.totalRuns"),
+      value: formatCount(k.totalRuns),
+      unit: "",
+    },
+    {
+      label: t("onlineEvals.scorer.detail.kpis.successRate"),
+      value: k.successRate == null ? "—" : k.successRate.toFixed(1),
+      unit: k.successRate == null ? "" : "%",
+    },
+    {
+      label: t("onlineEvals.scorer.detail.kpis.avgLatency"),
+      ...splitLatency(k.avgLatencyMs),
+    },
+    {
+      label: t("onlineEvals.scorer.detail.kpis.usedBy"),
+      value: String(usedByJobs.value.length),
+      unit: "",
+    },
+  ];
+});
 
 // — Helpers —
 function jobNameFor(jobId: string): string {
@@ -864,13 +781,8 @@ function relativeTime(timestampMs: number): string {
   align-items: center;
   gap: 0.375rem;
   padding: 0.625rem 0.75rem;
-  background: color-mix(
-    in srgb,
-    var(--color-primary-600) 8%,
-    transparent
-  );
-  border: 0.0625rem solid
-    color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  background: color-mix(in srgb, var(--color-primary-600) 8%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
   border-radius: 0.3125rem;
   font-size: var(--text-xs);
   color: var(--color-text-heading, currentColor);
@@ -887,13 +799,11 @@ function relativeTime(timestampMs: number): string {
   font-size: var(--text-2xs);
 }
 
-
 .sd-code {
   margin: 0;
   padding: 0.75rem;
   background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
-  border: 0.0625rem solid
-    color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
   border-radius: 0.375rem;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -922,22 +832,13 @@ function relativeTime(timestampMs: number): string {
 .sd-versions__item {
   padding: 0.75rem 0.875rem;
   background: var(--color-card-bg);
-  border: 0.0625rem solid
-    color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
   border-radius: 0.375rem;
 }
 
 .sd-versions__item--active {
-  border-color: color-mix(
-    in srgb,
-    var(--color-primary-600) 30%,
-    transparent
-  );
-  background: color-mix(
-    in srgb,
-    var(--color-primary-600) 5%,
-    var(--color-card-bg)
-  );
+  border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+  background: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
 }
 
 .sd-versions__head {
@@ -958,11 +859,7 @@ function relativeTime(timestampMs: number): string {
   border-radius: 0.1875rem;
   font-size: var(--text-3xs);
   font-weight: 600;
-  background: color-mix(
-    in srgb,
-    var(--color-status-success-text) 14%,
-    transparent
-  );
+  background: color-mix(in srgb, var(--color-status-success-text) 14%, transparent);
   color: var(--color-status-success-text);
 }
 
@@ -1019,11 +916,7 @@ function relativeTime(timestampMs: number): string {
 
 .sd-used-list__item {
   width: 100%;
-  background: color-mix(
-    in srgb,
-    var(--color-text-secondary) 5%,
-    transparent
-  ) !important;
+  background: color-mix(in srgb, var(--color-text-secondary) 5%, transparent) !important;
   border: 0.0625rem solid transparent !important;
   border-radius: 0.3125rem !important;
   transition:
@@ -1032,16 +925,8 @@ function relativeTime(timestampMs: number): string {
 }
 
 .sd-used-list__item:hover {
-  border-color: color-mix(
-    in srgb,
-    var(--color-primary-600) 35%,
-    transparent
-  ) !important;
-  background: color-mix(
-    in srgb,
-    var(--color-primary-600) 5%,
-    transparent
-  ) !important;
+  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-primary-600) 5%, transparent) !important;
 }
 
 .sd-used-list__item:deep(button) {

@@ -47,21 +47,18 @@
             icon-left="add"
           />
         </template>
-        <ODropdownItem
-          data-test="dashboard-add-group-add-condition"
-          @select="emitAddCondition"
-        >
+        <ODropdownItem data-test="dashboard-add-group-add-condition" @select="emitAddCondition">
           {{ t("common.addCondition") }}
         </ODropdownItem>
-        <ODropdownItem
-          data-test="dashboard-add-group-add-group"
-          @select="emitAddGroup"
-        >
+        <ODropdownItem data-test="dashboard-add-group-add-group" @select="emitAddGroup">
           {{ t("common.addGroup") }}
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="border-l border-border-default flex justify-between items-center">
+    <div
+      v-if="groupNestedIndex !== 0"
+      class="border-l border-border-default flex justify-between items-center"
+    >
       <OButton
         variant="ghost"
         size="icon"
@@ -117,12 +114,7 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: [
-    "add-condition",
-    "add-group",
-    "remove-group",
-    "logical-operator-change",
-  ],
+  emits: ["add-condition", "add-group", "remove-group", "logical-operator-change"],
   setup(props, { emit }) {
     const { t } = useI18n();
     const showAddMenu = ref(false);

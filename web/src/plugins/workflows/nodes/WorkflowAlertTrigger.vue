@@ -74,9 +74,7 @@ import { buildTestSampleText } from "@/plugins/workflows/testSample";
 
 // Async like every other QueryEditor consumer — Monaco is already on this route
 // (Function node, Test dialog, Step Result drawer), so this adds no new chunk.
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const { t } = useI18n();
 

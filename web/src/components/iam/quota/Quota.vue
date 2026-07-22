@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :disabled="activeTab == 'role-limits' && !expandedRow"
                 @click="editTableWithInput"
               >
-                {{ t('iam.quotaPage.editQuota') }}
+                {{ t("iam.quotaPage.editQuota") }}
                 <template #icon-right>
                   <OIcon name="edit" size="sm" class="opacity-70" style="font-weight: 200" />
                 </template>
@@ -68,10 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex items-center justify-between w-full mb-2">
-            <div
-              v-if="selectedOrganization && activeType == 'table'"
-              class="flex items-center"
-            >
+            <div v-if="selectedOrganization && activeType == 'table'" class="flex items-center">
               <OSearchInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
@@ -97,10 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="handleApiCategorySelect"
               />
             </div>
-            <div
-              v-if="selectedOrganization"
-              class="flex items-center float-right ml-auto"
-            >
+            <div v-if="selectedOrganization" class="flex items-center float-right ml-auto">
               <div class="app-tabs-container h-9 w-fit mr-3">
                 <app-tabs
                   data-test="time-unit-tabs"
@@ -124,60 +118,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- this table for api limits -->
-      <div v-if="activeTab == 'api-limits' && activeType == 'table'" class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
-      <OTable
-        :data="apiLimitsRows"
-        :columns="generateColumns()"
-        row-key="module_name"
-        :loading="isApiLimitsLoading"
-        :global-filter="searchQuery"
-        pagination="client"
-        :page-size="20"
-        sorting="client"
-        filter-mode="client"
-        :default-columns="false"
-        :enable-column-resize="true"
-        :persist-columns="true"
-        table-id="iam-quota-api-limits"
-        :show-global-filter="false"
+      <div
+        v-if="activeTab == 'api-limits' && activeType == 'table'"
+        class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden"
       >
-        <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-api-limits"
-            :filtered="!!searchQuery"
-            :hide-action="!searchQuery"
-            @action="(id) => id === 'clear-filters' && (searchQuery = '')"
-          />
-        </template>
-        <template #bottom />
-        <template v-for="col in apiLimitCrudColumnIds" :key="col" #[`cell-${col}`]="{ row, value }">
-          <div v-if="editTable" class="bg-surface-subtle">
-            <div
-              v-if="value != '-'"
-              contenteditable="true"
-              debounce="500"
-              :class="{
-                'editable-cell': editTable,
-                'px-2.5': editTable,
-                'py-0': editTable && !isDark,
-                'edited-input': isEdited(row.module_name, col),
-                'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(row.module_name, col),
-                'p-0!': isEdited(row.module_name, col) && isDark,
-              }"
-              @input="(event: any) => handleInputChange('', row.module_name, value, col, event.target.innerText)"
-              @keypress="restrictToNumbers"
-              @paste="preventNonNumericPaste"
-            >
-              {{ changedValues[row.module_name]?.[col] ?? value }}
-            </div>
-            <div v-else>-</div>
-          </div>
-          <template v-else>
-            {{ value }}
+        <OTable
+          :data="apiLimitsRows"
+          :columns="generateColumns()"
+          row-key="module_name"
+          :loading="isApiLimitsLoading"
+          :global-filter="searchQuery"
+          pagination="client"
+          :page-size="20"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-quota-api-limits"
+          :show-global-filter="false"
+        >
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-api-limits"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+            />
           </template>
-        </template>
-      </OTable>
+          <template #bottom />
+          <template
+            v-for="col in apiLimitCrudColumnIds"
+            :key="col"
+            #[`cell-${col}`]="{ row, value }"
+          >
+            <div v-if="editTable" class="bg-surface-subtle">
+              <div
+                v-if="value != '-'"
+                contenteditable="true"
+                debounce="500"
+                :class="{
+                  'editable-cell': editTable,
+                  'px-2.5': editTable,
+                  'py-0': editTable && !isDark,
+                  'edited-input': isEdited(row.module_name, col),
+                  'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(
+                    row.module_name,
+                    col,
+                  ),
+                  'p-0!': isEdited(row.module_name, col) && isDark,
+                }"
+                @input="
+                  (event: any) =>
+                    handleInputChange('', row.module_name, value, col, event.target.innerText)
+                "
+                @keypress="restrictToNumbers"
+                @paste="preventNonNumericPaste"
+              >
+                {{ changedValues[row.module_name]?.[col] ?? value }}
+              </div>
+              <div v-else>-</div>
+            </div>
+            <template v-else>
+              {{ value }}
+            </template>
+          </template>
+        </OTable>
       </div>
 
       <div
@@ -196,7 +203,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <!-- this table for role limits -->
-       <div v-if="activeTab == 'role-limits' && activeType == 'table'"  class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+      <div
+        v-if="activeTab == 'role-limits' && activeType == 'table'"
+        class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden"
+      >
         <OTable
           :data="rolesLimitRows"
           :columns="roleLimitsColumns"
@@ -230,18 +240,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
           <template #expansion="{ row }: { row: any }">
             <template v-for="(moduleRow, index) in filteredRoleLevelModuleRows" :key="index">
-              <div v-if="!editTable" class="flex items-center px-6 py-1 text-sm border-b border-table-row-divider">
+              <div
+                v-if="!editTable"
+                class="flex items-center px-6 py-1 text-sm border-b border-table-row-divider"
+              >
                 <span class="w-50">{{ moduleRow.module_name }}</span>
                 <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
                   <template v-if="moduleRow[col] == '-'">-</template>
                   <template v-else>{{ moduleRow[col] }}</template>
                 </span>
               </div>
-              <div v-else class="flex items-center px-6 py-1 text-sm border-b border-table-row-divider">
+              <div
+                v-else
+                class="flex items-center px-6 py-1 text-sm border-b border-table-row-divider"
+              >
                 <span class="w-50">{{ moduleRow.module_name }}</span>
                 <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
                   <template v-if="moduleRow[col] == '-'">-</template>
-                  <div v-else
+                  <div
+                    v-else
                     contenteditable="true"
                     debounce="500"
                     :class="{
@@ -250,10 +267,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'py-0': !isDark,
                       'bg-surface-subtle': !isEdited(moduleRow.module_name, col),
                       'edited-input': isEdited(moduleRow.module_name, col),
-                      'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(moduleRow.module_name, col),
+                      'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(
+                        moduleRow.module_name,
+                        col,
+                      ),
                       'p-0!': isEdited(moduleRow.module_name, col) && isDark,
                     }"
-                    @input="(event: any) => handleInputChange(row.role_name, moduleRow.module_name, moduleRow[col], col, event.target.innerText)"
+                    @input="
+                      (event: any) =>
+                        handleInputChange(
+                          row.role_name,
+                          moduleRow.module_name,
+                          moduleRow[col],
+                          col,
+                          event.target.innerText,
+                        )
+                    "
                     @keypress="restrictToNumbers"
                     @paste="preventNonNumericPaste"
                     class="inline-block px-2 py-0.5"
@@ -294,18 +323,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OSpinner size="md" />
       </div>
-      <div
-        v-else-if="
-          activeTab == 'api-limits' && !loading && !selectedOrganization
-        "
-      >
+      <div v-else-if="activeTab == 'api-limits' && !loading && !selectedOrganization">
         <NoOrganizationSelected />
       </div>
-      <div
-        v-else-if="
-          activeTab == 'role-limits' && !loading && !selectedOrganization
-        "
-      >
+      <div v-else-if="activeTab == 'role-limits' && !loading && !selectedOrganization">
         <NoOrganizationSelected />
       </div>
 
@@ -313,12 +334,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="flex justify-end w-full ml-auto sticky bottom-0 top-0 z-1 mt-auto pr-3 py-2 gap-2 border-t border-border-default bg-surface-base"
         v-if="editTable && activeType == 'table'"
       >
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="cancelChanges"
-        >
-          {{ t('iam.quotaPage.cancel') }}
+        <OButton variant="outline" size="sm-action" @click="cancelChanges">
+          {{ t("iam.quotaPage.cancel") }}
         </OButton>
         <OButton
           variant="primary"
@@ -326,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="Object.keys(changedValues).length === 0"
           @click="saveChanges"
         >
-          {{ t('iam.quotaPage.save') }}
+          {{ t("iam.quotaPage.save") }}
         </OButton>
       </div>
       <div
@@ -339,7 +356,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="cancelJsonChanges"
           :disabled="isSavingJson"
         >
-          {{ t('iam.quotaPage.cancel') }}
+          {{ t("iam.quotaPage.cancel") }}
         </OButton>
         <OButton
           variant="primary"
@@ -347,7 +364,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="saveJsonChanges"
           :disabled="isSavingJson"
         >
-          {{ isSavingJson ? t('iam.quotaPage.savingChanges') : t('iam.quotaPage.saveChanges') }}
+          {{ isSavingJson ? t("iam.quotaPage.savingChanges") : t("iam.quotaPage.saveChanges") }}
         </OButton>
       </div>
     </div>
@@ -377,7 +394,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
 import { useI18n } from "vue-i18n";
 import {
   computed,
@@ -421,14 +437,12 @@ export default defineComponent({
     AppTabs,
     OPageLayout,
     ConfirmDialog,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     OEmptyState,
     OSpinner,
     OIcon,
     OTable,
-},
+  },
   setup() {
     const { t } = useI18n();
     const selectedOrganization = ref<any>(null);
@@ -504,15 +518,11 @@ export default defineComponent({
     };
 
     const apiLimitCrudColumnIds = computed(() =>
-      apiLimitsColumns.value
-        .filter((c) => c.id !== "module_name")
-        .map((c) => c.id),
+      apiLimitsColumns.value.filter((c) => c.id !== "module_name").map((c) => c.id),
     );
 
     const roleLimitCrudColumnIds = computed(() =>
-      roleLimitsColumns.value
-        .filter((c) => c.id !== "role_name")
-        .map((c) => c.id),
+      roleLimitsColumns.value.filter((c) => c.id !== "role_name").map((c) => c.id),
     );
 
     const apiLimitsColumns = computed<OTableColumnDef[]>(() => {
@@ -711,12 +721,9 @@ export default defineComponent({
         //these are the modules that are displayed in the dropdown
         //to select the api category that user can use to filter the api limits
         if (!store.state.modulesToDisplay[selectedOrganization.value.value]) {
-          apiCategories.value = await getModulesToDisplay(
-            selectedOrganization.value.value,
-          );
+          apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
         } else {
-          apiCategories.value =
-            store.state.modulesToDisplay[selectedOrganization.value.value];
+          apiCategories.value = store.state.modulesToDisplay[selectedOrganization.value.value];
         }
       }
     });
@@ -775,17 +782,14 @@ export default defineComponent({
       });
 
       if (activeTab.value === "api-limits") {
-        if (
-          !store.state.allApiLimitsByOrgId[selectedOrganization.value.value]
-        ) {
+        if (!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]) {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
           resultTotal.value = apiLimitsRows.value.length;
         } else {
-          apiLimitsRows.value =
-            store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
+          apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
           resultTotal.value = apiLimitsRows.value.length;
         }
       } else if (activeTab.value === "role-limits") {
@@ -809,9 +813,7 @@ export default defineComponent({
             label: org.name,
             value: org.identifier,
           }));
-          organizations.value.sort((a: any, b: any) =>
-            a.label.localeCompare(b.label),
-          );
+          organizations.value.sort((a: any, b: any) => a.label.localeCompare(b.label));
           isOrgLoading.value = false;
         } catch (error) {
           isOrgLoading.value = false;
@@ -855,16 +857,13 @@ export default defineComponent({
         await getRolesByOrganization();
       }
       if (tab === "api-limits") {
-        if (
-          !store.state.allApiLimitsByOrgId[selectedOrganization.value.value]
-        ) {
+        if (!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]) {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
         } else {
-          apiLimitsRows.value =
-            store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
+          apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
         }
         resultTotal.value = apiLimitsRows.value.length;
       }
@@ -1025,9 +1024,7 @@ export default defineComponent({
       } catch (error: any) {
         toast({
           variant: "error",
-          message:
-            error.response.data.message ||
-            t("iam.quotaPage.errorUpdatingRateLimits"),
+          message: error.response.data.message || t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1098,9 +1095,7 @@ export default defineComponent({
         isSavingJson.value = false;
         toast({
           variant: "error",
-          message:
-            error.response.data.message ||
-            t("iam.quotaPage.errorUpdatingRateLimits"),
+          message: error.response.data.message || t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1108,17 +1103,13 @@ export default defineComponent({
 
     const isEdited = (moduleName: string, operation: string) => {
       return (
-        changedValues.value[moduleName] &&
-        changedValues.value[moduleName][operation] !== undefined
+        changedValues.value[moduleName] && changedValues.value[moduleName][operation] !== undefined
       );
     };
 
     const generateColumns = () => {
       if (
-        Object.prototype.hasOwnProperty.call(
-          selectedOrganization.value ?? {},
-          "value",
-        ) &&
+        Object.prototype.hasOwnProperty.call(selectedOrganization.value ?? {}, "value") &&
         selectedOrganization.value.value != ""
       ) {
         return apiLimitsColumns.value;
@@ -1129,13 +1120,9 @@ export default defineComponent({
 
     const downloadTemplate = async () => {
       try {
-        const response = await ratelimitService.download_template(
-          selectedOrganization.value.value,
-        );
+        const response = await ratelimitService.download_template(selectedOrganization.value.value);
         const jsonData = JSON.stringify(response.data, null, 2);
-        const url = window.URL.createObjectURL(
-          new Blob([jsonData], { type: "application/json" }),
-        );
+        const url = window.URL.createObjectURL(new Blob([jsonData], { type: "application/json" }));
         const a = document.createElement("a");
         a.href = url;
         a.download = `rate_limit_template_${selectedOrganization.value.label}.json`;
@@ -1189,9 +1176,7 @@ export default defineComponent({
               try {
                 const parsedJson = JSON.parse(e.target.result);
                 // Convert to array if it's a single object
-                const jsonArray = Array.isArray(parsedJson)
-                  ? parsedJson
-                  : [parsedJson];
+                const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
                 resolve(jsonArray);
               } catch (error) {
                 toast({
@@ -1238,9 +1223,7 @@ export default defineComponent({
         //expand the row at first only because we need to show the loading state for the user
         expandedRow.value = row.uuid;
         if (
-          !store.state.allRoleLimitsByOrgIdByRole[
-            selectedOrganization.value.value
-          ]?.[row.role_name]
+          !store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[row.role_name]
         ) {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
@@ -1249,9 +1232,7 @@ export default defineComponent({
           );
         } else {
           roleLevelModuleRows.value =
-            store.state.allRoleLimitsByOrgIdByRole[
-              selectedOrganization.value.value
-            ][row.role_name];
+            store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][row.role_name];
         }
         filterModulesBasedOnCategory();
         // Otherwise, expand the clicked row and collapse any other row
@@ -1309,9 +1290,7 @@ export default defineComponent({
 
         // Remove keys with "-" values
         const filteredItem = Object.fromEntries(
-          Object.entries(item).filter(
-            ([k, v]) => k !== "module_name" && v !== "-",
-          ),
+          Object.entries(item).filter(([k, v]) => k !== "module_name" && v !== "-"),
         );
 
         // Assign the cleaned object to the transformed key
@@ -1341,10 +1320,7 @@ export default defineComponent({
       //if the changes are not there then we need to update the active type to table mode
       else {
         //here we are checking if any changes are made to the json string so that we can show the confirm dialog
-        let isChanged = jsonDiff(
-          jsonStrToDisplay.value,
-          transformData(apiLimitsRows.value),
-        );
+        let isChanged = jsonDiff(jsonStrToDisplay.value, transformData(apiLimitsRows.value));
         if (isChanged && editTable.value) {
           //here we store the next type to be used when the user confirms the changes
           nextType.value = type.toLowerCase();
@@ -1360,11 +1336,7 @@ export default defineComponent({
 
     const populateJsonStr = () => {
       if (activeTab.value == "api-limits") {
-        jsonStrToDisplay.value = JSON.stringify(
-          transformData(apiLimitsRows.value),
-          null,
-          2,
-        );
+        jsonStrToDisplay.value = JSON.stringify(transformData(apiLimitsRows.value), null, 2);
       } else {
         jsonStrToDisplay.value = JSON.stringify(
           transformData(filteredRoleLevelModuleRows.value),
@@ -1409,8 +1381,8 @@ export default defineComponent({
     const filterApiCategoriesToDisplayOptions = (val: any, update: any) => {
       if (val.length > 0) {
         update();
-        filteredApiCategoryToDisplayOptions.value = apiCategories.value.filter(
-          (role: any) => role.label.toLowerCase().includes(val.toLowerCase()),
+        filteredApiCategoryToDisplayOptions.value = apiCategories.value.filter((role: any) =>
+          role.label.toLowerCase().includes(val.toLowerCase()),
         );
       } else {
         update();
@@ -1433,7 +1405,8 @@ export default defineComponent({
         selectedOrganization.value = null;
         return;
       }
-      selectedOrganization.value = organizationToDisplay.value.find((o: any) => o.value === val) ?? null;
+      selectedOrganization.value =
+        organizationToDisplay.value.find((o: any) => o.value === val) ?? null;
       if (!selectedOrganization.value) return;
       await updateOrganization();
     };
@@ -1448,8 +1421,7 @@ export default defineComponent({
       if (selectedApiCategory.value?.value) {
         filteredRoleLevelModuleRows.value = roleLevelModuleRows.value.filter(
           (row: any) =>
-            row.module_name.toLowerCase() ===
-            selectedApiCategory.value?.value.toLowerCase(),
+            row.module_name.toLowerCase() === selectedApiCategory.value?.value.toLowerCase(),
         );
       } else {
         filteredRoleLevelModuleRows.value = roleLevelModuleRows.value;
@@ -1492,7 +1464,8 @@ export default defineComponent({
         const storeKey = `${openedRole.value}_${newTimeUnit}`;
         if (store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[storeKey]) {
           // Use cached data
-          roleLevelModuleRows.value = store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][storeKey];
+          roleLevelModuleRows.value =
+            store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][storeKey];
         } else {
           // Fetch from API
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
@@ -1620,7 +1593,11 @@ export default defineComponent({
   margin: 0;
 }
 
-.quota-page :deep(th:not([data-test="o2-table-th-module_name"]):not([data-test="o2-table-th-role_name"]) [data-test="o2-table-th-sort-trigger"]) {
+.quota-page
+  :deep(
+    th:not([data-test="o2-table-th-module_name"]):not([data-test="o2-table-th-role_name"])
+      [data-test="o2-table-th-sort-trigger"]
+  ) {
   justify-content: center;
 }
 </style>

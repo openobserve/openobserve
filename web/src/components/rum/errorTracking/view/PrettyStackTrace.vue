@@ -21,13 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="isLoadingTranslation"
       data-test="rum-pretty-stack-trace-loading"
       class="loading-container p-6 text-center min-h-50 flex flex-col items-center justify-center rounded-default"
-      :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
+      :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
       <OSpinner variant="dots" size="lg" />
-      <div class="mt-3 text-text-secondary font-medium" style="font-size: var(--text-sm);">
+      <div class="mt-3 text-text-secondary font-medium" style="font-size: var(--text-sm)">
         {{ t("rum.translatingStackTrace") }}
       </div>
-      <div class="mt-1 text-text-secondary" style="font-size: var(--text-xs);">
+      <div class="mt-1 text-text-secondary" style="font-size: var(--text-xs)">
         {{ t("rum.translatingStackTraceHint") }}
       </div>
     </div>
@@ -37,16 +37,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-else-if="allSourceInfoNull"
       data-test="rum-pretty-stack-trace-unavailable"
       class="no-source-maps-container p-3 text-center flex flex-col items-center justify-center rounded-default py-5 px-6"
-      :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
+      :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
       <OIcon name="code-off" size="lg" class="mb-2" />
       <div class="text-base font-medium text-text-secondary mb-1">
         {{ t("rum.sourceMapsNotAvailable") }}
       </div>
-      <div class="text-sm text-text-secondary" style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact);">
+      <div
+        class="text-sm text-text-secondary"
+        style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact)"
+      >
         {{ t("rum.sourceMapsNotAvailableBody") }}
       </div>
-      <div v-if="props.error.service || props.error.version" class="flex items-center justify-center gap-2 mt-2 mb-2">
+      <div
+        v-if="props.error.service || props.error.version"
+        class="flex items-center justify-center gap-2 mt-2 mb-2"
+      >
         <span
           v-if="props.error.service"
           class="service-version-badge service-badge inline-flex items-center gap-1 py-1 px-2.5 rounded-default text-xs font-medium bg-badge-purple-soft-bg text-badge-purple-soft-text"
@@ -86,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="error-header px-3 py-2 font-bold border border-solid rounded-t-default text-sm font-semibold [letter-spacing:0.01em] !px-4 !py-2.5 [box-shadow:0_1px_2px_rgba(0,0,0,0.05)] -mb-px"
           :style="{
             'background-color': errorHeaderBackground,
-            'color': errorHeaderColor,
+            color: errorHeaderColor,
             'border-color': borderColor,
           }"
         >
@@ -135,22 +141,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="source-context !px-4 !pb-4 !pt-0 bg-code-block-bg"
           >
             <!-- File location -->
-            <div class="source-location-header text-text-secondary text-xs !mb-2.5 text-2xs font-semibold [letter-spacing:0.02em] opacity-80">
-              {{ t("rum.stackLine") }} {{ stackTrace.stack[0].source_info.stack_line }}:{{ stackTrace.stack[0].source_info.stack_col }}
+            <div
+              class="source-location-header text-text-secondary text-xs !mb-2.5 text-2xs font-semibold [letter-spacing:0.02em] opacity-80"
+            >
+              {{ t("rum.stackLine") }} {{ stackTrace.stack[0].source_info.stack_line }}:{{
+                stackTrace.stack[0].source_info.stack_col
+              }}
               <span class="ml-1">
-                ({{ t("rum.stackLines") }} {{ stackTrace.stack[0].source_info.source_line_start }}-{{ stackTrace.stack[0].source_info.source_line_end }})
+                ({{ t("rum.stackLines") }}
+                {{ stackTrace.stack[0].source_info.source_line_start }}-{{
+                  stackTrace.stack[0].source_info.source_line_end
+                }})
               </span>
             </div>
 
             <!-- Source code snippet with syntax highlighting -->
-            <div class="source-code-box border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
+            <div
+              class="source-code-box border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+              :style="{ 'border-color': borderColor }"
+            >
               <CodeQueryEditor
                 :ref="(el: any) => setEditorRef(traceIndex, 0, el)"
                 :editor-id="`source-frame-${traceIndex}-0`"
                 :query="stackTrace.stack[0].source_info.source"
                 :read-only="true"
                 language="javascript"
-                style="height: 200px;"
+                style="height: 200px"
               />
             </div>
           </div>
@@ -175,11 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
-            <OIcon
-              name="expand-more"
-              size="xs"
-              class="mr-1"
-            />
+            <OIcon name="expand-more" size="xs" class="mr-1" />
             <span class="text-xs text-text-secondary">
               {{
                 stackTrace.stack.length - 1 > 1
@@ -205,7 +217,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="collapsed-frame-content flex items-center gap-2">
                   <OIcon
-                    :name="isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'"
+                    :name="
+                      isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'
+                    "
                     size="xs"
                     class="mr-1 text-icon-color"
                   />
@@ -225,21 +239,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="isFrameExpanded(traceIndex, frameIndex + 1) && frame.source_info"
                 class="source-context !px-4 !pb-4 !pt-0 bg-code-block-bg"
               >
-                <div class="source-location-header text-text-secondary text-xs !mb-2.5 ml-4 text-2xs font-semibold [letter-spacing:0.02em] opacity-80">
-                  {{ t("rum.stackLine") }} {{ frame.source_info.stack_line }}:{{ frame.source_info.stack_col }}
+                <div
+                  class="source-location-header text-text-secondary text-xs !mb-2.5 ml-4 text-2xs font-semibold [letter-spacing:0.02em] opacity-80"
+                >
+                  {{ t("rum.stackLine") }} {{ frame.source_info.stack_line }}:{{
+                    frame.source_info.stack_col
+                  }}
                   <span class="ml-1">
-                    ({{ t("rum.stackLines") }} {{ frame.source_info.source_line_start }}-{{ frame.source_info.source_line_end }})
+                    ({{ t("rum.stackLines") }} {{ frame.source_info.source_line_start }}-{{
+                      frame.source_info.source_line_end
+                    }})
                   </span>
                 </div>
 
-                <div class="source-code-box ml-4 border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
+                <div
+                  class="source-code-box ml-4 border border-solid rounded-default h-50 overflow-hidden [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+                  :style="{ 'border-color': borderColor }"
+                >
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"
                     :query="frame.source_info.source"
                     :read-only="true"
                     language="javascript"
-                    style="height: 200px;"
+                    style="height: 200px"
                   />
                 </div>
               </div>
@@ -268,7 +291,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 
 import {
   generateCacheKey,
@@ -335,7 +358,7 @@ const allSourceInfoNull = computed(() => {
   if (translatedStackTrace.value.length === 0) return false;
 
   return translatedStackTrace.value.every((trace) =>
-    trace.stack.every((frame) => !frame.source_info)
+    trace.stack.every((frame) => !frame.source_info),
   );
 });
 
@@ -400,13 +423,14 @@ const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
   // Relative position = stack_line - source_line_start + 1
   const relativeLineNumber = stack_line - source_line_start;
 
-
   // Use the decorateRanges method to highlight the error line
   if (editorComponent.decorateRanges) {
-    editorComponent.decorateRanges([{
-      startLine: relativeLineNumber,
-      endLine: relativeLineNumber,
-    }]);
+    editorComponent.decorateRanges([
+      {
+        startLine: relativeLineNumber,
+        endLine: relativeLineNumber,
+      },
+    ]);
   }
 };
 
@@ -435,7 +459,7 @@ const translateStackTrace = async () => {
       store.state.selectedOrganization.identifier,
       service,
       version,
-      env
+      env,
     );
 
     // Check cache first
@@ -472,13 +496,11 @@ const translateStackTrace = async () => {
       payload.env = env;
     }
 
-
     // Call the API
     const response = await sourcemapsService.translateStackTrace(
       store.state.selectedOrganization.identifier,
-      payload
+      payload,
     );
-
 
     if (response.data && response.data.stacktrace) {
       // Check if stacktrace is already an array, if not wrap it in an array
@@ -508,9 +530,7 @@ const translateStackTrace = async () => {
     console.error("Error response:", error?.response);
     console.error("Error response data:", error?.response?.data);
     translationError.value =
-      error?.response?.data?.message ||
-      error?.message ||
-      t("rum.failedToTranslateStackTrace");
+      error?.response?.data?.message || error?.message || t("rum.failedToTranslateStackTrace");
   } finally {
     isLoadingTranslation.value = false;
   }
@@ -549,6 +569,6 @@ watch(
   () => props.error_stack,
   () => {
     translateStackTrace();
-  }
+  },
 );
 </script>

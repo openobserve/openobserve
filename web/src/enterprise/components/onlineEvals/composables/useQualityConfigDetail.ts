@@ -57,11 +57,7 @@ function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
 }
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
@@ -93,9 +89,7 @@ function unhealthyExprFor(config: ScoreConfig): UnhealthyExpr {
     if (!Array.isArray(list) || list.length === 0) {
       return { expr: null, contextLabel: "" };
     }
-    const inList = list
-      .map((c) => `'${escapeSqlString(String(c))}'`)
-      .join(", ");
+    const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
     return {
       expr: `value_categorical NOT IN (${inList})`,
       contextLabel: `Healthy ∈ {${list.join(", ")}}`,
@@ -166,12 +160,7 @@ export function useQualityConfigDetail(
   const booleanAgg = ref<BooleanAggRow | null>(null);
   const categoricalRows = ref<CategoricalAggRow[]>([]);
 
-  async function runQuery<T>(
-    sqlText: string,
-    label: string,
-    startUs: number,
-    endUs: number,
-  ) {
+  async function runQuery<T>(sqlText: string, label: string, startUs: number, endUs: number) {
     try {
       const hits = await executeQuery(sqlText, startUs, endUs, "logs");
       console.debug(`[QualityDetail:${label}]`, { hitCount: hits.length });
@@ -216,12 +205,7 @@ export function useQualityConfigDetail(
         booleanAgg.value = null;
         categoricalRows.value = [];
       } else if (type === "boolean") {
-        const hits = await runQuery<BooleanAggRow>(
-          booleanSql(where),
-          "boolean",
-          startUs,
-          endUs,
-        );
+        const hits = await runQuery<BooleanAggRow>(booleanSql(where), "boolean", startUs, endUs);
         booleanAgg.value = hits[0] ?? null;
         numericAgg.value = null;
         categoricalRows.value = [];
@@ -250,14 +234,12 @@ export function useQualityConfigDetail(
     void refresh();
   });
 
-  const dataType = computed<"numeric" | "boolean" | "categorical" | "unknown">(
-    () => {
-      if (!selectedConfig.value) return "unknown";
-      const t = dataTypeOf(selectedConfig.value);
-      if (t === "numeric" || t === "boolean" || t === "categorical") return t;
-      return "unknown";
-    },
-  );
+  const dataType = computed<"numeric" | "boolean" | "categorical" | "unknown">(() => {
+    if (!selectedConfig.value) return "unknown";
+    const t = dataTypeOf(selectedConfig.value);
+    if (t === "numeric" || t === "boolean" || t === "categorical") return t;
+    return "unknown";
+  });
 
   const kpis = computed<DetailKpi[]>(() => {
     const cfg = selectedConfig.value;
@@ -270,9 +252,7 @@ export function useQualityConfigDetail(
       const unhealthy = toNumber(agg?.unhealthy);
       const range = valueOf<any>(cfg, "numericRange", "numeric_range");
       const rangeText =
-        range && range.min != null && range.max != null
-          ? `Range ${range.min}–${range.max}`
-          : "";
+        range && range.min != null && range.max != null ? `Range ${range.min}–${range.max}` : "";
       const cards: DetailKpi[] = [
         {
           id: "avg",
@@ -300,8 +280,7 @@ export function useQualityConfigDetail(
         cards.push({
           id: "unhealthy",
           titleKey: "unhealthy",
-          value:
-            total > 0 && unhealthy != null ? (unhealthy / total) * 100 : null,
+          value: total > 0 && unhealthy != null ? (unhealthy / total) * 100 : null,
           context: u.contextLabel,
           format: "percent",
         });
@@ -347,13 +326,9 @@ export function useQualityConfigDetail(
     }
 
     if (dataType.value === "categorical") {
-      const total = categoricalRows.value.reduce(
-        (s, r) => s + (toNumber(r.c) ?? 0),
-        0,
-      );
+      const total = categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0);
       const ht = valueOf<any>(cfg, "healthyThreshold", "healthy_threshold");
-      const healthyCats: string[] =
-        ht?.healthy_categories || ht?.healthyCategories || [];
+      const healthyCats: string[] = ht?.healthy_categories || ht?.healthyCategories || [];
       let healthyCount = 0;
       let unhealthyCount = 0;
       for (const r of categoricalRows.value) {
@@ -369,8 +344,7 @@ export function useQualityConfigDetail(
           id: "healthy",
           titleKey: "healthy",
           value: total > 0 ? (healthyCount / total) * 100 : null,
-          context:
-            healthyCats.length > 0 ? healthyCats.join(" · ") : "no threshold",
+          context: healthyCats.length > 0 ? healthyCats.join(" · ") : "no threshold",
           format: "percent",
         },
         {
@@ -397,14 +371,10 @@ export function useQualityConfigDetail(
   // the detail panel's empty state so a freshly-created (but never-scored)
   // config reads as "waiting for scores" instead of a wall of dashes.
   const hasScores = computed<boolean>(() => {
-    if (dataType.value === "numeric")
-      return (toNumber(numericAgg.value?.total) ?? 0) > 0;
-    if (dataType.value === "boolean")
-      return (toNumber(booleanAgg.value?.total) ?? 0) > 0;
+    if (dataType.value === "numeric") return (toNumber(numericAgg.value?.total) ?? 0) > 0;
+    if (dataType.value === "boolean") return (toNumber(booleanAgg.value?.total) ?? 0) > 0;
     if (dataType.value === "categorical")
-      return (
-        categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0) > 0
-      );
+      return categoricalRows.value.reduce((s, r) => s + (toNumber(r.c) ?? 0), 0) > 0;
     return false;
   });
 

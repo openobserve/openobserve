@@ -6,7 +6,10 @@
     class="home-view-skeleton w-full h-full flex flex-col px-page-edge pt-2 pb-1 overflow-hidden"
   >
     <!-- Streams section header -->
-    <div data-test="home-view-skeleton-streams-header" class="flex items-center justify-between mb-2">
+    <div
+      data-test="home-view-skeleton-streams-header"
+      class="flex items-center justify-between mb-2"
+    >
       <div class="flex items-center gap-2">
         <OSkeleton class="w-8 h-8" />
         <OSkeleton type="text" class="w-24 h-5" />
@@ -31,7 +34,9 @@
     </div>
 
     <!-- Main region: resources rail + two status-chart cards -->
-    <div class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)] gap-3 flex-1 min-h-0">
+    <div
+      class="grid grid-cols-1 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)] gap-3 flex-1 min-h-0"
+    >
       <!-- Resources rail -->
       <div
         data-test="home-view-skeleton-rail"

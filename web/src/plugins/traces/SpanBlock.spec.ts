@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-
 const mockStore = createStore({
   state: {
     theme: "light",
@@ -165,8 +164,7 @@ describe("SpanBlock", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-        },
+        stubs: {},
       },
     });
 
@@ -194,9 +192,7 @@ describe("SpanBlock", () => {
     expect(spanMarker().exists()).toBe(true);
     expect(spanMarker().attributes("style")).toContain(`width: 91.72%`);
     expect(spanMarker().attributes("style")).toContain(`left: 0%`);
-    expect(spanMarker().attributes("style")).toContain(
-      `height: ${mockSpanDimensions.barHeight}px`,
-    );
+    expect(spanMarker().attributes("style")).toContain(`height: ${mockSpanDimensions.barHeight}px`);
   });
 
   it("should display duration text", () => {
@@ -272,8 +268,7 @@ describe("SpanBlock", () => {
           provide: {
             store: mockStore,
           },
-          stubs: {
-          },
+          stubs: {},
         },
       });
     });
@@ -285,9 +280,7 @@ describe("SpanBlock", () => {
 
     it("should apply defocus class when span is not selected", async () => {
       await flushPromises();
-      const spanBlock = newWrapper.find(
-        '[data-test="span-block-select-trigger"]',
-      );
+      const spanBlock = newWrapper.find('[data-test="span-block-select-trigger"]');
       expect(spanBlock.classes()).toContain("opacity-30");
     });
 
@@ -300,9 +293,7 @@ describe("SpanBlock", () => {
 
     describe("When span is clicked", async () => {
       beforeEach(async () => {
-        const spanBlock = newWrapper.find(
-          '[data-test="span-block-select-trigger"]',
-        );
+        const spanBlock = newWrapper.find('[data-test="span-block-select-trigger"]');
         await spanBlock.trigger("click");
       });
 
@@ -519,9 +510,7 @@ describe("SpanBlock", () => {
 
     it("span-marker height should match spanDimensions.barHeight", () => {
       const marker = wrapper.find('[data-test="span-marker"]');
-      expect(marker.attributes("style")).toContain(
-        `height: ${mockSpanDimensions.barHeight}px`,
-      );
+      expect(marker.attributes("style")).toContain(`height: ${mockSpanDimensions.barHeight}px`);
     });
 
     it("inner color div should use span.style.color as background", () => {

@@ -17,14 +17,7 @@
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  watch,
-  onUnmounted,
-  nextTick,
-} from "vue";
+import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 import * as echarts from "echarts/core";
 import { MapChart } from "echarts/charts";
 import worldMap from "@/assets/dashboard/maps/map.json";
@@ -62,7 +55,7 @@ export default defineComponent({
         echarts.registerMap("world", worldMap as any);
 
         // Default empty chart configuration to ensure map is visible
-    
+
         chart.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
       }
     };
@@ -92,7 +85,7 @@ export default defineComponent({
             chart?.setOption(withChartFont(newOptions), true);
           } else {
             // If no data provided, set a default empty map
-            
+
             chart?.setOption(withChartFont(DEFAULT_MAP_OPTIONS), true);
           }
         }

@@ -133,10 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OEmptyState>
 
     <!-- Detail panel + buttons (outside OEmptyState — avoids its overflow:hidden) -->
-    <div
-      v-if="hasAnyContent"
-      class="w-full max-w-2xl mx-auto px-6 flex flex-col gap-3"
-    >
+    <div v-if="hasAnyContent" class="w-full max-w-2xl mx-auto px-6 flex flex-col gap-3">
       <ErrorDetailPanel
         :summary-line="summaryLine"
         :detail-body="detailBody"
@@ -165,7 +162,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="w-4 h-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]" alt="" />
+            <img
+              :src="aiIconSrc"
+              class="w-4 h-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+              alt=""
+            />
           </template>
           {{ t("queryError.askAi") }}
         </OButton>
@@ -194,18 +195,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- ── BLOCK layout (dashboard panels, alerts) ───────────────────────── -->
-  <div
-    v-else
-    class="w-full flex flex-col gap-3 p-4"
-    data-test="query-error-state"
-  >
+  <div v-else class="w-full flex flex-col gap-3 p-4" data-test="query-error-state">
     <!-- Title row -->
     <div class="flex items-start gap-2">
-      <OIcon
-        name="error-outline"
-        size="sm"
-        class="text-status-error shrink-0 mt-0.5"
-      />
+      <OIcon name="error-outline" size="sm" class="text-status-error shrink-0 mt-0.5" />
       <div class="flex flex-col gap-0.5 min-w-0">
         <p class="text-sm font-semibold text-text-body m-0">
           {{ resolvedTitle }}
@@ -236,9 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="rounded-default bg-surface-panel border border-border-default px-3 py-2 max-h-40 overflow-y-auto"
         data-test="query-error-detail-expanded"
       >
-        <p
-          class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all"
-        >
+        <p class="text-xs font-mono text-text-secondary m-0 whitespace-pre-wrap break-all">
           {{ detailBody }}
         </p>
       </div>
@@ -388,9 +379,7 @@ const {
 
 const { t } = useI18n();
 const resolvedTitle = computed(() => props.title ?? defaultTitle.value);
-const resolvedDescription = computed(
-  () => props.description ?? defaultDescription.value,
-);
+const resolvedDescription = computed(() => props.description ?? defaultDescription.value);
 
 // ── Copy feedback — show "Copied!" for 2 s after the user clicks ───────────
 

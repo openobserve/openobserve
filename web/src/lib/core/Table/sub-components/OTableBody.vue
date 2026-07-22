@@ -55,11 +55,7 @@ const props = defineProps<{
   /** Enable click-to-copy on cell values */
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
-  getCellStyle?: (params: {
-    columnId: string;
-    row: any;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
 }>();
 
 const emit = defineEmits<{
@@ -69,9 +65,7 @@ const emit = defineEmits<{
   "row-dblclick": [row: any, event: MouseEvent];
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
-  "cell-click": [
-    params: { columnId: string; row: any; value: any },
-  ];
+  "cell-click": [params: { columnId: string; row: any; value: any }];
   "row-reorder": [data: any[]];
 }>();
 
@@ -83,8 +77,8 @@ const allRowsDisabled = computed(() => {
   return props.rows.every((r) => props.disableRowReorder!(r.original));
 });
 
-const rowReorderEnabled = computed(() =>
-  props.enableRowReorder && !props.globalFilterActive && !allRowsDisabled.value
+const rowReorderEnabled = computed(
+  () => props.enableRowReorder && !props.globalFilterActive && !allRowsDisabled.value,
 );
 
 // ── Row reorder state ──────────────────────────────────────────────
@@ -188,11 +182,7 @@ function getRowForItem(item: any): Row<any> {
       @cell-click="emit('cell-click', $event)"
     >
       <!-- Pass through named cell slots from parent -->
-      <template
-        v-for="(_, slotName) in slots"
-        :key="slotName"
-        #[slotName]="slotProps"
-      >
+      <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
         <slot :name="slotName" v-bind="slotProps" />
       </template>
       <template v-if="slots.expansion" #expansion="expSlotProps">
@@ -202,10 +192,7 @@ function getRowForItem(item: any): Row<any> {
   </VueDraggableNext>
 
   <!-- Normal (non-virtual, non-draggable) body -->
-  <tbody
-    v-else-if="!isVirtual()"
-    data-test="o2-table-body"
-  >
+  <tbody v-else-if="!isVirtual()" data-test="o2-table-body">
     <OTableBodyRow
       v-for="row in rows"
       :key="row.id"
@@ -242,11 +229,7 @@ function getRowForItem(item: any): Row<any> {
       @cell-click="emit('cell-click', $event)"
     >
       <!-- Pass through named cell slots from parent -->
-      <template
-        v-for="(_, slotName) in slots"
-        :key="slotName"
-        #[slotName]="slotProps"
-      >
+      <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
         <slot :name="slotName" v-bind="slotProps" />
       </template>
       <template v-if="slots.expansion" #expansion="expSlotProps">
@@ -258,20 +241,16 @@ function getRowForItem(item: any): Row<any> {
   <!-- Virtual scroll body: rows stay in flow; top/bottom spacer rows
        reserve the offset above first and below last visible row so cells
        inherit the parent table's column layout (same as non-virtual). -->
-  <tbody
-    v-else
-    data-test="o2-table-body"
-  >
-    <tr
-      v-if="virtualRows && virtualRows.length && virtualRows[0].start > 0"
-      aria-hidden="true"
-    >
-      <td :style="{ height: `${virtualRows[0].start + (baseOffset ?? 0)}px`, padding: 0, border: 0 }" />
+  <tbody v-else data-test="o2-table-body">
+    <tr v-if="virtualRows && virtualRows.length && virtualRows[0].start > 0" aria-hidden="true">
+      <td
+        :style="{ height: `${virtualRows[0].start + (baseOffset ?? 0)}px`, padding: 0, border: 0 }"
+      />
     </tr>
 
     <OTableBodyRow
       v-for="virtualRow in virtualRows"
-      :key="(virtualRow.key as string | number)"
+      :key="virtualRow.key as string | number"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
       :table="table"
@@ -281,7 +260,11 @@ function getRowForItem(item: any): Row<any> {
       :is-row-selected="isRowSelectedFn?.(getRowForIndex(virtualRow.index)?.original)"
       :is-row-selectable="isRowSelectable"
       :expansion-enabled="expansionEnabled"
-      :can-expand="getRowExpansionEnabled ? getRowExpansionEnabled(getRowForIndex(virtualRow.index)?.original) : true"
+      :can-expand="
+        getRowExpansionEnabled
+          ? getRowExpansionEnabled(getRowForIndex(virtualRow.index)?.original)
+          : true
+      "
       :is-expanded="isExpandedFn?.(getRowForIndex(virtualRow.index)?.original)"
       :highlight-text="highlightText"
       :should-highlight-column="shouldHighlightColumn"
@@ -302,11 +285,7 @@ function getRowForItem(item: any): Row<any> {
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
     >
-      <template
-        v-for="(_, slotName) in slots"
-        :key="slotName"
-        #[slotName]="slotProps"
-      >
+      <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
         <slot :name="slotName" v-bind="slotProps" />
       </template>
       <template v-if="slots.expansion" #expansion="expSlotProps">
@@ -314,10 +293,7 @@ function getRowForItem(item: any): Row<any> {
       </template>
     </OTableBodyRow>
 
-    <tr
-      v-if="virtualRows && virtualRows.length && totalSize"
-      aria-hidden="true"
-    >
+    <tr v-if="virtualRows && virtualRows.length && totalSize" aria-hidden="true">
       <td
         :style="{
           height: `${Math.max(0, totalSize - (virtualRows[virtualRows.length - 1].start + virtualRows[virtualRows.length - 1].size))}px`,

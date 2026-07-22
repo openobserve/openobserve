@@ -17,144 +17,157 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex flex-col h-full p-0">
     <template v-if="!showImportRegexPatternDialog">
-    <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-    <OPageLayout
-      :title="t('regex_patterns.title')"
-      icon="pattern"
-      :subtitle="t('settings.regexPatternList.subtitle')"
-      bleed
-    >
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          @click="importRegexPattern"
-          data-test="regex-pattern-list-import"
-        >{{ t("regex_patterns.import") }}</OButton>
-        <OButton
-          data-test="regex-pattern-list-add-pattern-btn"
-          variant="primary"
-          size="sm"
-          @click="createRegexPattern"
-        >{{ t("regex_patterns.create_pattern") }}</OButton>
-      </template>
-    <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
-    <OTable
-      :frame="false"
-      data-test="regex-pattern-list-table"
-      :data="visibleRows"
-      :columns="columns"
-      row-key="id"
-      :selected-ids="selectedPatternIds"
-      selection="multiple"
-      pagination="client"
-      :page-size="20"
-      :page-size-options="[10, 20, 50, 100]"
-      sorting="client"
-      filter-mode="client"
-      :default-columns="false"
-      show-index
-      :enable-column-resize="true"
-      :persist-columns="true"
-      table-id="settings-regex-patterns"
-      :show-global-filter="false"
-      :loading="listLoading"
-      @update:selected-ids="handleSelectedIdsUpdate"
-    >
-      <template #toolbar>
-        <OSearchInput
-          v-model="filterQuery"
-          class="flex-1"
-          :placeholder="t('regex_patterns.search')"
-        />
-      </template>
-      <template #toolbar-trailing>
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="listLoading"
-          data-test="regex-pattern-list-refresh-btn"
-          @click="getRegexPatterns"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="regexPatternsRefresh" />
-        </OButton>
-      </template>
-      <template #empty>
-        <OEmptyState
-          v-if="!listLoading"
-          size="hero"
-          preset="no-regex-patterns"
-          :filtered="filterQuery !== ''"
-          @action="(id) => id === 'clear-filters' ? (filterQuery = '') : id === 'import' ? importRegexPattern() : createRegexPattern()"
-        />
-      </template>
-      <template #cell-pattern="{ row }">
-        <OCodeCell :value="row.pattern" />
-      </template>
-      <template #cell-created_at="{ row }">
-        <OTimeCell :value="row.created_at" unit="iso" :timezone="store.state.timezone" />
-      </template>
-      <template #cell-updated_at="{ row }">
-        <OTimeCell :value="row.updated_at" unit="iso" :timezone="store.state.timezone" />
-      </template>
-      <template #cell-actions="{ row }">
-        <div class="flex items-center gap-1 justify-center">
+      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
+      <OPageLayout
+        :title="t('regex_patterns.title')"
+        icon="pattern"
+        :subtitle="t('settings.regexPatternList.subtitle')"
+        bleed
+      >
+        <template #actions>
           <OButton
-            :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
-            data-row-action="export"
-            variant="ghost"
-            size="icon-sm"
-            :title="t('settings.regexPatternList.exportTitle')"
-            @click.stop="exportRegexPattern(row)"
-            icon-left="download"
-          />
-          <OButton
-            :data-test="`regex-pattern-list-${row.id}-update-regex-pattern`"
-            data-row-action="edit"
-            variant="ghost"
-            size="icon-sm"
-            :title="t('regex_patterns.edit')"
-            @click.stop="editRegexPattern(row)"
-            icon-left="edit"
-          />
-          <OButton
-            :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern`"
-            data-row-action="delete"
-            variant="ghost-destructive"
-            size="icon-sm"
-            :title="t('regex_patterns.delete')"
-            @click.stop="confirmDeleteRegexPattern(row)"
-            icon-left="delete"
-          />
-        </div>
-      </template>
-      <template #bottom>
-        <div class="flex items-center gap-2">
-          <span class="text-xs font-normal">
-            {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
-          </span>
-          <OButton
-            v-if="selectedPatterns.length > 0"
-            data-test="regex-pattern-list-delete-patterns-btn"
-            variant="outline-destructive"
-            size="sm-action"
-            icon-left="delete"
-            @click="openBulkDeleteDialog"
+            variant="outline"
+            size="sm"
+            @click="importRegexPattern"
+            data-test="regex-pattern-list-import"
+            >{{ t("regex_patterns.import") }}</OButton
           >
-            {{ t("settings.regexPatternList.delete") }}
-          </OButton>
+          <OButton
+            data-test="regex-pattern-list-add-pattern-btn"
+            variant="primary"
+            size="sm"
+            @click="createRegexPattern"
+            >{{ t("regex_patterns.create_pattern") }}</OButton
+          >
+        </template>
+        <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
+          <OTable
+            :frame="false"
+            data-test="regex-pattern-list-table"
+            :data="visibleRows"
+            :columns="columns"
+            row-key="id"
+            :selected-ids="selectedPatternIds"
+            selection="multiple"
+            pagination="client"
+            :page-size="20"
+            :page-size-options="[10, 20, 50, 100]"
+            sorting="client"
+            filter-mode="client"
+            :default-columns="false"
+            show-index
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="settings-regex-patterns"
+            :show-global-filter="false"
+            :loading="listLoading"
+            @update:selected-ids="handleSelectedIdsUpdate"
+          >
+            <template #toolbar>
+              <OSearchInput
+                v-model="filterQuery"
+                class="flex-1"
+                :placeholder="t('regex_patterns.search')"
+              />
+            </template>
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="listLoading"
+                data-test="regex-pattern-list-refresh-btn"
+                @click="getRegexPatterns"
+              >
+                <OTooltip
+                  side="bottom"
+                  :content="t('common.refresh')"
+                  shortcut-id="regexPatternsRefresh"
+                />
+              </OButton>
+            </template>
+            <template #empty>
+              <OEmptyState
+                v-if="!listLoading"
+                size="hero"
+                preset="no-regex-patterns"
+                :filtered="filterQuery !== ''"
+                @action="
+                  (id) =>
+                    id === 'clear-filters'
+                      ? (filterQuery = '')
+                      : id === 'import'
+                        ? importRegexPattern()
+                        : createRegexPattern()
+                "
+              />
+            </template>
+            <template #cell-pattern="{ row }">
+              <OCodeCell :value="row.pattern" />
+            </template>
+            <template #cell-created_at="{ row }">
+              <OTimeCell :value="row.created_at" unit="iso" :timezone="store.state.timezone" />
+            </template>
+            <template #cell-updated_at="{ row }">
+              <OTimeCell :value="row.updated_at" unit="iso" :timezone="store.state.timezone" />
+            </template>
+            <template #cell-actions="{ row }">
+              <div class="flex items-center gap-1 justify-center">
+                <OButton
+                  :data-test="`regex-pattern-list-${row.id}-export-regex-pattern`"
+                  data-row-action="export"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('settings.regexPatternList.exportTitle')"
+                  @click.stop="exportRegexPattern(row)"
+                  icon-left="download"
+                />
+                <OButton
+                  :data-test="`regex-pattern-list-${row.id}-update-regex-pattern`"
+                  data-row-action="edit"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('regex_patterns.edit')"
+                  @click.stop="editRegexPattern(row)"
+                  icon-left="edit"
+                />
+                <OButton
+                  :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern`"
+                  data-row-action="delete"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('regex_patterns.delete')"
+                  @click.stop="confirmDeleteRegexPattern(row)"
+                  icon-left="delete"
+                />
+              </div>
+            </template>
+            <template #bottom>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-normal">
+                  {{ resultTotal }} {{ t("regex_patterns.bottom_header") }}
+                </span>
+                <OButton
+                  v-if="selectedPatterns.length > 0"
+                  data-test="regex-pattern-list-delete-patterns-btn"
+                  variant="outline-destructive"
+                  size="sm-action"
+                  icon-left="delete"
+                  @click="openBulkDeleteDialog"
+                >
+                  {{ t("settings.regexPatternList.delete") }}
+                </OButton>
+              </div>
+            </template>
+          </OTable>
         </div>
-      </template>
-    </OTable>
-    </div>
-    </OPageLayout>
+      </OPageLayout>
     </template>
     <ImportRegexPattern
       v-else-if="showImportRegexPatternDialog"
       @cancel:hideform="showImportRegexPatternDialog = false"
       @update:list="getRegexPatterns"
-      :regex-patterns="regexPatterns.map(pattern => pattern.name)"
+      :regex-patterns="regexPatterns.map((pattern) => pattern.name)"
     />
     <ConfirmDialog
       v-model="deleteDialog.show"
@@ -292,7 +305,6 @@ export default defineComponent({
 
     const resultTotal = ref(0);
 
-
     const listLoading = ref(false);
 
     const showImportRegexPatternDialog = ref(false);
@@ -303,9 +315,7 @@ export default defineComponent({
       isEdit: false,
     });
 
-    const selectedPatternIds = computed(() =>
-      selectedPatterns.value.map((p: any) => p.id),
-    );
+    const selectedPatternIds = computed(() => selectedPatterns.value.map((p: any) => p.id));
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const map = new Map(regexPatterns.value.map((r: any) => [r.id, r]));
@@ -319,16 +329,10 @@ export default defineComponent({
         regexPatterns.value = store.state.organizationData.regexPatterns;
         resultTotal.value = regexPatterns.value.length;
       }
-      if (
-        router.currentRoute.value.query.from == "logs" &&
-        config.isEnterprise == "true"
-      ) {
+      if (router.currentRoute.value.query.from == "logs" && config.isEnterprise == "true") {
         createRegexPattern();
       }
-      if (
-        router.currentRoute.value.query.action == "import" &&
-        config.isEnterprise == "true"
-      ) {
+      if (router.currentRoute.value.query.action == "import" && config.isEnterprise == "true") {
         importRegexPattern();
       }
     });
@@ -427,11 +431,7 @@ export default defineComponent({
           description: row.description,
         };
 
-        const regexPatternJson = JSON.stringify(
-          regexPatternToBeExported,
-          null,
-          2,
-        );
+        const regexPatternJson = JSON.stringify(regexPatternToBeExported, null, 2);
         const blob = new Blob([regexPatternJson], {
           type: "application/json",
         });
@@ -477,9 +477,7 @@ export default defineComponent({
     };
 
     const bulkDeleteRegexPatterns = async () => {
-      const patternIds = selectedPatterns.value.map(
-        (pattern: any) => pattern.id,
-      );
+      const patternIds = selectedPatterns.value.map((pattern: any) => pattern.id);
 
       try {
         const res = await regexPatternsService.bulkDelete(
@@ -495,7 +493,10 @@ export default defineComponent({
           });
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
-            message: t("settings.regexPatternList.bulkDeletePartial", { successful: successful.length, unsuccessful: unsuccessful.length }),
+            message: t("settings.regexPatternList.bulkDeletePartial", {
+              successful: successful.length,
+              unsuccessful: unsuccessful.length,
+            }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
@@ -523,7 +524,12 @@ export default defineComponent({
     };
 
     useShortcuts([
-      { id: "regexPatternsRefresh", handler: () => { if (!isInputFocused()) getRegexPatterns(); } },
+      {
+        id: "regexPatternsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getRegexPatterns();
+        },
+      },
     ]);
 
     return {

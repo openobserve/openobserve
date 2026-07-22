@@ -31,9 +31,7 @@ defineSlots<TimeSlots>();
 const _fallbackId = useId();
 const inputId = computed(() => props.id ?? _fallbackId);
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 // ── Popover state ──────────────────────────────────────────────
@@ -42,7 +40,7 @@ const popoverOpen = ref(false);
 // ── Analog clock state ─────────────────────────────────────────
 type ClockMode = "hour" | "minute" | "second";
 const clockMode = ref<ClockMode>("hour");
-const internalHour = ref(0);   // 0-23
+const internalHour = ref(0); // 0-23
 const internalMinute = ref(0); // 0-59
 const internalSecond = ref(0); // 0-59
 
@@ -115,8 +113,7 @@ const handPos = computed(() => {
   if (clockMode.value === "hour") {
     index = internalHour.value % 12;
   } else {
-    const val =
-      clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
+    const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
     index = Math.floor(val / 5) % 12;
   }
   return calcPos(index, 12, HAND_RADIUS);
@@ -126,8 +123,7 @@ function isClockNumSelected(num: ClockNum): boolean {
   if (clockMode.value === "hour") {
     return (internalHour.value % 12 || 12) === num.value;
   }
-  const val =
-    clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
+  const val = clockMode.value === "minute" ? internalMinute.value : internalSecond.value;
   return Math.floor(val / 5) * 5 === num.value;
 }
 
@@ -137,9 +133,7 @@ function onClockClick(num: ClockNum) {
 
   if (clockMode.value === "hour") {
     const h12 = num.value;
-    const h24 = isAM.value
-      ? h12 === 12 ? 0 : h12
-      : h12 === 12 ? 12 : h12 + 12;
+    const h24 = isAM.value ? (h12 === 12 ? 0 : h12) : h12 === 12 ? 12 : h12 + 12;
     internalHour.value = h24;
     clockMode.value = "minute";
     emitCurrentValue();
@@ -183,15 +177,9 @@ function emitCurrentValue() {
 }
 
 // ── Header display ─────────────────────────────────────────────
-const displayHour = computed(() =>
-  String(internalHour.value % 12 || 12).padStart(2, "0"),
-);
-const displayMinute = computed(() =>
-  String(internalMinute.value).padStart(2, "0"),
-);
-const displaySecond = computed(() =>
-  String(internalSecond.value).padStart(2, "0"),
-);
+const displayHour = computed(() => String(internalHour.value % 12 || 12).padStart(2, "0"));
+const displayMinute = computed(() => String(internalMinute.value).padStart(2, "0"));
+const displaySecond = computed(() => String(internalSecond.value).padStart(2, "0"));
 
 // ── Clear ──────────────────────────────────────────────────────
 function handleClear(e: Event) {
@@ -245,14 +233,16 @@ const fieldClasses = computed(() => [
       :for="inputId"
       class="o-input-label text-sm font-semibold leading-tight flex items-center gap-1"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
         class="cursor-help text-datepicker-label"
-      ><slot name="tooltip" /></OIcon>
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <PopoverRoot v-model:open="popoverOpen">
@@ -307,7 +297,9 @@ const fieldClasses = computed(() => [
             class="size-3.5"
             aria-hidden="true"
           >
-            <path d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z" />
+            <path
+              d="M3.72 3.72a.75.75 0 0 1 1.06 0L8 6.94l3.22-3.22a.75.75 0 1 1 1.06 1.06L9.06 8l3.22 3.22a.75.75 0 1 1-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 0 1-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 0 1 0-1.06Z"
+            />
           </svg>
         </button>
       </div>
@@ -335,8 +327,12 @@ const fieldClasses = computed(() => [
               ]"
               :aria-label="`Hour: ${displayHour}`"
               @click="clockMode = 'hour'"
-            >{{ displayHour }}</button>
-            <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none">:</span>
+            >
+              {{ displayHour }}
+            </button>
+            <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none"
+              >:</span
+            >
             <button
               type="button"
               :class="[
@@ -347,9 +343,13 @@ const fieldClasses = computed(() => [
               ]"
               :aria-label="`Minute: ${displayMinute}`"
               @click="clockMode = 'minute'"
-            >{{ displayMinute }}</button>
+            >
+              {{ displayMinute }}
+            </button>
             <template v-if="withSeconds">
-              <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none">:</span>
+              <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none"
+                >:</span
+              >
               <button
                 type="button"
                 :class="[
@@ -360,7 +360,9 @@ const fieldClasses = computed(() => [
                 ]"
                 :aria-label="`Second: ${displaySecond}`"
                 @click="clockMode = 'second'"
-              >{{ displaySecond }}</button>
+              >
+                {{ displaySecond }}
+              </button>
             </template>
           </div>
 
@@ -378,7 +380,9 @@ const fieldClasses = computed(() => [
               ]"
               aria-label="AM"
               @click="setAM"
-            >AM</button>
+            >
+              AM
+            </button>
             <div class="w-px bg-datepicker-border shrink-0" aria-hidden="true" />
             <button
               type="button"
@@ -390,7 +394,9 @@ const fieldClasses = computed(() => [
               ]"
               aria-label="PM"
               @click="setPM"
-            >PM</button>
+            >
+              PM
+            </button>
           </div>
         </div>
 
@@ -437,9 +443,11 @@ const fieldClasses = computed(() => [
                 :cx="num.x"
                 :cy="num.y"
                 r="15"
-                :class="isClockNumSelected(num)
-                  ? 'fill-datepicker-clock-selected-bg'
-                  : 'fill-transparent group-hover:fill-datepicker-clock-hover-bg'"
+                :class="
+                  isClockNumSelected(num)
+                    ? 'fill-datepicker-clock-selected-bg'
+                    : 'fill-transparent group-hover:fill-datepicker-clock-hover-bg'
+                "
               />
               <text
                 :x="num.x"
@@ -448,10 +456,14 @@ const fieldClasses = computed(() => [
                 dominant-baseline="central"
                 font-size="13"
                 class="pointer-events-none select-none"
-                :class="isClockNumSelected(num)
-                  ? 'fill-datepicker-clock-selected-text'
-                  : 'fill-datepicker-day-text'"
-              >{{ num.label }}</text>
+                :class="
+                  isClockNumSelected(num)
+                    ? 'fill-datepicker-clock-selected-text'
+                    : 'fill-datepicker-day-text'
+                "
+              >
+                {{ num.label }}
+              </text>
             </g>
           </svg>
         </div>
@@ -499,15 +511,14 @@ const fieldClasses = computed(() => [
             class="text-xs font-medium text-datepicker-day-selected-bg outline-none ring-offset-1 ring-offset-surface-base hover:opacity-80 focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-[box-shadow] duration-150"
             data-test="otime-close"
             @click="popoverOpen = false"
-          >Close</button>
+          >
+            Close
+          </button>
         </div>
       </PopoverContent>
     </PopoverRoot>
 
-    <div
-      v-if="effectiveError || helpText"
-      class="flex items-center gap-2"
-    >
+    <div v-if="effectiveError || helpText" class="flex items-center gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
         class="text-xs text-datepicker-error-text leading-none"
@@ -515,10 +526,7 @@ const fieldClasses = computed(() => [
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="text-xs text-datepicker-label leading-none"
-      >
+      <span v-else-if="helpText" class="text-xs text-datepicker-label leading-none">
         {{ helpText }}
       </span>
     </div>

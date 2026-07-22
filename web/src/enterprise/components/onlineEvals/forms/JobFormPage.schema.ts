@@ -46,10 +46,7 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
     })
     .superRefine((val, ctx) => {
       // Sampling value is required unless the mode is "all" (which ignores it).
-      if (
-        val.samplingMode !== "all" &&
-        String(val.samplingValue ?? "").trim().length === 0
-      ) {
+      if (val.samplingMode !== "all" && String(val.samplingValue ?? "").trim().length === 0) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["samplingValue"],

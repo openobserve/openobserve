@@ -46,7 +46,7 @@ const pageSizeModel = computed({
 });
 
 const pageSizeSelectOptions = computed(() =>
-  props.pageSizeOptions.map((n) => ({ label: String(n), value: n }))
+  props.pageSizeOptions.map((n) => ({ label: String(n), value: n })),
 );
 </script>
 
@@ -71,9 +71,7 @@ const pageSizeSelectOptions = computed(() =>
         data-test="o2-table-pagination-count-skel"
       />
       <slot v-else-if="slots.actions" name="actions" />
-      <span v-else>
-        {{ totalCount.toLocaleString() }} {{ title }}
-      </span>
+      <span v-else> {{ totalCount.toLocaleString() }} {{ title }} </span>
     </div>
 
     <!-- Right: controls -->
@@ -89,7 +87,8 @@ const pageSizeSelectOptions = computed(() =>
         class="text-primary text-xs whitespace-nowrap"
         data-test="o2-table-pagination-info"
       >
-        {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }} {{ totalCount.toLocaleString() }}
+        {{ t("search.showing") }} {{ showingFrom }} - {{ showingTo }} {{ t("search.of") }}
+        {{ totalCount.toLocaleString() }}
       </span>
       <div class="w-px h-4 bg-border-default shrink-0" v-if="pageSizeOptions.length > 0" />
       <div v-if="pageSizeOptions.length > 0" class="flex items-center gap-1.5 text-primary text-xs">
@@ -155,6 +154,8 @@ const pageSizeSelectOptions = computed(() =>
    `[animation:…]` utility it has to override. `.o2-pag-skel` is this
    component's own element, so scoping is safe. */
 @media (prefers-reduced-motion: reduce) {
-  .o2-pag-skel { animation: none; }
+  .o2-pag-skel {
+    animation: none;
+  }
 }
 </style>

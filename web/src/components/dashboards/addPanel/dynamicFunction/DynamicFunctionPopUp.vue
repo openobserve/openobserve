@@ -1,17 +1,23 @@
 ﻿<template>
   <div
     data-test="dynamic-function-popup-root"
-    :class="
-      !customQuery && !fields.isDerived
-        ? 'flex gap-2'
-        : 'flex flex-col gap-y-2'
-    "
+    :class="!customQuery && !fields.isDerived ? 'flex gap-2' : 'flex flex-col gap-y-2'"
   >
     <div class="w-auto shrink-0">
-      <div class="font-semibold text-compact pb-3" data-test="dynamic-function-popup-property-label">{{ t('dashboard.dynamicFunctionPopUp.property') }}</div>
+      <div
+        class="font-semibold text-compact pb-3"
+        data-test="dynamic-function-popup-property-label"
+      >
+        {{ t("dashboard.dynamicFunctionPopUp.property") }}
+      </div>
       <div class="flex flex-col gap-3.5">
         <div>
-          <div class="text-compact font-normal leading-[70%] pb-0.75" data-test="dynamic-function-popup-label-text">{{ t('dashboard.dynamicFunctionPopUp.label') }}</div>
+          <div
+            class="text-compact font-normal leading-[70%] pb-0.75"
+            data-test="dynamic-function-popup-label-text"
+          >
+            {{ t("dashboard.dynamicFunctionPopUp.label") }}
+          </div>
           <OInput
             v-model="fields.label"
             size="sm"
@@ -20,7 +26,9 @@
           />
         </div>
         <div>
-          <div class="text-compact font-normal leading-[70%] pb-0.75">{{ t('dashboard.dynamicFunctionPopUp.alias') }}</div>
+          <div class="text-compact font-normal leading-[70%] pb-0.75">
+            {{ t("dashboard.dynamicFunctionPopUp.alias") }}
+          </div>
           <OInput
             v-model="fields.alias"
             size="sm"
@@ -66,14 +74,12 @@
 
       <OSeparator v-if="!customQuery && !fields.isDerived" />
 
-      <OTabPanels
-        v-if="!customQuery && !fields.isDerived"
-        v-model="fields.type"
-        animated
-      >
+      <OTabPanels v-if="!customQuery && !fields.isDerived" v-model="fields.type" animated>
         <OTabPanel name="build">
           <div class="pt-2 max-h-105 overflow-auto">
-            <div class="font-semibold text-compact pb-3">{{ t('dashboard.dynamicFunctionPopUp.configuration') }}</div>
+            <div class="font-semibold text-compact pb-3">
+              {{ t("dashboard.dynamicFunctionPopUp.configuration") }}
+            </div>
             <SelectFunction
               v-model="fields"
               data-test="dynamic-function-popup-select-function"
@@ -95,12 +101,9 @@
         </OTabPanel>
       </OTabPanels>
 
-      <div
-        class="pt-2 pr-3"
-        v-if="!customQuery && !fields.isDerived && allowAggregation"
-      >
+      <div class="pt-2 pr-3" v-if="!customQuery && !fields.isDerived && allowAggregation">
         <div class="flex items-center gap-2 mb-2">
-          <span class="font-bold">{{ t('dashboard.dynamicFunctionPopUp.having') }}</span>
+          <span class="font-bold">{{ t("dashboard.dynamicFunctionPopUp.having") }}</span>
 
           <OButton
             variant="outline"
@@ -110,14 +113,11 @@
             data-test="dynamic-function-popup-having-add-btn"
             icon-left="add"
           >
-            {{ t('dashboard.dynamicFunctionPopUp.add') }}
+            {{ t("dashboard.dynamicFunctionPopUp.add") }}
           </OButton>
         </div>
 
-        <div
-          class="flex space-x-2 items-center"
-          v-if="isHavingFilterVisible()"
-        >
+        <div class="flex space-x-2 items-center" v-if="isHavingFilterVisible()">
           <OSelect
             v-model="getHavingCondition().operator"
             :options="havingOperators"
@@ -223,11 +223,7 @@ export default {
 
     // if functionName property is missing for build type, selected function Name will be None -> null
     // Ensure functionName property exists for build type fields
-    if (
-      fields.value &&
-      fields.value.type === "build" &&
-      !("functionName" in fields.value)
-    ) {
+    if (fields.value && fields.value.type === "build" && !("functionName" in fields.value)) {
       fields.value.functionName = null;
     }
 
@@ -282,9 +278,7 @@ export default {
     };
 
     const getHavingCondition = () => {
-      return (
-        fields.value.havingConditions?.[0] || { operator: null, value: null }
-      );
+      return fields.value.havingConditions?.[0] || { operator: null, value: null };
     };
 
     return {

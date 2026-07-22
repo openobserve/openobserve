@@ -63,9 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Shared node typography (0.9375rem = the old 15px / bold / left) lives
          here so every #body slot inherits it — wrappers supply content, not
          styling. Changing it here changes every node type at once. -->
-    <div
-      class="flow-node__container text-left min-w-0 text-sm! font-bold! leading-[1.4]!"
-    >
+    <div class="flow-node__container text-left min-w-0 text-sm! font-bold! leading-[1.4]!">
       <slot name="body" />
     </div>
 
@@ -114,7 +112,5 @@ const props = withDefaults(
   },
 );
 
-const handleClass = computed(
-  () => `node_handle_custom handle_${props.ioType || "default"}`,
-);
+const handleClass = computed(() => `node_handle_custom handle_${props.ioType || "default"}`);
 </script>

@@ -141,12 +141,7 @@ import Sortable from "sortablejs";
 import { useI18n } from "vue-i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
-import {
-  deleteTab,
-  editTab,
-  getDashboard,
-  updateDashboard,
-} from "@/utils/commons";
+import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -307,9 +302,7 @@ export default defineComponent({
               t("dashboard.tabsSettings.tabReorderFailed"),
           );
         } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"),
-          );
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
         }
         emit("refresh");
         await getDashboardData();
@@ -319,11 +312,7 @@ export default defineComponent({
     const editItem = (tabId: any) => {
       editTabId.value = tabId;
       editTabObj.data = JSON.parse(
-        JSON.stringify(
-          currentDashboardData.data.tabs.find(
-            (tab: any) => tab.tabId === tabId,
-          ),
-        ),
+        JSON.stringify(currentDashboardData.data.tabs.find((tab: any) => tab.tabId === tabId)),
       );
     };
 
@@ -355,9 +344,7 @@ export default defineComponent({
               t("dashboard.tabsSettings.tabUpdationFailed"),
           );
         } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"),
-          );
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
         }
 
         emit("refresh");
@@ -407,9 +394,7 @@ export default defineComponent({
               t("dashboard.tabsSettings.tabDeletionFailed"),
           );
         } else {
-          showErrorNotification(
-            error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"),
-            {
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {
             timeout: 2000,
           });
         }
