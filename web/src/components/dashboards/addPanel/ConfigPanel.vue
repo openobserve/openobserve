@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="dashboardPanelData.data.type == 'custom_chart'" class="pb-8">
     <div class="max-w-75 mx-3">
-      <div class="mb-2 font-semibold">
+      <div class="mb-1.5 text-compact font-medium text-input-label-text">
         {{ t("dashboard.description") }}
       </div>
       <OTextarea
@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="pb-8">
     <!-- Search bar -->
     <div
-      class="sticky p-1 top-0 z-20 bg-card-glass-solid border-b border-solid border-card-glass-border"
+      class="sticky p-1 top-0 z-20 bg-card-glass-solid"
       data-test="dashboard-config-search-wrapper"
     >
       <div class="flex flex-nowrap items-center gap-1">
@@ -74,12 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionGeneral')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <div
           v-show="isConfigOptionVisible('general', 'description')"
           class="max-w-75"
         >
-          <div class="mb-2 font-semibold">
+          <div class="mb-1.5 text-compact font-medium text-input-label-text">
             {{ t("dashboard.description") }}
           </div>
           <OTextarea
@@ -113,7 +113,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Panel Default Time Configuration -->
         <div
           v-show="isConfigOptionVisible('general', 'panel-default-time')"
-          class="mb-2"
         >
           <div class="flex items-center">
             <OSwitch
@@ -138,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div v-if="useDefaultTime" class="mt-2">
-            <div class="font-bold mb-1">
+            <div class="mb-1.5 text-compact font-medium text-input-label-text">
               {{ t("dashboard.defaultDuration") }}
             </div>
             <div
@@ -208,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionPromqlTable')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <PromQLChartConfig
           :chart-type="dashboardPanelData.data.type"
           :is-config-option-visible="isConfigOptionVisible"
@@ -234,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionGeographic')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <PromQLChartConfig :chart-type="dashboardPanelData.data.type" />
       </div>
     </OCollapsible>
@@ -252,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLegend')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OSwitch
           v-if="shouldShowLegendsToggle(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'show-legends')"
@@ -445,7 +444,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :items="dashboardSelectfieldPromQlList"
           search-regex="(?:{([^}]*)(?:{.*})*$|([a-zA-Z-_]+)$)"
-          class="mt-2"
           :value-replace-fn="selectPromQlNameOption"
           data-test="dashboard-config-promql-legend"
         >
@@ -480,7 +478,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionData')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OSelect
           v-show="isConfigOptionVisible('data', 'unit')"
           v-model="dashboardPanelDataModel.data.config.unit"
@@ -568,9 +566,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             dashboardPanelData.data.type != 'maps'
           "
           v-show="isConfigOptionVisible('data', 'query-label')"
-          class="mt-3"
         >
-          <div class="flex items-center gap-1 mb-2 font-semibold">
+          <div class="flex items-center gap-1 mb-1.5 text-compact font-medium text-input-label-text">
             {{ t("dashboard.multiSqlQueryLabel") }}
             <OIcon name="info-outline" size="sm" />
             <OTooltip
@@ -725,7 +722,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionAxis')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OInput
           v-if="shouldShowAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('axis', 'axis-width')"
@@ -827,7 +824,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLabels')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OSelect
           v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('labels', 'label-position')"
@@ -939,7 +936,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLineStyle')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OSelect
           v-if="shouldShowAreaLineStyleConfig(dashboardPanelData)"
           v-show="isConfigOptionVisible('lineStyle', 'symbol')"
@@ -1000,7 +997,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionTable')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OSwitch
           v-show="isConfigOptionVisible('table', 'wrap')"
           v-model="dashboardPanelDataModel.data.config.wrap_table_cells"
@@ -1080,7 +1077,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionPivotTable')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OSwitch
           v-if="!promqlMode && isPivotMode"
           v-show="isConfigOptionVisible('pivotTable', 'pivot-show-row-totals')"
@@ -1210,7 +1207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <ValueMapping />
       </div>
     </OCollapsible>
@@ -1238,7 +1235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OverrideConfig
           :dashboardPanelData="dashboardPanelData"
           :panelData="panelData"
@@ -1263,7 +1260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionMap')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="o2-input flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="o2-input flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <div v-if="dashboardPanelData.data.type == 'maps'">
           <OSelect
             v-model="dashboardPanelDataModel.data.config.map_type.type"
@@ -1452,7 +1449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionGauge')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <OInput
           v-show="isConfigOptionVisible('gauge', 'gauge-min')"
           v-model.number="
@@ -1517,7 +1514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionLayout')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <div v-show="isConfigOptionVisible('layout', 'trellis-layout')">
           <OSelect
             :label="t('dashboard.trellisLayout')"
@@ -1646,7 +1643,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionColors')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <ColorPaletteDropDown />
         <ColorBySeries :colorBySeriesData="panelData" />
       </div>
@@ -1679,7 +1676,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <Drilldown :variablesData="variablesData" />
       </div>
     </OCollapsible>
@@ -1717,7 +1714,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <CustomDateTimePicker
           modelValue="0m"
           :isFirstEntry="true"
@@ -1783,7 +1780,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           max-width="250px"
         />
       </template>
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <MarkLineConfig />
       </div>
     </OCollapsible>
@@ -1802,7 +1799,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :label="t('dashboard.configSectionBackground')"
       class="border-t border-solid border-card-glass-border"
     >
-      <div class="flex flex-col gap-3 p-2 ml-3 overflow-x-hidden box-border">
+      <div class="flex flex-col gap-2.5 px-3 py-2.5 overflow-x-hidden box-border">
         <BackGroundColorConfig />
       </div>
     </OCollapsible>
