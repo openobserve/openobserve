@@ -552,7 +552,7 @@ const openDetail = (monitor: any) => {
   const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name }
   if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt)
   router.push({
-    name: 'synthetics-monitor-results',
+    name: 'synthetic-monitor-results',
     params: { id: String(monitor.id) },
     query,
   });
