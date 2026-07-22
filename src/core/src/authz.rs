@@ -156,7 +156,6 @@ pub async fn check_permissions(
     true
 }
 
-#[cfg(feature = "enterprise")]
 pub async fn list_objects_for_user(
     org_id: &str,
     user_id: &str,
@@ -164,14 +163,4 @@ pub async fn list_objects_for_user(
     object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
     db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn list_objects_for_user(
-    _org_id: &str,
-    _user_id: &str,
-    _permission: &str,
-    _object_type: &str,
-) -> anyhow::Result<Option<Vec<String>>> {
-    db::authz::list_objects_for_user(_org_id, _user_id, _permission, _object_type).await
 }

@@ -30,15 +30,28 @@ pub async fn clean() {
     loop {
         interval.tick().await;
         let limit_time = chrono::Utc::now().timestamp_micros() - duration_limit;
-        match db::workflows::delete_runs_and_errors_older_than(limit_time).await {
-            Ok((errors, runs)) => {
-                log::info!("cleaned {errors} old entries for workflow errors");
-                log::info!("cleaned {runs} old entries for workflow run data");
-            }
+
+        let errors = match db::workflows::delete_errors_older_than(limit_time).await {
+            Ok(v) => v,
             Err(e) => {
-                log::error!("error cleaning workflow data older than {limit_time}: {e}");
+                log::error!(
+                    "error listing workflow errors older than {limit_time} for cleanup : {e}"
+                );
+                continue;
             }
-        }
+        };
+        log::info!("cleaned {errors} old entries for workflow errors");
+
+        let runs = match db::workflows::delete_runs_older_than(limit_time).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!(
+                    "error listing workflow runs older than {limit_time} for cleanup : {e}"
+                );
+                continue;
+            }
+        };
+        log::info!("cleaned {runs} old entries for workflow run data");
     }
 }
 
@@ -54,17 +67,29 @@ pub async fn send_workflow_trigger(trigger: WorkflowTrigger) -> Result<(), anyho
         .await?;
 
     let config = o2_enterprise::enterprise::common::config::get_config();
-    if config.super_cluster.enabled
-        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::send_workflow_trigger(
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::send_workflow_trigger(
             serde_json::to_string(&trigger)?,
         )
         .await
-    {
-        log::error!(
-            "error sending workflow trigger to super cluster for workflow {} trace {}: {e}",
-            trigger.workflow_id,
-            trigger.trace_id
-        );
+        {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow trigger notification to super cluster queue for type: {:?} workflow_id: {} trace_id: {}",
+                    trigger.trigger_type,
+                    trigger.workflow_id,
+                    trigger.trace_id
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow trigger notification to super cluster queue for type: {:?} workflow_id: {} trace_id: {} : {e}",
+                    trigger.trigger_type,
+                    trigger.workflow_id,
+                    trigger.trace_id
+                );
+            }
+        }
     }
     Ok(())
 }

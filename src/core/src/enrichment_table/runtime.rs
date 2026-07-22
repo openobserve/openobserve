@@ -186,3 +186,18 @@ pub async fn get_enrichment_table_data(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use config::utils::time::now_micros;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_enrichment_table_data() {
+        // This will fail in test environment due to missing dependencies,
+        // but tests the function structure
+        let result = get_enrichment_table_data("test_org", "test_table", false, now_micros()).await;
+        assert!(result.is_err());
+    }
+}

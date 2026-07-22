@@ -159,12 +159,14 @@ pub async fn update_error_input_file_cluster_data(
     Ok(())
 }
 
-pub async fn delete_runs_and_errors_older_than(
-    limit_time: i64,
-) -> Result<(usize, usize), anyhow::Error> {
-    let error_entries = infra::table::workflows::delete_all_errors_older_than(limit_time).await?;
-    let run_entries = infra::table::workflows::delete_all_runs_older_than(limit_time).await?;
-    Ok((error_entries.len(), run_entries.len()))
+pub async fn delete_errors_older_than(limit_time: i64) -> Result<usize, anyhow::Error> {
+    let entries = infra::table::workflows::delete_all_errors_older_than(limit_time).await?;
+    Ok(entries.len())
+}
+
+pub async fn delete_runs_older_than(limit_time: i64) -> Result<usize, anyhow::Error> {
+    let entries = infra::table::workflows::delete_all_runs_older_than(limit_time).await?;
+    Ok(entries.len())
 }
 
 pub async fn watch() -> Result<(), anyhow::Error> {
