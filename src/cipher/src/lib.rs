@@ -13,10 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Background jobs kept separate from the request-serving frontends.
+#[cfg(feature = "enterprise")]
+mod enterprise;
+#[cfg(feature = "enterprise")]
+pub mod registry;
 
-#![recursion_limit = "256"]
-
-pub use openobserve_core::{common, service};
-
-pub mod job;
+#[cfg(feature = "enterprise")]
+pub use enterprise::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};

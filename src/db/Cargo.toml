@@ -8,6 +8,8 @@ publish = false
 [features]
 default = []
 enterprise = [
+    "dep:openobserve-cipher",
+    "openobserve-cipher/enterprise",
     "dep:o2_enterprise",
     "dep:o2_openfga",
     "common/enterprise",
@@ -22,6 +24,7 @@ arrow.workspace = true
 arrow-schema.workspace = true
 bytes.workspace = true
 chrono.workspace = true
+openobserve-cipher = { workspace = true, optional = true }
 common.workspace = true
 config.workspace = true
 cron.workspace = true

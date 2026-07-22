@@ -15,15 +15,15 @@
 
 use std::sync::Arc;
 
-pub use ::db::keys::{CIPHER_KEY_PREFIX, add, remove, update};
+use ::openobserve_cipher::registry::REGISTRY;
 use infra::db::Event;
 use o2_enterprise::enterprise::cipher::CipherData;
 
-use crate::cipher::registry::REGISTRY;
+use super::CIPHER_KEY_PREFIX;
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let prefix = CIPHER_KEY_PREFIX;
-    let cluster_coordinator = ::db::get_coordinator().await;
+    let cluster_coordinator = crate::get_coordinator().await;
     let mut events = cluster_coordinator.watch(prefix).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching cipher keys");

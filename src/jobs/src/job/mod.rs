@@ -32,8 +32,6 @@ use crate::{
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
-#[cfg(feature = "enterprise")]
-mod cipher;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -940,8 +938,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
-        tokio::task::spawn(cipher::run());
-        tokio::task::spawn(crate::service::keys::watch());
+        tokio::task::spawn(db::keys::cache());
+        tokio::task::spawn(db::keys::watch());
         tokio::task::spawn(org_storage::run());
         tokio::task::spawn(crate::service::org_storage_providers::watch());
         tokio::task::spawn(crate::service::workflows::runtime::clean());

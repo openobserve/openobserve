@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::openobserve_cipher::registry::REGISTRY;
 use infra::table::cipher::{self, ListFilter};
 use o2_enterprise::enterprise::cipher::CipherData;
 
-use crate::cipher::registry::REGISTRY;
-
-pub async fn run() -> Result<(), anyhow::Error> {
+pub async fn cache() -> Result<(), anyhow::Error> {
     log::info!("retrieving and caching cipher keys in memory");
     let filter = ListFilter {
         org: None,

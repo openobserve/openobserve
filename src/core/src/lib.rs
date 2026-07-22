@@ -17,9 +17,6 @@
 
 #![recursion_limit = "256"]
 
-#[cfg(feature = "enterprise")]
-pub use ::search::cipher;
-
 pub mod alerts;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
@@ -46,8 +43,6 @@ pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
 pub mod ingestion_types;
-#[cfg(feature = "enterprise")]
-pub mod keys;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;

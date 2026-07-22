@@ -29,7 +29,7 @@ pub use crate::{
 };
 #[cfg(feature = "enterprise")]
 pub use crate::{
-    anomaly_detection, keys, llm_evaluations, ofga, org_storage_providers, providers, ratelimit,
+    anomaly_detection, llm_evaluations, ofga, org_storage_providers, providers, ratelimit,
     search_jobs, workflows,
 };
 #[cfg(feature = "cloud")]

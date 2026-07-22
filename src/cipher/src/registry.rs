@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock as Lazy;
+use std::sync::LazyLock;
 
 use hashbrown::HashMap;
 use o2_enterprise::enterprise::cipher::Cipher;
 use parking_lot::RwLock;
 
-pub static REGISTRY: Lazy<RwLock<Registry>> = Lazy::new(|| RwLock::new(Registry::new()));
+pub static REGISTRY: LazyLock<RwLock<Registry>> = LazyLock::new(|| RwLock::new(Registry::new()));
 
 #[derive(Default)]
 pub struct Registry {

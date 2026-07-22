@@ -3618,6 +3618,7 @@ dependencies = [
  "log",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-cipher",
  "parquet",
  "proto",
  "rayon",
@@ -6862,6 +6863,7 @@ dependencies = [
  "openobserve-api-common",
  "openobserve-api-management",
  "openobserve-api-query",
+ "openobserve-cipher",
  "openobserve-core",
  "openobserve-mcp",
  "opentelemetry",
@@ -6971,6 +6973,18 @@ dependencies = [
  "tower",
  "tracing",
  "transform",
+ "utoipa",
+]
+
+[[package]]
+name = "openobserve-cipher"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.16.1",
+ "o2_enterprise",
+ "parking_lot 0.12.5",
+ "serde",
+ "serde_json",
  "utoipa",
 ]
 
@@ -9687,6 +9701,7 @@ dependencies = [
  "memchr",
  "o2_enterprise",
  "object_store",
+ "openobserve-cipher",
  "opentelemetry",
  "parking_lot 0.12.5",
  "parquet",
