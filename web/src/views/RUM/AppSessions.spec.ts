@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { nextTick } from "vue";
 import AppSessions from "./AppSessions.vue";
+import searchService from "@/services/search";
 
 // Mock the composables
 const mockSessionState = {
@@ -385,13 +386,14 @@ describe("AppSessions.vue", () => {
     it("should initialize with correct columns structure", () => {
       const columns = wrapper.vm.tableColumns;
 
-      expect(columns).toHaveLength(6);
+      expect(columns).toHaveLength(7);
       expect(columns[0].id).toBe("action_play");
       expect(columns[1].id).toBe("session");
-      expect(columns[2].id).toBe("activity");
-      expect(columns[3].id).toBe("health");
-      expect(columns[4].id).toBe("location");
-      expect(columns[5].id).toBe("duration");
+      expect(columns[2].id).toBe("platform");
+      expect(columns[3].id).toBe("activity");
+      expect(columns[4].id).toBe("health");
+      expect(columns[5].id).toBe("location");
+      expect(columns[6].id).toBe("duration");
     });
 
     it("should fetch stream fields on mount", async () => {
@@ -935,6 +937,254 @@ describe("AppSessions.vue", () => {
       expect(wrapper.findComponent({ name: "FrustrationBadge" }).exists()).toBe(
         false,
       );
+    });
+  });
+
+  describe("platform column", () => {
+    // OTable stub used only by this describe block: unlike the shared OTable
+    // stub (which only exposes the "health"/"location" scoped slots), these
+    // tests need the "cell-platform" slot rendered for every row in `data`
+    // so the platform label produced by classifySource() is actually visible.
+    const buildPlatformStubs = () => ({
+      OButton: {
+        template:
+          '<button data-test-stub="o-button" v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+        emits: ["click"],
+      },
+      OSplitter: {
+        template:
+          '<div data-test-stub="o-splitter"><slot name="before" /><slot name="after" /></div>',
+        props: ["modelValue", "unit", "horizontal"],
+      },
+      OIcon: {
+        template: '<span data-test-stub="o-icon" v-bind="$attrs"></span>',
+        props: ["name", "size"],
+      },
+      OTable: {
+        template:
+          '<div data-test="rum-sessions-table" v-bind="$attrs"><div v-for="row in data" :key="row.session_id"><slot name="cell-platform" :row="row" /></div></div>',
+        props: [
+          "data",
+          "columns",
+          "loading",
+          "rowKey",
+          "columnVisibility",
+          "getRowStatusColor",
+        ],
+      },
+      DateTime: {
+        template:
+          '<div data-test="date-time" v-bind="$attrs" @on:date-change="$emit(\'on:date-change\', $event)"></div>',
+        props: [
+          "autoApply",
+          "defaultType",
+          "defaultAbsoluteTime",
+          "defaultRelativeTime",
+        ],
+        emits: ["on:date-change"],
+      },
+      SyntaxGuide: { template: '<div data-test="syntax-guide"></div>' },
+      QueryEditor: {
+        template:
+          '<div data-test="query-editor" v-bind="$attrs" @update:query="$emit(\'update:query\', $event)"></div>',
+        props: ["query", "editorId", "debounceTime"],
+        emits: ["update:query"],
+      },
+      SearchFieldList: {
+        template:
+          '<div data-test="field-list" v-bind="$attrs" @event-emitted="$emit(\'event-emitted\', $event)"></div>',
+        props: ["fields", "timeStamp", "streamName"],
+        emits: ["event-emitted"],
+      },
+      FrustrationBadge: {
+        template:
+          '<div data-test-stub="frustration-badge" v-bind="$attrs"></div>',
+        props: ["count"],
+      },
+      SessionLocationColumn: {
+        template:
+          '<div data-test="session-location-column" v-bind="$attrs"></div>',
+        props: ["column"],
+      },
+      NoData: { template: '<div data-test-stub="no-data" />' },
+    });
+
+    // Remounts AppSessions with the platform-aware OTable stub. The default
+    // beforeEach's OTable stub only exposes the "health"/"location" scoped
+    // slots, so these tests need their own mount to render "cell-platform".
+    beforeEach(async () => {
+      wrapper.unmount();
+
+      wrapper = mount(AppSessions, {
+        props: { isSessionReplayEnabled: true },
+        global: {
+          plugins: [store, router, i18n],
+          stubs: buildPlatformStubs(),
+        },
+      });
+
+      await flushPromises();
+      await nextTick();
+    });
+
+    // Directly drives the rendered platform cell from a single session row —
+    // sidesteps the multi-call async search-service chain (window aggregate +
+    // main _rumdata query + _sessionreplay query) that populates `rows` in
+    // production, matching the existing spec's established pattern of setting
+    // `wrapper.vm.rows` directly (see "Error Handling" -> "should handle search
+    // service errors gracefully").
+    const setSessionRow = async (source: string | undefined) => {
+      wrapper.vm.rows = [
+        {
+          session_id: "session-1",
+          source,
+          error_count: 0,
+          frustration_count: 0,
+          events: 2,
+          time_spent: 5000,
+        },
+      ];
+
+      await nextTick();
+    };
+
+    it("renders React Native as the platform label when source is react-native", async () => {
+      // Act
+      await setSessionRow("react-native");
+
+      // Assert
+      const platformText = wrapper.find(
+        '[data-test="rum-app-sessions-platform-text"]',
+      );
+      expect(platformText.exists()).toBe(true);
+      expect(platformText.text()).toBe("React Native");
+    });
+
+    it("renders iOS as the platform label when source is ios", async () => {
+      // Act
+      await setSessionRow("ios");
+
+      // Assert
+      const platformText = wrapper.find(
+        '[data-test="rum-app-sessions-platform-text"]',
+      );
+      expect(platformText.exists()).toBe(true);
+      expect(platformText.text()).toBe("iOS");
+    });
+
+    it("renders Android as the platform label when source is android", async () => {
+      // Act
+      await setSessionRow("android");
+
+      // Assert
+      const platformText = wrapper.find(
+        '[data-test="rum-app-sessions-platform-text"]',
+      );
+      expect(platformText.exists()).toBe(true);
+      expect(platformText.text()).toBe("Android");
+    });
+
+    it("renders Flutter as the platform label when source is flutter", async () => {
+      // Act
+      await setSessionRow("flutter");
+
+      // Assert
+      const platformText = wrapper.find(
+        '[data-test="rum-app-sessions-platform-text"]',
+      );
+      expect(platformText.exists()).toBe(true);
+      expect(platformText.text()).toBe("Flutter");
+    });
+
+    it("renders Browser as the platform label when source is empty", async () => {
+      // Act
+      await setSessionRow("");
+
+      // Assert
+      const platformText = wrapper.find(
+        '[data-test="rum-app-sessions-platform-text"]',
+      );
+      expect(platformText.exists()).toBe(true);
+      expect(platformText.text()).toBe("Browser");
+    });
+
+    it("renders Browser as the platform label when source is undefined", async () => {
+      // Act — browser RUM sessions omit the `source` field entirely.
+      await setSessionRow(undefined);
+
+      // Assert
+      const platformText = wrapper.find(
+        '[data-test="rum-app-sessions-platform-text"]',
+      );
+      expect(platformText.exists()).toBe(true);
+      expect(platformText.text()).toBe("Browser");
+    });
+
+    it("renders the raw source value when source is unrecognized", async () => {
+      // Act
+      await setSessionRow("roku");
+
+      // Assert
+      const platformText = wrapper.find(
+        '[data-test="rum-app-sessions-platform-text"]',
+      );
+      expect(platformText.exists()).toBe(true);
+      expect(platformText.text()).toBe("roku");
+    });
+
+    it("includes min(source) as source in the main _rumdata search query", async () => {
+      // Arrange — getSessions() builds its 3 chained search requests by
+      // mutating a single shared request object in place (main query, then
+      // reused for the _sessionreplay query), so inspecting mock.calls
+      // afterwards would only ever see the final mutation. Instead, capture
+      // each request's SQL text at call time via a custom implementation.
+      vi.mocked(searchService.search).mockClear();
+      const capturedSqls: string[] = [];
+      vi.mocked(searchService.search).mockImplementation(
+        async (params: any) => {
+          capturedSqls.push(params?.query?.query?.sql ?? "");
+          return { data: { hits: [] } };
+        },
+      );
+
+      // Act
+      wrapper.vm.getSessions();
+      await flushPromises();
+      await flushPromises();
+
+      const mainQuerySql = capturedSqls.find(
+        (sql) =>
+          sql.includes("GROUP BY session_id") &&
+          sql.includes('FROM "_rumdata"') &&
+          sql.includes("zo_sql_timestamp"),
+      );
+
+      // Assert
+      expect(mainQuerySql).toBeDefined();
+      expect(mainQuerySql).toContain("min(source) as source");
+
+      // Restore the default fixture response for any tests that run after.
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: {
+          hits: [
+            {
+              session_id: "session1",
+              zo_sql_timestamp: 1672531200000,
+              start_time: 1672531000,
+              end_time: 1672531300,
+              source: "web",
+              user_agent_user_agent_family: "Chrome",
+              user_agent_os_family: "Windows",
+              ip: "192.168.1.1",
+              error_count: 2,
+              user_email: "test@example.com",
+              country: "US",
+              city: "New York",
+              country_iso_code: "us",
+            },
+          ],
+        },
+      });
     });
   });
 });
