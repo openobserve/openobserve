@@ -16,39 +16,224 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="rca-analysis-container" class="flex flex-col flex-1 overflow-hidden">
-    <!-- Trigger button when no analysis exists and not loading and not in-flight -->
-    <div v-if="!hasExistingRca && !rcaLoading && !analysisInFlight" data-test="rca-trigger-section" class="mb-2 flex-shrink-0">
+    <!-- Persistent failure state. Rendered above any existing report so a failed
+         reanalysis is visible without hiding the previous result. -->
+    <OBanner
+      v-if="rcaError && !isRunning"
+      data-test="rca-error-banner"
+      variant="error"
+      icon="error-outline"
+      class="mb-2 flex-shrink-0"
+    >
+      <p class="font-medium mb-0">{{ t('alerts.incidents.rcaFailed') }}</p>
+      <p data-test="rca-error-reason" class="text-xs mt-0.5 mb-0 opacity-90">
+        {{ rcaError.reason }}
+      </p>
+      <p
+        v-if="rcaError.details"
+        data-test="rca-error-details"
+        class="text-xs mt-1 mb-0 opacity-70 break-words"
+      >
+        {{ rcaError.details }}
+      </p>
+      <template #actions>
+        <OButton
+          data-test="rca-retry-btn"
+          variant="outline"
+          size="sm"
+          @click="$emit('trigger-rca')"
+        >
+          <OIcon name="refresh" size="sm" class="mr-1" />
+          {{ t('alerts.incidents.rcaRetry') }}
+        </OButton>
+      </template>
+    </OBanner>
+
+    <!-- Trigger button when nothing has run, nothing is running, and nothing failed -->
+    <div
+      v-if="!hasExistingRca && !isRunning && !rcaError"
+      data-test="rca-trigger-section"
+      class="mb-2 flex-shrink-0"
+    >
       <OButton
         data-test="trigger-rca-btn"
         variant="outline"
         size="sm"
-        :disabled="rcaLoading"
         @click="$emit('trigger-rca')"
       >
-        Analyze Incident
+        {{ t('alerts.incidents.rcaAnalyzeIncident') }}
       </OButton>
     </div>
 
     <!-- Analysis in progress: both background (in-flight) and user-triggered (rcaLoading) -->
-    <div
-      v-if="analysisInFlight || rcaLoading"
+    <OBanner
+      v-if="isRunning"
       data-test="rca-inflight-container"
-      class="flex items-center gap-3 rounded-default px-4 py-3 mb-2 flex-shrink-0 bg-status-info-bg border border-banner-info-border"
+      :variant="analysisIsStale ? 'warning' : 'info'"
+      inline-actions
+      class="mb-2 flex-shrink-0"
     >
-      <OSpinner variant="dots" size="xs" />
-      <div>
-        <p
-          class="text-sm font-medium mb-0 text-status-info-text"
-        >
-          {{ hasExistingRca ? 'AI SRE Agent is seeing what changed since the last analysis…' : 'AI SRE Agent is analyzing this incident, please wait…' }}
+      <template #icon>
+        <OSpinner v-if="!analysisIsStale" variant="dots" size="xs" />
+        <OIcon v-else name="warning" size="sm" />
+      </template>
+
+      <div class="flex items-center gap-2">
+        <p data-test="rca-inflight-message" class="text-sm font-medium mb-0">
+          {{ hasExistingRca ? t('alerts.incidents.rcaReanalyzing') : t('alerts.incidents.rcaAnalyzing') }}
         </p>
-        <p
-          class="text-xs mt-0.5 mb-0 text-status-info-text opacity-70"
+        <span
+          v-if="analysisElapsedLabel"
+          data-test="rca-elapsed"
+          class="text-xs opacity-70 whitespace-nowrap"
         >
-          {{ hasExistingRca ? 'The report will be updated once the analysis is complete.' : 'The report will appear here once the analysis is complete.' }}
-        </p>
+          {{ t('alerts.incidents.rcaStartedAgo', { time: analysisElapsedLabel }) }}
+        </span>
       </div>
+      <p class="text-xs mt-0.5 mb-0 opacity-70">
+        {{
+          analysisIsStale
+            ? t('alerts.incidents.rcaStale')
+            : hasExistingRca
+              ? t('alerts.incidents.rcaReanalyzingHint')
+              : t('alerts.incidents.rcaAnalyzingHint')
+        }}
+      </p>
+
+      <template #actions>
+        <OButton
+          data-test="rca-cancel-btn"
+          variant="outline"
+          size="sm"
+          :disabled="rcaCancelling"
+          @click="$emit('cancel-rca')"
+        >
+          {{ rcaCancelling ? t('alerts.incidents.rcaCancelling') : t('alerts.incidents.rcaCancel') }}
+        </OButton>
+      </template>
+    </OBanner>
+
+    <!-- Report toolbar: when it ran, which version, and what you can do with it.
+         Only meaningful once a report exists and nothing is streaming over it. -->
+    <div
+      v-if="hasExistingRca && !(rcaLoading && rcaStreamContent)"
+      data-test="rca-toolbar"
+      class="flex items-center gap-2 flex-wrap mb-2 flex-shrink-0"
+    >
+      <span
+        v-if="analyzedAgoLabel"
+        data-test="rca-analyzed-ago"
+        class="text-xs text-text-secondary"
+      >
+        {{ t('alerts.incidents.rcaAnalyzedAgo', { time: analyzedAgoLabel }) }}
+      </span>
+
+      <!-- Version picker, shown only when there is history to pick from -->
+      <ODropdown v-if="rcaHistory.length" align="start">
+        <template #trigger>
+          <OButton data-test="rca-history-btn" variant="ghost-muted" size="sm">
+            <OIcon name="history" size="sm" class="mr-1" />
+            {{ t('alerts.incidents.rcaHistory') }}
+            <OIcon name="keyboard-arrow-down" size="xs" class="ml-1" />
+          </OButton>
+        </template>
+
+        <ODropdownItem
+          data-test="rca-history-current"
+          :disabled="viewingArchivedIndex === null"
+          @select="$emit('view-report', null)"
+        >
+          {{ t('alerts.incidents.rcaHistoryCurrent') }}
+        </ODropdownItem>
+        <ODropdownItem
+          v-for="(report, idx) in rcaHistory"
+          :key="report.archived_at"
+          :data-test="`rca-history-item-${idx}`"
+          :disabled="viewingArchivedIndex === idx"
+          @select="$emit('view-report', idx)"
+        >
+          {{ formatArchivedAt(report.archived_at) }}
+        </ODropdownItem>
+      </ODropdown>
+
+      <div class="flex-1" />
+
+      <OButton
+        data-test="rca-copy-btn"
+        variant="ghost-muted"
+        size="sm"
+        @click="$emit('copy-report')"
+      >
+        <OIcon name="content-copy" size="sm" class="mr-1" />
+        {{ t('alerts.incidents.rcaCopy') }}
+      </OButton>
+      <OButton
+        data-test="rca-download-btn"
+        variant="ghost-muted"
+        size="sm"
+        @click="$emit('download-report')"
+      >
+        <OIcon name="download" size="sm" class="mr-1" />
+        {{ t('alerts.incidents.rcaDownload') }}
+      </OButton>
+
+      <!-- Re-run. Fresh is the default; continuity is the deliberate choice. -->
+      <ODropdown v-if="!isRunning" align="end">
+        <template #trigger>
+          <OButton data-test="rca-reanalyze-btn" variant="outline" size="sm">
+            <OIcon name="refresh" size="sm" class="mr-1" />
+            {{ t('alerts.incidents.rcaReanalyze') }}
+            <OIcon name="keyboard-arrow-down" size="xs" class="ml-1" />
+          </OButton>
+        </template>
+
+        <ODropdownItem
+          data-test="rca-reanalyze-fresh"
+          @select="$emit('trigger-rca', { buildOnPrevious: false })"
+        >
+          <span class="flex flex-col">
+            <span>{{ t('alerts.incidents.rcaFreshAnalysis') }}</span>
+            <span class="text-xs text-text-secondary">
+              {{ t('alerts.incidents.rcaFreshAnalysisHint') }}
+            </span>
+          </span>
+        </ODropdownItem>
+        <ODropdownItem
+          data-test="rca-reanalyze-build"
+          @select="$emit('trigger-rca', { buildOnPrevious: true })"
+        >
+          <span class="flex flex-col">
+            <span>{{ t('alerts.incidents.rcaBuildOnPrevious') }}</span>
+            <span class="text-xs text-text-secondary">
+              {{ t('alerts.incidents.rcaBuildOnPreviousHint') }}
+            </span>
+          </span>
+        </ODropdownItem>
+      </ODropdown>
     </div>
+
+    <!-- Viewing an archived report: make it unmistakable this is not current -->
+    <OBanner
+      v-if="viewingArchivedIndex !== null"
+      data-test="rca-archived-banner"
+      variant="warning"
+      icon="history"
+      dense
+      inline-actions
+      class="mb-2 flex-shrink-0"
+    >
+      {{ t('alerts.incidents.rcaViewingArchived') }}
+      <template #actions>
+        <OButton
+          data-test="rca-back-to-current-btn"
+          variant="outline"
+          size="sm"
+          @click="$emit('view-report', null)"
+        >
+          {{ t('alerts.incidents.rcaBackToCurrent') }}
+        </OButton>
+      </template>
+    </OBanner>
 
     <!-- Streaming content while loading -->
     <div
@@ -63,8 +248,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
 
-    <!-- Existing analysis content -->
-    <div v-else-if="hasExistingRca && !rcaLoading" data-test="rca-existing-container" class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default">
+    <!-- Existing analysis content. Kept mounted while a reanalysis runs so the previous
+         report stays readable instead of blanking for the duration of the request. -->
+    <div
+      v-else-if="hasExistingRca"
+      data-test="rca-existing-container"
+      class="rca-container rounded-default p-3 flex-1 overflow-auto border bg-surface-base border-border-default"
+    >
       <div
         data-test="rca-existing-content"
         class="text-sm whitespace-pre-wrap rca-content"
@@ -75,14 +265,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import DOMPurify from "dompurify";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import type { ArchivedRcaReport } from "@/services/incidents";
+
+interface RcaError {
+  reason: string;
+  details: string;
+}
+
+/** Compact "3m" / "2h 5m" / "4d" elapsed label from a millisecond delta. */
+function humanizeElapsed(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m`;
+  return `${Math.floor(hours / 24)}d`;
+}
 
 export default defineComponent({
   name: "IncidentRCAAnalysis",
-  components: { OButton, OSpinner },
+  components: { OBanner, OButton, ODropdown, ODropdownItem, OIcon, OSpinner },
   props: {
     hasExistingRca: {
       type: Boolean,
@@ -108,12 +320,62 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-  },
-  emits: ['trigger-rca'],
-  methods: {
-    sanitize(html: string): string {
-      return DOMPurify.sanitize(html);
+    /** Last terminal failure, or null when the most recent run did not fail. */
+    rcaError: {
+      type: Object as () => RcaError | null,
+      default: null,
     },
+    rcaCancelling: {
+      type: Boolean,
+      default: false,
+    },
+    /** Preformatted elapsed time for the running analysis, e.g. "4m". */
+    analysisElapsedLabel: {
+      type: String,
+      default: "",
+    },
+    /** True once a run outlives the server's staleness window and is likely dead. */
+    analysisIsStale: {
+      type: Boolean,
+      default: false,
+    },
+    /** Superseded reports for this incident, newest first. */
+    rcaHistory: {
+      type: Array as () => ArchivedRcaReport[],
+      default: () => [],
+    },
+    /** Index into rcaHistory being viewed, or null when showing the current report. */
+    viewingArchivedIndex: {
+      type: Number as () => number | null,
+      default: null,
+    },
+    /** Epoch micros the current report was produced, for the "Analyzed X ago" label. */
+    analyzedAt: {
+      type: Number as () => number | null,
+      default: null,
+    },
+  },
+  emits: ["trigger-rca", "cancel-rca", "view-report", "copy-report", "download-report"],
+  setup(props) {
+    const { t } = useI18n();
+
+    // A run is active whether it was started here (rcaLoading) or in the background
+    // (analysisInFlight); both render the same banner and both are cancellable.
+    const isRunning = computed(() => props.analysisInFlight || props.rcaLoading);
+
+    const analyzedAgoLabel = computed(() => {
+      if (!props.analyzedAt) return "";
+      // Timestamps arrive as microseconds since epoch.
+      const elapsed = Date.now() - props.analyzedAt / 1000;
+      return elapsed < 0 ? "" : humanizeElapsed(elapsed);
+    });
+
+    const formatArchivedAt = (micros: number): string =>
+      new Date(micros / 1000).toLocaleString();
+
+    const sanitize = (html: string): string => DOMPurify.sanitize(html);
+
+    return { t, isRunning, analyzedAgoLabel, formatArchivedAt, sanitize };
   },
 });
 </script>

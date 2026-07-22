@@ -359,6 +359,10 @@ pub struct TriggerRcaQuery {
     /// Treat this as a user-initiated reanalysis — bypasses cooldown (default: false)
     #[serde(default)]
     pub reanalysis: bool,
+    /// Feed the previous report to the agent so it builds on it instead of starting
+    /// from scratch (default: false — each run is a fresh, independent analysis).
+    #[serde(default)]
+    pub build_on_previous: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -471,13 +475,19 @@ pub async fn trigger_incident_rca(
             }
         };
 
-    // Build RCA context — include previous analysis so the agent can build on it
-    let previous_analysis = infra::table::alert_incidents::get_topology(&org_id, &incident_id)
-        .await
-        .ok()
-        .flatten()
-        .and_then(|t| t.suggested_root_cause)
-        .filter(|s| !s.is_empty());
+    // Build RCA context. Each run is a fresh analysis unless the caller explicitly opts
+    // into continuity — chaining every run compounds the report (and the agent's context)
+    // and carries any early mistake forward with no way to shake it off.
+    let previous_analysis = if query.build_on_previous {
+        infra::table::alert_incidents::get_topology(&org_id, &incident_id)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|t| t.suggested_root_cause)
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
     let context = IncidentRcaContext {
         incident_id: incident.incident.id.clone(),
         org_id: incident.incident.org_id.clone(),
@@ -553,13 +563,15 @@ pub async fn trigger_incident_rca(
         let org_id_bg = org_id.clone();
         let incident_id_bg = incident_id.clone();
         let user_email_bg = user_email.user_id.clone();
-        tokio::spawn(async move {
+        let build_on_previous = query.build_on_previous;
+        let handle = tokio::spawn(async move {
             if let Err(e) = crate::service::alerts::incidents::trigger_rca_for_incident(
                 org_id_bg.clone(),
                 incident_id_bg.clone(),
                 true,
                 true,
                 user_email_bg,
+                build_on_previous,
             )
             .await
             {
@@ -584,7 +596,13 @@ pub async fn trigger_incident_rca(
                     );
                 }
             }
+            crate::service::alerts::incidents::unregister_rca_task(&org_id_bg, &incident_id_bg);
         });
+        crate::service::alerts::incidents::register_rca_task(
+            &org_id,
+            &incident_id,
+            handle.abort_handle(),
+        );
 
         return axum::response::Response::builder()
             .status(axum::http::StatusCode::ACCEPTED)
@@ -659,6 +677,103 @@ pub async fn trigger_incident_rca(
 
         MetaHttpResponse::json(RcaResponse { rca_content })
     }
+}
+
+#[cfg(feature = "enterprise")]
+/// CancelIncidentRca
+#[utoipa::path(
+    delete,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "CancelIncidentRca",
+    summary = "Cancel the in-flight RCA analysis for an incident",
+    description = "Aborts a running root cause analysis and records a terminal cancellation event, releasing the in-flight guard so a new analysis can be started immediately.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Analysis cancelled", content_type = "application/json", body = ()),
+        (status = 400, description = "No analysis in progress", content_type = "application/json", body = ()),
+        (status = 500, description = "Internal error", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+        ("x-o2-mcp" = json!({"description": "Cancel a running incident RCA", "category": "alerts"}))
+    )
+)]
+pub async fn cancel_incident_rca(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+
+    let cooldown = get_o2_config().incidents.reanalysis_cooldown_minutes;
+    let events = infra::table::incident_events::get(&org_id, &incident_id)
+        .await
+        .unwrap_or_default();
+
+    // Nothing running — report it rather than writing a spurious terminal event.
+    if !crate::service::alerts::incidents::is_analysis_in_flight(&events, cooldown * 2) {
+        return MetaHttpResponse::bad_request("No analysis is currently in progress");
+    }
+
+    match crate::service::alerts::incidents::cancel_rca_for_incident(
+        &org_id,
+        &incident_id,
+        Some(user_email.user_id.clone()),
+    )
+    .await
+    {
+        Ok(aborted) => MetaHttpResponse::json(serde_json::json!({
+            "message": "Analysis cancelled",
+            "aborted_local_task": aborted,
+        })),
+        Err(e) => MetaHttpResponse::internal_error(format!("Failed to cancel analysis: {e}")),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+/// GetIncidentRcaHistory
+#[utoipa::path(
+    get,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/rca/history",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "GetIncidentRcaHistory",
+    summary = "List RCA reports for an incident",
+    description = "Returns the current root cause analysis report plus any superseded reports retained for this incident, newest first.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "RCA report history", content_type = "application/json", body = ()),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"description": "List past incident RCA reports", "category": "alerts"}))
+    )
+)]
+pub async fn get_incident_rca_history(
+    Path((org_id, incident_id)): Path<(String, String)>,
+) -> Response {
+    let topology = match infra::table::alert_incidents::get_topology(&org_id, &incident_id).await {
+        Ok(Some(t)) => t,
+        Ok(None) => {
+            return MetaHttpResponse::json(serde_json::json!({ "current": null, "previous": [] }));
+        }
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+
+    MetaHttpResponse::json(serde_json::json!({
+        "current": topology.suggested_root_cause,
+        "previous": topology.previous_analyses,
+    }))
 }
 
 /// Get incident events timeline

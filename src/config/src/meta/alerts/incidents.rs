@@ -248,6 +248,21 @@ impl DimensionRelationship {
     }
 }
 
+/// A superseded RCA report, retained so users can read earlier analyses.
+///
+/// Archived by [`IncidentTopology::record_rca_result`] when a newer report replaces it.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ArchivedRcaReport {
+    /// The full markdown report as it was generated
+    pub content: String,
+    /// Microseconds since epoch, stamped when the report was archived
+    pub archived_at: i64,
+}
+
+/// Default number of superseded RCA reports to retain per incident.
+/// Overridden by `O2_INCIDENTS_RCA_HISTORY_LIMIT`.
+pub const DEFAULT_RCA_HISTORY_LIMIT: usize = 25;
+
 /// Alert flow graph showing how alerts cascaded across services over time
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct IncidentTopology {
@@ -257,8 +272,41 @@ pub struct IncidentTopology {
     pub edges: Vec<AlertEdge>,
     /// Related incident IDs (for cross-incident correlation)
     pub related_incident_ids: Vec<String>,
-    /// AI-generated root cause analysis (markdown)
+    /// AI-generated root cause analysis (markdown) — the current report
     pub suggested_root_cause: Option<String>,
+    /// Superseded reports, newest first. Bounded by the configured history limit so
+    /// this JSON column cannot grow without limit across a long-lived incident.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub previous_analyses: Vec<ArchivedRcaReport>,
+}
+
+impl IncidentTopology {
+    /// Install `content` as the current report, archiving whatever it replaces.
+    ///
+    /// The outgoing report is pushed to the front of `previous_analyses` (newest first)
+    /// and the list is truncated to `history_limit`. A `history_limit` of 0 disables
+    /// history entirely and clears any previously retained reports.
+    pub fn record_rca_result(&mut self, content: impl Into<String>, history_limit: usize) {
+        let content = content.into();
+
+        if history_limit == 0 {
+            self.previous_analyses.clear();
+        } else if let Some(prev) = self.suggested_root_cause.take() {
+            // Identical re-runs would otherwise fill the history with duplicates.
+            if !prev.is_empty() && prev != content {
+                self.previous_analyses.insert(
+                    0,
+                    ArchivedRcaReport {
+                        content: prev,
+                        archived_at: chrono::Utc::now().timestamp_micros(),
+                    },
+                );
+                self.previous_analyses.truncate(history_limit);
+            }
+        }
+
+        self.suggested_root_cause = Some(content);
+    }
 }
 
 /// Node in the alert flow graph
@@ -618,6 +666,15 @@ pub enum IncidentEventType {
         /// Optional error details for debugging
         error_details: Option<String>,
     },
+
+    /// AI/RCA analysis cancelled by a user.
+    /// Terminal, like Complete/Failed: clears the in-flight guard immediately so a
+    /// retry can start without waiting for the stale threshold.
+    #[serde(rename = "ai_analysis_cancelled")]
+    AIAnalysisCancelled {
+        /// User who cancelled the run. `None` when cancelled by the system.
+        user_id: Option<String>,
+    },
 }
 
 impl IncidentEvent {
@@ -731,6 +788,10 @@ impl IncidentEvent {
             trigger_type,
             error_details,
         })
+    }
+
+    pub fn ai_analysis_cancelled(user_id: Option<String>) -> Self {
+        Self::now(IncidentEventType::AIAnalysisCancelled { user_id })
     }
 
     /// Increment alert count if this is an Alert event for the given alert_id.
@@ -1049,6 +1110,7 @@ mod tests {
             edges: vec![edge],
             related_incident_ids: vec!["incident-1".to_string()],
             suggested_root_cause: Some("High memory usage".to_string()),
+            previous_analyses: vec![],
         };
 
         assert_eq!(topology.nodes.len(), 2);
@@ -1735,6 +1797,86 @@ mod tests {
             event.event_type,
             IncidentEventType::Resolved { user_id: None }
         ));
+    }
+
+    #[test]
+    fn test_record_rca_result_archives_previous() {
+        let mut t = IncidentTopology::default();
+
+        t.record_rca_result("first", 25);
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("first"));
+        // Nothing was superseded on the very first run.
+        assert!(t.previous_analyses.is_empty());
+
+        t.record_rca_result("second", 25);
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("second"));
+        assert_eq!(t.previous_analyses.len(), 1);
+        assert_eq!(t.previous_analyses[0].content, "first");
+        assert!(t.previous_analyses[0].archived_at > 0);
+    }
+
+    #[test]
+    fn test_record_rca_result_orders_newest_first() {
+        let mut t = IncidentTopology::default();
+        for r in ["r1", "r2", "r3", "r4"] {
+            t.record_rca_result(r, 25);
+        }
+
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("r4"));
+        let archived: Vec<_> = t
+            .previous_analyses
+            .iter()
+            .map(|a| a.content.as_str())
+            .collect();
+        assert_eq!(archived, vec!["r3", "r2", "r1"]);
+    }
+
+    #[test]
+    fn test_record_rca_result_respects_history_limit() {
+        let mut t = IncidentTopology::default();
+        for i in 0..10 {
+            t.record_rca_result(format!("report-{i}"), 3);
+        }
+
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("report-9"));
+        // Only the three most recent superseded reports survive.
+        assert_eq!(t.previous_analyses.len(), 3);
+        assert_eq!(t.previous_analyses[0].content, "report-8");
+        assert_eq!(t.previous_analyses[2].content, "report-6");
+    }
+
+    #[test]
+    fn test_record_rca_result_zero_limit_disables_history() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_result("first", 25);
+        t.record_rca_result("second", 25);
+        assert_eq!(t.previous_analyses.len(), 1);
+
+        // Dropping the limit to 0 clears retained reports and stops archiving.
+        t.record_rca_result("third", 0);
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("third"));
+        assert!(t.previous_analyses.is_empty());
+    }
+
+    #[test]
+    fn test_record_rca_result_skips_identical_report() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_result("same", 25);
+        t.record_rca_result("same", 25);
+
+        // An unchanged re-run should not fill history with duplicates.
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("same"));
+        assert!(t.previous_analyses.is_empty());
+    }
+
+    #[test]
+    fn test_topology_previous_analyses_backward_compatible() {
+        // Topology JSON written before history existed must still deserialize.
+        let json = r#"{"nodes":[],"edges":[],"related_incident_ids":[],
+            "suggested_root_cause":"legacy report"}"#;
+        let t: IncidentTopology = serde_json::from_str(json).unwrap();
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("legacy report"));
+        assert!(t.previous_analyses.is_empty());
     }
 
     #[test]
