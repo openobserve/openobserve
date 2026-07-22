@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="composite-alert-summary"
-    class="composite-summary h-full overflow-y-auto p-4 text-[0.8125rem] flex flex-col gap-4"
+    class="composite-summary h-full overflow-y-auto p-4 text-compact flex flex-col gap-4"
   >
     <!-- Plain-English sentence -->
     <div
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="check" size="xs" class="text-status-positive mt-1 shrink-0" />
         <div class="flex flex-wrap items-center gap-1.5">
           <span class="font-semibold">{{ t("alerts.composite.firesWhen") }}:</span>
-          <code class="summary-chip">{{ composite.expression || "—" }}</code>
+          <code :class="chipClass">{{ composite.expression || "—" }}</code>
         </div>
       </div>
 
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="`sum-${term.name}`"
             class="flex items-start gap-1.5"
           >
-            <span class="summary-chip shrink-0">{{ term.name }}</span>
+            <span class="shrink-0" :class="chipClass">{{ term.name }}</span>
             <span
               class="leading-relaxed break-all"
               :class="termSummary(term).muted ? 'text-text-secondary italic opacity-70' : 'text-text-secondary'"
@@ -57,13 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex items-center gap-2">
         <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.monitors") }}:</span>
-        <span class="summary-chip">{{ triggerCondition.period }} {{ t("alerts.composite.minutes") }}</span>
+        <span :class="chipClass">{{ triggerCondition.period }} {{ t("alerts.composite.minutes") }}</span>
       </div>
 
       <div class="flex items-center gap-2">
         <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.checksEvery") }}:</span>
-        <span class="summary-chip">{{ triggerCondition.frequency }} {{ t("alerts.composite.minutes") }}</span>
+        <span :class="chipClass">{{ triggerCondition.frequency }} {{ t("alerts.composite.minutes") }}</span>
       </div>
 
       <div class="flex items-start gap-2">
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-wrap items-center gap-1.5 min-w-0">
           <span class="font-semibold">{{ t("alerts.composite.notifies") }}:</span>
           <template v-if="onCompositeDests.length">
-            <span v-for="d in onCompositeDests" :key="`d-${d}`" class="summary-chip">{{ d }}</span>
+            <span v-for="d in onCompositeDests" :key="`d-${d}`" :class="chipClass">{{ d }}</span>
           </template>
           <span v-else class="flex items-center gap-1 text-status-warning">
             {{ t("alerts.composite.noDestination") }}
@@ -85,20 +85,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="`sum-onterm-${name}`"
         class="flex items-start gap-2 pl-6"
       >
-        <span class="text-text-secondary">{{ t("alerts.composite.term") }} <span class="summary-chip">{{ name }}</span> →</span>
+        <span class="text-text-secondary">{{ t("alerts.composite.term") }} <span :class="chipClass">{{ name }}</span> →</span>
         <span class="break-all">{{ dests.join(", ") }}</span>
       </div>
 
       <div class="flex items-center gap-2">
         <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.onError") }}:</span>
-        <span class="summary-chip">{{ onErrorSummary }}</span>
+        <span :class="chipClass">{{ onErrorSummary }}</span>
       </div>
 
       <div class="flex items-center gap-2">
         <OIcon name="check" size="xs" class="text-status-positive shrink-0" />
         <span class="font-semibold">{{ t("alerts.composite.cooldown") }}:</span>
-        <span class="summary-chip">{{ triggerCondition.silence }} {{ t("alerts.composite.minutes") }}</span>
+        <span :class="chipClass">{{ triggerCondition.silence }} {{ t("alerts.composite.minutes") }}</span>
       </div>
     </div>
   </div>
@@ -128,6 +128,10 @@ export default defineComponent({
   },
   setup(props) {
     const { t } = useI18n();
+
+    // Soft-primary badge chip styling (utility string, not a scoped-CSS class).
+    const chipClass =
+      "inline-flex items-center rounded-default px-1.5 py-px text-xs font-medium bg-badge-primary-soft-bg text-badge-primary-soft-text whitespace-nowrap";
 
     const sentence = computed(() =>
       t("alerts.composite.summarySentence", {
@@ -179,6 +183,7 @@ export default defineComponent({
 
     return {
       t,
+      chipClass,
       sentence,
       termSummary,
       onCompositeDests,
@@ -189,16 +194,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-.summary-chip {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  background: var(--color-badge-primary-soft-bg);
-  color: var(--color-badge-primary-soft-text);
-  white-space: nowrap;
-}
-</style>

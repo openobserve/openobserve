@@ -20,8 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          from the info icon beside the Simple | Composite toggle (parent). -->
     <div v-if="!infoDismissed" class="relative">
       <span
-        class="absolute z-10 cursor-pointer text-text-secondary hover:text-text-primary"
-        style="top: 10px; right: 10px"
+        class="absolute z-10 top-2.5 right-2.5 cursor-pointer text-text-secondary hover:text-text-body"
         data-test="composite-info-dismiss"
         :title="t('alerts.composite.dismiss')"
         @click="$emit('update:infoDismissed', true)"
@@ -78,9 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Expression -->
-    <div class="card-container border border-border-default rounded-md p-3 flex flex-col gap-2">
+    <div class="card-container border border-border-default rounded-surface p-3 flex flex-col gap-2">
       <div class="flex items-center gap-2">
-        <span class="text-sm font-semibold">{{ t("alerts.composite.expression") }} <span class="text-text-primary">*</span></span>
+        <span class="text-sm font-semibold">{{ t("alerts.composite.expression") }} <span class="text-text-body">*</span></span>
         <OTooltip :content="t('alerts.composite.expressionHelp')" />
       </div>
       <OInput
@@ -97,14 +96,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span
           v-for="term in composite.terms"
           :key="term.name"
-          class="composite-term-chip cursor-pointer"
+          class="cursor-pointer"
+          :class="chipClass"
           :data-test="`composite-expr-chip-${term.name}`"
           @click="insertTerm(term.name)"
         >{{ term.name || "—" }}</span>
       </div>
       <div
         v-if="!expressionResult.valid && composite.expression"
-        class="flex items-center gap-1 text-[13px] font-medium text-negative"
+        class="flex items-center gap-1 text-compact font-medium text-negative"
         data-test="composite-expression-error"
       >
         <OIcon name="error-outline" size="xs" />
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Shared evaluation schedule -->
-    <div class="card-container border border-border-default rounded-md p-3 flex flex-col gap-3">
+    <div class="card-container border border-border-default rounded-surface p-3 flex flex-col gap-3">
       <span class="text-sm font-semibold">{{ t("alerts.composite.schedule") }}</span>
       <div class="flex items-center gap-4 flex-wrap">
         <div class="flex items-center gap-1.5">
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v) => setSchedule('period', v)"
             type="number"
             :min="1"
-            class="w-[90px] h-[28px]! min-h-[28px]!"
+            class="w-22.5 h-7! min-h-7!"
             data-test="composite-period-input"
           />
           <span class="text-xs text-text-secondary">{{ t("alerts.composite.minutes") }}</span>
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v) => setSchedule('frequency', v)"
             type="number"
             :min="1"
-            class="w-[90px] h-[28px]! min-h-[28px]!"
+            class="w-22.5 h-7! min-h-7!"
             data-test="composite-frequency-input"
           />
           <span class="text-xs text-text-secondary">{{ t("alerts.composite.minutes") }}</span>
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="(v) => setSchedule('silence', v)"
             type="number"
             :min="0"
-            class="w-[90px] h-[28px]! min-h-[28px]!"
+            class="w-22.5 h-7! min-h-7!"
             data-test="composite-silence-input"
           />
           <span class="text-xs text-text-secondary">{{ t("alerts.composite.minutes") }}</span>
@@ -156,19 +156,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Notifications -->
-    <div class="card-container border border-border-default rounded-md p-3 flex flex-col gap-3">
+    <div class="card-container border border-border-default rounded-surface p-3 flex flex-col gap-3">
       <span class="text-sm font-semibold">{{ t("alerts.composite.notifications") }}</span>
 
       <!-- Composite-level destinations (required) -->
       <div class="flex items-center gap-2 flex-wrap">
-        <span class="text-xs font-semibold whitespace-nowrap min-w-[130px]">
-          {{ t("alerts.composite.onComposite") }} <span class="text-text-primary">*</span>
+        <span class="text-xs font-semibold whitespace-nowrap min-w-32.5">
+          {{ t("alerts.composite.onComposite") }} <span class="text-text-body">*</span>
         </span>
         <OSelect
           :model-value="composite.notify.on_composite"
           :options="destinations"
           multiple
-          class="min-w-[260px] h-[28px]! min-h-[28px]!"
+          class="min-w-65 h-7! min-h-7!"
           data-test="composite-on-composite-select"
           :class="composite.notify.on_composite.length ? '' : 'field-error'"
           @update:model-value="setOnComposite"
@@ -190,12 +190,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="`onterm-${term.name}`"
           class="flex items-center gap-2 flex-wrap"
         >
-          <span class="composite-term-chip">{{ term.name }}</span>
+          <span :class="chipClass">{{ term.name }}</span>
           <OSelect
             :model-value="composite.notify.on_term[term.name] || []"
             :options="destinations"
             multiple
-            class="min-w-[260px] h-[28px]! min-h-[28px]!"
+            class="min-w-65 h-7! min-h-7!"
             :data-test="`composite-on-term-${term.name}-select`"
             @update:model-value="(val) => setOnTerm(term.name, val)"
           />
@@ -204,12 +204,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- On-error policy -->
       <div class="flex items-center gap-2">
-        <span class="text-xs font-semibold whitespace-nowrap min-w-[130px]">{{ t("alerts.composite.onError") }}</span>
+        <span class="text-xs font-semibold whitespace-nowrap min-w-32.5">{{ t("alerts.composite.onError") }}</span>
         <OSelect
           :model-value="composite.on_error"
           :options="onErrorOptions"
           :searchable="false"
-          class="min-w-[220px] h-[28px]! min-h-[28px]!"
+          class="min-w-55 h-7! min-h-7!"
           data-test="composite-on-error-select"
           @update:model-value="setOnError"
         />
@@ -340,6 +340,11 @@ export default defineComponent({
     // propagate exactly as before while satisfying vue/no-mutating-props.
     const composite = computed(() => props.composite);
     const triggerCondition = computed(() => props.triggerCondition);
+
+    // Exact-alias chip styling (soft-primary badge, mono). Utility string kept in
+    // one place instead of a scoped-CSS class.
+    const chipClass =
+      "inline-flex items-center rounded-default px-1.5 py-px text-xs font-medium font-mono bg-badge-primary-soft-bg text-badge-primary-soft-text whitespace-nowrap";
 
     // Template write handlers — mutate the parent-owned model via the computed
     // aliases (script mutation), keeping the template free of prop mutations.
@@ -508,6 +513,7 @@ export default defineComponent({
 
     return {
       t,
+      chipClass,
       MAX_TERMS,
       termsListRef,
       memberOptions,
@@ -527,19 +533,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* Exact-alias chip (no case/space transform, unlike OTag's humanised labels). */
-.composite-term-chip {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  font-family: var(--font-mono);
-  background: var(--color-badge-primary-soft-bg);
-  color: var(--color-badge-primary-soft-text);
-  white-space: nowrap;
-}
-</style>

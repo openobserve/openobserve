@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Evaluated expression: names → states → result -->
     <div v-if="previewResult" class="text-xs flex flex-col gap-1">
       <span class="text-text-secondary">{{ t("alerts.composite.howItEvaluated") }}:</span>
-      <code class="bg-code-bg rounded px-2 py-1 break-all">
+      <code class="bg-code-bg rounded-default px-2 py-1 break-all">
         {{ composite.expression }} → {{ substitutedExpression }} = {{ previewResult.result.toUpperCase() }}
       </code>
     </div>
@@ -58,11 +58,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="tp in previewResult.terms"
         :key="`prev-${tp.name}`"
-        class="flex flex-col gap-1 border border-border-default rounded px-2 py-1.5"
+        class="flex flex-col gap-1 border border-border-default rounded-default px-2 py-1.5"
         :data-test="`composite-preview-term-${tp.name}`"
       >
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="composite-term-chip">{{ tp.name }}</span>
+          <span :class="chipClass">{{ tp.name }}</span>
           <span v-if="tp.member_name" class="text-xs text-text-secondary">{{ tp.member_name }}</span>
           <OTag :variant="stateTagType(tp.state)" :value="tp.state" class="uppercase" />
         </div>
@@ -127,6 +127,10 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18n();
     const store = useStore();
+
+    // Exact-alias chip styling (soft-primary badge, mono).
+    const chipClass =
+      "inline-flex items-center rounded-default px-1.5 py-px text-xs font-medium font-mono bg-badge-primary-soft-bg text-badge-primary-soft-text whitespace-nowrap";
 
     const previewLoading = ref(false);
     const previewError = ref<string | null>(null);
@@ -221,6 +225,7 @@ export default defineComponent({
 
     return {
       t,
+      chipClass,
       previewLoading,
       previewError,
       previewResult,
@@ -233,18 +238,3 @@ export default defineComponent({
 });
 </script>
 
-<style scoped>
-/* Exact-alias chip (no case/space transform, unlike OTag's humanised labels). */
-.composite-term-chip {
-  display: inline-flex;
-  align-items: center;
-  border-radius: 4px;
-  padding: 1px 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  font-family: var(--font-mono);
-  background: var(--color-badge-primary-soft-bg);
-  color: var(--color-badge-primary-soft-text);
-  white-space: nowrap;
-}
-</style>
