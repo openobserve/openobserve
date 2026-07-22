@@ -1,7 +1,7 @@
 {
   "totals": {
     "rawProjectRamp": 8,
-    "rawVarInComponent": 564,
+    "rawVarInComponent": 559,
     "arbZ": 0,
     "darkMechanism": 8,
     "unscopedStyle": 2,
@@ -226,7 +226,7 @@
       "rawVarInComponent": 1
     },
     "plugins/logs/SearchResult.vue": {
-      "rawVarInComponent": 19
+      "rawVarInComponent": 16
     },
     "plugins/logs/TenstackTable.vue": {
       "rawVarInComponent": 5
@@ -259,7 +259,7 @@
       "rawVarInComponent": 9
     },
     "plugins/traces/ThreadToolCalls.vue": {
-      "rawVarInComponent": 30
+      "rawVarInComponent": 28
     },
     "plugins/traces/ThreadView.vue": {
       "rawVarInComponent": 9
