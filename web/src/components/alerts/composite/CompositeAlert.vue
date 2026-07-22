@@ -84,7 +84,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('alerts.composite.expressionHelp')" />
       </div>
       <OInput
-        v-model="composite.expression"
+        :model-value="composite.expression"
+        @update:model-value="setExpression"
         data-test="composite-expression-input"
         :placeholder="t('alerts.composite.expressionPlaceholder')"
         class="text-sm"
@@ -118,7 +119,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-1.5">
           <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.period") }}</span>
           <OInput
-            v-model.number="triggerCondition.period"
+            :model-value="triggerCondition.period"
+            @update:model-value="(v) => setSchedule('period', v)"
             type="number"
             :min="1"
             class="w-[90px] h-[28px]! min-h-[28px]!"
@@ -129,7 +131,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-1.5">
           <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.frequency") }}</span>
           <OInput
-            v-model.number="triggerCondition.frequency"
+            :model-value="triggerCondition.frequency"
+            @update:model-value="(v) => setSchedule('frequency', v)"
             type="number"
             :min="1"
             class="w-[90px] h-[28px]! min-h-[28px]!"
@@ -140,7 +143,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex items-center gap-1.5">
           <span class="text-xs font-semibold whitespace-nowrap">{{ t("alerts.composite.silence") }}</span>
           <OInput
-            v-model.number="triggerCondition.silence"
+            :model-value="triggerCondition.silence"
+            @update:model-value="(v) => setSchedule('silence', v)"
             type="number"
             :min="0"
             class="w-[90px] h-[28px]! min-h-[28px]!"
@@ -167,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="min-w-[260px] h-[28px]! min-h-[28px]!"
           data-test="composite-on-composite-select"
           :class="composite.notify.on_composite.length ? '' : 'field-error'"
-          @update:model-value="(val) => (composite.notify.on_composite = val)"
+          @update:model-value="setOnComposite"
         />
         <OButton
           variant="ghost"
@@ -207,7 +211,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :searchable="false"
           class="min-w-[220px] h-[28px]! min-h-[28px]!"
           data-test="composite-on-error-select"
-          @update:model-value="(val) => (composite.on_error = val)"
+          @update:model-value="setOnError"
         />
       </div>
     </div>
@@ -330,6 +334,30 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
 
+    // Alias the parent-owned reactive model props. The parent (useAlertForm)
+    // passes a mutable `composite`/`compositeTrigger` it owns one-way; editing
+    // through these computed aliases keeps the same reference, so in-place writes
+    // propagate exactly as before while satisfying vue/no-mutating-props.
+    const composite = computed(() => props.composite);
+    const triggerCondition = computed(() => props.triggerCondition);
+
+    // Template write handlers — mutate the parent-owned model via the computed
+    // aliases (script mutation), keeping the template free of prop mutations.
+    const setExpression = (val: string | number) => {
+      composite.value.expression = String(val ?? "");
+    };
+    const setSchedule = (key: "period" | "frequency" | "silence", val: any) => {
+      triggerCondition.value[key] = Number(val);
+    };
+    const setOnComposite = (val: SelectModelValue) => {
+      composite.value.notify.on_composite = Array.isArray(val)
+        ? (val as string[])
+        : [];
+    };
+    const setOnError = (val: SelectModelValue) => {
+      composite.value.on_error = Array.isArray(val) ? val[0] : val;
+    };
+
     const termsListRef = ref<HTMLElement | null>(null);
 
     // Open a member alert's edit form in a new tab (deep-link into the alert
@@ -394,7 +422,7 @@ export default defineComponent({
         // even on edit-load (before the user re-picks).
         const byId: Record<string, string> = {};
         memberOptions.value.forEach((o) => (byId[o.value] = o.label));
-        props.composite.terms.forEach((tm: any) => {
+        composite.value.terms.forEach((tm: any) => {
           if (tm.alert_id && !tm.member_name && byId[tm.alert_id]) {
             tm.member_name = byId[tm.alert_id];
           }
@@ -413,26 +441,26 @@ export default defineComponent({
 
     const expressionResult = computed(() =>
       validateCompositeExpression(
-        props.composite.expression || "",
-        props.composite.terms.map((tm: any) => tm.name),
+        composite.value.expression || "",
+        composite.value.terms.map((tm: any) => tm.name),
       ),
     );
 
     /** Next unused single-letter term name (A, B, C, ...). */
     const nextTermName = (): string => {
-      const used = new Set(props.composite.terms.map((tm: any) => tm.name));
+      const used = new Set(composite.value.terms.map((tm: any) => tm.name));
       for (let i = 0; i < 26; i++) {
         const name = String.fromCharCode(65 + i);
         if (!used.has(name)) return name;
       }
-      return `T${props.composite.terms.length}`;
+      return `T${composite.value.terms.length}`;
     };
 
     const addTerm = () => {
-      if (props.composite.terms.length >= MAX_TERMS) return;
+      if (composite.value.terms.length >= MAX_TERMS) return;
       // Mark as added this session so its Existing/New toggle stays editable in
       // update mode (already-saved terms stay locked — see CompositeTermCard).
-      props.composite.terms.push({ ...makeCompositeTerm(nextTermName()), _isNew: true });
+      composite.value.terms.push({ ...makeCompositeTerm(nextTermName()), _isNew: true });
       // Move focus to the new term so the author sees where it was added.
       nextTick(() => {
         const cards = termsListRef.value?.querySelectorAll(".composite-term-card");
@@ -449,25 +477,25 @@ export default defineComponent({
     };
 
     const removeTerm = (idx: number | string) => {
-      if (props.composite.terms.length <= 2) return;
-      const [removed] = props.composite.terms.splice(Number(idx), 1);
-      if (removed && props.composite.notify.on_term[removed.name]) {
-        delete props.composite.notify.on_term[removed.name];
+      if (composite.value.terms.length <= 2) return;
+      const [removed] = composite.value.terms.splice(Number(idx), 1);
+      if (removed && composite.value.notify.on_term[removed.name]) {
+        delete composite.value.notify.on_term[removed.name];
       }
     };
 
     const setOnTerm = (name: string, val: SelectModelValue) => {
       const arr = Array.isArray(val) ? (val as string[]) : [];
       if (arr.length === 0) {
-        delete props.composite.notify.on_term[name];
+        delete composite.value.notify.on_term[name];
       } else {
-        props.composite.notify.on_term[name] = arr;
+        composite.value.notify.on_term[name] = arr;
       }
     };
 
     const insertTerm = (name: string) => {
-      const expr = props.composite.expression || "";
-      props.composite.expression = expr ? `${expr} ${name}` : name;
+      const expr = composite.value.expression || "";
+      composite.value.expression = expr ? `${expr} ${name}` : name;
     };
 
     onMounted(loadMembers);
@@ -490,6 +518,10 @@ export default defineComponent({
       addTerm,
       removeTerm,
       setOnTerm,
+      setExpression,
+      setSchedule,
+      setOnComposite,
+      setOnError,
       insertTerm,
     };
   },
