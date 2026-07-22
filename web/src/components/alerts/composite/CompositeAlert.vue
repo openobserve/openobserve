@@ -538,8 +538,8 @@ export default defineComponent({
   font-size: 0.75rem;
   font-weight: 500;
   font-family: var(--font-mono);
-  background: color-mix(in srgb, var(--q-primary) 12%, transparent);
-  color: var(--q-primary);
+  background: var(--color-badge-primary-soft-bg);
+  color: var(--color-badge-primary-soft-text);
   white-space: nowrap;
 }
 </style>

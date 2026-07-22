@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          independently and appear as ordinary rows. -->
                     <span
                       v-if="row.is_composite"
-                      class="shrink-0 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-semibold text-[var(--q-primary)] bg-[color-mix(in_srgb,var(--q-primary)_12%,transparent)]"
+                      class="shrink-0 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[11px] font-semibold text-badge-primary-soft-text bg-badge-primary-soft-bg"
                       :data-test="`alert-list-${row.name}-composite-badge`"
                     >
                       <OIcon name="account-tree" size="xs" />

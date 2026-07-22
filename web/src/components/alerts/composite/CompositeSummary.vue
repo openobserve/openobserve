@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Plain-English sentence -->
     <div
-      class="summary-sentence italic leading-[1.6] border-l-2 border-[var(--q-primary)] bg-[color-mix(in_srgb,var(--q-primary)_6%,transparent)] rounded-r px-3 py-2"
+      class="summary-sentence italic leading-[1.6] border-l-2 border-accent bg-badge-primary-soft-bg rounded-r px-3 py-2"
     >
       {{ sentence }}
     </div>
@@ -197,8 +197,8 @@ export default defineComponent({
   padding: 1px 6px;
   font-size: 0.75rem;
   font-weight: 500;
-  background: color-mix(in srgb, var(--q-primary) 12%, transparent);
-  color: var(--q-primary);
+  background: var(--color-badge-primary-soft-bg);
+  color: var(--color-badge-primary-soft-text);
   white-space: nowrap;
 }
 </style>
