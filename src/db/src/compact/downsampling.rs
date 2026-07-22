@@ -173,11 +173,13 @@ mod tests {
         )
         .await
         .unwrap();
-        sync_cache_to_db().await.unwrap();
         assert_eq!(
             get_offset("default", StreamType::Metrics, "compact_file", (0, 100)).await,
             (OFFSET, "LOCAL".to_string())
         );
-        assert!(!list_offset().await.unwrap().is_empty());
+        assert_eq!(
+            get_offset_from_cache("default", StreamType::Metrics, "compact_file", (0, 100)).await,
+            Some((OFFSET, "LOCAL".to_string()))
+        );
     }
 }
