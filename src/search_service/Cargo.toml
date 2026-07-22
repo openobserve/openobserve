@@ -9,30 +9,24 @@ publish = false
 default = []
 enterprise = [
     "audit/enterprise",
-    "db/enterprise",
     "dep:o2_enterprise",
     "common/enterprise",
     "config/enterprise",
-    "promql/enterprise",
     "search/enterprise",
     "usage_reporting/enterprise",
 ]
 vectorscan = [
-    "db/vectorscan",
     "dep:o2_enterprise",
     "o2_enterprise/vectorscan",
     "search/vectorscan",
 ]
-vortex = ["dep:vortex", "config/vortex", "o2_enterprise?/vortex", "search/vortex"]
+vortex = ["config/vortex", "o2_enterprise?/vortex", "search/vortex"]
 
 [dependencies]
-audit.workspace = true
+audit = { workspace = true, optional = true }
 common.workspace = true
 transform.workspace = true
-promql.workspace = true
 search.workspace = true
-anyhow.workspace = true
-async-trait.workspace = true
 async-recursion.workspace = true
 arrow.workspace = true
 arrow-schema.workspace = true
@@ -50,30 +44,20 @@ infra.workspace = true
 ingester.workspace = true
 itertools.workspace = true
 log.workspace = true
-md5.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
-object_store.workspace = true
 opentelemetry.workspace = true
 parking_lot.workspace = true
 parquet.workspace = true
-prost.workspace = true
 proto.workspace = true
 rand.workspace = true
 rayon.workspace = true
-regex.workspace = true
-serde.workspace = true
 serde_json.workspace = true
 sqlparser.workspace = true
 svix-ksuid.workspace = true
-tantivy.workspace = true
-tantivy_utils.workspace = true
-thiserror.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
-url.workspace = true
-vortex = { workspace = true, optional = true }
 wal.workspace = true
 usage_reporting.workspace = true
 
