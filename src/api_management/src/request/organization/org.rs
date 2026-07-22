@@ -640,6 +640,7 @@ pub async fn extend_trial_period(
     request_body(content = inline(SetAiUsageLimitRequest), content_type = "application/json"),
     responses(
         (status = 200, description = "Updated AI credit usage", body = crate::service::trial_quota::AiUsageResponse),
+        (status = 400, description = "AI credit limit is outside the configured range"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Organization not found"),
     ),
@@ -654,6 +655,11 @@ pub async fn set_ai_usage_limit(
     }
     if infra::table::organizations::get(&req.org_id).await.is_err() {
         return MetaHttpResponse::not_found("organization not found");
+    }
+
+    let cfg = o2_enterprise::enterprise::common::config::get_config();
+    if let Err(err) = cfg.cloud.validate_ai_credit_limit(req.credits_limit) {
+        return MetaHttpResponse::bad_request(err);
     }
 
     if let Err(err) = crate::service::trial_quota::set_limit(&req.org_id, req.credits_limit).await {
