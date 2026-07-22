@@ -252,6 +252,11 @@ export default defineComponent({
     signout() {
       this.closeSocket();
 
+      // AI chat streams outlive their component by design, so navigating away
+      // doesn't kill an answer. Logout has to stop them explicitly — otherwise
+      // they keep streaming and writing chat history after sign-out.
+      window.dispatchEvent(new Event("o2:abort-ai-streams"));
+
       // Clear any open notifications so they don't carry over past logout.
       dismissAll();
 
@@ -1336,6 +1341,18 @@ export default defineComponent({
         userClickedOrg.value = newVal;
       },
       { immediate: true },
+    );
+
+    // Home page has its own inline AI tab (see toggleAIChat's home special-case
+    // above), so the sidebar chat panel is redundant there — close it on
+    // arrival so we don't show both the sidebar and the home AI tab at once.
+    watch(
+      () => router.currentRoute.value.name,
+      (routeName) => {
+        if (routeName === "home" && store.state.isAiChatEnabled) {
+          closeChat();
+        }
+      },
     );
 
     const showShortcuts = ref(false);
