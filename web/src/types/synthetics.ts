@@ -161,10 +161,7 @@ export type RecorderPortInbound =
 
 // ---- Bridge transport types (content-script relay, replaces chrome.runtime.*) ----
 
-export type TrustResponse =
-  | { type: 'trust-required'; origin: string; nonce: string }
-  | { type: 'trust-granted'; origin: string; nonce: string }
-  | { type: 'trust-denied'; origin: string; nonce: string }
+export type BridgeStatusMessage =
   | { type: 'bridge-disconnected' }
 
 /**
