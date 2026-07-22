@@ -30,34 +30,6 @@ const MAX_SUGGESTIONS: usize = 3;
 /// (hundreds of fields in an error are token noise).
 const MAX_FIELDS_IN_MESSAGE: usize = 10;
 
-/// SQL functions that are valid in O2 queries besides the UDFs in
-/// `DEFAULT_FUNCTIONS`. Used only for did-you-mean ranking.
-const COMMON_FUNCTIONS: &[&str] = &[
-    "count",
-    "sum",
-    "avg",
-    "min",
-    "max",
-    "median",
-    "approx_percentile_cont",
-    "date_bin",
-    "date_trunc",
-    "date_format",
-    "histogram",
-    "spath",
-    "to_timestamp",
-    "to_timestamp_micros",
-    "lower",
-    "upper",
-    "coalesce",
-    "concat",
-    "length",
-    "substring",
-    "replace",
-    "abs",
-    "round",
-];
-
 /// Attach `hint`/`suggestions` to an error body when the error code carries
 /// enough information. No-op for codes we have nothing smart to say about.
 pub fn enrich(resp: &mut HttpResponse, code: &ErrorCodes) {
@@ -109,10 +81,12 @@ fn enrich_function_not_defined(resp: &mut HttpResponse, inner: &str) {
         return;
     };
 
-    let candidates = DEFAULT_FUNCTIONS
+    // The registry snapshot covers every callable function: DataFusion
+    // built-ins plus the O2 UDFs (same source DataFusion's own
+    // "Did you mean" pulls from, minus per-org VRL functions).
+    let candidates = search::datafusion::exec::registered_function_names()
         .iter()
-        .map(|f| f.name)
-        .chain(COMMON_FUNCTIONS.iter().copied());
+        .map(|s| s.as_str());
     let suggestions = suggest(&func, candidates);
 
     resp.message = format!("unknown function '{func}'");
@@ -382,6 +356,16 @@ mod tests {
                 .unwrap()
                 .contains("histogram(_timestamp, '1 hour')")
         );
+    }
+
+    #[test]
+    fn function_datafusion_builtin_suggested() {
+        let mut resp = body();
+        enrich(
+            &mut resp,
+            &ErrorCodes::SearchFunctionNotDefined("Invalid function 'cout'".to_string()),
+        );
+        assert!(resp.suggestions.unwrap().contains(&"count".to_string()));
     }
 
     #[test]
