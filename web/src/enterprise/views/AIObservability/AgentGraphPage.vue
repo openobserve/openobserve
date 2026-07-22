@@ -242,9 +242,17 @@ function effectiveWindow() {
 async function loadStreams() {
   try {
     const res = (await getStreams("traces", false, false)) as {
-      list?: { name: string }[];
+      list?: { name: string; settings?: { is_llm_stream?: boolean } }[];
     };
-    availableStreams.value = (res?.list ?? []).map((s) => s.name);
+    // Only LLM trace streams belong in the Agent Graph picker — a plain
+    // service/HTTP trace stream has no agents or gen_ai edges to graph, so
+    // offering it would just resolve to an empty graph. `is_llm_stream` is the
+    // backend-maintained flag (auto-detected at ingest from gen_ai_* columns).
+    // Exclude only streams explicitly flagged non-LLM, matching the same filter
+    // used by LLM Insights and Sessions.
+    availableStreams.value = (res?.list ?? [])
+      .filter((s) => s.settings?.is_llm_stream !== false)
+      .map((s) => s.name);
     if (
       availableStreams.value.length &&
       !availableStreams.value.includes(activeStream.value)
