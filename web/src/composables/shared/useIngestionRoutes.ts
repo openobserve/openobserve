@@ -16,6 +16,7 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
+import LoongCollector from "@/components/ingestion/logs/LoongCollector.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
@@ -219,6 +220,14 @@ const useIngestionRoutes = () => {
                   path: "syslogng",
                   name: "syslogNg",
                   component: SyslogNg,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "loongcollector",
+                  name: "loongcollector",
+                  component: LoongCollector,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
