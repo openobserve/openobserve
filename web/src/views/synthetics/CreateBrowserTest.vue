@@ -195,7 +195,6 @@ onMounted(() => {
   // after mid-session install). The content script sends 'oo-bridge-ready' when
   // chrome.scripting.executeScript injects it, and the composable calls this back.
   recorder.registerAutoDetect(() => {
-    console.log("Register auto detect");
     extensionInstalled.value = true
     extensionReady.value = true
   })
@@ -600,28 +599,12 @@ function onClearResults() {
             </div>
           </div>
 
-          <!-- Step 2: Click the extension icon to activate -->
+          <!-- Step 2: Enable incognito mode -->
           <div class="flex items-start gap-4 p-4">
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-              :class="extensionReady ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse'"
+              :class="incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse'"
             >2</span>
-            <div class="flex-1 min-w-0">
-              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
-              <p class="text-xs text-text-secondary m-0">{{ t('synthetics.createBrowserTest.setupStep2Description') }}</p>
-              <p
-                v-if="extensionReady"
-                class="text-xs font-medium text-status-success-text! mt-2"
-              >{{ t('synthetics.createBrowserTest.setupConnected') }}</p>
-            </div>
-          </div>
-
-          <!-- Step 3: Enable incognito mode -->
-          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionReady }">
-            <span
-              class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-              :class="extensionReady ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
-            >3</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
                 <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep3Title') }}</h4>
@@ -630,9 +613,24 @@ function onClearResults() {
               <OSwitch
                 v-model="incognitoAllowed"
                 :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
-                :disabled="!extensionReady"
                 data-test="synthetics-setup-incognito-switch"
               />
+            </div>
+          </div>
+
+          <!-- Step 3: Click the extension icon to activate -->
+          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !incognitoAllowed }">
+            <span
+              class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
+              :class="extensionReady ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : incognitoAllowed ? 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
+            >3</span>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
+              <p class="text-xs text-text-secondary m-0">{{ t('synthetics.createBrowserTest.setupStep2Description') }}</p>
+              <p
+                v-if="extensionReady"
+                class="text-xs font-medium text-status-success-text! mt-2"
+              >{{ t('synthetics.createBrowserTest.setupConnected') }}</p>
             </div>
           </div>
         </div>

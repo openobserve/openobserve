@@ -235,7 +235,7 @@ const useSyntheticsRecorder = () => {
     // ran (SW suspend, tab backgrounding, etc.). Sending the probe re-activates
     // the bridge before we send the startRecording command.
     window.postMessage({ ch: 'oo-bridge-probe' }, '*');
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise(r => setTimeout(r, 500));
 
     bridgeConnect()
     bridgeDisconnectHandler = () => {
