@@ -17,44 +17,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   A card's preview chart.
 
-  Runs the preview response through the same PromQL -> ECharts converter the
-  dashboards use, so a card renders exactly what the drilled-in panel will. The
-  card-specific styling (fixed series colour by card index, 9% area fill, no
-  legend) is applied to the converted options rather than forked into a second
-  renderer.
+  Renders the preview response through the SAME component a dashboard panel uses
+  (PanelSchemaRenderer), so a card draws exactly what the drilled-in panel will.
+  The results are already fetched — the metrics explorer's preview queue owns the
+  fetch lifecycle (concurrency-capped, viewport-gated, cancellable, cached) — so
+  they are handed to the panel via `injectedPromqlData` instead of letting it
+  fire its own query. The card-specific look (fixed colour, no legend, pinned
+  axis) is expressed as panel config the shared converter already understands.
 -->
 <template>
-  <div ref="chartPanelRef" class="w-full h-full">
-    <ChartRenderer
-      v-if="chartData.options"
-      :data="chartData"
-      :height="height"
-      @error="onChartError"
+  <div ref="chartPanelRef" class="w-full h-full" :style="{ height }">
+    <PanelSchemaRenderer
+      :panel-schema="panelSchema"
+      :selected-time-obj="selectedTimeObj"
+      :variables-data="variablesData"
+      :injected-promql-data="injectedPromqlData"
+      :allow-alert-creation="allowAlertCreation"
+      :allow-annotations-add="false"
+      :allow-annotations-a-p-i="false"
+      @error="onPanelError"
       @updated:data-zoom="$emit('zoom', $event)"
-      @domcontextmenu="$emit('contextmenu', $event)"
     />
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-  type PropType,
-} from "vue";
-import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import * as echarts from "echarts/core";
-import { toZonedTime } from "date-fns-tz";
-import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
-import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
+import { computed, defineComponent, type PropType } from "vue";
+import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 export default defineComponent({
   name: "MetricCardChart",
-  components: { ChartRenderer },
+  components: { PanelSchemaRenderer },
   props: {
     /** One PromQL query_range response per query in the effective variant. */
     results: { type: Array as PropType<any[]>, required: true },
@@ -68,33 +61,30 @@ export default defineComponent({
     height: { type: String, default: "100%" },
     /**
      * The window these results were queried for, in MICROSECONDS — the same unit
-     * the grid holds it in. Without it the time axis is whatever ECharts infers
-     * from the data, which is not the window the user picked. See `pinTimeAxis`.
+     * the grid holds it in. Handed to the panel as the time range AND (via the
+     * `pin_x_axis_to_range` config) the range the x-axis is pinned to, so a
+     * sparsely-scraped metric with a single point does not auto-range into a
+     * ~two-day axis.
      */
     timeRange: {
       type: Object as PropType<{ start_time: number; end_time: number }>,
       default: null,
     },
+    /**
+     * Opt in to the panel's right-click → Create Alert menu. On for a real
+     * explorer card; off for a function-config preview tile, which is not a
+     * place to author an alert.
+     */
+    allowAlertCreation: { type: Boolean, default: false },
   },
   /**
-   * `zoom` carries ECharts' `{start, end}` (epoch ms) from a drag-select on the
-   * chart.
-   *
-   * Not emitted for the heatmap: its x-axis is categorical (one column per
-   * bucket), so the converter withholds the toolbox there anyway.
-   *
-   * `contextmenu` carries ChartRenderer's `{x, y, value}` from a right-click on a
-   * data point — the same event PanelSchemaRenderer turns into Create Alert.
-   * ChartRenderer only fires it for line/bar series, so a heatmap card is
-   * naturally excluded (a bucket count is not an alert threshold).
+   * `zoom` carries the panel's `updated:data-zoom` payload (a drag-select on the
+   * chart). `error` carries a conversion/render failure message so the card can
+   * show its error tile — the query itself already succeeded (these are already
+   * fetched results), so this is a render-time failure only.
    */
-  emits: ["error", "zoom", "contextmenu"],
+  emits: ["error", "zoom"],
   setup(props, { emit }) {
-    const store = useStore();
-    const { t } = useI18n();
-    const chartPanelRef = ref(null);
-    const chartData = ref<any>({ options: null });
-
     /**
      * Decimal places that keep the axis readable at the data's magnitude.
      *
@@ -122,14 +112,16 @@ export default defineComponent({
     };
 
     /**
-     * A minimal panel schema. It is the same shape the drill-in hands to the
-     * editor, which is what keeps "what you click is what you get" true.
+     * The panel schema. The same shape the drill-in hands the editor, which is
+     * what keeps "what you click is what you get" true. `type` is fixed from the
+     * card's resolved variant (metadata-driven, never inferred from the data).
      */
-    const buildPanelSchema = () => ({
+    const panelSchema = computed(() => ({
       id: "metrics-explorer-card",
+      title: "",
       type: props.chartType,
       queryType: "promql",
-      queries: props.queries.map((q: any) => ({
+      queries: (props.queries ?? []).map((q: any) => ({
         query: q.expr,
         customQuery: true,
         fields: { stream_type: "metrics" },
@@ -141,205 +133,87 @@ export default defineComponent({
         decimals: adaptiveDecimals(),
         show_legends: false,
         // Gridlines make a small chart readable — without them a sparkline is
-        // just a shape. The heatmap is solid colour, so they'd only add noise
-        // there; it opts out below.
+        // just a shape. The heatmap is solid colour, so they'd only add noise.
         show_gridlines: props.chartType !== "heatmap",
         show_symbol: false,
         line_interpolation: "smooth",
         line_thickness: 1.5,
         color: { mode: "fixed", fixedColor: [props.color] },
-        // Activates the classic-histogram transform (le-sort + de-accumulate).
-        // Without it a cumulative-bucket heatmap renders as nonsense.
+        // Injected data is never "loading", so the converter would auto-range
+        // the x-axis; pin it to the queried window instead. See `timeRange`.
+        pin_x_axis_to_range: true,
+        // Activates the classic-histogram transform (le-sort + de-accumulate)
+        // and the card-sized heatmap look (small colour bar, thinned bucket
+        // labels, no top gap). Without them a cumulative-bucket heatmap renders
+        // as nonsense on a full-size layout that swamps a card.
         ...(props.chartType === "heatmap"
           ? {
               heatmap_mode: "prometheus_histogram",
+              compact_preview: true,
               bucket_unit: props.bucketUnit,
               bucket_unit_custom: props.bucketUnitCustom,
             }
           : {}),
       },
-    });
+    }));
 
-    /**
-     * Pins the time axis to the window the data was QUERIED for.
-     *
-     * `convertPromQLData` sets `xAxis.min`/`max` only while a panel is streaming;
-     * a settled chart is left to ECharts, which scales the axis to the data it was
-     * given. A card with very few points (a sparsely-scraped metric can return
-     * ONE) makes ECharts invent a span of its own — widened out to about two days
-     * — so the axis disagrees with the picker. State the known window instead.
-     * This also keeps every card spanning the same window, so a spike at the same
-     * x is the same moment.
-     *
-     * Not applied to the heatmap: its x-axis is categorical (one column per
-     * bucket), so a time min/max means nothing there.
-     */
-    const pinTimeAxis = (options: any) => {
+    /** The queried window as the Date pair PanelSchemaRenderer expects. */
+    const selectedTimeObj = computed(() => {
       const range = props.timeRange;
-      if (!range?.start_time || !range?.end_time) return;
-      if (props.chartType === "heatmap") return;
-
-      const axis = options.xAxis;
-      if (!axis || Array.isArray(axis) || axis.type !== "time") return;
-
-      // µs to ms, then into the same coordinate space the converter puts the
-      // series timestamps in — a zoned Date, or a zoneless ISO string for UTC.
-      const toAxisValue = (microseconds: number) => {
-        const ms = microseconds / 1000;
-        return store.state.timezone !== "UTC"
-          ? toZonedTime(ms, store.state.timezone)
-          : new Date(ms).toISOString().slice(0, -1);
+      if (!range?.start_time || !range?.end_time) {
+        return { start_time: null, end_time: null };
+      }
+      return {
+        start_time: new Date(range.start_time / 1000),
+        end_time: new Date(range.end_time / 1000),
       };
-
-      axis.min = toAxisValue(range.start_time);
-      axis.max = toAxisValue(range.end_time);
-    };
-
-    /**
-     * `render` awaits the converter, and the watcher below fires it on every
-     * prop change — so two renders can be in flight at once, and without this
-     * the SLOWER, staler one paints last. Only the newest may write.
-     */
-    let renderSeq = 0;
-
-    const render = async () => {
-      const seq = ++renderSeq;
-      if (!props.results?.length) {
-        chartData.value = { options: null };
-        return;
-      }
-      try {
-        const converted: any = await convertPromQLData(
-          buildPanelSchema(),
-          props.results,
-          store,
-          chartPanelRef,
-          ref(null), // hoveredSeriesState — cards have no cross-panel hover
-          [], // annotations
-        );
-
-        if (seq !== renderSeq) return;
-
-        const options = converted?.options;
-        if (options) {
-          // The card clips its content (`overflow-hidden`, fixed height), and
-          // ECharts renders its tooltip INSIDE the chart container by default —
-          // so a tooltip near an edge was being sliced off at the card boundary.
-          // Portal it to <body> so it can overflow the card, and confine it to
-          // the viewport so it never runs off screen either.
-          options.tooltip = {
-            ...(options.tooltip ?? {}),
-            appendToBody: true,
-            confine: true,
-          };
-
-          pinTimeAxis(options);
-
-          if (props.chartType === "heatmap") {
-            // Keep the colour bar — without it the cells are just colours with
-            // no scale. Sized down and pinned under the axis so it doesn't
-            // overlap the plot.
-            if (options.visualMap) {
-              options.visualMap = {
-                ...options.visualMap,
-                show: true,
-                orient: "horizontal",
-                left: "center",
-                bottom: 0,
-                itemWidth: 10,
-                itemHeight: 90,
-                precision: 2,
-                textStyle: { fontSize: 9 },
-              };
-              // Room for the bar, below the x-axis labels.
-              options.grid = { ...(options.grid ?? {}), bottom: 26 };
-            }
-            for (const series of options.series ?? []) {
-              series.label = { ...(series.label ?? {}), show: false };
-            }
-            // Thin the bucket labels to what a card can actually render, but
-            // ALWAYS keep the top row. A histogram's `+Inf` bucket is the one
-            // that says "and everything slower than this", and ECharts'
-            // `hideOverlap` would otherwise drop it.
-            if (options.yAxis) {
-              const rowCount = options.yAxis.data?.length ?? 0;
-              const step = Math.max(1, Math.ceil(rowCount / 8));
-              options.yAxis.axisLabel = {
-                ...(options.yAxis.axisLabel ?? {}),
-                fontSize: 9,
-                width: 46,
-                overflow: "truncate",
-                hideOverlap: false,
-                // Count DOWN from the top row, so `+Inf` is always labelled and
-                // the spacing stays even.
-                interval: (index: number) =>
-                  (rowCount - 1 - index) % step === 0,
-              };
-            }
-            if (options.xAxis) {
-              options.xAxis.axisLabel = {
-                ...(options.xAxis.axisLabel ?? {}),
-                fontSize: 9,
-                hideOverlap: true,
-              };
-            }
-          }
-        }
-        chartData.value = converted ?? { options: null };
-      } catch (error: any) {
-        if (seq !== renderSeq) return;
-        chartData.value = { options: null };
-        emit("error", error?.message ?? t("metrics.metricCardChart.failedToRenderChart"));
-      }
-    };
-
-    const onChartError = (error: any) => emit("error", error);
-
-    /**
-     * Keep the canvas in step with the card.
-     *
-     * ChartRenderer only re-lays-out on a WINDOW resize, but a card changes
-     * width without one — opening a rail panel, or the column count changing on
-     * a container resize. The canvas would keep its old size and the chart would
-     * sit stretched or clipped inside it. So watch the card itself and resize
-     * the ECharts instance ChartRenderer initialized on its own root.
-     */
-    let resizeObserver: ResizeObserver | null = null;
-
-    onMounted(() => {
-      if (!chartPanelRef.value || typeof ResizeObserver === "undefined") return;
-      resizeObserver = new ResizeObserver(() => {
-        const host = (
-          chartPanelRef.value as unknown as HTMLElement
-        )?.querySelector('[data-test="chart-renderer"]');
-        if (host) echarts.getInstanceByDom(host as HTMLElement)?.resize();
-      });
-      resizeObserver.observe(chartPanelRef.value as unknown as HTMLElement);
     });
 
-    onBeforeUnmount(() => {
-      resizeObserver?.disconnect();
-      resizeObserver = null;
+    /**
+     * The already-fetched results, handed to the panel so it renders WITHOUT
+     * firing its own query. `metadata` carries the queried window (µs) so the
+     * converter's `pin_x_axis_to_range` has a range to pin to.
+     */
+    const injectedPromqlData = computed(() => {
+      if (!props.results?.length) return undefined;
+      const range = props.timeRange;
+      return {
+        data: props.results,
+        metadata: {
+          queries: [
+            {
+              startTime: range?.start_time,
+              endTime: range?.end_time,
+            },
+          ],
+        },
+      };
     });
 
-    // Everything `render` reads.
-    watch(
-      () => [
-        props.results,
-        props.queries,
-        props.chartType,
-        props.color,
-        props.unit,
-        props.unitCustom,
-        props.bucketUnit,
-        props.bucketUnitCustom,
-        props.timeRange,
-      ],
-      render,
-      { immediate: true, deep: false },
-    );
+    /**
+     * Stable empty variables object. The card substitutes no variables, and the
+     * injected-data path skips the variable wait anyway — but the prop is
+     * required, so keep one identity to avoid churning the panel's watcher.
+     */
+    const variablesData = {};
 
-    return { chartPanelRef, chartData, onChartError };
+    /**
+     * The panel emits an error object `{ message }`; forward only the message,
+     * and only when there is one (it also fires with an empty message to RESET
+     * the parent's error, which the card handles by clearing on new results).
+     */
+    const onPanelError = (error: any) => {
+      const message = error?.message ?? error;
+      if (message) emit("error", String(message));
+    };
+
+    return {
+      panelSchema,
+      selectedTimeObj,
+      injectedPromqlData,
+      variablesData,
+      onPanelError,
+    };
   },
 });
 </script>

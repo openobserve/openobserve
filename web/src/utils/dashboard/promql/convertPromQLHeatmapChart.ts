@@ -161,6 +161,62 @@ function formatBucketLabel(le: string, leValue: number, config: any): string {
 }
 
 /**
+ * Card-sized heatmap. The metrics explorer's preview cards are a few cm tall,
+ * where the default colour bar and full-size axis labels swamp the plot (the
+ * cells collapse to a thin line and only one bucket label survives). Shrinks the
+ * visual map, thins the bucket labels — always keeping the top `+Inf` row — and
+ * drops the font sizes. Mutates and returns `options`. Only run when the card
+ * sets `config.compact_preview`.
+ */
+function applyCompactPreview(options: any): any {
+  if (options.visualMap) {
+    options.visualMap = {
+      ...options.visualMap,
+      show: true,
+      orient: "horizontal",
+      left: "center",
+      bottom: 0,
+      itemWidth: 10,
+      itemHeight: 90,
+      precision: 2,
+      textStyle: { fontSize: 9 },
+    };
+    // Pull the plot to the top edge (no default top inset on a short card) and
+    // leave room for the bar below the x-axis labels.
+    options.grid = { ...(options.grid ?? {}), top: 8, bottom: 26 };
+  }
+
+  const yAxis = Array.isArray(options.yAxis) ? options.yAxis[0] : options.yAxis;
+  const rowCount = yAxis?.data?.length ?? 0;
+  if (yAxis && rowCount) {
+    // Thin the bucket labels to what a card can render, but ALWAYS keep the top
+    // row: a histogram's `+Inf` bucket is the "everything slower than this" row,
+    // and ECharts' hideOverlap would otherwise drop it. Count DOWN from the top
+    // so `+Inf` is always labelled and the spacing stays even.
+    const step = Math.max(1, Math.ceil(rowCount / 8));
+    yAxis.axisLabel = {
+      ...(yAxis.axisLabel ?? {}),
+      fontSize: 9,
+      width: 46,
+      overflow: "truncate",
+      hideOverlap: false,
+      interval: (index: number) => (rowCount - 1 - index) % step === 0,
+    };
+  }
+
+  const xAxis = Array.isArray(options.xAxis) ? options.xAxis[0] : options.xAxis;
+  if (xAxis) {
+    xAxis.axisLabel = {
+      ...(xAxis.axisLabel ?? {}),
+      fontSize: 9,
+      hideOverlap: true,
+    };
+  }
+
+  return options;
+}
+
+/**
  * Converter for heatmap charts
  * Displays time-series data as a 2D heatmap with color intensity
  */
@@ -228,7 +284,7 @@ export class HeatmapConverter implements PromQLChartConverter {
     // Format timestamps to extract time portion (consistent with bar charts)
     const xAxisData = buildXAxisData(timeAxis);
 
-    return {
+    const options: any = {
       series: [
         {
           type: "heatmap",
@@ -292,6 +348,9 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
       tooltip: {
         position: "top",
+        // render into <body> so the tooltip is not clipped by the panel's
+        // overflow — same container treatment as the other PromQL charts
+        appendToBody: true,
         textStyle: {
           color: chartColor("--color-tooltip-text"),
           fontSize: 12,
@@ -325,6 +384,8 @@ export class HeatmapConverter implements PromQLChartConverter {
         containLabel: true,
       },
     };
+
+    return config?.compact_preview ? applyCompactPreview(options) : options;
   }
 
   /**
@@ -402,7 +463,7 @@ export class HeatmapConverter implements PromQLChartConverter {
 
     const xAxisData = buildXAxisData(timestamps);
 
-    return {
+    const options: any = {
       series: [
         {
           type: "heatmap",
@@ -450,6 +511,9 @@ export class HeatmapConverter implements PromQLChartConverter {
       },
       tooltip: {
         position: "top",
+        // render into <body> so the tooltip is not clipped by the panel's
+        // overflow — same container treatment as the other PromQL charts
+        appendToBody: true,
         textStyle: {
           color: chartColor("--color-tooltip-text"),
           fontSize: 12,
@@ -484,5 +548,7 @@ export class HeatmapConverter implements PromQLChartConverter {
         containLabel: true,
       },
     };
+
+    return config?.compact_preview ? applyCompactPreview(options) : options;
   }
 }

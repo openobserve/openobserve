@@ -373,9 +373,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :bucket-unit-custom="bucketO2Unit.unitCustom ?? undefined"
         :color="color"
         :time-range="dataTimeRange"
+        :allow-alert-creation="true"
         @error="renderError = String($event ?? '')"
         @zoom="$emit('zoom', $event)"
-        @contextmenu="onChartContextMenu"
       />
 
       <div v-else class="h-full">
@@ -464,44 +464,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Create Alert — the SAME menu the dashboard panel raises on right-click
-         (PanelSchemaRenderer mounts this exact component), so the gesture and the
-         wording are identical wherever a chart is. Position is viewport-fixed
-         from the click, so the card's `overflow-hidden` cannot clip it. -->
-    <AlertContextMenu
-      :visible="alertMenu.visible"
-      :x="alertMenu.x"
-      :y="alertMenu.y"
-      :value="alertMenu.value"
-      @select="onCreateAlert"
-      @close="alertMenu.visible = false"
-    />
   </div>
 </template>
 
 <script lang="ts">
 import {
   computed,
-  defineAsyncComponent,
   defineComponent,
   onBeforeUnmount,
   onMounted,
-  reactive,
   ref,
   watch,
   type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import useTheme from "@/composables/useTheme";
 import MetricCardChart from "./MetricCardChart.vue";
-
-// Async, exactly as PanelSchemaRenderer imports it: the menu is only ever
-// needed once a user right-clicks a chart, so it stays out of the grid's chunk.
-const AlertContextMenu = defineAsyncComponent(
-  () => import("@/components/dashboards/AlertContextMenu.vue"),
-);
 import RelativeTime from "@/components/common/RelativeTime.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -556,7 +534,6 @@ export default defineComponent({
     LoadingProgress,
     OTag,
     OTooltip,
-    AlertContextMenu,
   },
   props: {
     card: { type: Object as PropType<MetricCardModel>, required: true },
@@ -594,80 +571,8 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const { t } = useI18n();
-    const store = useStore();
-    const router = useRouter();
     const root = ref<HTMLElement | null>(null);
     const { isDark } = useTheme();
-
-    /* ------------------------------------------------ create alert */
-
-    /**
-     * Right-click a data point -> Create Alert, the same gesture a dashboard
-     * panel offers. Handled HERE rather than emitted to the explorer: the menu is
-     * positioned from the click and the payload is this card's own query, so
-     * there is nothing for the parent to decide. (`contextmenu` is also a real
-     * DOM event name — emitting it would bind to the root element and fire on
-     * every right-click anywhere on the card, which is the trap the `refresh`
-     * note above describes.)
-     */
-    const alertMenu = reactive({ visible: false, x: 0, y: 0, value: 0 });
-
-    const onChartContextMenu = (event: {
-      x: number;
-      y: number;
-      value: number;
-    }) => {
-      // The clicked point's value seeds the threshold, so the alert opens
-      // pre-filled with the number the user actually pointed at.
-      if (!Number.isFinite(event?.value)) return;
-      alertMenu.visible = true;
-      alertMenu.x = event.x;
-      alertMenu.y = event.y;
-      alertMenu.value = event.value;
-    };
-
-    /**
-     * The same `panelData` contract the dashboard path builds
-     * (usePanelActions.handleCreateAlert) and the alert page reads: queries +
-     * queryType + timeRange + the chosen condition/threshold.
-     *
-     * `yAxisColumn` is deliberately absent — it is SQL-only there too; a PromQL
-     * alert thresholds the expression's own value.
-     */
-    const onCreateAlert = (selection: {
-      condition: string;
-      threshold: number;
-    }) => {
-      alertMenu.visible = false;
-
-      const queries = props.queries ?? [];
-      if (!queries.length) return;
-
-      const panelData = {
-        panelTitle: props.card.name,
-        panelId: `metrics-explorer-card-${props.card.name}`,
-        queries: queries.map((q: any) => ({
-          query: q.expr,
-          customQuery: true,
-          fields: { stream_type: "metrics" },
-          config: { promql_legend: q.legendTemplate ?? "" },
-        })),
-        queryType: "promql",
-        timeRange: props.timeRange,
-        threshold: selection.threshold,
-        condition: selection.condition,
-        executedQuery: queries[0]?.expr,
-      };
-
-      router.push({
-        name: "addAlert",
-        query: {
-          org_identifier: store.state.selectedOrganization?.identifier,
-          fromPanel: "true",
-          panelData: encodeURIComponent(JSON.stringify(panelData)),
-        },
-      });
-    };
 
     const color = computed(() => cardColorForIndex(props.index, isDark.value));
     // Kept for the card's aria label; the VISIBLE badge renders through the
@@ -858,9 +763,6 @@ export default defineComponent({
       dataTimeRange,
       renderError,
       onRetryRender,
-      alertMenu,
-      onChartContextMenu,
-      onCreateAlert,
     };
   },
 });
