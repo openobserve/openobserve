@@ -118,11 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('metrics.explorer.card.openTooltip')" />
         </OButton>
 
-        <!-- Pin (star). Always visible. -->
+        <!-- Pin (star). Always visible. Filled gold star when favorited. -->
         <OButton
           variant="ghost"
           size="icon"
-          :icon-left="isFavorite ? 'favorite' : 'favorite-border'"
+          :icon-left="isFavorite ? 'star' : 'star-outline'"
+          :class="isFavorite ? 'text-favorite' : ''"
           :aria-label="
             isFavorite
               ? t('metrics.explorer.card.favoriteRemoveAria', {
