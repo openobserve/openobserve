@@ -168,6 +168,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="capitalize"
                 data-test="service-graph-node-panel-tab-operations"
               />
+              <!-- Agent behavior (loops/failures) — only for agent nodes on
+                   enterprise builds. See Agent Signals design §4b. -->
+              <OTab
+                v-if="showBehaviorTab"
+                name="behavior"
+                :label="t('aiObservability.behavior.node.tabLabel')"
+                class="capitalize"
+                data-test="service-graph-node-panel-tab-behavior"
+              />
               <OTab
                 v-for="cfg in activeResourceTabConfigs"
                 :key="cfg.id"
@@ -261,7 +270,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :columns="operationsTableColumns"
                     :rows="sortedOperationsTableRows"
                     :sort-by="sortBy"
-                    :sort-order="sortOrder"
+                    :sort-order="sortOrderProp"
                     :loading="loadingOperations"
                     :default-columns="false"
                     :enable-column-reorder="false"
@@ -348,6 +357,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </OTabPanel>
 
+            <!-- Behavior Tab (agent nodes, enterprise) -->
+            <OTabPanel
+              v-if="showBehaviorTab"
+              name="behavior"
+              class="p-0! panel-section mb-0!"
+              data-test="service-graph-side-panel-behavior"
+            >
+              <AgentNodeBehaviorTab
+                :agent-name="behaviorAgentName"
+                :source-stream="streamFilter"
+                :start-time="timeRange.startTime"
+                :end-time="timeRange.endTime"
+              />
+            </OTabPanel>
+
             <!-- Nodes Tab -->
             <!-- Dynamic OTEL resource tabs (Pods, Nodes, Hosts, Containers, Functions, ECS Tasks…) -->
             <OTabPanel
@@ -372,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
                   :rows="sortResourceRows(buildResourceTableRows(cfg))"
                   :sort-by="sortBy"
-                  :sort-order="sortOrder"
+                  :sort-order="sortOrderProp"
                   :loading="resourceTabLoading[cfg.id]"
                   :default-columns="false"
                   :enable-column-reorder="false"
@@ -610,6 +634,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ServiceCatalogBarCell from "./components/ServiceCatalogBarCell.vue";
+import config from "@/aws-exports";
 
 const TelemetryCorrelationDashboard = defineAsyncComponent(
   () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -621,6 +646,12 @@ const RenderDashboardCharts = defineAsyncComponent(
 
 const TenstackTable = defineAsyncComponent(
   () => import("@/components/TenstackTable.vue"),
+);
+
+// Agent-scoped behavior signals shown on agent nodes (enterprise). Async so the
+// enterprise chunk only loads when an agent node's Behavior tab is opened.
+const AgentNodeBehaviorTab = defineAsyncComponent(
+  () => import("@/enterprise/views/AIObservability/AgentNodeBehaviorTab.vue"),
 );
 
 // ---------------------------------------------------------------------------
@@ -859,6 +890,7 @@ export default defineComponent({
     OCheckbox,
     OIcon,
     ServiceCatalogBarCell,
+    AgentNodeBehaviorTab,
 },
   props: {
     selectedNode: {
@@ -1043,7 +1075,7 @@ export default defineComponent({
       );
       const serviceFilter = `${serviceNameField.value} = '${serviceName}'`;
 
-      convertedDashboard.tabs[0].panels.forEach((panel: any, index) => {
+      convertedDashboard.tabs[0].panels.forEach((panel: any, index: number) => {
         let whereClause: string;
 
         if (panel.title === "Errors") {
@@ -1167,7 +1199,7 @@ export default defineComponent({
         if (f.panelTitle === "Errors") errorsOnly = true;
         if (f.panelTitle === "Duration" && f.start !== null && f.start > 0) {
           minDurationMicros = f.start;
-          maxDurationMicros = f.end;
+          maxDurationMicros = f.end ?? undefined;
         }
       });
 
@@ -1298,45 +1330,6 @@ export default defineComponent({
         correlationError.value = null;
       },
     );
-
-    // Extract semantic dimensions from a span for richer metric correlation
-    const extractSpanDimensions = (
-      span: Record<string, any>,
-    ): Record<string, string> => {
-      const dimensions: Record<string, string> = {};
-      if (span.service_name) dimensions["service"] = span.service_name;
-
-      const attributeMappings: Record<string, string> = {
-        k8s_namespace_name: "k8s-namespace",
-        "k8s.namespace.name": "k8s-namespace",
-        k8s_deployment_name: "k8s-deployment",
-        "k8s.deployment.name": "k8s-deployment",
-        k8s_pod_name: "k8s-pod",
-        "k8s.pod.name": "k8s-pod",
-        k8s_container_name: "k8s-container",
-        "k8s.container.name": "k8s-container",
-        k8s_node_name: "k8s-node",
-        "k8s.node.name": "k8s-node",
-        k8s_cluster_name: "k8s-cluster",
-        "k8s.cluster.name": "k8s-cluster",
-        host_name: "host-name",
-        "host.name": "host-name",
-        cloud_region: "cloud-region",
-        "cloud.region": "cloud-region",
-        cloud_availability_zone: "cloud-availability-zone",
-        "cloud.availability_zone": "cloud-availability-zone",
-        container_name: "container-name",
-        "container.name": "container-name",
-      };
-
-      for (const [attr, dim] of Object.entries(attributeMappings)) {
-        let service_attr = "service_" + attr;
-        if (span[service_attr] && !dimensions[dim]) {
-          dimensions[dim] = String(span[service_attr]);
-        }
-      }
-      return dimensions;
-    };
 
     // Fetch the most recent span for this service to extract rich semantic dimensions
     const fetchLatestSpan = async (): Promise<Record<string, any> | null> => {
@@ -1551,6 +1544,28 @@ export default defineComponent({
 
     /** Whether the selected node is an inferred service (uninstrumented dependency). */
     const isInferred = computed(() => !!props.selectedNode?.service_type);
+
+    // The clicked agent's display name (same value the graph node is keyed by
+    // and that AgentSignalDetailPanel filters on — see design §4b id-vs-name).
+    const behaviorAgentName = computed<string>(
+      () =>
+        props.selectedNode?.name ||
+        props.selectedNode?.label ||
+        props.selectedNode?.id ||
+        "",
+    );
+
+    // The Behavior tab (loop/failure signals) shows only for agent nodes on
+    // enterprise builds, and only when a concrete stream is selected (the
+    // signals stream is per-source-stream). The AgentNodeBehaviorTab itself
+    // degrades gracefully to a "feature off" hint if the rollup is disabled.
+    const showBehaviorTab = computed(
+      () =>
+        config.isEnterprise === "true" &&
+        props.selectedNode?.service_type === "agent" &&
+        props.streamFilter !== "all" &&
+        !!props.streamFilter,
+    );
 
     // Tabs actually shown. For inferred services use the registry tabs;
     // for instrumented services use the user-selected OTEL resource tabs.
@@ -1767,6 +1782,12 @@ export default defineComponent({
     // ── Sorting state ──────────────────────────────────────────────────────
     const sortBy = ref<string>("");
     const sortOrder = ref<"asc" | "desc" | "">("");
+
+    // The table's sort-order prop only accepts "asc" | "desc" | undefined; our
+    // internal "" cleared-sentinel maps to undefined for the binding.
+    const sortOrderProp = computed<"asc" | "desc" | undefined>(() =>
+      sortOrder.value === "" ? undefined : sortOrder.value,
+    );
 
     // 3-state sort cycle to match other O2 tables (OTable): asc → desc → cleared.
     // TenstackTable itself only toggles asc/desc, so we drive the cycle from our
@@ -2467,6 +2488,8 @@ export default defineComponent({
       serviceHealth,
       isAllStreamsSelected,
       isInferred,
+      showBehaviorTab,
+      behaviorAgentName,
       serviceNameField,
       streamFieldSet,
       formatNumber,
@@ -2521,6 +2544,7 @@ export default defineComponent({
       sortedOperationsTableRows,
       sortBy,
       sortOrder,
+      sortOrderProp,
       handleSortChange,
       sortResourceRows,
       formatOperationLatency,

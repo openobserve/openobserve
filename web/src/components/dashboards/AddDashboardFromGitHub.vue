@@ -223,6 +223,7 @@ import AddFolder from "@/components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -282,18 +283,9 @@ export default defineComponent({
     const importing = ref(false);
     const preparing = ref(false);
     const showAddFolderDialog = ref(false);
+    // The Add Folder dialog submits natively via form-id="add-folder-dashboards-form";
+    // this ref only anchors the child instance.
     const addFolderRef = ref<InstanceType<typeof AddFolder> | null>(null);
-    const isAddingFolder = ref(false);
-
-    const handleAddFolder = async () => {
-      if (!addFolderRef.value || isAddingFolder.value) return;
-      isAddingFolder.value = true;
-      try {
-        await addFolderRef.value.submit();
-      } finally {
-        isAddingFolder.value = false;
-      }
-    };
 
     const filteredDashboards = computed(() => {
       if (!searchQuery.value) return dashboards.value;
@@ -704,8 +696,6 @@ export default defineComponent({
       preparing,
       showAddFolderDialog,
       addFolderRef,
-      isAddingFolder,
-      handleAddFolder,
       isSelected,
       toggleDashboard,
       loadDashboards,
@@ -722,7 +712,11 @@ export default defineComponent({
 
 // Classify a dashboard into a category key, its icon, and a token-backed
 // badge variant. Category keys resolve to translated labels via categoryLabel().
-function getCategoryInfo(dashboard: { name: string }) {
+function getCategoryInfo(dashboard: { name: string }): {
+  icon: string;
+  variant: BadgeVariant;
+  category: string;
+} {
   const n = dashboard.name.toLowerCase();
   if (n.includes("aws") || n.includes("amazon") || n.includes("ec2") || n.includes("s3") || n.includes("rds") || n.includes("elb") || n.includes("lambda"))
     return { icon: "cloud",         variant: "orange-soft",  category: "aws" };

@@ -10,7 +10,6 @@
     data-test="eval-job-detail"
     @update:open="handleOpenChange"
   >
-
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
     <div class="flex flex-col h-full min-h-0">
       <!-- ── Global window control ── -->
@@ -138,6 +137,17 @@
 
               <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
               <dd class="m-0 text-compact text-text-body wrap-break-word">{{ streamType }}</dd>
+
+              <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.targetScopeLabel") }}</dt>
+              <dd class="m-0 text-compact text-text-body wrap-break-word">{{ targetScopeLabel }}</dd>
+
+              <template v-if="completionWindow">
+                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.idleWindowLabel") }}</dt>
+                <dd class="m-0 text-compact text-text-body wrap-break-word">{{ completionWindow.idleWindowSecs }}s</dd>
+
+                <dt class="text-xs font-semibold text-text-secondary">{{ t("onlineEvals.job.detail.maxAgeLabel") }}</dt>
+                <dd class="m-0 text-compact text-text-body wrap-break-word">{{ completionWindow.maxAgeSecs }}s</dd>
+              </template>
             </dl>
 
             <!-- Filter rendered as a code block with a header bar + copy action,
@@ -182,7 +192,9 @@
               class="m-0 pb-1.5 inline-flex items-center gap-1.5 text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
-              <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
+              <OTag type="fieldTag" value="soft">{{
+                resolvedScorers.length
+              }}</OTag>
             </h4>
             <OEmptyState
               v-if="resolvedScorers.length === 0"
@@ -302,6 +314,99 @@
                 {{ samplingValue }}
               </dd>
             </dl>
+          </section>
+
+          <!-- Manual evaluation -->
+          <section class="flex flex-col gap-2 px-5">
+            <h4
+              class="m-0 pb-[0.375rem] inline-flex items-center gap-[0.375rem] text-compact font-semibold leading-[1.5] text-text-heading border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+            >
+              {{ t("onlineEvals.job.detail.manualSection") }}
+            </h4>
+            <p class="m-0 text-xs text-text-secondary">
+              {{ t("onlineEvals.job.detail.manualHelp") }}
+            </p>
+            <OForm
+              :form="manualEvalForm"
+              class="flex flex-col gap-3"
+              v-slot="{ isSubmitting }"
+            >
+              <div class="grid grid-cols-2 gap-3 max-[45rem]:grid-cols-1">
+                <OFormInput
+                  name="targetId"
+                  :label="t('onlineEvals.job.detail.manualTargetIdLabel')"
+                  size="sm"
+                  :placeholder="manualTargetPlaceholder"
+                  required
+                  data-test="eval-job-manual-target-id-input"
+                />
+                <OFormInput
+                  v-if="targetScope === 'span'"
+                  name="spanId"
+                  :label="t('onlineEvals.job.detail.manualSpanIdLabel')"
+                  size="sm"
+                  :placeholder="
+                    manualFormValues.targetId ||
+                    t('onlineEvals.job.detail.manualSpanIdPlaceholder')
+                  "
+                  data-test="eval-job-manual-span-id-input"
+                />
+                <OFormInput
+                  name="traceId"
+                  :label="t('onlineEvals.job.detail.manualTraceIdLabel')"
+                  size="sm"
+                  :placeholder="
+                    targetScope === 'trace'
+                      ? manualFormValues.targetId ||
+                        t('onlineEvals.job.detail.manualTraceIdPlaceholder')
+                      : t('onlineEvals.job.detail.manualTraceIdPlaceholder')
+                  "
+                  data-test="eval-job-manual-trace-id-input"
+                />
+                <OFormInput
+                  v-if="targetScope !== 'trace'"
+                  name="sessionId"
+                  :label="t('onlineEvals.job.detail.manualSessionIdLabel')"
+                  size="sm"
+                  :placeholder="
+                    targetScope === 'session'
+                      ? manualFormValues.targetId ||
+                        t('onlineEvals.job.detail.manualSessionIdPlaceholder')
+                      : t('onlineEvals.job.detail.manualSessionIdPlaceholder')
+                  "
+                  data-test="eval-job-manual-session-id-input"
+                />
+                <OFormInput
+                  name="reason"
+                  :label="t('onlineEvals.job.detail.manualReasonLabel')"
+                  size="sm"
+                  :placeholder="
+                    t('onlineEvals.job.detail.manualReasonPlaceholder')
+                  "
+                  class="col-span-2 max-[45rem]:col-span-1"
+                  data-test="eval-job-manual-reason-input"
+                />
+                <OFormTextarea
+                  name="variablesJson"
+                  :label="t('onlineEvals.job.detail.manualVariablesLabel')"
+                  size="sm"
+                  :rows="4"
+                  class="col-span-2 max-[45rem]:col-span-1"
+                  data-test="eval-job-manual-variables-input"
+                />
+              </div>
+              <div class="flex justify-end">
+                <OButton
+                  type="submit"
+                  variant="primary"
+                  size="sm-action"
+                  :loading="isSubmitting"
+                  data-test="eval-job-manual-submit-btn"
+                >
+                  {{ t("onlineEvals.job.detail.manualSubmit") }}
+                </OButton>
+              </div>
+            </OForm>
           </section>
 
           <!-- Metadata -->
@@ -467,6 +572,10 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -479,24 +588,34 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import onlineEvalsService from "@/services/online-evals.service";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { showError } from "../utils/evalFormat";
 import type {
   EvalJob,
+  EvalTargetScope,
   Scorer,
   ScoreConfig,
 } from "@/services/online-evals.service";
-import { entityId } from "../utils/evalEntity";
+import { entityId, targetScopeOf } from "../utils/evalEntity";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import {
   useEvalJobRuns,
+  type JobRunRow,
   type JobRunsWindow,
 } from "../composables/useEvalJobRuns";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   ALL_AGENTS_VALUE,
   agentFilterKey,
   agentFilterLabel,
   type AgentFilterSelection,
 } from "../utils/agentFilterSql";
+import {
+  makeManualEvalSchema,
+  type ManualEvalForm,
+} from "./EvalJobDetail.schema";
 
 const props = defineProps<{
   row: EvalJob;
@@ -541,6 +660,102 @@ const streamType = computed<string>(
   () => valueOf<string>(props.row, "streamType", "stream_type") ?? "traces",
 );
 
+const targetScope = computed<EvalTargetScope>(() => targetScopeOf(props.row));
+const targetScopeLabel = computed(() =>
+  t(`onlineEvals.job.targetScopes.${targetScope.value}`),
+);
+
+const completionWindow = computed<{
+  idleWindowSecs: number;
+  maxAgeSecs: number;
+} | null>(() => {
+  const cfg =
+    targetScope.value === "trace"
+      ? valueOf<any>(props.row, "traceConfig", "trace_config")
+      : targetScope.value === "session"
+        ? valueOf<any>(props.row, "sessionConfig", "session_config")
+        : null;
+  if (!cfg) return null;
+  return {
+    idleWindowSecs: Number(
+      valueOf<any>(cfg, "idleWindowSecs", "idle_window_secs") ?? 0,
+    ),
+    maxAgeSecs: Number(valueOf<any>(cfg, "maxAgeSecs", "max_age_secs") ?? 0),
+  };
+});
+
+const manualEvalDefaults = (): ManualEvalForm => ({
+  targetId: "",
+  spanId: "",
+  traceId: "",
+  sessionId: "",
+  reason: "",
+  variablesJson: "{}",
+});
+const manualEvalForm = useOForm<ManualEvalForm>({
+  defaultValues: manualEvalDefaults(),
+  schema: makeManualEvalSchema(t),
+  onSubmit: submitManualEval,
+});
+const manualFormValues = manualEvalForm.useStore(
+  (state: any) => state.values as ManualEvalForm,
+);
+
+const manualTargetPlaceholder = computed(() => {
+  if (targetScope.value === "trace") {
+    return t("onlineEvals.job.detail.manualTraceIdPlaceholder");
+  }
+  if (targetScope.value === "session") {
+    return t("onlineEvals.job.detail.manualSessionIdPlaceholder");
+  }
+  return t("onlineEvals.job.detail.manualSpanIdPlaceholder");
+});
+
+function resetManualForm() {
+  manualEvalForm.reset(manualEvalDefaults());
+}
+
+async function submitManualEval(value: ManualEvalForm) {
+  const targetId = value.targetId.trim();
+  try {
+    const variables = value.variablesJson.trim()
+      ? JSON.parse(value.variablesJson)
+      : {};
+    const payload = {
+      targetId,
+      spanId:
+        targetScope.value === "span" ? value.spanId.trim() || targetId : null,
+      traceId:
+        targetScope.value === "trace"
+          ? value.traceId.trim() || targetId
+          : value.traceId.trim() || null,
+      sessionId:
+        targetScope.value === "session"
+          ? value.sessionId.trim() || targetId
+          : value.sessionId.trim() || null,
+      variables,
+      reason: value.reason.trim() || null,
+    };
+    const result = await onlineEvalsService.jobs.manualEval(
+      orgId.value,
+      String(props.row.id),
+      payload,
+    );
+    toast({
+      variant: "success",
+      message: t("onlineEvals.job.detail.manualSuccess", {
+        count: result.tasksCreated,
+      }),
+    });
+    resetManualForm();
+    await refreshRunsData();
+  } catch (err: any) {
+    showError(err, t("onlineEvals.job.detail.manualError"));
+  }
+}
+
+watch(() => props.row.id, resetManualForm);
+
 const normalizedFilter = computed(() => {
   const raw = valueOf<any>(props.row, "filterCondition", "filter_condition");
   return normalizeJobFilterCondition(raw);
@@ -563,10 +778,6 @@ const filterText = computed<string>(() => {
   });
   return body ? `if ${body}` : "";
 });
-
-const statusLabel = computed(() =>
-  t(`onlineEvals.jobStatus.${props.row.status}`, props.row.status),
-);
 
 const samplingMode = computed(
   () => valueOf<string>(props.row, "samplingMode", "sampling_mode") ?? "all",
@@ -862,7 +1073,7 @@ const kpiCards = computed<{ label: string; value: string; unit: string }[]>(
 );
 
 // — OTable column definitions —
-const runColumns = computed(() => [
+const runColumns = computed<OTableColumnDef<JobRunRow>[]>(() => [
   {
     id: "timestampMs",
     header: t("onlineEvals.job.detail.runs.col.time"),
@@ -926,7 +1137,6 @@ const runColumns = computed(() => [
     meta: { align: "left" },
   },
 ]);
-
 
 // — Helpers —
 function formatTimestamp(microsOrMs: number): string {

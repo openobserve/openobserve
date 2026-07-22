@@ -127,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template v-else>
       <div
-        v-for="(field, index) in fields as any"
+        v-for="(field, index) in fields"
         :key="field.uuid"
         class="flex justify-start items-end gap-2 pb-2"
         :data-test="`alert-conditions-${index + 1}`"
@@ -201,6 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, reactive, inject } from "vue";
+import type { PropType, Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
@@ -209,16 +210,17 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
 import { useStore } from "vuex";
 
 const props = defineProps({
   fields: {
-    type: Array,
+    type: Array as PropType<ConditionField[]>,
     default: () => [],
     required: false,
   },
   streamFields: {
-    type: Array,
+    type: Array as PropType<SelectOptionInput[]>,
     default: () => [],
     required: true,
   },
@@ -240,6 +242,16 @@ const props = defineProps({
     required: false,
   },
 });
+interface ConditionRow {
+  column: string;
+  operator: string;
+  value: string;
+}
+
+interface ConditionField extends ConditionRow {
+  uuid: string;
+}
+
 const fieldErrors = reactive<Record<string, string>>({});
 
 var triggerOperators: any = ref([
@@ -275,13 +287,13 @@ const resolvePath = (obj: any, path: string): any =>
 
 // ⚠️ MUST be form.useStore (reactive) — NOT form.state.values (a snapshot a
 // computed won't track; playbook §2).
-const formRows = injectedForm
+const formRows: Ref<ConditionRow[]> = injectedForm
   ? injectedForm.useStore((s: any) =>
       props.namePrefix ? (resolvePath(s.values, props.namePrefix) ?? []) : [],
     )
-  : ref<any[]>([]);
+  : ref<ConditionRow[]>([]);
 
-const makeConditionRow = () => ({ column: "", operator: "=", value: "" });
+const makeConditionRow = (): ConditionRow => ({ column: "", operator: "=", value: "" });
 
 const addFormRow = () =>
   injectedForm?.pushFieldValue(props.namePrefix, makeConditionRow());

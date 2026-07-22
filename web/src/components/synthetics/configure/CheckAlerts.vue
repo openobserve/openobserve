@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import type { BrowserCheck } from '@/types/synthetics'
 import OInput from '@/lib/forms/Input/OInput.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
+import type { SelectModelValue } from '@/lib/forms/Select/OSelect.types'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 
@@ -55,7 +56,10 @@ const localDestinations = computed({
 
 const destinationError = ref(false)
 
-function onDestinationsChange(v: string[]) {
+function onDestinationsChange(value: SelectModelValue) {
+  const v = (Array.isArray(value) ? value : []).filter(
+    (d): d is string => typeof d === 'string',
+  )
   destinationError.value = v.length === 0
   emit('update:check', { ...props.check, notifications: { destinations: v } })
 }

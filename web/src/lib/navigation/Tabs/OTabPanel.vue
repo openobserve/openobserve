@@ -56,8 +56,8 @@ const panelClasses = computed<string[]>(() => {
     </div>
   </template>
   <template v-else>
-    <Transition v-if="animated && isActive" name="o-tab-panel">
-      <div role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
+    <Transition v-if="animated" name="o-tab-panel">
+      <div v-if="isActive" role="tabpanel" :id="`tab-panel-${props.name}`" :aria-labelledby="`tab-${props.name}`" tabindex="0" :class="panelClasses">
         <slot />
       </div>
     </Transition>

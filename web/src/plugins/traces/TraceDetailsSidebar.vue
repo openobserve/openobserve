@@ -251,14 +251,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="px-page-edge span_details_tabs">
       <OTabs
-        v-model="activeTab"
+        :model-value="activeTab"
+        @update:model-value="$emit('update:activeTab', $event)"
         dense
         align="left"
         data-test="trace-details-sidebar-tabs"
       >
         <!-- LLM Preview Tab (conditional - shown first for LLM traces) -->
         <OTab
-          v-if="isLLMSpan"
+          v-if="canPreviewSpan"
           name="preview"
           :label="t('traces.traceDetailsSidebar.preview')"
           data-test="trace-details-sidebar-tabs-preview"
@@ -334,12 +335,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           : 'px-page-edge py-2'
       "
     >
-      <OTabPanels v-model="activeTab"
+      <OTabPanels :model-value="activeTab"
+@update:model-value="$emit('update:activeTab', $event)"
 grow
 class="h-full overflow-y-auto">
         <!-- LLM Preview Tab Panel -->
         <OTabPanel
-          v-if="isLLMSpan"
+          v-if="canPreviewSpan"
           name="preview"
           class="llm-preview-panel p-3"
         >
@@ -373,8 +375,8 @@ class="h-full overflow-y-auto">
                       variant="outline"
                       size="icon"
                       :title="t('traces.traceDetailsSidebar.copyInput')"
-                      @click="copyContent(span.gen_ai_input_messages, 'input')"
-                      :disabled="!hasContent(span.gen_ai_input_messages)"
+                      @click="copyContent(previewInput, 'input')"
+                      :disabled="!hasContent(previewInput)"
                     >
                       <OIcon name="content-copy" size="xs" />
                     </OButton>
@@ -399,15 +401,15 @@ class="h-full overflow-y-auto">
                     </OCollapsible>
                   </div>
                   <div
-                    v-if="!hasContent(span.gen_ai_input_messages) && !parsedSystemInstructions"
+                    v-if="!hasContent(previewInput) && !parsedSystemInstructions"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
                     {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
-</div>
+                  </div>
                   <LLMContentRenderer
-                    v-if="hasContent(span.gen_ai_input_messages)"
-                    :content="span.gen_ai_input_messages"
-                    :observation-type="span.gen_ai_operation_name"
+                    v-if="hasContent(previewInput)"
+                    :content="previewInput"
+                    :observation-type="previewOperationName"
                     content-type="input"
                     :span="span"
                     view-mode="formatted"
@@ -440,8 +442,8 @@ class="h-full overflow-y-auto">
                       variant="outline"
                       size="icon"
                       :title="t('traces.traceDetailsSidebar.copyOutput')"
-                      @click="copyContent(span.gen_ai_output_messages, 'output')"
-                      :disabled="!hasContent(span.gen_ai_output_messages)"
+                      @click="copyContent(previewOutput, 'output')"
+                      :disabled="!hasContent(previewOutput)"
                     >
                       <OIcon name="content-copy" size="xs" />
                     </OButton>
@@ -449,15 +451,15 @@ class="h-full overflow-y-auto">
                 </div>
                 <div class="llm-content-box flex-1 h-full max-h-[calc(100%-1.625rem)] border border-solid border-card-glass-border rounded-default p-3 overflow-y-auto overflow-x-hidden bg-code-bg">
                   <div
-                    v-if="!hasContent(span.gen_ai_output_messages)"
+                    v-if="!hasContent(previewOutput)"
                     class="text-text-secondary italic text-center p-8 text-sm"
                   >
                     {{ t('traces.traceDetailsSidebar.noDataAvailable') }}
-</div>
+                  </div>
                   <LLMContentRenderer
                     v-else
-                    :content="span.gen_ai_output_messages"
-                    :observation-type="span.gen_ai_operation_name"
+                    :content="previewOutput"
+                    :observation-type="previewOperationName"
                     content-type="output"
                     :span="span"
                     view-mode="formatted"
@@ -811,7 +813,7 @@ class="h-5! text-xs!">
             :metric-group-definitions="metricGroupResources"
             :panelHeight="12"
             :panelWidth="96"
-            @close="activeTab = 'attributes'"
+            @close="$emit('update:activeTab', 'attributes')"
           />
           <!-- Loading/Empty state when no data -->
           <div
@@ -857,7 +859,7 @@ import { cloneDeep } from "lodash-es";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
-import { defineComponent, onBeforeMount, ref, watch, type Ref, inject } from "vue";
+import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18n } from "vue-i18n";
@@ -866,7 +868,6 @@ import {
   formatTimeWithSuffix,
   convertTimeFromNsToUs,
   getImageURL,
-  b64EncodeUnicode,
 } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -879,7 +880,6 @@ import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import type { TelemetryContext } from "@/utils/telemetryCorrelation";
-import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import config from "@/aws-exports";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import {
@@ -891,13 +891,13 @@ import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
 import TenstackTable from "@/components/TenstackTable.vue";
 import {
+  hasTracePreview,
   isLLMTrace,
   parseUsageDetails,
   parseCostDetails,
   getObservationTypeColor,
   formatModelParameters,
 } from "@/utils/llmUtils";
-import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -905,17 +905,16 @@ import AttributeValueCell from "@/components/AttributeValueCell.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import DbSpanDetails from "./DbSpanDetails.vue";
 import TraceErrorTab from "./components/TraceErrorTab.vue";
-import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
 } from "@/utils/traces/useSpanServiceDetection";
+import type { Span } from "@/ts/interfaces/traces/span.types";
 import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 
 // luxon equivalent of "MMM DD, YYYY HH:mm:ss.SSS Z" → e.g. "Jun 24, 2026 17:39:32.157 +0530"
@@ -925,7 +924,7 @@ export default defineComponent({
   name: "TraceDetailsSidebar",
   props: {
     span: {
-      type: Object,
+      type: Object as PropType<Span>,
       default: () => null,
     },
     baseTracePosition: {
@@ -1009,6 +1008,22 @@ export default defineComponent({
     const { t } = useI18n();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
+    const canPreviewSpan = computed(() => hasTracePreview(props.span));
+    const previewInput = computed(
+      () =>
+        props.span?.gen_ai_input_messages ??
+        props.span?.attributes_prompt ??
+        "",
+    );
+    const previewOutput = computed(
+      () =>
+        props.span?.gen_ai_output_messages ??
+        props.span?.attributes_response ??
+        "",
+    );
+    const previewOperationName = computed(
+      () => props.span?.gen_ai_operation_name ?? "evaluator",
+    );
 
     const spanDetails: any = ref({
       attrs: {},
@@ -1046,8 +1061,6 @@ export default defineComponent({
     const sysInstrOpen = ref(false);
     const modelParamsOpen = ref(false);
 
-    const showPendingFilter = false;
-
     const closeSidebar = () => {
       emit("close");
     };
@@ -1075,7 +1088,7 @@ export default defineComponent({
 
     // Emits class names only — the colours live in the style block below, driven
     // by the registered --color-json-* tokens, so the output themes itself.
-    const highlightedJSON = (value) => {
+    const highlightedJSON = (value: Record<string, unknown>) => {
       const attrs = value;
       const query = props.searchQuery;
 
@@ -1115,10 +1128,6 @@ export default defineComponent({
     };
 
     const store = useStore();
-
-    const RAW_VALUE_FILTER_FIELDS = new Set([
-      store.state?.zoConfig?.timestamp_column || "_timestamp",
-    ]);
 
     const hasDbSpan = computed(() =>
       Object.keys(props.span ?? {}).some((key) => key.startsWith("db_")),
@@ -1468,9 +1477,9 @@ export default defineComponent({
       spanDetails.attrs.span_kind = getSpanKind(spanDetails.attrs.span_kind);
 
       try {
-        spanDetails.events = JSON.parse(props.span.events || "[]").map(
-          (event: any) => event,
-        );
+        spanDetails.events = JSON.parse(
+          (props.span.events as unknown as string) || "[]",
+        ).map((event: any) => event);
       } catch (_e: any) {
         console.log(_e);
         spanDetails.events = [];
@@ -2087,6 +2096,10 @@ export default defineComponent({
       config,
       // LLM
       isLLMSpan,
+      canPreviewSpan,
+      previewInput,
+      previewOutput,
+      previewOperationName,
       hasDbSpan,
       llmMetrics,
       copyContent,

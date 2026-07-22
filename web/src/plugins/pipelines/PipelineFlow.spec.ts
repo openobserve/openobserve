@@ -143,9 +143,10 @@ vi.mock("./useDnD", () => ({
         nodes: [],
         edges: []
       },
-      dirtyFlag: false
+      dirtyFlag: false,
+      isDragOver: false
     };
-    
+
     mockOnDragOver = vi.fn();
     mockOnDrop = vi.fn();
     mockOnDragLeave = vi.fn();
@@ -186,7 +187,8 @@ describe("PipelineFlow.vue", () => {
         nodes: [],
         edges: []
       },
-      dirtyFlag: false
+      dirtyFlag: false,
+      isDragOver: false
     };
   });
 

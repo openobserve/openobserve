@@ -227,19 +227,6 @@ vi.mock("@/composables/shared/useManagementRoutes", () => ({
 // ---------------------------------------------------------------------------
 import routerInstance from "@/router/routes";
 
-// ---------------------------------------------------------------------------
-// Helper: flatten the nested route tree into a single list of route records
-// ---------------------------------------------------------------------------
-function flattenRoutes(routes: any[]): any[] {
-  return routes.reduce((acc: any[], route: any) => {
-    acc.push(route);
-    if (route.children && route.children.length) {
-      acc.push(...flattenRoutes(route.children));
-    }
-    return acc;
-  }, []);
-}
-
 describe("router/routes (singleton)", () => {
   // getRoutes() already returns a flat list of all route records including nested ones;
   // calling flattenRoutes on top of it would double-count children.

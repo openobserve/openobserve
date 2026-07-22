@@ -149,6 +149,52 @@ describe("useFavoriteDashboards", () => {
     expect(favorites.value).toEqual([]);
   });
 
+  it("removeFavorites drops deleted dashboards and persists the remainder", async () => {
+    (settings.setUserSetting as any).mockResolvedValue({});
+    const { removeFavorites, favorites } = useFavoriteDashboards();
+    favorites.value = [D1, D2];
+    await removeFavorites("org1", "me@example.com", ["abc"]);
+    expect(favorites.value).toEqual([D2]);
+    expect(settings.setUserSetting).toHaveBeenCalledWith(
+      "org1",
+      "me@example.com",
+      "favorite_dashboards",
+      [D2],
+      "ui",
+    );
+  });
+
+  it("removeFavorites skips the write when nothing matched", async () => {
+    const { removeFavorites, favorites } = useFavoriteDashboards();
+    favorites.value = [D1];
+    await removeFavorites("org1", "me@example.com", ["not-favorited"]);
+    expect(favorites.value).toEqual([D1]);
+    expect(settings.setUserSetting).not.toHaveBeenCalled();
+  });
+
+  it("removeFavorites keeps the row hidden even if the write fails", async () => {
+    (settings.setUserSetting as any).mockRejectedValue({
+      response: { status: 500 },
+    });
+    const { removeFavorites, favorites } = useFavoriteDashboards();
+    favorites.value = [D1, D2];
+    await removeFavorites("org1", "me@example.com", ["abc"]);
+    // No revert: the dashboard is already gone from the backend, so restoring
+    // the row would just re-create the ghost this cleanup exists to remove.
+    expect(favorites.value).toEqual([D2]);
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("removeFavorites no-ops without org, user, or ids", async () => {
+    const { removeFavorites, favorites } = useFavoriteDashboards();
+    favorites.value = [D1];
+    await removeFavorites("", "me@example.com", ["abc"]);
+    await removeFavorites("org1", "", ["abc"]);
+    await removeFavorites("org1", "me@example.com", []);
+    expect(settings.setUserSetting).not.toHaveBeenCalled();
+    expect(favorites.value).toEqual([D1]);
+  });
+
   it("isFavorite reflects the current list", () => {
     const { isFavorite, favorites } = useFavoriteDashboards();
     favorites.value = [D1];

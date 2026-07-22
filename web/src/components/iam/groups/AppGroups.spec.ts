@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import AppGroups from "@/components/iam/groups/AppGroups.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -252,12 +252,6 @@ describe("AppGroups Component", () => {
       expect(wrapper.vm.showAddGroup).toBe(false);
     });
 
-    it("hides add group dialog when hideAddGroup is called", () => {
-      wrapper.vm.showAddGroup = true;
-      wrapper.vm.hideAddGroup();
-      expect(wrapper.vm.showAddGroup).toBe(false);
-    });
-
     it("refreshes groups list when AddGroup emits added:group", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockClear();
@@ -476,7 +470,6 @@ describe("AppGroups Component", () => {
       await wrapper.vm.$nextTick();
       
       // Since we're using a mock component, we check the computed message
-      const expectedMessage = "Are you sure you want to delete 'test-group'?";
       expect(wrapper.vm.deleteConformDialog.data.group_name).toBe("test-group");
     });
   });
@@ -488,7 +481,7 @@ describe("AppGroups Component", () => {
         createMockAxiosResponse(["group1", "group2"]) as any
       );
 
-      const wrapper = mount(AppGroups, {
+      mount(AppGroups, {
         global: {
           provide: { store },
           plugins: [i18n, router],

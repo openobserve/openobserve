@@ -221,7 +221,15 @@ pub fn init_url_processor() {
 /// Returns an error only if the channel is closed, which only happens during
 /// process shutdown. In production, this should never fail during normal operation.
 pub fn trigger_url_job_processing(org_id: String, table_name: String) -> Result<(), String> {
-    URL_JOB_SENDER
+    send_url_job_event(&URL_JOB_SENDER, org_id, table_name)
+}
+
+fn send_url_job_event(
+    sender: &mpsc::UnboundedSender<EnrichmentUrlJobEvent>,
+    org_id: String,
+    table_name: String,
+) -> Result<(), String> {
+    sender
         .send(EnrichmentUrlJobEvent { org_id, table_name })
         .map_err(|e| format!("Failed to send job event: {}", e))
 }
@@ -1922,31 +1930,43 @@ async fn save_enrichment_batch(
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_mpsc_trigger() {
-        let result = trigger_url_job_processing("test_org".to_string(), "test_table".to_string());
+    fn test_sender() -> (
+        mpsc::UnboundedSender<EnrichmentUrlJobEvent>,
+        mpsc::UnboundedReceiver<EnrichmentUrlJobEvent>,
+    ) {
+        mpsc::unbounded_channel()
+    }
+
+    #[test]
+    fn test_mpsc_trigger() {
+        let (sender, _receiver) = test_sender();
+        let result = send_url_job_event(&sender, "test_org".to_string(), "test_table".to_string());
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_mpsc_trigger_multiple_times() {
+    #[test]
+    fn test_mpsc_trigger_multiple_times() {
+        let (sender, _receiver) = test_sender();
         // Multiple triggers for the same org/table should all succeed
         for i in 0..5 {
-            let result = trigger_url_job_processing(format!("org_{}", i), format!("table_{}", i));
+            let result = send_url_job_event(&sender, format!("org_{}", i), format!("table_{}", i));
             assert!(result.is_ok(), "trigger {} should succeed", i);
         }
     }
 
-    #[tokio::test]
-    async fn test_mpsc_trigger_empty_strings() {
+    #[test]
+    fn test_mpsc_trigger_empty_strings() {
+        let (sender, _receiver) = test_sender();
         // Empty strings are valid identifiers for the channel
-        let result = trigger_url_job_processing("".to_string(), "".to_string());
+        let result = send_url_job_event(&sender, "".to_string(), "".to_string());
         assert!(result.is_ok());
     }
 
-    #[tokio::test]
-    async fn test_mpsc_trigger_unicode_org_id() {
-        let result = trigger_url_job_processing("org_测试".to_string(), "table_データ".to_string());
+    #[test]
+    fn test_mpsc_trigger_unicode_org_id() {
+        let (sender, _receiver) = test_sender();
+        let result =
+            send_url_job_event(&sender, "org_测试".to_string(), "table_データ".to_string());
         assert!(result.is_ok());
     }
 

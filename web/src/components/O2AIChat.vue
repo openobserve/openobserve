@@ -1411,7 +1411,6 @@ import { chartColor } from "@/utils/chartTheme";
 import {
   ChatMessage,
   ChatHistoryEntry,
-  ToolCall,
   ContentBlock,
   NavigationAction,
   ImageAttachment,
@@ -1539,11 +1538,11 @@ export default defineComponent({
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<any>(null); // RichTextInput component instance
-    const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref("");
     const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
-    const chatHistory = ref<ChatHistoryEntry[]>([]);
+    // `model` is stored on persisted entries but missing from the shared interface
+    const chatHistory = ref<(ChatHistoryEntry & { model?: string })[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
@@ -1658,6 +1657,7 @@ export default defineComponent({
       tool: string;
       message: string;
       context: Record<string, any>;
+      call_id?: string;
     } | null>(null);
 
     // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
@@ -1756,28 +1756,6 @@ export default defineComponent({
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
       }
-    };
-
-    // Flush any in-progress streaming text into the last assistant text block
-    // and reset streaming state. Called before inserting non-text blocks
-    // (confirmation_required, navigation_action) so the text preceding them is
-    // not lost.
-    const finalizeTextBlock = () => {
-      if (currentTextSegment.value) {
-        const lm = chatMessages.value[chatMessages.value.length - 1];
-        if (lm && lm.role === "assistant" && lm.contentBlocks) {
-          const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-          if (lb && lb.type === "text") {
-            lb.text = currentTextSegment.value;
-          }
-        }
-      }
-      if (typewriterAnimationId.value) {
-        cancelAnimationFrame(typewriterAnimationId.value);
-        typewriterAnimationId.value = null;
-      }
-      currentTextSegment.value = "";
-      displayedStreamingContent.value = "";
     };
 
     // Interval ID for title animation
@@ -1905,16 +1883,6 @@ export default defineComponent({
     const historyIndex = ref(-1);
     const HISTORY_KEY = "ai-chat-query-history";
     const MAX_HISTORY_SIZE = 10;
-
-    const modelConfig: any = {
-      openai: ["gpt-4.1"],
-      groq: [
-        "llama-3.3-70b-versatile",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-      ],
-      xai: ["xai/grok-3-mini-beta", "xai/grok-3-latest"],
-    };
 
     const capabilities = [
       "1. Create a SQL query for me",
@@ -3490,22 +3458,6 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Throttled save for streaming - saves at most every STREAMING_SAVE_INTERVAL ms
-     * This prevents data loss if the user reloads the page during streaming
-     * @param force - If true, saves immediately regardless of throttle (used for first assistant message)
-     */
-    const throttledStreamingSave = async (force: boolean = false) => {
-      const now = Date.now();
-      if (
-        force ||
-        now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL
-      ) {
-        lastStreamingSaveTime.value = now;
-        await saveToHistory();
-      }
-    };
-
     const loadHistory = async () => {
       try {
         // Load history using the composable (automatically prunes to 100 items)
@@ -4029,7 +3981,11 @@ export default defineComponent({
 
         // Add base64 encoded query
         if (target.query) {
-          queryParams.query = encodeForUrl(target.query);
+          queryParams.query = encodeForUrl(
+            typeof target.query === "string"
+              ? target.query
+              : JSON.stringify(target.query),
+          );
         }
 
         // Add VRL function if present
@@ -4048,33 +4004,36 @@ export default defineComponent({
       } else if (action.action === "navigate_direct") {
         // Direct navigation - build proper URLs based on resource type
         let path = action.target.path || `/${action.resource_type}`;
+        // navigate_direct always carries the record form of `query`
+        const targetQuery = action.target.query as
+          | Record<string, any>
+          | undefined;
         const queryParams: Record<string, string> = {
           org_identifier: store.state.selectedOrganization.identifier,
-          ...action.target.query,
+          ...targetQuery,
         };
 
         // Resource-type-specific URL handling
         if (action.resource_type === "alert") {
           path = "/alerts";
-          const alertId =
-            action.target.alert_id || action.target.query?.alert_id;
+          const alertId = action.target.alert_id || targetQuery?.alert_id;
           if (alertId) {
             // Navigate to specific alert with update action
             queryParams.action = "update";
             queryParams.alert_id = alertId;
-            queryParams.name = action.target.name || action.target.query?.name;
+            queryParams.name = action.target.name || targetQuery?.name;
           }
           queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+            action.target.folder || targetQuery?.folder || "default";
         } else if (action.resource_type === "dashboard") {
           // Dashboards use /dashboards/view path
           path = "/dashboards/view";
           queryParams.dashboard =
             action.target.dashboard_id ||
             action.target.dashboardId ||
-            action.target.query?.dashboardId;
+            targetQuery?.dashboardId;
           queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+            action.target.folder || targetQuery?.folder || "default";
           queryParams.tab = action.target.tab || "tab-1";
           queryParams.refresh = "Off";
           queryParams.period = "15m";
@@ -4083,10 +4042,8 @@ export default defineComponent({
           // Pipelines use /pipeline/pipelines/edit path
           path = "/pipeline/pipelines/edit";
           queryParams.id =
-            action.target.pipeline_id ||
-            action.target.id ||
-            action.target.query?.id;
-          queryParams.name = action.target.name || action.target.query?.name;
+            action.target.pipeline_id || action.target.id || targetQuery?.id;
+          queryParams.name = action.target.name || targetQuery?.name;
         }
 
         await router.push({ path, query: queryParams });
@@ -4217,9 +4174,8 @@ export default defineComponent({
           }
 
           // Scroll to bottom after loading chat
-          await nextTick(() => {
-            scrollToBottom();
-          });
+          await nextTick();
+          scrollToBottom();
         }
       } catch (error) {
         console.error("Error loading chat:", error);
@@ -4897,36 +4853,6 @@ export default defineComponent({
       previewImage.value = null;
     };
 
-    // Scroll input textarea to bottom to show latest appended content
-    const scrollInputToBottom = () => {
-      // Clear any pending scroll timeout
-      if (scrollTimeoutId.value !== null) {
-        clearTimeout(scrollTimeoutId.value);
-      }
-
-      // Set new timeout for scroll
-      scrollTimeoutId.value = setTimeout(() => {
-        const textarea = chatInput.value?.$el?.querySelector("textarea");
-        if (!textarea) return;
-
-        textarea.focus();
-        textarea.setSelectionRange(
-          textarea.value.length,
-          textarea.value.length,
-        );
-
-        // Scroll all scrollable parent elements
-        let element = textarea;
-        while (element && element !== document.body) {
-          if (element.scrollHeight > element.clientHeight) {
-            element.scrollTop = element.scrollHeight;
-          }
-          element = element.parentElement;
-        }
-
-        scrollTimeoutId.value = null;
-      }, 50);
-    };
 
     // Load query history from localStorage
     const loadQueryHistory = () => {
@@ -5267,7 +5193,7 @@ export default defineComponent({
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
         const highlighted = formatted.replace(
-          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
           (match) => {
             let cls = "json-number";
             if (/^"/.test(match)) {
@@ -5381,12 +5307,6 @@ export default defineComponent({
           contentBlocks: message.contentBlocks || [],
         };
       });
-    });
-
-    // Check if there's an assistant message in progress (for loading indicator positioning)
-    const hasAssistantMessage = computed(() => {
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      return lastMessage?.role === "assistant";
     });
 
     const retryGeneration = async (message: any) => {
@@ -5545,15 +5465,21 @@ export default defineComponent({
       return Object.keys(data).length > 0 ? data : null;
     };
 
-    const hasToolCallDetails = (block: ContentBlock) => {
+    // `response` is stamped onto blocks by the stream handler but is not part
+    // of the shared ContentBlock interface.
+    const hasToolCallDetails = (
+      block: ContentBlock & { response?: Record<string, any> },
+    ) => {
       // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
       if (block.success === false) return true;
-      if (block.success !== false && block.summary) return true;
+      if (block.summary) return true;
       if (block.response) return true;
       return getToolCallDisplayData(block.context) !== null;
     };
 
-    const formatToolCallMessage = (block: ContentBlock) => {
+    const formatToolCallMessage = (
+      block: ContentBlock & { response?: Record<string, any> },
+    ) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
       if (block.tool === "testFunction") {

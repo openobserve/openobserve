@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-role_name="{ row }">
             {{ row.role_name }}
           </template>
-          <template #expansion="{ row }">
+          <template #expansion="{ row }: { row: any }">
             <template v-for="(moduleRow, index) in filteredRoleLevelModuleRows" :key="index">
               <div v-if="!editTable" class="flex items-center px-6 py-1 text-sm border-b border-table-row-divider">
                 <span class="w-50">{{ moduleRow.module_name }}</span>
@@ -930,7 +930,7 @@ export default defineComponent({
     };
     //this is used for handling the input changes for both api limits and row limits
     const handleInputChange = (
-      roleName: any = "",
+      _roleName: any = "",
       moduleName: string,
       row: any,
       operation: string,
@@ -1115,7 +1115,10 @@ export default defineComponent({
 
     const generateColumns = () => {
       if (
-        selectedOrganization.value?.hasOwnProperty("value") &&
+        Object.prototype.hasOwnProperty.call(
+          selectedOrganization.value ?? {},
+          "value",
+        ) &&
         selectedOrganization.value.value != ""
       ) {
         return apiLimitsColumns.value;
@@ -1129,7 +1132,6 @@ export default defineComponent({
         const response = await ratelimitService.download_template(
           selectedOrganization.value.value,
         );
-        const blob = new Blob([response.data], { type: "application/json" });
         const jsonData = JSON.stringify(response.data, null, 2);
         const url = window.URL.createObjectURL(
           new Blob([jsonData], { type: "application/json" }),
@@ -1220,25 +1222,6 @@ export default defineComponent({
 
     const generateUniqueId = (row: any) => {
       return row.api_group_name + "_" + row.api_group_operation;
-    };
-    const filteredData = (rows: any, terms: any) => {
-      var filtered = [];
-      terms = terms.toLowerCase();
-      if (activeTab.value === "api-limits") {
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i].module_name.toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      } else {
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i].role_name.toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      }
-
-      return filtered;
     };
     const triggerExpand = async (row: any) => {
       if (Object.keys(changedValues.value).length > 0) {
@@ -1486,8 +1469,6 @@ export default defineComponent({
           variant: "warning",
           message: t("iam.quotaPage.saveBeforeSwitchingTimeUnits"),
         });
-        // Revert back to previous time unit
-        activeTimeUnit.value = activeTimeUnit.value;
         return;
       }
 

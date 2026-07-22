@@ -127,14 +127,4 @@ describe("AIIntegrationDetail", () => {
       expect(wrapper.text()).toContain("Select an integration to view details.");
     });
   });
-
-  describe("display name", () => {
-    it("falls back to integrationSlug when integration not found", () => {
-      wrapper = mountDetail({
-        categorySlug: "frameworks",
-        integrationSlug: "unknown-integration",
-      });
-      expect((wrapper.vm as any).displayName).toBe("unknown-integration");
-    });
-  });
 });

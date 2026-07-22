@@ -29,6 +29,7 @@ use config::{
     utils::json::Value,
 };
 
+pub use crate::functions_cache::cache;
 use crate::{
     common::{
         self,
@@ -380,7 +381,7 @@ pub async fn update_function(
     if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name)
-                && let Err(e) = db::pipeline::update(&pipeline, None).await
+                && let Err(e) = crate::service::pipeline::store::update(&pipeline, None).await
             {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,

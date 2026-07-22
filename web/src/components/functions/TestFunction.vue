@@ -261,7 +261,6 @@
 import {
   onBeforeMount,
   ref,
-  defineExpose,
   computed,
   nextTick,
   onMounted,
@@ -282,11 +281,9 @@ import {
   rangesFromServerError,
   type SqlErrorRange,
 } from "@/utils/query/sqlDiagnostics";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
-import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -323,27 +320,6 @@ const QueryEditor = defineAsyncComponent(
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
 const outputEvents = ref<string>("");
-
-const dummyEvents = {
-  data: {
-    results: [
-      {
-        event: {
-          _timestamp: 1735128523652186,
-          job: "test",
-          level: "info",
-          log: "test message for openobserve",
-        },
-      },
-      {
-        event: {
-          log: "test message for openobserve",
-        },
-        message: "Error in event",
-      },
-    ],
-  },
-};
 
 const originalOutputEvents = ref<any>("");
 
@@ -484,19 +460,6 @@ const outputMessage = computed(() => {
   return "";
 });
 
-const areInputValid = () => {
-  if (!inputQuery.value) {
-    toast({
-      variant: "error",
-      message: t("function.pleaseEnterQuery"),
-    });
-    sqlQueryErrorMsg.value = t("function.pleaseEnterQuery");
-    return false;
-  }
-
-  return true;
-};
-
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
   const { sqlParser }: any = useSqlParser.default();
@@ -565,8 +528,11 @@ watch(
 watch(inputQuery, (value) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
-  autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex() ?? -1;
-  autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.cursorIndex =
+    queryEditorRef.value?.getCursorIndex() ?? -1;
+  // Ref may be unmounted; fall back to a no-op to match popup.open's non-optional type.
+  autoCompleteData.value.popup.open =
+    queryEditorRef.value?.triggerAutoComplete ?? (() => {});
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStream.value.type;
   autoCompleteData.value.streamName = selectedStream.value.name;
@@ -814,6 +780,7 @@ function getLineRanges(object: any) {
   } catch (e) {
     console.log("Error in getLineRanges", e);
   }
+  return undefined;
 }
 
 function highlightSpecificEvent() {

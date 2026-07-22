@@ -51,10 +51,12 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+pub mod agent_signals;
 pub mod inferred;
 pub mod otel;
 pub mod schema_compat;
 pub mod service_graph;
+pub mod session;
 
 #[cfg(feature = "cloud")]
 use crate::service::stream::get_stream;
@@ -111,6 +113,7 @@ const SPAN_ID_BYTES_COUNT: usize = 8;
 const TRACE_ID_BYTES_COUNT: usize = 16;
 const ATTR_STATUS_CODE: &str = "status_code";
 const ATTR_STATUS_MESSAGE: &str = "status_message";
+const O2_INGEST_TS_COL_NAME: &str = "_o2_ingest_ts";
 
 // Gen-AI semantic-convention column names produced by the OTEL processor after
 // dot→underscore flattening. Must stay in sync with GEN_AI_SCHEMA_FIELDS in
@@ -163,6 +166,13 @@ fn normalize_llm_field_types(record_val: &mut Map<String, json::Value>) {
             );
         }
     }
+}
+
+fn set_o2_ingest_ts(record_val: &mut Map<String, json::Value>) {
+    record_val.insert(
+        O2_INGEST_TS_COL_NAME.to_string(),
+        json::Value::Number(now_micros().into()),
+    );
 }
 
 fn collect_gen_ai_agent_observation(
@@ -663,10 +673,12 @@ pub async fn handle_otlp_request(
 
                 let mut value: json::Value = json::to_value(local_val).unwrap();
                 // add timestamp
-                value.as_object_mut().unwrap().insert(
+                let record = value.as_object_mut().unwrap();
+                record.insert(
                     TIMESTAMP_COL_NAME.to_string(),
                     json::Value::Number(timestamp.into()),
                 );
+                set_o2_ingest_ts(record);
 
                 if !executable_pipelines.is_empty() {
                     stream_pipeline_inputs.push(value);
@@ -805,6 +817,7 @@ pub async fn handle_otlp_request(
                                     crate::service::ingestion::refactor_map(record_val, fields);
                             }
                             restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
+                            set_o2_ingest_ts(&mut record_val);
 
                             log::debug!(
                                 "[TRACES:OTLP] pipeline result for stream: {} got {} records",
@@ -973,6 +986,7 @@ fn finalize_and_buffer_trace_span(
         record_val = crate::service::ingestion::refactor_map(record_val, fields);
     }
     restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
+    set_o2_ingest_ts(&mut record_val);
     let (ts_data, _) = json_data_by_stream
         .entry(traces_stream_name.to_string())
         .or_insert((Vec::new(), None));
@@ -1138,6 +1152,7 @@ pub async fn ingest_json(
             TIMESTAMP_COL_NAME.to_string(),
             json::Value::Number(timestamp.into()),
         );
+        set_o2_ingest_ts(&mut record_val);
         let _ = collect_gen_ai_agent_observation(
             org_id,
             StreamType::Traces,
@@ -1612,6 +1627,26 @@ mod tests {
     fn test_get_span_status_none() {
         // Test None status (default case)
         assert_eq!(super::get_span_status(None), "UNSET");
+    }
+
+    #[test]
+    fn test_set_o2_ingest_ts_overwrites_existing_value() {
+        let mut record = json!({
+            "_o2_ingest_ts": 1,
+            "trace_id": "trace-1"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+
+        super::set_o2_ingest_ts(&mut record);
+
+        assert!(
+            record
+                .get("_o2_ingest_ts")
+                .and_then(|value| value.as_i64())
+                .is_some_and(|value| value > 1)
+        );
     }
 
     #[test]

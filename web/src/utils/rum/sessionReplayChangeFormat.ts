@@ -41,7 +41,6 @@
  *        < 0   -> insert before node (id + insertionPoint)
  */
 
- 
 
 // ---------------------------------------------------------------------------
 // Constants (mirror packages/browser-rum sessionReplayConstants.ts)

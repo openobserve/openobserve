@@ -31,7 +31,7 @@ vi.mock("./chartColorUtils", () => ({
 }));
 
 vi.mock("./dateTimeUtils", () => ({
-  formatDate: vi.fn((date) => "2023-12-25 10:00:00"),
+  formatDate: vi.fn(() => "2023-12-25 10:00:00"),
 }));
 
 vi.mock("date-fns-tz", () => ({

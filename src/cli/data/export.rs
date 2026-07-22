@@ -69,6 +69,7 @@ impl Context for Export {
             use_cache: false,
             clear_cache: false,
             local_mode: None,
+            agent_options: None,
         };
 
         match SearchService::search("", &c.org, stream_type, None, &req).await {

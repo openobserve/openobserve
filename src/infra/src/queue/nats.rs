@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::max, sync::Arc};
+use std::{cmp::max, sync::Arc, time::Duration};
 
 use async_nats::jetstream::{self, consumer::DeliverPolicy};
 use async_trait::async_trait;
@@ -22,7 +22,7 @@ use config::{get_cluster_name, get_config};
 use futures::TryStreamExt;
 use tokio::{sync::mpsc, task::JoinHandle};
 
-use crate::{db::nats::get_nats_client, errors::*, queue};
+use crate::{db::nats::get_nats_client, errors::*, queue, queue::format_key};
 
 pub async fn init() -> Result<()> {
     Ok(())
@@ -32,6 +32,34 @@ pub struct NatsQueue {
     prefix: String,
     consumer_name: String,
     is_durable: bool,
+}
+
+pub struct NatsPullConsumer {
+    consumer: jetstream::consumer::PullConsumer,
+    ack_wait: Duration,
+}
+
+impl NatsPullConsumer {
+    pub fn ack_wait(&self) -> Duration {
+        self.ack_wait
+    }
+
+    pub async fn next(&mut self) -> Result<Option<super::Message>> {
+        let mut messages = self
+            .consumer
+            .batch()
+            .max_messages(1)
+            .expires(Duration::from_secs(30))
+            .messages()
+            .await
+            .map_err(|e| Error::Message(format!("failed to request NATS message: {e}")))?;
+
+        messages
+            .try_next()
+            .await
+            .map(|message| message.map(super::Message::from_nats))
+            .map_err(|e| Error::Message(format!("failed to receive NATS message: {e}")))
+    }
 }
 
 impl NatsQueue {
@@ -54,6 +82,38 @@ impl NatsQueue {
             consumer_name: format_key(&consumer_name),
             is_durable,
         }
+    }
+
+    pub async fn pull_consumer(
+        &self,
+        topic: &str,
+        deliver_policy: Option<queue::DeliverPolicy>,
+    ) -> Result<NatsPullConsumer> {
+        let stream_name = format!("{}{}", self.prefix, format_key(topic));
+        let client = get_nats_client().await.clone();
+        let jetstream = jetstream::new(client);
+        let stream = jetstream
+            .get_stream(&stream_name)
+            .await
+            .map_err(|e| Error::Message(format!("failed to get NATS stream {stream_name}: {e}")))?;
+        let config = jetstream::consumer::pull::Config {
+            name: Some(self.consumer_name.clone()),
+            durable_name: self.is_durable.then(|| self.consumer_name.clone()),
+            deliver_policy: get_deliver_policy(deliver_policy),
+            ..Default::default()
+        };
+        let consumer = stream
+            .get_or_create_consumer(&self.consumer_name, config)
+            .await
+            .map_err(|e| {
+                Error::Message(format!(
+                    "failed to get or create NATS consumer {} for stream {stream_name}: {e}",
+                    self.consumer_name
+                ))
+            })?;
+        let ack_wait = consumer.cached_info().config.ack_wait;
+
+        Ok(NatsPullConsumer { consumer, ack_wait })
     }
 }
 
@@ -188,7 +248,7 @@ impl super::Queue for NatsQueue {
                         break;
                     }
                 };
-                let message = super::Message::Nats(message);
+                let message = super::Message::from_nats(message);
                 tx.send(message).await.map_err(|e| {
                     log::error!("Failed to send nats message for stream {stream_name}: {e}");
                     Error::Message(format!(
@@ -222,53 +282,9 @@ fn get_deliver_policy(deliver_policy: Option<queue::DeliverPolicy>) -> DeliverPo
     }
 }
 
-// format the key to be a valid nats key
-// refer to: https://docs.nats.io/nats-concepts/subjects#characters-allowed-and-recommended-for-subject-names
-fn format_key(key: &str) -> String {
-    let mut result = String::new();
-
-    for ch in key.chars() {
-        match ch {
-            // Keep recommended characters as-is
-            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => result.push(ch),
-            // Replace other characters with underscore for safety
-            _ => result.push('_'),
-        }
-    }
-
-    result
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{format_key, *};
-
-    #[test]
-    fn test_queue_nats_format_key() {
-        // Test basic functionality
-        assert_eq!(format_key("test"), "test");
-        assert_eq!(format_key("test123"), "test123");
-        assert_eq!(format_key("test-key"), "test-key");
-        assert_eq!(format_key("test_key"), "test_key");
-
-        // Test forbidden characters
-        assert_eq!(format_key("test.key"), "test_key");
-        assert_eq!(format_key("test*key"), "test_key");
-        assert_eq!(format_key("test>key"), "test_key");
-        assert_eq!(format_key("test key"), "test_key");
-        assert_eq!(format_key("test\0key"), "test_key");
-
-        // Test empty string
-        assert_eq!(format_key(""), "");
-
-        // Test mixed characters
-        assert_eq!(format_key("test@#$%^&*()key"), "test_________key");
-        assert_eq!(format_key("test.key*value>data"), "test_key_value_data");
-
-        // Test unicode characters (should be replaced with _)
-        assert_eq!(format_key("test中文key"), "test__key");
-        assert_eq!(format_key("test🚀key"), "test_key");
-    }
+    use super::*;
 
     #[test]
     fn test_nats_queue_new_strips_trailing_slash() {

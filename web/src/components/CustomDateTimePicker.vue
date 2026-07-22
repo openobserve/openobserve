@@ -35,7 +35,7 @@
               >
                 <div class="text-sm font-semibold min-w-18.75">{{ period.label }}</div>
                 <div
-                  v-for="(item, itemIndex) in relativeDates[period.value]"
+                  v-for="item in relativeDates[period.value]"
                   :key="item"
                 >
                   <OButton
@@ -83,7 +83,7 @@
   </ODropdown>
 </template>
 
-<script setup>
+<script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -91,8 +91,19 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import type { DropdownAlign } from "@/lib/overlay/Dropdown/ODropdown.types";
 import { ref, reactive, watch, computed } from "vue";
+import type { PropType } from "vue";
+
+// Period keys used to index relativeDates and label lookups.
+type PeriodKey = "s" | "m" | "h" | "d" | "w" | "M";
+
+interface RelativePeriod {
+  label: string;
+  value: PeriodKey;
+}
 
 // Define props to receive the value (offset) from parent
 const props = defineProps({
@@ -106,8 +117,9 @@ const props = defineProps({
   align: {
     default: "end",
     required: false,
-    type: String,
-    validator: (v) => ["start", "center", "end"].includes(v),
+    type: String as PropType<DropdownAlign>,
+    validator: (v: DropdownAlign) =>
+      ["start", "center", "end"].includes(v),
   },
 });
 
@@ -128,7 +140,7 @@ const picker = reactive({
 });
 
 // Periods for selection
-const relativePeriods = [
+const relativePeriods: RelativePeriod[] = [
   { label: "Seconds", value: "s" },
   { label: "Minutes", value: "m" },
   { label: "Hours", value: "h" },
@@ -137,7 +149,7 @@ const relativePeriods = [
   { label: "Months", value: "M" },
 ];
 
-const relativeDates = {
+const relativeDates: Record<PeriodKey, number[]> = {
   s: [1, 5, 10, 15, 30, 45],
   m: [1, 5, 10, 15, 30, 45],
   h: [1, 2, 3, 6, 8, 12],
@@ -157,7 +169,7 @@ const relativePeriodsSelect = ref([
 ]);
 
 // Function to map period values to their labels
-const getPeriodLabelFromValue = (periodValue) => {
+const getPeriodLabelFromValue = (periodValue: SelectModelValue | string) => {
   const period = relativePeriods.find((p) => p.value === periodValue);
   return period ? period.label : "Minutes";
 };
@@ -167,19 +179,23 @@ watch(
   () => props.modelValue,
   (newValue) => {
     if (newValue) {
-      const value = newValue.match(/\d+/g)[0]; // Extract numeric value
-      const period = newValue.match(/[a-zA-Z]+/g)[0]; // Extract period
+      const valueMatch = newValue.match(/\d+/g); // Extract numeric value
+      const periodMatch = newValue.match(/[a-zA-Z]+/g); // Extract period
+      const value = valueMatch ? valueMatch[0] : undefined;
+      const period = periodMatch ? periodMatch[0] : undefined;
 
       picker.data.selectedDate.relative.value = Number(value);
-      picker.data.selectedDate.relative.period = period;
-      picker.data.selectedDate.relative.label = getPeriodLabelFromValue(period); // Dynamically set label
+      picker.data.selectedDate.relative.period = period ?? "";
+      picker.data.selectedDate.relative.label = getPeriodLabelFromValue(
+        period ?? "",
+      ); // Dynamically set label
     }
   },
   { immediate: true },
 );
 
 // Function to update the relative date when selected
-const setRelativeDate = (period, item) => {
+const setRelativeDate = (period: RelativePeriod, item: number) => {
   picker.data.selectedDate.relative.period = period.value;
   picker.data.selectedDate.relative.value = item;
   picker.data.selectedDate.relative.label = getPeriodLabelFromValue(
@@ -191,7 +207,7 @@ const setRelativeDate = (period, item) => {
 };
 
 // Function to update custom period when selecting from the select
-const updateCustomPeriod = (newPeriod) => {
+const updateCustomPeriod = (newPeriod: SelectModelValue | string) => {
   picker.data.selectedDate.relative.label = getPeriodLabelFromValue(newPeriod);
   emit(
     "update:modelValue",
@@ -209,10 +225,10 @@ const getTrimmedDisplayValue = () => {
 };
 
 // Check if the current selection matches the modelValue
-const isSelected = (value, period) => {
+const isSelected = (value: number, period: PeriodKey) => {
   return (
-    picker.data.selectedDate.relative.value == value &&
-    picker.data.selectedDate.relative.period == period
+    picker.data.selectedDate.relative.value === value &&
+    picker.data.selectedDate.relative.period === period
   );
 };
 

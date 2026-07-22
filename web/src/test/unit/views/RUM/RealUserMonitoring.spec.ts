@@ -301,7 +301,7 @@ describe("RealUserMonitoring.vue", () => {
         props: ["isRumEnabled", "isSessionReplayEnabled"],
       };
 
-      const wrapper = mount(RealUserMonitoring, {
+      mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
           stubs: {
@@ -488,7 +488,7 @@ describe("RealUserMonitoring.vue", () => {
     it("should use keep-alive for routes with keepAlive meta", async () => {
       await router.push({ name: "Sessions" });
 
-      const wrapper = mount(RealUserMonitoring, {
+      mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
           stubs: {

@@ -324,7 +324,6 @@ export default defineComponent({
             this.user.last_name = token.family_name ? token.family_name : "";
           }
           const sessionUserInfo = getDecodedUserInfo();
-          const d = new Date();
           this.userInfo =
             sessionUserInfo !== null
               ? JSON.parse(sessionUserInfo as string)
@@ -332,7 +331,7 @@ export default defineComponent({
 
           if (
             (this.userInfo !== null &&
-              this.userInfo.hasOwnProperty("pgdata")) ||
+              Object.prototype.hasOwnProperty.call(this.userInfo, "pgdata")) ||
             config.isEnterprise === "true"
           ) {
             this.store.dispatch("login", {
@@ -371,7 +370,7 @@ export default defineComponent({
                           timeout: 0,
 });
 
-            usersService.addNewUser(this.user).then((res) => {
+            usersService.addNewUser(this.user).then((_res) => {
               this.store.dispatch("login", {
                 loginState: true,
                 userInfo: this.userInfo,

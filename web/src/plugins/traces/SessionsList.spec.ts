@@ -347,7 +347,10 @@ describe("SessionsList — loading state", () => {
 });
 
 describe("SessionsList — sessions table", () => {
-  it("fetches stream sessions with no agent filter by default", async () => {
+  it("should fetch stream sessions with no agent filter when in stream mode", async () => {
+    // Default scope is "agent" now — opt into stream mode via the persisted
+    // preference, the same path a returning user takes.
+    localStorage.setItem("sessionsList_filterMode", "stream");
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
@@ -361,7 +364,8 @@ describe("SessionsList — sessions table", () => {
     );
   });
 
-  it("does not load agents while refreshing in stream mode", async () => {
+  it("should not load agents while refreshing when in stream mode", async () => {
+    localStorage.setItem("sessionsList_filterMode", "stream");
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 

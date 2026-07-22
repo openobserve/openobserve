@@ -138,7 +138,7 @@ describe("ChartRenderer", () => {
     };
 
     // Mock intersection observer
-    global.IntersectionObserver = vi.fn(function(callback) {
+    global.IntersectionObserver = vi.fn(function() {
       return {
         observe: vi.fn(),
         unobserve: vi.fn(),

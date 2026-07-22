@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { ref, reactive } from "vue";
 
 // -- Mocks (hoisted) --
@@ -21,6 +21,11 @@ import { ref, reactive } from "vue";
 const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
+}));
+
+// usePatternActions calls useI18n() directly (outside a component), so stub it.
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
 }));
 
 const mockRouterPush = vi.fn();
@@ -174,6 +179,29 @@ describe("usePatternActions", () => {
       navigatePatternDetail(true, false);
 
       expect(selectedPattern.value).toBeNull();
+    });
+
+    it("navigates the passed visible list, not the full pattern set", () => {
+      // Simulate a severity filter: the visible list is a 2-item subset in a
+      // different order than the full mockPatternsState list.
+      const visible = [
+        { template: "visible-A", pattern_id: "vA" },
+        { template: "visible-B", pattern_id: "vB" },
+      ];
+      const { openPatternDetails, navigatePatternDetail, selectedPattern, navTotal } =
+        usePatternActions();
+      openPatternDetails(visible[0], 0, visible);
+
+      // Total reflects the visible list, not the full set.
+      expect(navTotal.value).toBe(2);
+
+      navigatePatternDetail(true, false);
+      expect(selectedPattern.value!.index).toBe(1);
+      expect(selectedPattern.value!.pattern.template).toBe("visible-B");
+
+      // Cannot step past the visible list's end.
+      navigatePatternDetail(true, false);
+      expect(selectedPattern.value!.index).toBe(1);
     });
   });
 

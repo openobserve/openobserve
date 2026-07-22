@@ -160,7 +160,6 @@ import type {
 } from "@/utils/awsIntegrations";
 import {
   generateCloudFormationURL,
-  generateDashboardURL,
 } from "@/utils/awsIntegrations";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
@@ -396,7 +395,7 @@ export default defineComponent({
       // If replacing existing dashboard, delete it first
       if (existingDashboardId) {
         try {
-          const deleteResponse = await dashboardsService.delete(
+          await dashboardsService.delete(
             orgId,
             existingDashboardId,
             folderId,
@@ -473,7 +472,6 @@ export default defineComponent({
 
           // User chose to replace
           const loadingNotif = toast({
-            type: "ongoing",
             message: "Replacing dashboard...",
             timeout: 0,
             variant: "loading",
@@ -518,7 +516,6 @@ export default defineComponent({
 
         // No existing dashboard, proceed with import
         const loadingNotif = toast({
-          type: "ongoing",
           message: "Importing dashboard...",
           timeout: 0,
           variant: "loading",

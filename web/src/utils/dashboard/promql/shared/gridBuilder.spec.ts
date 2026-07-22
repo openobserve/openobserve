@@ -22,7 +22,7 @@ import {
 
 // Mock the legendConfiguration module
 vi.mock("../../legendConfiguration", () => ({
-  calculateBottomLegendHeight: vi.fn((seriesCount, width, series, height) => {
+  calculateBottomLegendHeight: vi.fn((seriesCount) => {
     return `${Math.min(50 + seriesCount * 2, 100)}px`;
   }),
   calculateRightLegendWidth: vi.fn(
@@ -30,7 +30,7 @@ vi.mock("../../legendConfiguration", () => ({
       return scrollable ? 200 : 150;
     },
   ),
-  getChartDimensions: vi.fn((ref) => ({
+  getChartDimensions: vi.fn(() => ({
     chartWidth: 800,
     chartHeight: 600,
   })),

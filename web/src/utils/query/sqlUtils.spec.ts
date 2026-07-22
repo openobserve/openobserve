@@ -34,7 +34,6 @@ import {
   parseWhereClauseToFilter,
   extractWhereClause,
 } from "./sqlUtils";
-import store from "@/test/unit/helpers/store";
 
 // Mock the imported modules
 const mockAstify = vi.fn();
@@ -740,9 +739,9 @@ describe("sqlUtils", () => {
 
   describe("formatValue function (internal)", () => {
     it("should handle null values", () => {
-      // Testing the internal formatValue function behavior through addLabelToSQlQuery
-      expect(null == null).toBe(true);
-      expect(undefined == null).toBe(true);
+      // Testing the internal formatValue function behavior directly
+      expect(formatValue(null)).toBe(null);
+      expect(formatValue(undefined)).toBe(undefined);
     });
 
     it("should handle string values with quotes", () => {
@@ -1982,7 +1981,7 @@ describe("sqlUtils", () => {
     it("should handle CASE/WHEN expressions as raw fields with parser", () => {
       // Mock parser that can reconstruct the CASE expression
       const mockParser = {
-        sqlify: (_ast: any) => {
+        sqlify: () => {
           // Simplified mock - return a SQL string containing the CASE expression
           return "SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp";
         }
@@ -2683,7 +2682,7 @@ describe("sqlUtils", () => {
         ]
       });
       
-      const result = await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", null);
+      await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", null);
       expect(mockSqlify).toHaveBeenCalled();
     });
 
@@ -2737,7 +2736,7 @@ describe("sqlUtils", () => {
         ]
       });
       
-      const result = await changeHistogramInterval("SELECT histogram(_timestamp), COUNT(*) FROM logs", "10m");
+      await changeHistogramInterval("SELECT histogram(_timestamp), COUNT(*) FROM logs", "10m");
       expect(mockSqlify).toHaveBeenCalled();
     });
 
@@ -2760,7 +2759,7 @@ describe("sqlUtils", () => {
         ]
       });
       
-      const result = await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", "5m");
+      await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", "5m");
       expect(mockSqlify).toHaveBeenCalled();
     });
   });
@@ -2856,7 +2855,7 @@ describe("sqlUtils", () => {
       
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       
-      const result = await getStreamNameFromQuery("Deep recursion query");
+      await getStreamNameFromQuery("Deep recursion query");
       
       expect(consoleSpy).toHaveBeenCalledWith("Maximum recursion depth reached while parsing SQL query");
       consoleSpy.mockRestore();
@@ -3179,7 +3178,7 @@ describe("sqlUtils", () => {
     });
 
     it("should handle empty labels array", async () => {
-      const result = await addLabelsToSQlQuery("SELECT * FROM logs", []);
+      await addLabelsToSQlQuery("SELECT * FROM logs", []);
       expect(mockSqlify).toHaveBeenCalled();
     });
 
@@ -3360,7 +3359,7 @@ describe("sqlUtils", () => {
 
     it("should handle BETWEEN operator simulation", async () => {
       const result1 = await addLabelToSQlQuery("SELECT * FROM logs", "timestamp", "2023-01-01", ">=");
-      const result2 = await addLabelToSQlQuery(result1, "timestamp", "2023-12-31", "<=");
+      await addLabelToSQlQuery(result1, "timestamp", "2023-12-31", "<=");
       expect(mockSqlify).toHaveBeenCalled();
     });
 

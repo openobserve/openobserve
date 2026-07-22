@@ -1,6 +1,5 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
 
 import CrossLinkManager from "./CrossLinkManager.vue";
 import i18n from "@/locales";

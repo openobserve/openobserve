@@ -15,11 +15,10 @@
 
 use std::sync::LazyLock as Lazy;
 
+pub use ::db::alerts::realtime_triggers::REALTIME_ALERT_TRIGGERS;
 use config::{RwAHashMap, meta::stream::StreamParams};
 
-use crate::service::{db::scheduler::Trigger, pipeline::batch_execution::ExecutablePipeline};
-
-pub static REALTIME_ALERT_TRIGGERS: Lazy<RwAHashMap<String, Trigger>> = Lazy::new(Default::default);
+use crate::service::pipeline::batch_execution::ExecutablePipeline;
 
 pub static STREAM_EXECUTABLE_PIPELINES: Lazy<RwAHashMap<StreamParams, Vec<ExecutablePipeline>>> =
     Lazy::new(Default::default);

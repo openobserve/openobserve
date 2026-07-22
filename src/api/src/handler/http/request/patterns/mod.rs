@@ -156,9 +156,11 @@ pub async fn extract_patterns(
             }
         }
 
-        // Set size limit for pattern extraction using O2 config
-        // This determines the maximum number of logs to analyze for pattern detection
-        // Default is 10K which aligns with industry standards for pattern quality
+        // Size limit for pattern extraction (max logs to analyze). This bounds the
+        // sample the clustering runs on. NOTE: per-pattern volume sparklines are
+        // NOT derived from this sample — the UI fetches an exact, tantivy-indexed
+        // histogram per pattern — so this only needs to be a representative sample
+        // for cluster discovery, not a time-uniform one.
         if req.query.size == 0 || req.query.size == -1 {
             let o2_cfg = get_o2_config();
             req.query.size = if o2_cfg.log_patterns.max_logs_for_extraction > 0 {
@@ -168,23 +170,19 @@ pub async fn extract_patterns(
             };
         }
 
-        // Set default sampling ratio for pattern extraction if not explicitly provided
-        // Pattern extraction benefits from sampling to improve performance on large datasets
-        if req.query.sampling_ratio.is_none() {
-            let sampling_ratio = get_o2_config().common.query_default_sampling_ratio;
-            let default_ratio = sampling_ratio / 100.0;
-            if default_ratio > 0.0 && default_ratio <= 1.0 {
-                req.query.sampling_ratio = Some(default_ratio);
-                log::info!(
-                    "[PATTERNS trace_id {trace_id}] Applied default sampling_ratio for pattern extraction: {sampling_ratio}%",
-                );
-            }
-        }
+        // Extraction deliberately does not use row-group sampling.
+        //
+        // The streaming layer splits the window into equal time slices and fetches
+        // each with its own limit, which both bounds the read (the limit stops the
+        // scan early on time-sorted files) and spreads the sample across the whole
+        // window. Row-group sampling on top of that made results non-deterministic:
+        // row-group time ranges are interpolated from file min/max, so a slice
+        // whose selected row group didn't actually overlap it returned nothing.
+        req.query.sampling_ratio = None;
 
         log::info!(
-            "[PATTERNS trace_id {trace_id}] Query configuration - size: {}, sampling_ratio: {:?}",
+            "[PATTERNS trace_id {trace_id}] Query configuration - size: {}",
             req.query.size,
-            req.query.sampling_ratio
         );
 
         // Set search_type if not already set (required by search execution)
@@ -196,9 +194,9 @@ pub async fn extract_patterns(
         let trace_id_clone = trace_id.clone();
         tokio::spawn(async move {
             streaming::process_search_stream_request(
+                trace_id_clone,
                 org_id,
                 user_id,
-                trace_id_clone,
                 req,
                 config::meta::stream::StreamType::Logs,
                 stream_names, // Use resolved stream names from SQL

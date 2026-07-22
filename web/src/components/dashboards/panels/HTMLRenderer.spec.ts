@@ -29,7 +29,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
-  processVariableContent: vi.fn((content, variables, context) => {
+  processVariableContent: vi.fn((content, variables) => {
     // Simple mock implementation that replaces {{variable}} patterns
     if (!content || typeof content !== 'string') return content;
 

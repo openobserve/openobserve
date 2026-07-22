@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 
 // All vi.mock calls MUST be at the TOP (hoisted by Vitest)
 
@@ -14,8 +14,7 @@ vi.mock("vuex", () => ({
 
 vi.mock("@/utils/timezone", () => ({
   getFunctionErrorMessage: vi.fn(
-    (msg: string, start: number, end: number, tz: string) =>
-      `${msg} (Data returned for: start to end)`,
+    (msg: string) => `${msg} (Data returned for: start to end)`,
   ),
 }));
 

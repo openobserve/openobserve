@@ -56,7 +56,6 @@ export { MetricConverter } from "./convertPromQLMetricChart";
 export { HeatmapConverter } from "./convertPromQLHeatmapChart";
 export { BarConverter } from "./convertPromQLBarChart";
 export { GeoConverter } from "./convertPromQLGeoChart";
-export { SankeyConverter } from "./convertPromQLSankeyChart";
 
 // Shared utilities
 export * from "./shared/types";

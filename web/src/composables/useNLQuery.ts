@@ -434,7 +434,6 @@ export function useNLQuery() {
 
       const decoder = new TextDecoder();
       let generatedQuery = '';
-      let chunkCount = 0;
       const toolCalls: Array<{tool: string, message: string, success?: boolean}> = [];
       const toolResults: Array<{tool: string, success: boolean, message: string}> = [];
       let hasError = false;
@@ -445,7 +444,6 @@ export function useNLQuery() {
       try {
         while (true) {
           const { done, value } = await reader.read();
-          chunkCount++;
 
           if (done) {
             break;

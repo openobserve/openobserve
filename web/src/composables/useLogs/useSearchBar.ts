@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
@@ -24,6 +23,7 @@ import searchService from "@/services/search";
 import { arraysMatch } from "@/utils/zincutils";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import type { ExtendedParsedSQLResult } from "@/composables/useLogs/logsUtils";
 
 import useActions from "@/composables/useActions";
 import useFunctions from "@/composables/useFunctions";
@@ -42,7 +42,6 @@ export const useSearchBar = () => {
   let { searchObj, searchObjDebug, notificationMsg } = searchState();
 
   const store = useStore();
-  const router = useRouter();
 
   const { fnParsedSQL, extractTimestamps } = logsUtils();
 
@@ -114,7 +113,6 @@ export const useSearchBar = () => {
   const getSavedViews = async () => {
     try {
       searchObj.loadingSavedView = true;
-      const favoriteViews: any = [];
       savedviewsService
         .get(store.state.selectedOrganization.identifier)
         .then((res) => {
@@ -156,6 +154,7 @@ export const useSearchBar = () => {
       const parsedSQL = fnParsedSQL();
 
       if (
+        !parsedSQL ||
         !Object.hasOwn(parsedSQL, "from") ||
         parsedSQL?.from == null ||
         parsedSQL?.from?.length == 0
@@ -234,7 +233,8 @@ export const useSearchBar = () => {
             return stream.table;
           }),
         );
-        let nextTable = parsedSQL._next;
+        let nextTable: ExtendedParsedSQLResult | null | undefined =
+          parsedSQL._next;
         //this will handle the union queries
         while (nextTable) {
           // Map through each "from" array in the _next object, as it can contain multiple tables
@@ -871,7 +871,7 @@ export const useSearchBar = () => {
   };
 
   const cancelQuery = async (): Promise<boolean> => {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       try {
         // only call cancel query api if it is enterprise
         // otherwise resolve and return immediately

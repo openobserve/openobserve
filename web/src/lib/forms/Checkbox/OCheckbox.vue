@@ -132,11 +132,6 @@ const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
   md: "size-4",
 };
 
-const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
-  xs: "text-xs",
-  sm: "text-xs",
-  md: "text-sm",
-};
 </script>
 
 <template>

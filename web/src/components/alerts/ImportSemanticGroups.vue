@@ -337,6 +337,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
@@ -384,7 +385,9 @@ const hasSelectedChanges = computed(() => {
   );
 });
 
-const loadFile = async (file: File | null) => {
+const loadFile = async (value: FileValue) => {
+  // Single-file input; take the first file when the model yields an array.
+  const file = Array.isArray(value) ? value[0] : value;
   if (!file) return;
 
   isImporting.value = true;

@@ -19,6 +19,7 @@ flamegraph.html
 /data*/
 /src/infra/data/
 /src/core/data/
+/src/db/data/
 /src/search/data/
 /.idea/
 /.vscode
@@ -80,7 +81,9 @@ tests/ui-testing/.env.old
 !/.opencode/agents/e2e_ci_council_of_agents/
 /tests/ux-audit/*.worktrees/
 
-# Track the shared ui-architect skill; the rest of .claude stays ignored.
+# Track the shared ui-architect + eslint-error-handling skills; the rest of
+# .claude stays ignored.
 !/.claude/skills/
 /.claude/skills/*
 !/.claude/skills/ui-architect/
+!/.claude/skills/eslint-error-handling/

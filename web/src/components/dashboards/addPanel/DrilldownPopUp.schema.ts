@@ -51,11 +51,22 @@ export const makeDrilldownPopUpSchema = (t: (_key: string) => string) =>
             .optional()
             .default([]),
         })
-        .default({}),
+        // Fully-shaped default: zod v4's .default() returns the value as-is
+        // (no inner-default fill), so it must match the output shape.
+        .default({
+          logsMode: "auto",
+          logsQuery: "",
+          url: "",
+          folder: "",
+          dashboard: "",
+          tab: "",
+          passAllVariables: true,
+          variables: [],
+        }),
     })
     .superRefine((val, ctx) => {
       const trimmed = (s: unknown) => String(s ?? "").trim();
-      const data = val.data ?? {};
+      const data = val.data ?? ({} as NonNullable<typeof val.data>);
 
       if (val.type === "byUrl") {
         const url = trimmed(data.url);

@@ -407,9 +407,12 @@ export class LogsPage {
         this.patternCardAnomalyBadge = (index) => `[data-test="pattern-card-${index}-anomaly-badge"]`;
         this.patternCardFrequency = (index) => `[data-test="pattern-card-${index}-frequency"]`;
         this.patternCardPercentage = (index) => `[data-test="pattern-card-${index}-percentage"]`;
-        this.patternCardIncludeBtn = (index) => `[data-test="pattern-card-${index}-include-btn"]`;
-        this.patternCardExcludeBtn = (index) => `[data-test="pattern-card-${index}-exclude-btn"]`;
         this.patternCardDetailsIcon = (index) => `[data-test="pattern-card-${index}"]`;
+        // Include/exclude/create-alert moved off the card and into the details
+        // dialog in the patterns UI redesign, so they are no longer per-index.
+        this.patternDetailIncludeBtn = '[data-test="pattern-detail-include-btn"]';
+        this.patternDetailExcludeBtn = '[data-test="pattern-detail-exclude-btn"]';
+        this.patternDetailCreateAlertBtn = '[data-test="pattern-detail-create-alert-btn"]';
         // The pattern-template wildcard chip carries a data-test hook (the `.wildcard-chip`
         // scoped class was dropped when the chip moved from a class to the OTag component).
         this.patternCardWildcardChips = (index) => `[data-test="pattern-card-${index}-template"] [data-test="pattern-card-wildcard-chip"]`;
@@ -9053,20 +9056,24 @@ export class LogsPage {
     }
 
     /**
-     * Click the include button on a pattern card
+     * Include a pattern in the query. The action lives in the pattern details
+     * dialog (opened by clicking the card), not on the card itself.
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternIncludeBtn(index = 0) {
-        await this.page.locator(this.patternCardIncludeBtn(index)).click();
+        await this.page.locator(this.patternCard(index)).click();
+        await this.page.locator(this.patternDetailIncludeBtn).click();
         testLogger.info(`Clicked include button on pattern ${index}`);
     }
 
     /**
-     * Click the exclude button on a pattern card
+     * Exclude a pattern from the query. As with include, the action lives in the
+     * pattern details dialog rather than on the card.
      * @param {number} index - The pattern card index (0-based)
      */
     async clickPatternExcludeBtn(index = 0) {
-        await this.page.locator(this.patternCardExcludeBtn(index)).click();
+        await this.page.locator(this.patternCard(index)).click();
+        await this.page.locator(this.patternDetailExcludeBtn).click();
         testLogger.info(`Clicked exclude button on pattern ${index}`);
     }
 
@@ -9240,23 +9247,10 @@ export class LogsPage {
         return content;
     }
 
-    /**
-     * Check if pattern include button is active/selected
-     * @param {number} index - The pattern card index (0-based)
-     */
-    async expectPatternIncludeBtnActive(index = 0) {
-        await expect(this.page.locator(this.patternCardIncludeBtn(index))).toHaveClass(/active|selected/);
-        testLogger.info(`Pattern ${index} include button is active`);
-    }
-
-    /**
-     * Check if pattern exclude button is active/selected
-     * @param {number} index - The pattern card index (0-based)
-     */
-    async expectPatternExcludeBtnActive(index = 0) {
-        await expect(this.page.locator(this.patternCardExcludeBtn(index))).toHaveClass(/active|selected/);
-        testLogger.info(`Pattern ${index} exclude button is active`);
-    }
+    // expectPatternIncludeBtnActive/expectPatternExcludeBtnActive were dropped in the
+    // patterns UI redesign: the include/exclude controls moved into the details dialog,
+    // where they are one-shot actions with no active/selected state to assert. They had
+    // no callers.
 
     // ============================================================================
     // BUILD TAB / QUERY BUILDER METHODS - PR #10305

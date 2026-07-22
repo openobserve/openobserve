@@ -301,8 +301,6 @@ import {
   defineComponent,
   ref,
   watch,
-  onActivated,
-  onDeactivated,
   nextTick,
   provide,
   defineAsyncComponent,
@@ -336,23 +334,18 @@ import {
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import ExportDashboard from "@/components/dashboards/ExportDashboard.vue";
 import RenderDashboardCharts from "./RenderDashboardCharts.vue";
-import { copyToClipboard } from "@/utils/clipboard";
 import useNotifications from "@/composables/useNotifications";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import reports from "@/services/reports";
-import destination from "@/services/alert_destination.js";
 import config from "@/aws-exports";
-import queryService from "../../services/search";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useLoading } from "@/composables/useLoading";
-import shortURLService from "@/services/short_url";
 import { isEqual } from "lodash-es";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { getUUID } from "@/utils/zincutils";
@@ -383,7 +376,6 @@ export default defineComponent({
   emits: ["onDeletePanel"],
   components: {
     OPageLayout,
-    OSeparator,
     DateTimePickerDashboard,
     ShareButton,
     AutoRefreshInterval,
@@ -394,7 +386,6 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
-    OSpinner,
     OIcon,
     OTooltip,
 },
@@ -1041,7 +1032,7 @@ export default defineComponent({
       // This prevents triggering reactivity for panels whose time hasn't changed
       // Remove keys that no longer exist
       Object.keys(currentTimeObjPerPanel.value).forEach((key) => {
-        if (!newPanelTimes.hasOwnProperty(key)) {
+        if (!Object.prototype.hasOwnProperty.call(newPanelTimes, key)) {
           delete currentTimeObjPerPanel.value[key];
         }
       });
@@ -1552,7 +1543,9 @@ export default defineComponent({
           Object.keys(newQuery).some(
             (key) => newQuery[key] !== route.query[key],
           ) ||
-          Object.keys(route.query).some((key) => !newQuery.hasOwnProperty(key));
+          Object.keys(route.query).some(
+            (key) => !Object.prototype.hasOwnProperty.call(newQuery, key),
+          );
 
         if (hasQueryChanged) {
           router.replace({ query: newQuery }).finally(() => {

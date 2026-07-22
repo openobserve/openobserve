@@ -84,6 +84,8 @@ const enterpriseResolverPlugin = {
 
       return defaultPath;
     }
+
+    return undefined;
   },
 };
 

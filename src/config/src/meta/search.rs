@@ -74,10 +74,54 @@ pub struct Request {
     pub clear_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub local_mode: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_options: Option<AgentOptions>,
 }
 
 pub fn default_use_cache() -> bool {
     get_config().common.result_cache_enabled
+}
+
+/// Agent-oriented response options. When absent the response is unchanged, so
+/// existing clients (UI) are unaffected.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[schema(as = SearchAgentOptions)]
+pub struct AgentOptions {
+    /// Render `hits` as a compact string block in `data` instead of a JSON
+    /// array. Tabular results shrink to ~60% of their JSON token cost as csv.
+    #[serde(default)]
+    pub output_format: OutputFormat,
+    /// Query execution mode. `partition` runs the partitioned streaming pipeline
+    /// (per-partition early termination, streaming-aggs cache) and collects
+    /// the result into this single response.
+    #[serde(default)]
+    pub mode: AgentSearchMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentSearchMode {
+    /// Current behavior: single search through the result cache path.
+    #[default]
+    Default,
+    /// Partitioned execution: the SSE-era backend partition loop scans
+    /// partition by partition, stops early once enough rows are collected,
+    /// and aggregation queries accumulate streaming-aggs cache per partition.
+    Partition,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputFormat {
+    /// Current behavior: `hits` is a JSON array of objects.
+    #[default]
+    Json,
+    /// `data` holds a CSV string; newlines inside cells are escaped to a
+    /// literal `\n` so every record stays on one line.
+    Csv,
+    /// `data` holds a markdown table; better column alignment for small
+    /// result sets at ~8% more tokens than csv.
+    MdTable,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -257,6 +301,16 @@ pub struct Response {
     pub query_index: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peak_memory_usage: Option<f64>,
+    /// Set when `agent_options.output_format` reformatted `hits` into `data`:
+    /// "csv", "md_table", or "ndjson" (automatic fallback for sparse results).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub format: Option<String>,
+    /// Formatted result block when `format` is set; `hits` is emptied.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub data: Option<String>,
+    /// Human/agent-readable note about server-side formatting decisions.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub advisory: Option<String>,
 }
 
 /// Paginated response used by list-style APIs (sessions, traces, users).
@@ -449,6 +503,9 @@ impl Response {
             is_histogram_eligible: None,
             query_index: None,
             peak_memory_usage: None,
+            format: None,
+            data: None,
+            advisory: None,
         }
     }
 
@@ -724,6 +781,7 @@ impl SearchHistoryRequest {
             use_cache: default_use_cache(),
             clear_cache: false,
             local_mode: None,
+            agent_options: None,
         };
         Ok(search_req)
     }
@@ -1342,6 +1400,7 @@ impl MultiStreamRequest {
                 use_cache: default_use_cache(),
                 clear_cache: false,
                 local_mode: None,
+                agent_options: None,
             });
         }
         res

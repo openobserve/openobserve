@@ -20,8 +20,6 @@ import {
   beforeEach,
   afterEach,
   vi,
-  afterAll,
-  beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 
@@ -81,7 +79,6 @@ import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import config from "@/aws-exports";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
@@ -115,7 +112,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-
 const mockStore = createStore({
   state: {
     theme: "light",
@@ -131,9 +127,6 @@ const mockStore = createStore({
 
 const mockEvents =
   '[{"name":"[work_group:short] done a job: user_id None, trace_id bd64db54267785abbe7a43869ed8eb6e","_timestamp":1752490492843047,"code.filepath":"/home/runner/work/o2-enterprise/o2-enterprise/o2-enterprise/o2_enterprise/src/enterprise/search/work_group.rs","code.lineno":"125","level":"DEBUG","target":"o2_enterprise::enterprise::search::work_group","code.namespace":"o2_enterprise::enterprise::search::work_group"}]';
-
-const mockExceptions =
-  '[{"_timestamp": 1752490492843047,"name": "exception","exception.type": "RuntimeError","exception.message": "Test error","exception.escaped": "false","exception.stacktrace": "Error: Test error\\n    at test.js:1:1"}]';
 
 const mockLinks =
   '[{"context": {"traceId": "f6e08ab2a928aa393375f0d9b05a9054", "spanId": "ecc59cb843104cf8"}}, {"context": {"traceId": "6262666637a9ae45ad3e25f5111dd59f", "spanId": "d9603ec7f76eb499"}}]';
@@ -210,7 +203,8 @@ const tabStubs = {
   },
   OTab: {
     name: "OTab",
-    template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+    template:
+      '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
     props: ["name", "label", "style"],
   },
   // OTabPanels: provide reactive context via setup()
@@ -400,7 +394,10 @@ describe("TraceDetailsSidebar", async () => {
         // — we set vm state directly.
         viewLogsWrapper.vm.correlationProps = {
           logStreams: [
-            { stream_name: "test-stream", filters: { service_name: "test-svc" } },
+            {
+              stream_name: "test-stream",
+              filters: { service_name: "test-svc" },
+            },
           ],
           timeRange: { startTime: 1000000, endTime: 2000000 },
         };
@@ -596,7 +593,9 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should not show database tab when span has no db_ attributes", () => {
       expect(
-        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+        wrapper
+          .find('[data-test="trace-details-sidebar-tabs-database"]')
+          .exists(),
       ).toBe(false);
     });
 
@@ -615,7 +614,9 @@ describe("TraceDetailsSidebar", async () => {
         span: { ...mockSpan, db_system: "postgresql" },
       });
       expect(
-        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+        wrapper
+          .find('[data-test="trace-details-sidebar-tabs-database"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -793,9 +794,7 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should pass span to TraceErrorTab stub", () => {
-      const spanIdEl = wrapper.find(
-        '[data-test="trace-error-tab-span-id"]',
-      );
+      const spanIdEl = wrapper.find('[data-test="trace-error-tab-span-id"]');
       expect(spanIdEl.exists()).toBe(true);
       expect(spanIdEl.text()).toBe(mockSpan.span_id);
     });
@@ -1165,8 +1164,6 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should properly update when span props change", async () => {
       // First, check the initial state
-      const initialLinks = wrapper.vm.spanLinks;
-
       // Update the span with invalid links
       await wrapper.setProps({
         span: {
@@ -1257,7 +1254,7 @@ describe("TraceDetailsSidebar", async () => {
       });
       expect(testWrapper.exists()).toBe(true);
       // Check that the component has the prop correctly set
-      expect(typeof testWrapper.vm.showLogStreamSelector).toBe('boolean');
+      expect(typeof testWrapper.vm.showLogStreamSelector).toBe("boolean");
       expect(testWrapper.vm.showLogStreamSelector).toBe(true);
       testWrapper.unmount();
     });
@@ -1307,13 +1304,15 @@ describe("TraceDetailsSidebar", async () => {
       });
       // The tooltip content should be computed and available
       expect(testWrapper.vm.viewLogsTooltipContent).toBeDefined();
-      expect(typeof testWrapper.vm.viewLogsTooltipContent).toBe('string');
+      expect(typeof testWrapper.vm.viewLogsTooltipContent).toBe("string");
 
       // The button should be wrapped in spans for tooltip functionality
-      const viewLogsBtn = testWrapper.find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]');
+      const viewLogsBtn = testWrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+      );
       if (viewLogsBtn.exists()) {
         const buttonWrapper = viewLogsBtn.element.parentElement;
-        expect(buttonWrapper?.tagName.toLowerCase()).toBe('span');
+        expect(buttonWrapper?.tagName.toLowerCase()).toBe("span");
       }
       testWrapper.unmount();
     });
@@ -1410,7 +1409,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain the internationalized string
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1426,7 +1425,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain loading text
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1442,7 +1441,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain default text
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1805,7 +1804,7 @@ describe("TraceDetailsSidebar", async () => {
           stubs: {
             ...baseStubs,
             LLMContentRenderer: {
-              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId"><slot /></div>`,
+              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId" :data-content="content"><slot /></div>`,
               props: [
                 "content",
                 "observationType",
@@ -1849,6 +1848,59 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="llm-content-renderer-output"]',
       );
       expect(outputRenderer.exists()).toBe(true);
+    });
+
+    it("renders a remote evaluator response in Preview without GenAI fields", async () => {
+      const remoteWrapper = mount(TraceDetailsSidebar, {
+        props: {
+          span: {
+            span_id: "remote-evaluator-span",
+            trace_id: "remote-evaluator-trace",
+            attributes_status: "success",
+            attributes_response:
+              '{"code":"OK","value":0.9,"reason":"Supported"}',
+          },
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+          activeTab: "preview",
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: {
+            ...baseStubs,
+            LLMContentRenderer: {
+              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-content="content"><slot /></div>`,
+              props: [
+                "content",
+                "observationType",
+                "contentType",
+                "span",
+                "viewMode",
+                "instanceId",
+              ],
+            },
+            TenstackTable: true,
+            "q-expansion-item": true,
+            CodemirrorEditor: true,
+            CodeQueryEditor: true,
+          },
+        },
+      });
+      await remoteWrapper.vm.$nextTick();
+
+      expect(
+        remoteWrapper
+          .find('[data-test="trace-details-sidebar-tabs-preview"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        remoteWrapper
+          .find('[data-test="llm-content-renderer-output"]')
+          .attributes("data-content"),
+      ).toBe('{"code":"OK","value":0.9,"reason":"Supported"}');
+
+      remoteWrapper.unmount();
     });
 
     it("should pass instance-id ending with -input to the input LLMContentRenderer", () => {

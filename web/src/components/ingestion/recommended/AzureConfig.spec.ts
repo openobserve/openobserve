@@ -15,7 +15,7 @@ vi.mock('../../../utils/zincutils', () => ({
   getEndPoint: vi.fn(() => ({ url: 'http://localhost:5080', host: 'localhost', port: '5080', protocol: 'http', tls: false })),
   getIngestionURL: vi.fn(() => 'http://localhost:5080'),
   b64EncodeStandard: vi.fn((str) => btoa(str)),
-  maskText: vi.fn((str) => '***'),
+  maskText: vi.fn(() => '***'),
 }));
 
 vi.mock('../../../utils/azureIntegrations', () => ({

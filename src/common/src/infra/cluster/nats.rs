@@ -31,10 +31,11 @@ use tokio::task;
 
 /// Register and keep alive the node to cluster
 pub(crate) async fn register_and_keep_alive() -> Result<()> {
-    // if local node is single node or meta store is not nats, return ok
+    // if local node is single node or cluster coordinator is not nats, return ok
     let cfg = get_config();
-    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
-    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+    let coordinator: config::meta::meta_store::MetaStore =
+        cfg.common.cluster_coordinator.as_str().into();
+    if cfg.common.local_mode || coordinator != config::meta::meta_store::MetaStore::Nats {
         return Ok(());
     }
 

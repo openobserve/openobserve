@@ -16,7 +16,6 @@
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildCategoryXAxis, buildCategoryYAxis, buildValueAxis, buildTooltip } from "./shared/axisBuilder";
-import { buildLegendConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { calculateWidthText } from "../chartDimensionUtils";
@@ -32,7 +31,6 @@ export class BarConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any
   ) {
     const chartType = panelSchema.type;
     const config = panelSchema.config || {};
@@ -56,7 +54,7 @@ export class BarConverter implements PromQLChartConverter {
       // First pass: calculate min/max
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
-          const numericValues = seriesData.values.map(([_, val]) => parseFloat(val));
+          const numericValues = seriesData.values.map(([, val]) => parseFloat(val));
           numericValues.forEach(val => {
             if (val < chartMin) chartMin = val;
             if (val > chartMax) chartMax = val;
@@ -68,7 +66,7 @@ export class BarConverter implements PromQLChartConverter {
       processedData.forEach((queryData) => {
         // Build categories from timestamps (only once)
         if (categories.length === 0) {
-          queryData.timestamps.forEach(([ts, formatted]) => {
+          queryData.timestamps.forEach(([, formatted]) => {
             // Extract just the time portion from the formatted timestamp
             // formatted can be Date object or ISO string
             let timeString: string;
@@ -97,7 +95,7 @@ export class BarConverter implements PromQLChartConverter {
           });
 
           // Get numeric values for color calculation
-          const numericValues = seriesData.values.map(([_, val]) => parseFloat(val));
+          const numericValues = seriesData.values.map(([, val]) => parseFloat(val));
 
           const color = getSeriesColor(
             config.color || null,
@@ -168,7 +166,7 @@ export class BarConverter implements PromQLChartConverter {
 
       // Second pass: apply colors
       seriesDataCollection.forEach((seriesData) => {
-        const numericValues = seriesData.rawValues.map(([_, val]) => parseFloat(val));
+        const numericValues = seriesData.rawValues.map(([, val]) => parseFloat(val));
 
         const color = getSeriesColor(
           config.color || null,

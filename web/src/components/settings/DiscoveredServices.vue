@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="retry-discovered-services-btn"
         variant="outline"
         size="sm-action"
-        @click="loadServices"
+        @click="() => loadServices()"
         icon-left="refresh"
       >
         {{ t("settings.correlation.retry") }}
@@ -177,7 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :persist-columns="true"
             table-id="settings-discovered-services"
             :show-global-filter="false"
-            expansion="multi"
+            expansion="multiple"
             :expand-on-row-click="(row: any) => row.__type === 'group'"
             :get-row-expansion-enabled="(row: any) => row.__type === 'group'"
             :keep-page-on-data-change="true"
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   ).sort(([a], [b]) => a.localeCompare(b))"
                   :key="`${key}=${value}`"
                   :dim-key="key"
-                  :value="value"
+                  :value="String(value)"
                 />
                 <span
                   v-if="Object.keys(row.disambiguation).length === 0"
@@ -541,7 +541,7 @@ import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "navigate-to-configuration"): void;
 }>();
 
@@ -621,27 +621,6 @@ const allValues = computed((): string[] => {
   }
   return [...vals].sort();
 });
-
-const filteredKeyOptions = ref<{ label: string; value: string }[]>([]);
-const filteredValueOptions = ref<string[]>([]);
-
-function filterKeyFn(val: string, update: (fn: () => void) => void) {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredKeyOptions.value = needle
-      ? allKeys.value.filter((k) => k.label.toLowerCase().includes(needle))
-      : allKeys.value;
-  });
-}
-
-function filterValueFn(val: string, update: (fn: () => void) => void) {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredValueOptions.value = needle
-      ? allValues.value.filter((v) => v.toLowerCase().includes(needle))
-      : allValues.value;
-  });
-}
 
 function unique(arr: string[]): string[] {
   return [...new Set(arr)];
@@ -913,14 +892,13 @@ const doResetServices = async () => {
     }
 
     const response = await serviceStreamsService.resetServices(orgId);
-    const { deleted_count, note } = response.data;
+    const { deleted_count } = response.data;
 
     toast({
       variant: "success",
       message: t("settings.correlation.resetServicesSuccess", {
         count: deleted_count,
       }),
-      caption: note,
       timeout: 5000,
     });
 
@@ -929,7 +907,6 @@ const doResetServices = async () => {
     toast({
       variant: "error",
       message: t("settings.correlation.resetServicesFailed"),
-      caption: err?.message || String(err),
     });
   } finally {
     resetting.value = false;

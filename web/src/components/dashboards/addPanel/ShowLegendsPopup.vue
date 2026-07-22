@@ -68,13 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="icon"
                 class="ml-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out"
                 data-test="dashboard-legend-copy-btn"
-                :data-copied="isLegendCopied(index) ? 'true' : undefined"
-                @click.stop="copyLegend(legend.name, index)"
+                :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
+                @click.stop="copyLegend(legend.name, Number(index))"
               >
                 <template #icon-left><OIcon
-                    :name="isLegendCopied(index) ? 'check' : 'content-copy'" size="sm"
+                    :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'" size="sm"
                 /></template>
-                <OTooltip :content="isLegendCopied(index) ? 'Copied!' : 'Copy legend'" />
+                <OTooltip :content="isLegendCopied(Number(index)) ? 'Copied!' : 'Copy legend'" />
               </OButton>
             </div>
           </div>

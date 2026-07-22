@@ -195,13 +195,14 @@ function onTickChange(newVal: CheckboxModelValue) {
         role="group"
         class="list-none m-0 p-0 pl-5 overflow-hidden min-h-0"
       >
-        <OTreeNode
-          v-if="isExpanded"
-          v-for="child in node.children"
-          :key="child[ctx.nodeKey] as TreeNodeKey"
-          :node="child"
-          :depth="depth + 1"
-        />
+        <template v-if="isExpanded">
+          <OTreeNode
+            v-for="child in node.children"
+            :key="child[ctx.nodeKey] as TreeNodeKey"
+            :node="child"
+            :depth="depth + 1"
+          />
+        </template>
       </ul>
     </div>
   </li>

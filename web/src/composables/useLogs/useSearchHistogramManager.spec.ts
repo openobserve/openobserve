@@ -15,9 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchHistogramManager } from "./useSearchHistogramManager";
-import { searchState } from "./searchState";
 import { logsUtils } from "./logsUtils";
-import { useHistogram } from "./useHistogram";
 
 // Create a shared mock state
 const createMockState = () => ({

@@ -42,7 +42,7 @@ module.exports = defineConfig({
       ]
     : [
         ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
-        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for downstream report consumers
       ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {

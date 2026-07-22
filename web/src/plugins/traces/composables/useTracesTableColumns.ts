@@ -130,9 +130,13 @@ const KNOWN_COLUMN_META: Record<
   },
 };
 
-function toColumnDef(fieldName: string): ColumnDef<Record<string, any>> {
+function toColumnDef(
+  fieldName: string,
+  searchMode?: "traces" | "spans",
+): ColumnDef<Record<string, any>> {
   const known = KNOWN_COLUMN_META[fieldName];
-  if (known) {
+  // "status" is a traces-mode special column; in spans mode treat it as generic
+  if (known && !(fieldName === "status" && searchMode === "spans")) {
     return {
       id: fieldName,
       header: known.header,
@@ -170,7 +174,7 @@ export function useTracesTableColumns() {
     selectedFields: string[],
   ): ColumnDef<Record<string, any>>[] => {
     const cols: ColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
-      toColumnDef(field),
+      toColumnDef(field, searchMode),
     );
 
     const timestampCol =
@@ -196,13 +200,13 @@ export function useTracesTableColumns() {
       const llm: ColumnDef<Record<string, any>>[] = [];
 
       if (!selectedFields.includes("input_tokens")) {
-        llm.push(toColumnDef("input_tokens"));
+        llm.push(toColumnDef("input_tokens", searchMode));
       }
       if (!selectedFields.includes("output_tokens")) {
-        llm.push(toColumnDef("output_tokens"));
+        llm.push(toColumnDef("output_tokens", searchMode));
       }
       if (!selectedFields.includes("cost")) {
-        llm.push(toColumnDef("cost"));
+        llm.push(toColumnDef("cost", searchMode));
       }
 
       if (tailIdx !== -1) {

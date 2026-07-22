@@ -19,6 +19,8 @@ const emit = defineEmits<{
 }>()
 
 const capturedSteps = ref<BrowserStep[]>([])
+// template-invokable id generator (script scope resolves the global crypto)
+const genId = () => crypto.randomUUID();
 const recordingSeconds = ref(0)
 const currentUrl = ref(props.startUrl)
 
@@ -54,6 +56,7 @@ onMounted(() => {
         name: 'Open start URL',
         value: props.startUrl,
         timeout: 30000,
+        code: '',
       })
     }, 500),
     setTimeout(() => {
@@ -64,6 +67,7 @@ onMounted(() => {
         selector: '#login-btn',
         selectorType: 'CSS',
         timeout: 30000,
+        code: '',
       })
     }, 2000),
     setTimeout(() => {
@@ -75,6 +79,7 @@ onMounted(() => {
         selectorType: 'CSS',
         value: 'user@example.com',
         timeout: 30000,
+        code: '',
       })
     }, 4000),
   )
@@ -146,7 +151,7 @@ onUnmounted(() => {
           @update:step="capturedSteps[index] = $event"
           @update:expanded="() => {}"
           @delete="capturedSteps.splice(index, 1)"
-          @duplicate="capturedSteps.splice(index + 1, 0, { ...step, id: crypto.randomUUID() })"
+          @duplicate="capturedSteps.splice(index + 1, 0, { ...step, id: genId() })"
           @insert-below="() => {}"
         />
       </div>

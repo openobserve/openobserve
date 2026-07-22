@@ -56,7 +56,6 @@ import {
   b64DecodeStandard,
 } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
-import { getUUID, getUUIDv7 } from "@/utils/uuid";
 
 import {
   trialPeriodAllowedPath,

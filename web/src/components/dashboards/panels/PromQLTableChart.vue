@@ -22,10 +22,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <TableRenderer
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
-        :wrap-cells="config.wrap_table_cells"
-        :value-mapping="config.mappings ?? []"
-        :show-pagination="config.table_pagination && !store.state.printMode"
-        :rows-per-page="config.table_pagination_rows_per_page"
+        :wrap-cells="panelConfig.wrap_table_cells"
+        :value-mapping="panelConfig.mappings ?? []"
+        :show-pagination="panelConfig.table_pagination && !store.state.printMode"
+        :rows-per-page="panelConfig.table_pagination_rows_per_page"
         :enable-filtering="enableFiltering"
         @row-click="$emit('row-click', $event)"
       >
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex-1" />
             <TablePaginationControls
-              :show-pagination="config.table_pagination && !store.state.printMode"
+              :show-pagination="panelConfig.table_pagination && !store.state.printMode"
               :pagination="scope.pagination"
               :pagination-options="scope.paginationOptions"
               :total-rows="scope.totalRows"
@@ -199,7 +199,7 @@ export default defineComponent({
     // Watch for data changes and set default legend only if not already set or legend options changed
     watch(
       () => props.data,
-      (newData) => {
+      () => {
         // Only set default legend if no legend is selected yet or if current selection is invalid
         if (legendOptions.value.length > 0) {
           const currentSelectionValid = legendOptions.value.some(
@@ -224,7 +224,7 @@ export default defineComponent({
     );
 
     // Make config reactive to prop changes
-    const config = computed(() => props.config || {});
+    const panelConfig = computed(() => props.config || {});
 
     const downloadTableAsCSV = (title?: string) => {
       innerTableRef.value?.downloadTableAsCSV(title);
@@ -247,7 +247,7 @@ export default defineComponent({
       selectedLegend,
       legendOptions,
       showLegendFooter,
-      config,
+      panelConfig,
       downloadTableAsCSV,
       downloadTableAsJSON,
     };

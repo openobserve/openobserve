@@ -196,11 +196,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  reactive,
   watch,
   defineAsyncComponent,
   computed,
   onBeforeUnmount,
+  type PropType,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import axios from "axios";
@@ -235,9 +235,11 @@ export default defineComponent({
       type: String,
       required: true,
     },
-    // Tabs configuration
+    // Tabs configuration (shape matches AppTabs' Tab interface)
     tabs: {
-      type: Array,
+      type: Array as PropType<
+        { label: string; value: string; icon?: string; disabled?: boolean }[]
+      >,
       default: () => [
         {
           label: "File Upload / JSON",

@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
             <OTooltip class="text-center"
               :content="item.title"
-              data-test="dashboard-addpanel-chart-selection-tooltip"
             />
           </div>
         </li>
@@ -62,7 +61,6 @@ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPa
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ChartSelection",
@@ -230,6 +228,6 @@ export default defineComponent({
       isChartDisabled,
     };
   },
-  components: { OIcon , OTooltip },
+  components: { OTooltip },
 });
 </script>

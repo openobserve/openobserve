@@ -81,8 +81,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="axis-field overflow-hidden"
                 radius="sm"
                 :draggable="true"
-                @dragstart="onFieldDragStart($event, itemX, 'x', index)"
-                @drop="onDrop($event, 'x', index)"
+                @dragstart="onFieldDragStart($event, itemX, 'x', Number(index))"
+                @drop="onDrop($event, 'x', Number(index))"
                 @dragenter="onDragEnter($event, 'x', index)"
               >
                 <OButton
@@ -143,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
-                  @click="removeXAxisItemByIndex(index)"
+                  @click="removeXAxisItemByIndex(Number(index))"
                   icon-left="close"
                 >
                 </OButton>
@@ -249,8 +249,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="axis-field overflow-hidden"
                 radius="sm"
                 :draggable="true"
-                @dragstart="onFieldDragStart($event, itemB, 'breakdown', index)"
-                @drop="onDrop($event, 'breakdown', index)"
+                @dragstart="
+                  onFieldDragStart($event, itemB, 'breakdown', Number(index))
+                "
+                @drop="onDrop($event, 'breakdown', Number(index))"
                 @dragenter="onDragEnter($event, 'breakdown', index)"
               >
                 <OButton
@@ -311,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="icon-chip"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
-                  @click="removeBreakdownItemByIndex(index)"
+                  @click="removeBreakdownItemByIndex(Number(index))"
                   icon-left="close"
                 >
                 </OButton>
@@ -383,8 +385,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="axis-field overflow-hidden"
             radius="sm"
             :draggable="true"
-            @dragstart="onFieldDragStart($event, itemY, 'y', index)"
-            @drop="onDrop($event, 'y', index)"
+            @dragstart="onFieldDragStart($event, itemY, 'y', Number(index))"
+            @drop="onDrop($event, 'y', Number(index))"
             @dragenter="onDragEnter($event, 'y', index)"
           >
             <OButton
@@ -449,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="icon-chip"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
-              @click="removeYAxisItemByIndex(index)"
+              @click="removeYAxisItemByIndex(Number(index))"
               icon-left="close"
             >
             </OButton>
@@ -522,8 +524,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="axis-field overflow-hidden"
               radius="sm"
               :draggable="true"
-              @dragstart="onFieldDragStart($event, itemZ, 'z', index)"
-              @drop="onDrop($event, 'z', index)"
+              @dragstart="onFieldDragStart($event, itemZ, 'z', Number(index))"
+              @drop="onDrop($event, 'z', Number(index))"
               @dragenter="onDragEnter($event, 'z', index)"
             >
               <OButton
@@ -584,7 +586,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="outline"
                 size="icon-chip"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
-                @click="removeZAxisItemByIndex(index)"
+                @click="removeZAxisItemByIndex(Number(index))"
                 icon-left="close"
               >
               </OButton>
@@ -654,8 +656,6 @@ import { getImageURL } from "../../../utils/zincutils";
 import DashboardGeoMapsQueryBuilder from "./DashboardGeoMapsQueryBuilder.vue";
 import DashboardMapsQueryBuilder from "./DashboardMapsQueryBuilder.vue";
 import DashboardSankeyChartBuilder from "./DashboardSankeyChartBuilder.vue";
-import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DashboardJoinsOption from "@/views/Dashboards/addPanel/DashboardJoinsOption.vue";
@@ -677,7 +677,7 @@ import {
   promqlSeedFor,
 } from "@/utils/dashboard/promqlSeed";
 import { isAutoSeededQuery } from "@/utils/metrics/metricPanelSeed";
-import type { PromqlBuilderQuery } from "@/components/promql/types";
+import type { PromqlBuilderQuery, PromqlStep } from "@/components/promql/types";
 import { normalizeSteps } from "@/components/promql/types";
 import usePromqlSuggestions from "@/composables/usePromqlSuggestions";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
@@ -686,6 +686,14 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+// Minimal shape of a dashboard panel query slot as read by the PromQL builder.
+interface DashboardQuerySlot {
+  fields?: {
+    promql_operations?: PromqlStep[];
+    promql_labels?: string[];
+  };
+}
 
 export default defineComponent({
   name: "DashboardQueryBuilder",
@@ -696,7 +704,6 @@ export default defineComponent({
     DashboardGeoMapsQueryBuilder,
     DashboardMapsQueryBuilder,
     DashboardSankeyChartBuilder,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DashboardJoinsOption,
     DynamicFunctionPopUp,
@@ -709,7 +716,7 @@ export default defineComponent({
   },
   props: ["dashboardData"],
   emits: ["customChartTemplateSelected"],
-  setup(props) {
+  setup() {
     const showXAxis = ref(true);
     const panelName = ref("");
     const panelDesc = ref("");
@@ -723,7 +730,7 @@ export default defineComponent({
       config: true,
       filter: false,
     });
-    const dashboardPanelDataPageKey = inject(
+    const dashboardPanelDataPageKey = inject<string>(
       "dashboardPanelDataPageKey",
       "dashboard",
     );
@@ -746,8 +753,6 @@ export default defineComponent({
       isAddZAxisNotAllowed,
       isAddBreakdownNotAllowed,
       cleanupDraggingFields,
-      selectedStreamFieldsBasedOnUserDefinedSchema,
-      fetchPromQLLabels,
       isPivotMode,
     } = useDashboardPanelData(dashboardPanelDataPageKey);
 
@@ -989,7 +994,7 @@ export default defineComponent({
             streamAlias: firstFieldTypeArg.streamAlias,
           };
 
-          const axisArray = getAxisArray(targetAxis);
+          getAxisArray(targetAxis);
 
           if (targetAxis !== "f") {
             if (
@@ -1136,11 +1141,11 @@ export default defineComponent({
       e.preventDefault();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
 
@@ -1160,7 +1165,7 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const xAxisHint = computed((e: any) => {
+    const xAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
@@ -1187,7 +1192,7 @@ export default defineComponent({
       }
     });
 
-    const bAxisHint = computed((e: any) => {
+    const bAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "stacked":
         case "area-stacked":
@@ -1198,7 +1203,7 @@ export default defineComponent({
       }
     });
 
-    const yAxisHint = computed((e: any) => {
+    const yAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "pie":
         case "donut":
@@ -1213,7 +1218,7 @@ export default defineComponent({
       }
     });
 
-    const zAxisHint = computed((e: any) => {
+    const zAxisHint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "heatmap":
           return t("dashboard.dashboardQueryBuilder.addOneField");
@@ -1276,8 +1281,6 @@ export default defineComponent({
       return zFields.map(commonBtnLabel);
     });
 
-    const operators = ["=", "<>", ">=", "<=", ">", "<"];
-
     // PromQL Builder Mode (queryType = "promql" with customQuery = false)
     const promqlBuilderMode = computed(
       () =>
@@ -1306,8 +1309,10 @@ export default defineComponent({
      * upgrading, so a changed reference is the signal that this panel was saved
      * under old ids. A modern panel is not touched.
      */
-    const loadSavedSteps = (currentQuery: any) => {
-      const stored = currentQuery?.fields?.promql_operations || [];
+    const loadSavedSteps = (
+      currentQuery: DashboardQuerySlot | undefined,
+    ): PromqlStep[] => {
+      const stored: PromqlStep[] = currentQuery?.fields?.promql_operations || [];
       const upgraded = normalizeSteps(stored);
 
       if (upgraded !== stored && currentQuery?.fields) {
@@ -1510,7 +1515,9 @@ export default defineComponent({
         try {
           const query = promqlRenderer.renderQuery(promqlBuilderQuery);
           currentQuery.query = query;
-        } catch (error) {}
+        } catch {
+          /* ignore: keep last valid query on render failure */
+        }
       },
       { deep: true },
     );

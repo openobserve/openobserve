@@ -40,6 +40,25 @@ use crate::{
     service::search::{self as SearchService},
 };
 
+/// Time slices the query window is cut into for pattern-extraction sampling.
+///
+/// Each slice is fetched with its own `LIMIT`, so each contributes an equal share
+/// of the sample and the clustering sees the whole window rather than only the
+/// newest rows. Measured: 6 slices covered half as many populated time buckets as
+/// 12, so 12 is the coverage/round-trip trade-off.
+const EXTRACTION_TIME_SLICES: usize = 12;
+
+/// How many extraction slices to fetch at once. Extraction cost is dominated by
+/// per-slice round trips (each slice's read is bounded by its own limit), so
+/// concurrency turns wall time from the sum of the slices into the max.
+const EXTRACTION_FETCH_CONCURRENCY: usize = 4;
+
+/// Oversampling headroom over the requested size. The accumulator down-samples
+/// uniformly to its own cap, so fetching a multiple keeps that down-sampling
+/// meaningful while bounding memory; it also absorbs slices that hold less data
+/// than their share and rows the accumulator discards (too-short text fields).
+const EXTRACTION_OVERSAMPLE: i64 = 3;
+
 /// Do partitioned search without cache
 #[tracing::instrument(
     name = "service:search:stream_execution:do_partitioned_search",
@@ -64,6 +83,9 @@ pub async fn do_partitioned_search(
     backup_query_fn: Option<String>,
     stream_name: &str,
     is_multi_stream_search: bool,
+    // Routes to `fetch_extraction_sample`, which samples across the whole window
+    // instead of returning the newest-first page this function otherwise builds.
+    extract_patterns: bool,
 ) -> Result<(), infra::errors::Error> {
     // limit the search by max_query_range
     // Enrichment tables have no retention and must be searched in full (the request spans
@@ -156,7 +178,25 @@ pub async fn do_partitioned_search(
         &partitions
     );
 
+    // Pattern extraction takes a dedicated path: it needs a sample spread across
+    // the window, not the newest-first page the code below produces.
+    if extract_patterns && req_size > 0 {
+        return fetch_extraction_sample(
+            req,
+            trace_id,
+            org_id,
+            stream_type,
+            user_id,
+            req_size,
+            (modified_start_time, modified_end_time),
+            accumulated_results,
+            is_multi_stream_search,
+        )
+        .await;
+    }
+
     let partition_num = partitions.len();
+
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         let mut req = req.clone();
         req.query.start_time = start_time;
@@ -444,6 +484,177 @@ pub async fn do_partitioned_search(
     }
 
     Ok(())
+}
+
+/// Fetch the log sample that log-pattern extraction clusters over.
+///
+/// Splits the window into equal time slices and fetches each concurrently with
+/// its own share of the budget, appending every slice's hits to
+/// `accumulated_results` for the caller's accumulator to down-sample.
+///
+/// Why slices rather than one query: each fetch is `ORDER BY _timestamp DESC
+/// LIMIT n`, so a single query over the whole window returns only its NEWEST n
+/// rows — the sample collapses into the last few minutes and patterns that
+/// appear earlier are never discovered. Giving each slice its own quota spreads
+/// the sample without widening the read, because that same limit bounds each
+/// slice's scan.
+///
+/// Skips the streaming/ordering/progress machinery of `do_partitioned_search`
+/// because the patterns handler discards every response except
+/// `PatternExtractionResult` — it only needs the accumulated hits.
+#[allow(clippy::too_many_arguments)]
+async fn fetch_extraction_sample(
+    req: &config::meta::search::Request,
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: &str,
+    req_size: i64,
+    window: (i64, i64),
+    accumulated_results: &mut Vec<SearchResultType>,
+    is_multi_stream_search: bool,
+) -> Result<(), infra::errors::Error> {
+    let (w_start, w_end) = window;
+    let span = w_end - w_start;
+    // A window too narrow to slice (or inverted) stays a single fetch.
+    let slices = if span > EXTRACTION_TIME_SLICES as i64 {
+        EXTRACTION_TIME_SLICES
+    } else {
+        1
+    };
+    let step = span / slices as i64;
+    let slice_size = ((req_size * EXTRACTION_OVERSAMPLE) / slices as i64).max(100);
+
+    let ranges: Vec<[i64; 2]> = (0..slices)
+        .map(|i| {
+            let s = w_start + (i as i64 * step);
+            // Last slice takes the remainder so integer division can't drop rows.
+            let e = if i == slices - 1 { w_end } else { s + step };
+            [s, e]
+        })
+        .collect();
+
+    // Each task owns its inputs: borrowing across the spawn leaves the enclosing
+    // future's Send bound "not general enough" to compile.
+    let org_id_owned = org_id.to_string();
+    let user_id_owned = user_id.to_string();
+    let mut responses: Vec<Response> = Vec::with_capacity(slices);
+    let mut last_error: Option<infra::errors::Error> = None;
+
+    for (chunk_idx, chunk) in ranges.chunks(EXTRACTION_FETCH_CONCURRENCY).enumerate() {
+        let mut handles = Vec::with_capacity(chunk.len());
+        for (i, &[s_start, s_end]) in chunk.iter().enumerate() {
+            let mut s_req = req.clone();
+            s_req.query.start_time = s_start;
+            s_req.query.end_time = s_end;
+            s_req.query.size = slice_size;
+            s_req.query.from = 0;
+            let s_trace_id = format!(
+                "{trace_id}-{}",
+                chunk_idx * EXTRACTION_FETCH_CONCURRENCY + i
+            );
+            let s_org_id = org_id_owned.clone();
+            let s_user_id = user_id_owned.clone();
+            handles.push(tokio::spawn(async move {
+                do_search(
+                    &s_trace_id,
+                    &s_org_id,
+                    stream_type,
+                    &s_req,
+                    &s_user_id,
+                    false, // extraction never reads from cache
+                    is_multi_stream_search,
+                )
+                .await
+            }));
+        }
+        for handle in handles {
+            match handle.await {
+                Ok(Ok(res)) => responses.push(res),
+                // One slice failing shouldn't sink the whole extraction — the
+                // rest still yield a usable (if smaller) sample.
+                Ok(Err(e)) => {
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice failed, continuing: {e}"
+                    );
+                    last_error = Some(e);
+                }
+                // A panicked task is still a failed slice: record it, or a run
+                // where every task panics would look like a successful search
+                // over an empty window.
+                Err(e) => {
+                    log::warn!(
+                        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: slice task panicked: {e}"
+                    );
+                    last_error = Some(infra::errors::Error::Message(format!(
+                        "pattern extraction slice task failed: {e}"
+                    )));
+                }
+            }
+        }
+    }
+
+    // Every slice failed: surface the error instead of reporting an empty
+    // sample, which the handler would render as "this window has no logs".
+    if responses.is_empty()
+        && let Some(e) = last_error
+    {
+        return Err(e);
+    }
+
+    // Trim to the caller's budget HERE, fairly across slices, rather than
+    // handing the accumulator more rows than its cap.
+    //
+    // The accumulator's overflow path is a rolling overwrite, not reservoir
+    // sampling: once full it replaces index (seen/interval - 1) % cap, so an
+    // over-budget feed silently overwrites the earliest rows it accepted — the
+    // earliest time slices — and they never reach the clustering. Staying
+    // within the cap keeps every slice represented.
+    trim_slices_to_budget(&mut responses, req_size as usize);
+
+    let fetched: usize = responses.iter().map(|r| r.hits.len()).sum();
+    for res in responses {
+        accumulated_results.push(SearchResultType::Search(res));
+    }
+
+    log::info!(
+        "[HTTP2_STREAM trace_id {trace_id}] Pattern extraction: fetched {fetched} rows from {slices} time slices"
+    );
+    Ok(())
+}
+
+/// Trim per-slice hits so the total fits `budget`, giving every slice as equal a
+/// share as its data allows (max-min fair): slices with less than an even share
+/// keep everything, and what they don't use is redistributed to fuller slices.
+/// Keeps the sample spread across the window instead of letting the busiest
+/// slices crowd out the quieter ones.
+fn trim_slices_to_budget(responses: &mut [Response], budget: usize) {
+    let total: usize = responses.iter().map(|r| r.hits.len()).sum();
+    if total <= budget || responses.is_empty() {
+        return;
+    }
+
+    // Allocate ascending by size: each step hands out an even share of what's
+    // left, so any slack from a small slice rolls into the larger ones.
+    let mut order: Vec<usize> = (0..responses.len()).collect();
+    order.sort_by_key(|&i| responses[i].hits.len());
+
+    let mut allowance = vec![0usize; responses.len()];
+    let mut remaining = budget;
+    let mut slices_left = responses.len();
+    for &i in &order {
+        let share = remaining / slices_left.max(1);
+        let take = responses[i].hits.len().min(share);
+        allowance[i] = take;
+        remaining -= take;
+        slices_left -= 1;
+    }
+
+    for (i, res) in responses.iter_mut().enumerate() {
+        res.hits.truncate(allowance[i]);
+        res.total = res.hits.len();
+        res.size = res.total as i64;
+    }
 }
 
 /// Get partitions for search
@@ -954,6 +1165,66 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
+
+    fn slice_with(n: usize) -> Response {
+        let mut r = Response::default();
+        r.hits = (0..n).map(|i| serde_json::json!({ "i": i })).collect();
+        r.total = n;
+        r
+    }
+
+    #[test]
+    fn test_trim_slices_under_budget_is_untouched() {
+        let mut slices = vec![slice_with(10), slice_with(20)];
+        trim_slices_to_budget(&mut slices, 100);
+        assert_eq!(slices[0].hits.len(), 10);
+        assert_eq!(slices[1].hits.len(), 20);
+    }
+
+    #[test]
+    fn test_trim_slices_keeps_every_slice_represented() {
+        // The bug this guards: handing the accumulator more than its cap makes
+        // it overwrite the earliest slices, so they vanish from the sample.
+        // Every slice must survive the trim with a share of the budget.
+        let mut slices = vec![
+            slice_with(2500),
+            slice_with(2500),
+            slice_with(2500),
+            slice_with(2500),
+            slice_with(2500),
+            slice_with(2500),
+        ];
+        trim_slices_to_budget(&mut slices, 10_000);
+
+        let total: usize = slices.iter().map(|s| s.hits.len()).sum();
+        assert_eq!(total, 10_000, "must fill the budget exactly");
+        for (i, s) in slices.iter().enumerate() {
+            assert!(s.hits.len() > 0, "slice {i} was dropped entirely");
+        }
+    }
+
+    #[test]
+    fn test_trim_slices_redistributes_slack_from_small_slices() {
+        // A sparse slice keeps everything it has; its unused share goes to the
+        // fuller slices rather than being wasted.
+        let mut slices = vec![slice_with(10), slice_with(5000), slice_with(5000)];
+        trim_slices_to_budget(&mut slices, 3000);
+
+        let total: usize = slices.iter().map(|s| s.hits.len()).sum();
+        assert_eq!(total, 3000);
+        assert_eq!(slices[0].hits.len(), 10, "small slice keeps all its rows");
+        assert!(slices[1].hits.len() > 1000 && slices[2].hits.len() > 1000);
+    }
+
+    #[test]
+    fn test_trim_slices_totals_stay_consistent_with_hits() {
+        let mut slices = vec![slice_with(5000), slice_with(5000)];
+        trim_slices_to_budget(&mut slices, 1000);
+        for s in &slices {
+            assert_eq!(s.total, s.hits.len());
+            assert_eq!(s.size, s.hits.len() as i64);
+        }
+    }
 
     #[test]
     fn test_calc_queried_range_basic() {

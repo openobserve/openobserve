@@ -365,27 +365,6 @@ const getCurrentUserId = (): string => {
   return store.state.userInfo?.email?.split("@")[0] || "User";
 };
 
-// Get initials from username
-const getInitials = (username: string): string => {
-  if (!username || username === "System") return "S";
-
-  // Handle email addresses
-  if (username.includes("@")) {
-    username = username.split("@")[0];
-  }
-
-  const parts = username.split(/[\s_.-]+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return username.substring(0, 2).toUpperCase();
-};
-
-// Get current user initials
-const getCurrentUserInitials = (): string => {
-  return getInitials(getCurrentUserId());
-};
-
 // Get avatar color based on username
 const getAvatarColor = (username: string): string => {
   const colors = [

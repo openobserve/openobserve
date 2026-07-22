@@ -235,6 +235,10 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 
 - **Pagination** (`pagination`: `"client"` | `"server"` | `"none"`, default `"client"`)
   - `pageSize` (number, default `20`), `pageSizeOptions` (number[], default `[20, 50, 100, 250, 500]`)
+  - ⚠️ A custom `pageSize` **must be a member of `pageSizeOptions`** — otherwise
+    the "Records per page" select renders with nothing selected (e.g.
+    `:page-size="10"` against the default options). Prefer the default `20`;
+    only override `pageSize` together with a matching `pageSizeOptions`.
   - `currentPage` (number, 1-based) — `v-model:currentPage` for server mode
   - `totalCount` (number) — required for server-side pagination
   - `keepPageOnDataChange` (boolean, default false) — don't reset page when `data` changes
@@ -269,6 +273,10 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
   - `dense` (default `true`), `bordered` (default `true`), `frame` (default `false` — outer frame border), `striped` (default false)
   - `stickyHeader` (default `true`), `showHeader` (default `true`), `wrap` (default false), `horizontalScroll` (natural-width cells + horizontal scroll; pair with `wrap=false`)
   - `fillHeight` (default `true` — set false to shrink to content), `virtualScroll` (default false, `virtualScrollItemSize` default `48`), `maxHeight`, `width`
+    - Empty state: fill-height tables let the empty state fill the available
+      space; non-fill-height tables reserve a `min-h-75` floor so the empty
+      state has presence. In a height-constrained card, keep `fillHeight`
+      (default) so the empty state never forces a scrollbar.
   - Row styling: `rowClass`, `getRowStyle`, `getRowStatusColor` (4px left status bar), `getCellStyle`, `enableCellCopy`
   - Highlight: `highlightText`, `highlightFields`
 

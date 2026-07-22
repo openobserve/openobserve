@@ -145,6 +145,42 @@ describe("OTooltip", () => {
     expect(contentSpan.classes()).toContain("inline-flex");
   });
 
+  // Both modes render a fragment (provider + portalled content), so Vue has no
+  // root to fall attributes onto — call-site class/aria were silently dropped
+  // with an "Extraneous non-props attributes" warning. They now land on the bubble.
+  it("forwards call-site class onto the tooltip bubble", () => {
+    const wrapper = mountTooltip(
+      { content: "Centered", open: true, class: "text-center" },
+      { default: () => h("button", "Hover") },
+    );
+    const bubble = wrapper.find('[data-test="o-tooltip-content"]');
+    expect(bubble.exists()).toBe(true);
+    expect(bubble.classes()).toContain("text-center");
+  });
+
+  it("merges a call-site style with the bubble's own styling", () => {
+    const wrapper = mountTooltip(
+      { content: "Wide", open: true, style: "min-width: 5rem" },
+      { default: () => h("button", "Hover") },
+    );
+    const style = wrapper.find('[data-test="o-tooltip-content"]').attributes("style") ?? "";
+    // The caller's declaration lands without discarding max-width, which the
+    // component sets from its own `maxWidth` prop.
+    expect(style).toContain("min-width");
+    expect(style).toContain("max-width");
+  });
+
+  // e2e selects the bubble by `o-tooltip-content` in many places, so a call-site
+  // data-test must not replace it.
+  it("keeps its own data-test even when a call site passes one", () => {
+    const wrapper = mountTooltip(
+      { content: "Owned", open: true, "data-test": "caller-supplied" },
+      { default: () => h("button", "Hover") },
+    );
+    expect(wrapper.find('[data-test="o-tooltip-content"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="caller-supplied"]').exists()).toBe(false);
+  });
+
   it("applies contentClass to the tooltip bubble", () => {
     const wrapper = mountTooltip(
       { content: "Styled", open: true, contentClass: "my-custom-class" },

@@ -16,7 +16,7 @@ import { makeCreateReportSchema } from "./CreateReport.schema";
 // Deterministic mocks for the resource-name + cron helpers (the schema imports
 // these from zincutils; control them per-test for the cron branches).
 vi.mock("@/utils/zincutils", () => ({
-  isValidResourceName: (val: string) => /^[^:#?&%'"\/\s]+$/.test(val),
+  isValidResourceName: (val: string) => /^[^:#?&%'"/\s]+$/.test(val),
   getCronIntervalDifferenceInSeconds: vi.fn(() => 3600),
   isAboveMinRefreshInterval: vi.fn(() => true),
 }));

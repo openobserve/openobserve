@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { computed, provide } from 'vue'
+import { computed } from 'vue'
 import OTabPanel from './OTabPanel.vue'
 import { TAB_PANELS_CONTEXT_KEY } from './OTabPanels.types'
 import type { TabPanelsContext } from './OTabPanels.types'

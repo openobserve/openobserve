@@ -30,10 +30,22 @@ use crate::{
 };
 
 #[cfg(feature = "enterprise")]
+fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i64> {
+    if total > max_rows {
+        return Err(anyhow::anyhow!(
+            "online eval scheduler interval has {total} rows, exceeding the safe limit of {max_rows}"
+        ));
+    }
+    let fetch_size = total
+        .checked_add(1)
+        .ok_or_else(|| anyhow::anyhow!("online eval scheduler result count exceeds search size"))?;
+    i64::try_from(fetch_size)
+        .map_err(|_| anyhow::anyhow!("online eval scheduler result count exceeds search size"))
+}
+
+#[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
-#[cfg(feature = "enterprise")]
-mod cipher;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -440,6 +452,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(o2_enterprise::enterprise::domain_management::db::watch());
     }
 
+    // Routers serve AI usage and organization-management requests, so their
+    // quota cache must be populated and kept in sync even though they skip the
+    // remaining background jobs below.
+    #[cfg(feature = "cloud")]
+    {
+        crate::service::trial_quota::init_from_db().await;
+        cloud::start_trial_quota_jobs();
+    }
+
     // Router doesn't need to initialize job
     if LOCAL_NODE.is_router() && LOCAL_NODE.is_single_role() {
         return Ok(());
@@ -467,7 +488,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(db::schema::watch());
+    tokio::task::spawn(crate::service::schema::watch());
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
@@ -492,11 +513,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(db::pipeline::watch());
+        tokio::task::spawn(crate::service::pipeline::store::watch());
     } else {
         // On nodes that do not run the heavy pipeline watch (e.g. routers), still maintain
         // PIPELINE_ID_TO_ORG so HTTP handlers can perform cross-org IDOR checks in O(1).
-        tokio::task::spawn(db::pipeline::watch_id_to_org());
+        tokio::task::spawn(crate::service::pipeline::store::watch_id_to_org());
     }
 
     // Dashboard id->org cache: maintained on every node type so HTTP handlers (e.g.
@@ -508,14 +529,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(db::enrichment_table::watch());
+        tokio::task::spawn(crate::service::enrichment_table::watch());
     }
 
     tokio::task::yield_now().await;
 
     // cache core metadata
     db::schema::cache().await.expect("stream cache failed");
-    db::functions::cache()
+    crate::service::functions::cache()
         .await
         .expect("functions cache failed");
     db::compact::retention::cache()
@@ -537,7 +558,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Sync built-in model pricing from GitHub (initial + periodic)
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
-                if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                if let Err(e) =
+                    crate::service::model_pricing::sync_built_in_from_github(false).await
+                {
                     log::error!("[model_pricing] initial built-in sync failed: {e}");
                 }
             });
@@ -547,7 +570,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 );
                 loop {
                     tokio::time::sleep(interval).await;
-                    if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                    if let Err(e) =
+                        crate::service::model_pricing::sync_built_in_from_github(false).await
+                    {
                         log::error!("[model_pricing] periodic built-in sync failed: {e}");
                     }
                 }
@@ -621,8 +646,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(service_graph::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(incidents::run());
-    // Register enterprise callbacks on every node. HTTP/background work can land on
-    // querier, ingester, or alert_manager nodes, so callbacks must be available everywhere.
+    // Register enterprise callbacks before durable consumers and scheduler startup.
+    // HTTP/background work can land on querier, ingester, or alert_manager nodes,
+    // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
@@ -676,6 +702,114 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 })
             },
         );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::register_search_executor(
+            |org_id, stream_type, sql, start_time, end_time| {
+                Box::pin(async move {
+                    let count_req = config::meta::search::Request {
+                        query: config::meta::search::Query {
+                            sql: sql.clone(),
+                            start_time,
+                            end_time,
+                            size: 1,
+                            track_total_hits: true,
+                            ..Default::default()
+                        },
+                        use_cache: false,
+                        ..Default::default()
+                    };
+                    let stream_type = config::meta::stream::StreamType::from(stream_type.as_str());
+                    let count_response =
+                        crate::service::search::search("", &org_id, stream_type, None, &count_req)
+                            .await
+                            .map_err(|e| anyhow::anyhow!(e))?;
+                    if count_response.is_partial || !count_response.function_error.is_empty() {
+                        return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            total: count_response.total,
+                            is_partial: count_response.is_partial,
+                            function_error: count_response.function_error,
+                            hits: Vec::new(),
+                        });
+                    }
+
+                    let total = count_response.total;
+                    if total == 0 {
+                        return Ok(Default::default());
+                    }
+                    let max_rows = o2_enterprise::enterprise::common::config::get_config()
+                        .llm_eval_config
+                        .max_buffer_size
+                        .saturating_mul(10)
+                        .max(10_001);
+                    let size = eval_scheduler_fetch_size(total, max_rows)?;
+                    let data_req = config::meta::search::Request {
+                        query: config::meta::search::Query {
+                            sql,
+                            start_time,
+                            end_time,
+                            size,
+                            track_total_hits: false,
+                            ..Default::default()
+                        },
+                        use_cache: false,
+                        ..Default::default()
+                    };
+                    crate::service::search::search("", &org_id, stream_type, None, &data_req)
+                        .await
+                        .map(|response| {
+                            o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                                hits: response.hits,
+                                total,
+                                is_partial: response.is_partial,
+                                function_error: response.function_error,
+                            }
+                        })
+                        .map_err(|e| anyhow::anyhow!(e))
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::register_executor(
+            |request| {
+                Box::pin(async move {
+                    let stream_type =
+                        config::meta::stream::StreamType::from(request.stream_type.as_str());
+                    let req = config::meta::search::Request {
+                        query: config::meta::search::Query {
+                            sql: request.sql,
+                            start_time: request.start_time,
+                            end_time: request.end_time,
+                            from: request.from as i64,
+                            size: request.size as i64,
+                            track_total_hits: request.track_total_hits,
+                            ..Default::default()
+                        },
+                        use_cache: false,
+                        ..Default::default()
+                    };
+                    crate::service::search::search(
+                        "",
+                        &request.org_id,
+                        stream_type,
+                        None,
+                        &req,
+                    )
+                    .await
+                    .map(|response| {
+                        o2_enterprise::enterprise::llm_evaluations::eval_jobs::search::EvalSearchResponse {
+                            hits: response.hits,
+                            total: response.total,
+                            is_partial: response.is_partial,
+                            function_error: response.function_error,
+                        }
+                    })
+                    .map_err(|error| anyhow::anyhow!(error))
+                })
+            },
+        );
+
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
+        o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
@@ -927,14 +1061,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
-        tokio::task::spawn(cipher::run());
+        tokio::task::spawn(db::keys::cache());
         tokio::task::spawn(db::keys::watch());
         tokio::task::spawn(org_storage::run());
-        tokio::task::spawn(db::org_storage_providers::watch());
-        tokio::task::spawn(db::workflows::clean());
+        tokio::task::spawn(crate::service::org_storage_providers::watch());
+        tokio::task::spawn(crate::service::workflows::runtime::clean());
         tokio::task::spawn(db::workflows::watch());
         if LOCAL_NODE.is_alert_manager() {
-            tokio::task::spawn(db::workflows::watch_workflow_triggers());
+            tokio::task::spawn(crate::service::workflows::runtime::watch_workflow_triggers());
         }
     }
 
@@ -951,12 +1085,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         });
     }
 
-    // Initialize AI credits from DB, start quota jobs, and other cloud tasks
+    // Initialize the remaining cloud tasks. AI quota state and synchronization
+    // are initialized above because single-role routers also serve quota APIs.
     #[cfg(feature = "cloud")]
     {
-        crate::service::trial_quota::init_from_db().await;
-        cloud::start_trial_quota_jobs();
-
         // OpenFGA migration
         o2_enterprise::enterprise::cloud::ofga_migrate()
             .await
@@ -1012,11 +1144,13 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Failed to clean up old JSON format enrichment tables");
 
-    db::schema::cache_enrichment_tables()
+    crate::service::enrichment_table::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
-    db::pipeline::cache().await.expect("Pipeline cache failed");
+    crate::service::pipeline::store::cache()
+        .await
+        .expect("Pipeline cache failed");
 
     // Lightweight dashboard id->org cache for cross-org IDOR checks. Runs on every node.
     db::dashboards::cache_id_to_org()
@@ -1024,4 +1158,20 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use super::eval_scheduler_fetch_size;
+
+    #[test]
+    fn eval_scheduler_fetches_one_row_past_the_count() {
+        assert_eq!(eval_scheduler_fetch_size(10_001, 100_000).unwrap(), 10_002);
+    }
+
+    #[test]
+    fn eval_scheduler_rejects_intervals_above_the_safe_limit() {
+        let error = eval_scheduler_fetch_size(100_001, 100_000).unwrap_err();
+        assert!(error.to_string().contains("exceeding the safe limit"));
+    }
 }
