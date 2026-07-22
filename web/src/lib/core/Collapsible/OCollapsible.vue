@@ -95,26 +95,31 @@ watch(
     <!-- Trigger -->
     <CollapsibleTrigger
       :class="[
-        'w-full flex items-center gap-2 text-start cursor-pointer select-none',
+        'group w-full flex items-center gap-2 text-start cursor-pointer select-none',
         'transition-colors duration-150 outline-none',
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
         'focus-visible:ring-2 focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-offset-1',
         variant === 'sidebar'
-          ? 'px-3 py-0 min-h-9 rounded-none'
+          ? [
+              'px-3 py-0 min-h-9 rounded-none',
+              'border-l-2 border-l-transparent',
+              'data-[state=open]:bg-collapsible-trigger-open-bg',
+              'data-[state=open]:border-l-collapsible-open-accent',
+            ]
           : 'px-2 py-2 rounded-default',
         triggerClass,
       ]"
     >
-      <!-- Sidebar: left-side chevron (always before slot or label) -->
+      <!-- Sidebar custom-trigger path keeps the original left-side chevron -->
       <OIcon
-        v-if="variant === 'sidebar'"
+        v-if="variant === 'sidebar' && hasCustomTrigger"
         name="chevron-right"
         size="md"
         class="text-collapsible-icon transition-transform duration-200"
         :class="isOpen ? 'rotate-90' : 'rotate-0'"
       />
 
-      <!-- Custom trigger slot - renders after sidebar chevron if present -->
+      <!-- Custom trigger slot -->
       <template v-if="hasCustomTrigger">
         <slot name="trigger" :open="isOpen" />
       </template>
@@ -126,12 +131,12 @@ watch(
           v-if="icon && isOIcon"
           :name="(icon as any)"
           size="md"
-          class="text-collapsible-icon shrink-0"
+          class="text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
         />
         <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else-if="icon"
-          class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0"
+          class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
           aria-hidden="true"
           >{{ icon }}</span
         >
@@ -151,13 +156,20 @@ watch(
           >
         </span>
 
-        <!-- Right chevron — default variant only -->
+        <!-- Right chevron -->
         <OIcon
           v-if="variant === 'default'"
           name="expand-more"
           size="md"
           class="text-collapsible-icon transition-transform duration-200"
           :class="isOpen ? 'rotate-180' : 'rotate-0'"
+        />
+        <OIcon
+          v-else
+          name="chevron-right"
+          size="md"
+          class="shrink-0 text-collapsible-icon transition-transform duration-200 group-data-[state=open]:text-collapsible-icon-open"
+          :class="isOpen ? 'rotate-90' : 'rotate-0'"
         />
       </template>
     </CollapsibleTrigger>

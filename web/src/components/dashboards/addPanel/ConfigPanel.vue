@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar"
       v-show="isSectionVisible('general')"
       :model-value="isExpanded('general')"
+      :icon="SECTION_ICONS.general"
       @update:modelValue="
         (v) => {
           expandedSections.general = v;
@@ -199,6 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="promqlMode && dashboardPanelData.data.type === 'table'"
       v-show="isSectionVisible('promqlTable')"
       :model-value="isExpanded('promqlTable')"
+      :icon="SECTION_ICONS.promqlTable"
       @update:modelValue="
         (v) => {
           expandedSections.promqlTable = v;
@@ -225,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="isSectionVisible('geographic')"
       :model-value="isExpanded('geographic')"
+      :icon="SECTION_ICONS.geographic"
       @update:modelValue="
         (v) => {
           expandedSections.geographic = v;
@@ -243,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar"
       v-show="isSectionVisible('legend')"
       :model-value="isExpanded('legend')"
+      :icon="SECTION_ICONS.legend"
       @update:modelValue="
         (v) => {
           expandedSections.legend = v;
@@ -470,6 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar"
       v-show="isSectionVisible('data')"
       :model-value="isExpanded('data')"
+      :icon="SECTION_ICONS.data"
       @update:modelValue="
         (v) => {
           expandedSections.data = v;
@@ -714,6 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar"
       v-show="isSectionVisible('axis')"
       :model-value="isExpanded('axis')"
+      :icon="SECTION_ICONS.axis"
       @update:modelValue="
         (v) => {
           expandedSections.axis = v;
@@ -816,6 +822,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar"
       v-show="isSectionVisible('labels')"
       :model-value="isExpanded('labels')"
+      :icon="SECTION_ICONS.labels"
       @update:modelValue="
         (v) => {
           expandedSections.labels = v;
@@ -928,6 +935,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar"
       v-show="isSectionVisible('lineStyle')"
       :model-value="isExpanded('lineStyle')"
+      :icon="SECTION_ICONS.lineStyle"
       @update:modelValue="
         (v) => {
           expandedSections.lineStyle = v;
@@ -989,6 +997,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('table')"
       :model-value="isExpanded('table')"
+      :icon="SECTION_ICONS.table"
       @update:modelValue="
         (v) => {
           expandedSections.table = v;
@@ -1069,6 +1078,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="sidebar"
       v-show="isSectionVisible('pivotTable')"
       :model-value="isExpanded('pivotTable')"
+      :icon="SECTION_ICONS.pivotTable"
       @update:modelValue="
         (v) => {
           expandedSections.pivotTable = v;
@@ -1190,6 +1200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
+      :icon="SECTION_ICONS.valueTransformations"
       @update:modelValue="
         (v) => {
           expandedSections.valueTransformations = v;
@@ -1218,6 +1229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('fieldOverrides')"
       :model-value="isExpanded('fieldOverrides')"
+      :icon="SECTION_ICONS.fieldOverrides"
       @update:modelValue="
         (v) => {
           expandedSections.fieldOverrides = v;
@@ -1252,6 +1264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="isSectionVisible('map')"
       :model-value="isExpanded('map')"
+      :icon="SECTION_ICONS.map"
       @update:modelValue="
         (v) => {
           expandedSections.map = v;
@@ -1441,6 +1454,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type === 'gauge'"
       v-show="isSectionVisible('gauge')"
       :model-value="isExpanded('gauge')"
+      :icon="SECTION_ICONS.gauge"
       @update:modelValue="
         (v) => {
           expandedSections.gauge = v;
@@ -1506,6 +1520,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showTrellisConfig"
       v-show="isSectionVisible('layout')"
       :model-value="isExpanded('layout')"
+      :icon="SECTION_ICONS.layout"
       @update:modelValue="
         (v) => {
           expandedSections.layout = v;
@@ -1635,6 +1650,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showColorPalette"
       v-show="isSectionVisible('colors')"
       :model-value="isExpanded('colors')"
+      :icon="SECTION_ICONS.colors"
       @update:modelValue="
         (v) => {
           expandedSections.colors = v;
@@ -1655,6 +1671,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey)"
       v-show="isSectionVisible('drilldown')"
       :model-value="isExpanded('drilldown')"
+      :icon="SECTION_ICONS.drilldown"
       @update:modelValue="
         (v) => {
           expandedSections.drilldown = v;
@@ -1693,6 +1710,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="isSectionVisible('comparison')"
       :model-value="isExpanded('comparison')"
+      :icon="SECTION_ICONS.comparison"
       @update:modelValue="
         (v) => {
           expandedSections.comparison = v;
@@ -1759,6 +1777,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
       v-show="isSectionVisible('markLines')"
       :model-value="isExpanded('markLines')"
+      :icon="SECTION_ICONS.markLines"
       @update:modelValue="
         (v) => {
           expandedSections.markLines = v;
@@ -1791,6 +1810,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="dashboardPanelData.data.type == 'metric'"
       v-show="isSectionVisible('background')"
       :model-value="isExpanded('background')"
+      :icon="SECTION_ICONS.background"
       @update:modelValue="
         (v) => {
           expandedSections.background = v;
@@ -1868,6 +1888,7 @@ import {
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
+import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 
 export default defineComponent({
   components: {
@@ -2711,6 +2732,7 @@ export default defineComponent({
       toggleAllSections,
       isPivotMode,
       decimalsTouched,
+      SECTION_ICONS,
     };
   },
 });
