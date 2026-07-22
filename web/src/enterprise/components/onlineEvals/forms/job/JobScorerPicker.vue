@@ -1,16 +1,14 @@
 <template>
   <div class="mb-4">
-    <div class="flex flex-col gap-0.5 mb-2">
-      <span class="text-xs font-semibold text-text-heading">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
-      <span class="text-2xs text-text-secondary">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
-    </div>
     <OSelect
       :model-value="modelValue"
+      :label="t('onlineEvals.job.scorerPicker.title')"
       :options="options"
       multiple
       searchable
       :placeholder="t('onlineEvals.job.scorerPicker.placeholder')"
       :search-placeholder="t('onlineEvals.job.scorerPicker.searchPlaceholder')"
+      :help-text="t(`onlineEvals.job.scorerPicker.hint.${targetScope}`)"
       size="md"
       :disabled="!scorers.length"
       data-test="job-form-scorer-select"
@@ -29,10 +27,11 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { Scorer } from "@/services/online-evals.service";
+import type { EvalTargetScope, Scorer } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf } from "../../utils/evalEntity";
 
 const props = defineProps<{
+  targetScope: EvalTargetScope;
   scorers: Scorer[];
   modelValue: string[];
 }>();
@@ -53,7 +52,10 @@ const options = computed(() =>
 
 function onChange(value: unknown) {
   if (Array.isArray(value)) {
-    emit("update:modelValue", value.map((v) => String(v)));
+    emit(
+      "update:modelValue",
+      value.map((v) => String(v)),
+    );
   }
 }
 </script>

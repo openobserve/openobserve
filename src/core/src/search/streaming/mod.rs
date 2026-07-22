@@ -70,6 +70,7 @@ use crate::{
 };
 
 pub mod cache;
+pub mod collect;
 pub mod execution;
 pub mod sorting;
 pub mod utils;
@@ -84,9 +85,9 @@ pub use sorting::order_search_results;
 /// Main function to process search stream requests
 #[allow(clippy::too_many_arguments)]
 pub async fn process_search_stream_request(
+    trace_id: String,
     org_id: String,
     user_id: String,
-    trace_id: String,
     mut req: Request,
     stream_type: StreamType,
     stream_names: Vec<String>,
@@ -815,9 +816,9 @@ pub async fn process_search_stream_request(
 /// and streams results as they become available from each query
 #[allow(clippy::too_many_arguments)]
 pub async fn process_search_stream_request_multi(
+    trace_id: String,
     org_id: String,
     user_id: String,
-    trace_id: String,
     queries: Vec<Request>,
     stream_type: StreamType,
     search_span: tracing::Span,
@@ -912,9 +913,9 @@ pub async fn process_search_stream_request_multi(
 
             // Launch the individual search stream request
             let search_task = process_search_stream_request(
+                query_trace_id.clone(),
                 org_id_clone.clone(),
                 user_id_clone.clone(),
-                query_trace_id.clone(),
                 req,
                 stream_type,
                 stream_names,

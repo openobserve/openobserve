@@ -8525,7 +8525,7 @@
         "chipSampling": "Örnekleme Kontrolü"
       },
       "descriptionPlaceholder": "Bu iş neyi izler?",
-      "samplingValueHelp": "JSON: rate 0-1 arası bir sayıdır, count pozitif bir tam sayıdır.",
+      "samplingValueHelp": "0 ile 1 arasında bir örnekleme oranı girin.",
       "samplingValueAllHelp": "Mod Tümü olduğunda geçerli değildir — eşleşen her olay değerlendirilir.",
       "samplingHelp": "Filtreden sonra uygulanır. Maliyeti kontrol eder — orana yalnızca eşleşen span'ler dahil edilir.",
       "presets": {
@@ -8544,6 +8544,7 @@
         "sampling": "Örnekleme"
       },
       "targetSection": "Hedef",
+      "filteringSection": "Filtreleme",
       "scorersSection": "Gol verenler ve haritalama",
       "nameLabel": "İsim",
       "namePlaceholder": "Üretim Sadakat Monitörü",
@@ -8553,7 +8554,7 @@
       "streamTypePlaceholder": "izleri",
       "descriptionLabel": "Açıklama",
       "samplingModeLabel": "Örnekleme modu",
-      "samplingValueLabel": "Örnekleme değeri JSON",
+      "samplingValueLabel": "Örnekleme oranı",
       "samplingModes": {
         "rate": "Oranı",
         "all": "Hepsi",

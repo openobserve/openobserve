@@ -100,6 +100,10 @@
           {{ row.stream }}
         </template>
 
+        <template #cell-targetScope="{ row }">
+          <OTag type="fieldTag" :value="targetScopeOf(row)">{{ targetScopeLabel(row) }}</OTag>
+        </template>
+
         <template #cell-scorers="{ row }">
           <span class="tabular-nums">{{ scorerCountText(row) }}</span>
         </template>
@@ -171,7 +175,7 @@ import type {
   EvalJob,
   EvalJobStatus,
 } from "@/services/online-evals.service";
-import { statusOf, valueOf } from "./utils/evalEntity";
+import { statusOf, targetScopeOf, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
@@ -275,6 +279,14 @@ const columns = computed(() => [
     meta: { align: "left" },
   },
   {
+    id: "targetScope",
+    header: t("onlineEvals.job.columns.targetScope"),
+    accessorFn: (row: EvalJob) => targetScopeOf(row),
+    sortable: true,
+    size: 120,
+    meta: { align: "left" },
+  },
+  {
     id: "scorers",
     header: t("onlineEvals.job.columns.scorers"),
     accessorFn: (row: EvalJob) => (row.scorers || []).length,
@@ -340,6 +352,10 @@ function scorerCountText(row: EvalJob) {
   const count = (row.scorers || []).length;
   if (count === 1) return t("onlineEvals.job.scorerCount", { count });
   return t("onlineEvals.job.scorersCount", { count });
+}
+
+function targetScopeLabel(row: EvalJob) {
+  return t(`onlineEvals.job.targetScopes.${targetScopeOf(row)}`);
 }
 
 function rowCreated(row: EvalJob) {

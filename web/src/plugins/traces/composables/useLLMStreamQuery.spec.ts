@@ -13,6 +13,7 @@
 
 const mockCancelStreamQuery = vi.fn();
 const mockFetchQueryDataWithHttpStream = vi.fn();
+const mockSearch = vi.hoisted(() => vi.fn());
 const mockStoreState = {
   selectedOrganization: { identifier: "test-org" },
   zoConfig: { sql_base64_enabled: false },
@@ -29,6 +30,10 @@ vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({ state: mockStoreState })),
 }));
 
+vi.mock("@/services/search", () => ({
+  default: { search: mockSearch },
+}));
+
 vi.mock("@/utils/zincutils", () => ({
   generateTraceContext: vi.fn(() => ({ traceId: "trace-fixed-id" })),
   b64EncodeUnicode: vi.fn((s: string) => `b64(${s})`),
@@ -41,15 +46,54 @@ import { useLLMStreamQuery } from "./useLLMStreamQuery";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockSearch.mockResolvedValue({ data: { hits: [] } });
   // Reset config to default for every test
   mockStoreState.zoConfig.sql_base64_enabled = false;
 });
 
 describe("useLLMStreamQuery — return shape", () => {
-  it("exposes executeQuery and cancelAll", () => {
+  it("exposes streaming, full-range, and cancellation APIs", () => {
     const api = useLLMStreamQuery();
     expect(typeof api.executeQuery).toBe("function");
+    expect(typeof api.executeQueryOnce).toBe("function");
     expect(typeof api.cancelAll).toBe("function");
+  });
+});
+
+describe("useLLMStreamQuery — executeQueryOnce", () => {
+  it("runs one non-streamed full-range search and returns its hits", async () => {
+    mockSearch.mockResolvedValueOnce({ data: { hits: [{ id: "latest" }] } });
+    const { executeQueryOnce } = useLLMStreamQuery();
+
+    await expect(
+      executeQueryOnce("SELECT * FROM x LIMIT 25", 100, 200, "logs"),
+    ).resolves.toEqual([{ id: "latest" }]);
+
+    expect(mockSearch).toHaveBeenCalledWith({
+      org_identifier: "test-org",
+      query: {
+        query: {
+          sql: "SELECT * FROM x LIMIT 25",
+          start_time: 100,
+          end_time: 200,
+          from: 0,
+          size: 25,
+        },
+      },
+      page_type: "logs",
+    });
+  });
+
+  it("preserves base64 encoding for full-range searches", async () => {
+    mockStoreState.zoConfig.sql_base64_enabled = true;
+    const { executeQueryOnce } = useLLMStreamQuery();
+
+    await executeQueryOnce("SELECT 42", 1, 2);
+
+    expect(mockSearch.mock.calls[0][0].query).toMatchObject({
+      query: { sql: "b64(SELECT 42)" },
+      encoding: "base64",
+    });
   });
 });
 
