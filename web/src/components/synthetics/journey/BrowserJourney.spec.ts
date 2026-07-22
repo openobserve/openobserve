@@ -18,6 +18,18 @@ const OInputStub = {
   emits: ['update:modelValue'],
   template: '<input v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />',
 }
+const OSelectStub = {
+  props: ['modelValue', 'options', 'label', 'error', 'errorMessage'],
+  template: '<select v-bind="$attrs" />',
+}
+const OCheckboxStub = {
+  props: ['modelValue', 'size'],
+  template: '<input type="checkbox" v-bind="$attrs" />',
+}
+const OTooltipStub = {
+  props: ['content'],
+  template: '<div />',
+}
 const JourneyStepsStub = {
   props: ['data', 'mode', 'selectedIds', 'expandedIds'],
   template: '<div class="journey-steps-stub" :data-test-multi="$attrs[\'data-test\']"><div v-for="item in data" :key="item.id" class="step-row">{{ item.name }}</div></div>',
@@ -61,6 +73,9 @@ const STUBS = {
   OIcon: OIconStub,
   OBadge: OBadgeStub,
   OInput: OInputStub,
+  OSelect: OSelectStub,
+  OCheckbox: OCheckboxStub,
+  OTooltip: OTooltipStub,
   JourneySteps: JourneyStepsStub,
   ConfirmDialog: ConfirmDialogStub,
   OSelect: OSelectStub,
@@ -68,39 +83,48 @@ const STUBS = {
   OCheckbox: OCheckboxStub,
 }
 
-interface FakePort {
-  postMessage: ReturnType<typeof vi.fn>
-  disconnect: ReturnType<typeof vi.fn>
-  onMessage: { addListener: ReturnType<typeof vi.fn>; removeListener: ReturnType<typeof vi.fn> }
-  onDisconnect: { addListener: ReturnType<typeof vi.fn> }
-  emit: (msg: unknown) => void
+// ── Bridge transport helpers ──────────────────────────────────────────────
+
+let postMessageSpy: ReturnType<typeof vi.fn>
+
+function getLastCommandNonce(): string | null {
+  const calls = postMessageSpy.mock.calls
+  for (let i = calls.length - 1; i >= 0; i--) {
+    const data = calls[i]?.[0]
+    if (data?.msg?.type === 'synthetics-command') return data.nonce as string
+  }
+  return null
 }
 
-function makePort(): FakePort {
-  let listener: ((msg: unknown) => void) | null = null
-  return {
-    postMessage: vi.fn(),
-    disconnect: vi.fn(),
-    onMessage: {
-      addListener: vi.fn((fn: (msg: unknown) => void) => { listener = fn }),
-      removeListener: vi.fn(() => { listener = null }),
-    },
-    onDisconnect: { addListener: vi.fn() },
-    emit: (msg: unknown) => listener?.(msg),
-  }
+function respondToLastCommand(msg: unknown) {
+  const nonce = getLastCommandNonce()
+  if (!nonce) throw new Error('No pending command nonce to respond to')
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      source: window,
+      data: { ch: 'oo-bridge', dir: 'to-page', nonce, msg },
+    }),
+  )
 }
 
-function installChrome(handlers: Record<string, (cb: (r: unknown) => void) => void>, port: FakePort) {
-  ;(globalThis as any).chrome = {
-    runtime: {
-      lastError: undefined,
-      sendMessage: vi.fn((_id: string, message: any, cb: (r: unknown) => void) => {
-        handlers[message.command.action]?.(cb)
-      }),
-      connect: vi.fn(() => port),
-    },
-  }
+function emitStreamEvent(payload: Record<string, unknown>) {
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      source: window,
+      data: {
+        ch: 'oo-bridge',
+        dir: 'to-page',
+        msg: { type: 'synthetics-recorder', recordingId: 'rec_1', payload },
+      },
+    }),
+  )
 }
+
+async function settleProbeDelay() {
+  await vi.advanceTimersByTimeAsync(500)
+}
+
+// ── Mount helper ──────────────────────────────────────────────────────────
 
 function mountJourney(props: Record<string, unknown> = {}) {
   return mount(BrowserJourney, {
@@ -111,20 +135,20 @@ function mountJourney(props: Record<string, unknown> = {}) {
 
 describe('BrowserJourney recording', () => {
   let wrapper: VueWrapper
-  let port: FakePort
 
   beforeEach(() => {
-    port = makePort()
+    postMessageSpy = vi.fn()
+    vi.spyOn(window, 'postMessage').mockImplementation(postMessageSpy)
+    vi.useFakeTimers()
   })
 
   afterEach(() => {
     wrapper?.unmount()
-    delete (globalThis as any).chrome
-    vi.clearAllMocks()
+    vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   it('should emit need-extension-setup when recording without a ready extension', async () => {
-    installChrome({}, port)
     wrapper = mountJourney({ extensionReady: false })
 
     await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger('click')
@@ -134,16 +158,25 @@ describe('BrowserJourney recording', () => {
   })
 
   it('should start recording and render streamed live steps', async () => {
-    installChrome({ startRecording: (cb) => cb({ success: true }) }, port)
     wrapper = mountJourney({ extensionReady: true, startUrl: 'https://app.test/login' })
 
     await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger('click')
+
+    // The composable sends a probe then waits 500ms before sending the command.
+    await settleProbeDelay()
+    respondToLastCommand({ success: true })
     await flushPromises()
 
-    expect((globalThis as any).chrome.runtime.connect).toHaveBeenCalled()
+    // PostMessage should have been called (probe + command)
+    expect(postMessageSpy).toHaveBeenCalled()
+    // Stop button should be visible now that isRecording is true
     expect(wrapper.find('[data-test="synthetics-journey-stop-btn"]').exists()).toBe(true)
 
-    port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'setActions', browserSteps: [{ id: 's1', action: 'click', name: 'Click login', selector: '#login' }] } })
+    // Stream steps via the bridge
+    emitStreamEvent({
+      method: 'setActions',
+      browserSteps: [{ id: 's1', action: 'click', name: 'Click login', selector: '#login' }],
+    })
     await flushPromises()
 
     expect(wrapper.findAll('.step-row')).toHaveLength(1)
@@ -151,21 +184,23 @@ describe('BrowserJourney recording', () => {
   })
 
   it('should merge recorded steps into the journey on stop', async () => {
-    installChrome(
-      {
-        startRecording: (cb) => cb({ success: true }),
-        stopRecording: (cb) => cb({ success: true }),
-      },
-      port,
-    )
     wrapper = mountJourney({ modelValue: [], extensionReady: true })
 
     await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger('click')
+
+    await settleProbeDelay()
+    respondToLastCommand({ success: true })
     await flushPromises()
-    // Steps stream in live over the port, then Stop merges them.
-    port.emit({ type: 'synthetics-recorder', recordingId: 'rec_1', payload: { method: 'setActions', browserSteps: [{ id: 's1', action: 'navigate', url: 'https://app.test' }] } })
+
+    // Steps stream in live over the bridge, then Stop merges them.
+    emitStreamEvent({
+      method: 'setActions',
+      browserSteps: [{ id: 's1', action: 'navigate', url: 'https://app.test' }],
+    })
     await flushPromises()
+
     await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger('click')
+    respondToLastCommand({ success: true })
     await flushPromises()
 
     const emitted = wrapper.emitted('update:modelValue')
@@ -177,11 +212,13 @@ describe('BrowserJourney recording', () => {
   })
 
   it('should auto-start recording on mount when autoRecord is set', async () => {
-    installChrome({ startRecording: (cb) => cb({ success: true }) }, port)
     wrapper = mountJourney({ extensionReady: true, autoRecord: true, startUrl: 'https://app.test' })
+
+    await settleProbeDelay()
+    respondToLastCommand({ success: true })
     await flushPromises()
 
-    expect((globalThis as any).chrome.runtime.connect).toHaveBeenCalled()
+    expect(postMessageSpy).toHaveBeenCalled()
     expect(wrapper.find('[data-test="synthetics-journey-stop-btn"]').exists()).toBe(true)
   })
 
