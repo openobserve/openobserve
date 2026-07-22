@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="hero"
                 :preset="filterQuery !== '' ? 'no-search-results' : 'no-data'"
                 :filtered="filterQuery !== ''"
-                @action="(id: string) => id === 'clear-filters' ? (filterQuery = '') : undefined"
+                @action="(id?: string) => id === 'clear-filters' ? (filterQuery = '') : undefined"
               />
             </template>
             <template #cell-actions="{ row }">

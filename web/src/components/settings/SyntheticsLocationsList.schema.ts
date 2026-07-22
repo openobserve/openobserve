@@ -11,7 +11,7 @@ export const makeSyntheticsLocationFormSchema = (t: (_key: string) => string) =>
   z
     .object({
       provider: z.enum(["aws", "gcp", "azure", "custom"], {
-        errorMap: () => ({ message: t("synthetics.locations.providerRequired") }),
+        message: t("synthetics.locations.providerRequired"),
       }),
       customProvider: z.string().optional().default(""),
       region: z.string().trim().min(1, t("synthetics.locations.regionRequired")),
