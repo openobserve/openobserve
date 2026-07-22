@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::get_config;
 use infra::{coordinator::get_coordinator, db::Event};
 
-use crate::workflows::{WorkflowTrigger, handle_workflow_trigger};
+use super::{WorkflowTrigger, handle_workflow_trigger};
 
 const CHECK_INTERVAL_MIN: u64 = 30;
 pub const WORKFLOW_TRIGGER_PREFIX: &str = "/workflow_trigger/";

@@ -88,8 +88,6 @@ pub mod trial_quota;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
-#[cfg(feature = "enterprise")]
-mod workflows_runtime;
 
 /// Compatibility namespace for the common crate. Authentication and stream-query helpers remain
 /// available at their historical paths while their service-backed implementations live in the

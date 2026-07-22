@@ -41,11 +41,7 @@ use crate::{
     },
 };
 
-pub mod runtime {
-    pub use crate::workflows_runtime::{
-        WORKFLOW_TRIGGER_PREFIX, clean, send_workflow_trigger, watch_workflow_triggers,
-    };
-}
+pub mod runtime;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub enum WorkflowTriggerType {
