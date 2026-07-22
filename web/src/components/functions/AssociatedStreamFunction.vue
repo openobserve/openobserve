@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template #expansion="{ row }">
+      <template #expansion>
         <div
           v-show="loadingFunctions"
           class="pl-3 py-1"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <template #cell-#="{ row, index }">
+            <template #[`cell-#`]="{ row, index }">
               <span v-if="!row._isAddRow">{{ index + 1 }}</span>
             </template>
 
@@ -201,7 +201,6 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -214,10 +213,10 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "PageLogStream",
   components: { SchemaIndex, NoData, OButton, ODrawer, OInnerLoading, OSwitch, OSelect, OSearchInput,
-    OIcon, OTable,
+    OTable,
 },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();
@@ -423,7 +422,7 @@ export default defineComponent({
 
             dismiss();
           })
-          .catch((err) => {
+          .catch(() => {
             dismiss();
             toast({
               variant: "error",
@@ -598,7 +597,7 @@ export default defineComponent({
             getLogStream();
           }
         })
-        .catch((err: any) => {
+        .catch(() => {
           toast({
             message: "Error while deleting stream.",
             variant: "error",
@@ -628,7 +627,7 @@ export default defineComponent({
           _function.name,
           _function
         )
-        .then((res) => {
+        .then(() => {
           getStreamFunctions(
             expandedRow.value.name,
             expandedRow.value.stream_type

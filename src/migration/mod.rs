@@ -69,14 +69,14 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
         infra::dist_lock::unlock(&lock).await?;
         return Err(e);
     }
-    if let Err(e) = infra::set_db_schema_version().await {
+    // cloud-related migrations
+    #[cfg(feature = "cloud")]
+    if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
         infra::dist_lock::unlock(&lock).await?;
         return Err(e);
     }
 
-    // cloud-related migrations
-    #[cfg(feature = "cloud")]
-    if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
+    if let Err(e) = infra::set_db_schema_version().await {
         infra::dist_lock::unlock(&lock).await?;
         return Err(e);
     }

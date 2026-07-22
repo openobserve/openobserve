@@ -76,6 +76,10 @@ export default defineComponent({
     watch(
       () => props.loading,
       (newValue, oldValue) => {
+        // Remember the previous loading state so shouldAnimate can stay
+        // true through the loading -> not-loading transition.
+        lastLoadingState.value = oldValue;
+
         if (oldValue && !newValue) {
           // When loading becomes false, quickly complete to 100% and start fade out
           internalPercentage.value = 100;
@@ -95,9 +99,7 @@ export default defineComponent({
     });
 
     const shouldAnimate = computed(() => {
-      const wasLoading = lastLoadingState.value;
-      lastLoadingState.value = props.loading;
-      return props.loading || wasLoading || isFadingOut.value;
+      return props.loading || lastLoadingState.value || isFadingOut.value;
     });
 
     const displayPercentage = computed(() => {

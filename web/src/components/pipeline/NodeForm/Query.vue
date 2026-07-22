@@ -124,7 +124,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import {
   computed,
-  defineAsyncComponent,
   onMounted,
   ref,
   watch,
@@ -139,7 +138,6 @@ import {
 import { useI18n } from "vue-i18n";
 import { getTimezoneOffset, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -159,9 +157,6 @@ import { makeQuerySchema, type QueryForm } from "./Query.schema";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-const VariablesInput = defineAsyncComponent(
-  () => import("@/components/alerts/VariablesInput.vue"),
-);
 
 interface RouteCondition {
   column: string;
@@ -228,11 +223,9 @@ const props = defineProps({
 const { t } = useI18n();
 
 
-const router = useRouter();
-
 const store = useStore();
 
-const { getStream, getStreams } = useStreams();
+const { getStream } = useStreams();
 
 const { buildQueryPayload } = useQuery();
 
@@ -247,8 +240,6 @@ function handleDrawerClose(v: boolean) {
     setTimeout(() => emit("cancel:hideform"), 300);
   }
 }
-
-const isUpdating = ref(false);
 
 const filteredColumns: any = ref([]);
 
@@ -277,21 +268,12 @@ function onRunQuery() {
   }
 }
 
-const filteredStreams: Ref<any[]> = ref([]);
-
-const indexOptions = ref([]);
-
 const originalStreamFields: Ref<any[]> = ref([]);
 
 // `isAggregationEnabled` is a reactive view of the form-owned flag. The
 // aggregation toggle in ScheduledPipeline writes it via the form, so this read
 // stays in sync (single source of truth — no mirror).
 const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
-
-const nodeLink = ref({
-  from: "",
-  to: "",
-});
 
 const dialog = ref({
   show: false,
@@ -412,26 +394,6 @@ onActivated(() => {
 
 const streamTypes = ["logs", "metrics", "traces"];
 
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
-const filterStreams = (val: string, update: any) => {
-  filteredStreams.value = filterColumns(indexOptions.value, val, update);
-};
 
 // Exposed computed for unit tests. The live drawer does not edit
 // streamRoute.name, so it is intentionally NOT a schema field (see Query.schema).
@@ -558,6 +520,7 @@ const saveQueryData = async () => {
   // All validations passed - add node and close dialog
   addNode(queryPayload);
   emit("cancel:hideform");
+  return undefined;
 };
 
 const openDeleteDialog = () => {
@@ -626,7 +589,7 @@ const validateSqlQuery = async () => {
         page_type: streamRoute.value.stream_type, //use the selected stream type
         validate: true,
       })
-      .then((res: any) => {
+      .then(() => {
         isValidSqlQuery.value = true;
         validatingSqlQuery.value = false;
         sqlErrorRanges.value = [];
@@ -674,7 +637,7 @@ const updateQueryType = (val: string) => {
   }
 };
 
-const toggleExpandLog = (index: number) => {
+const toggleExpandLog = () => {
   expandedLogs.value = [];
 };
 

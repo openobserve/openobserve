@@ -35,19 +35,17 @@ export class MapsConverter implements PromQLChartConverter {
     panelSchema: any,
     store: any,
     extras: any,
-    chartPanelRef?: any,
   ) {
     const config: MapsConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
 
     // Get label names for location name
-    const nameLabel =
-      config.name_label || "name" || "location" || "country" || "region";
+    const nameLabel = config.name_label || "name";
 
     const locationValueMap = new Map<string, number[]>();
     const errors: string[] = [];
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         const rawLocationName = seriesData.metric[nameLabel] || seriesData.name;
 
         if (!rawLocationName) {

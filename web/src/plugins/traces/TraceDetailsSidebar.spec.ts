@@ -20,8 +20,6 @@ import {
   beforeEach,
   afterEach,
   vi,
-  afterAll,
-  beforeAll,
 } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 
@@ -81,7 +79,6 @@ import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import config from "@/aws-exports";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
@@ -130,9 +127,6 @@ const mockStore = createStore({
 
 const mockEvents =
   '[{"name":"[work_group:short] done a job: user_id None, trace_id bd64db54267785abbe7a43869ed8eb6e","_timestamp":1752490492843047,"code.filepath":"/home/runner/work/o2-enterprise/o2-enterprise/o2-enterprise/o2_enterprise/src/enterprise/search/work_group.rs","code.lineno":"125","level":"DEBUG","target":"o2_enterprise::enterprise::search::work_group","code.namespace":"o2_enterprise::enterprise::search::work_group"}]';
-
-const mockExceptions =
-  '[{"_timestamp": 1752490492843047,"name": "exception","exception.type": "RuntimeError","exception.message": "Test error","exception.escaped": "false","exception.stacktrace": "Error: Test error\\n    at test.js:1:1"}]';
 
 const mockLinks =
   '[{"context": {"traceId": "f6e08ab2a928aa393375f0d9b05a9054", "spanId": "ecc59cb843104cf8"}}, {"context": {"traceId": "6262666637a9ae45ad3e25f5111dd59f", "spanId": "d9603ec7f76eb499"}}]';
@@ -1170,8 +1164,6 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should properly update when span props change", async () => {
       // First, check the initial state
-      const initialLinks = wrapper.vm.spanLinks;
-
       // Update the span with invalid links
       await wrapper.setProps({
         span: {

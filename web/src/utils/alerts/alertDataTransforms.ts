@@ -316,7 +316,7 @@ export const convertV0ToV2 = (v0Data: any[]): V2Group => {
   }
 
   // Convert each flat condition to V2 format
-  const conditions: V2Condition[] = v0Data.map((item: any, index: number) => {
+  const conditions: V2Condition[] = v0Data.map((item: any) => {
     const condition: V2Condition = {
       filterType: "condition",
       column: item.column || "",
@@ -343,7 +343,7 @@ export const convertV0ToV2 = (v0Data: any[]): V2Group => {
  * V1: {groupId, label: "and", items: [...]}
  * V2: {filterType: "group", logicalOperator: "AND", conditions: [...]}
  */
-export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Group => {
+export const convertV1ToV2 = (v1Data: any): V2Group => {
   if (!v1Data) {
     return {
       filterType: "group",
@@ -362,12 +362,12 @@ export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Grou
   const label = v1Data.label || "and";
   const logicalOperator = label.toUpperCase() as "AND" | "OR";
 
-  const conditions: (V2Condition | V2Group)[] = items.map((item: any, index: number) => {
+  const conditions: (V2Condition | V2Group)[] = items.map((item: any) => {
     // Check if it's a nested group
     // V1 groups have 'items' array (and optionally 'label' and 'groupId')
     if (item.items && Array.isArray(item.items)) {
       // It's a V1 group, convert recursively
-      return convertV1ToV2(item, false);
+      return convertV1ToV2(item);
     }
 
     // It's a condition
@@ -475,9 +475,9 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   //in recursive call
   //the current logicalOperator will be and
 
-  const conditions: (V2Condition | V2Group)[] = items.map((item: any, index: number) => {
+  const conditions: (V2Condition | V2Group)[] = items.map((item: any) => {
     // Check if it's a nested group
-    // here we will map all the items one by one and if we find any group 
+    // here we will map all the items one by one and if we find any group
     // then we will again send that to conversion recursively and whatever operator we had for this particualr group before we send
     // we will assign it to that nested group logicalOperator
     if (item.and || item.or) {

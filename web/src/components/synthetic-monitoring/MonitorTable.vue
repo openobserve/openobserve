@@ -253,7 +253,7 @@
         columns
         :description="t('synthetics.table.noResults')"
         :data-test="`${dataTest}-empty-state`"
-        @action="(id: string) => emit('empty-action', id)"
+        @action="(id?: string) => { if (!id) return; emit('empty-action', id); }"
       />
     </template>
 

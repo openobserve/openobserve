@@ -348,7 +348,7 @@ const props = defineProps<{
   runsError: string | null;
 }>();
 
-const emit = defineEmits<{
+defineEmits<{
   (e: "back"): void;
   (e: "update:scope", value: QualityScope): void;
   (e: "open-run", value: QualityRunRow): void;

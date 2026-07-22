@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('common.name')"
           required
           class="showLabelOnTop mt-2"
-          maxlength="100"
+          :maxlength="100"
           data-test="add-group-groupname-input-btn"
           :help-text="t('iam.nameHelpText')"
         />

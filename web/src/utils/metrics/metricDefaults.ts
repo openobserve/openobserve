@@ -29,6 +29,99 @@
  */
 
 import { PromqlStepId } from "@/components/promql/types";
+import type {
+  PromqlBuilderQuery,
+  PromqlLabelMatcher,
+  PromqlStep,
+} from "@/components/promql/types";
+
+/** A filter as callers pass it in: label/value plus an optional operator. */
+interface FilterInput {
+  label: string;
+  value: string;
+  operator?: string;
+}
+
+/** Filters accepted by the selector builders: a list, or a label->value map. */
+type FiltersArg = FilterInput[] | Record<string, string> | undefined;
+
+/** A matcher after normalization: validated label, operator and value. */
+interface NormalizedMatcher {
+  label: string;
+  operator: PromqlOperator;
+  value: string;
+}
+
+/** Extra context resolving a stream to a card kind. */
+interface CardKindContext {
+  streamNames?: Set<string>;
+  familyType?: string;
+}
+
+/** One query of a variant: the preview `expr` plus optional builder state. */
+interface VariantQuery {
+  expr: string;
+  legendTemplate?: string;
+  builder?: PromqlBuilderQuery;
+}
+
+/** One variant of a card: an ordered set of queries and its chart shape. */
+interface Variant {
+  id: string;
+  footerLabel: string;
+  label: string;
+  queries: VariantQuery[];
+  chartType: string;
+  unit?: string;
+  previewable?: boolean;
+  options?: { percentiles?: number[] };
+  availablePercentiles?: number[];
+}
+
+/** The context `buildVariants` consumes, assembled by `getMetricDefaults`. */
+interface BuildVariantsContext {
+  metricName: string;
+  base: string;
+  sel: string;
+  baseSel?: string;
+  countSel: string;
+  w: string;
+  labels?: string[];
+  unit: string;
+  builderLabels: PromqlLabelMatcher[];
+  builderSafe: boolean;
+}
+
+/** One name-inference rule: segments that match, and the unit each yields. */
+interface UnitRule {
+  match: string[];
+  unit: string;
+  rated: string;
+}
+
+/** A panel's unit config: a formatter id plus an optional custom-unit label. */
+interface O2Unit {
+  unit: string;
+  unitCustom: string | null;
+}
+
+/** The parts of a `getMetricDefaults` result that `resolveVariant` re-resolves. */
+interface ResolvedVariantSource {
+  variants: Variant[];
+  chartType: string;
+  unit: string;
+  footerLabel: string;
+}
+
+/** Full context accepted by `getMetricDefaults`. */
+interface MetricDefaultsContext {
+  streamNames?: Set<string>;
+  familyType?: string;
+  filters?: FilterInput[];
+  rateWindow?: string;
+  labels?: string[];
+  applyNanGuard?: boolean;
+}
 
 /**
  * Fallback scrape interval, in seconds, for when the org has not set one.
@@ -155,7 +248,7 @@ const DEFAULT_UNIT = { unit: "short", rated: "count-per-sec" };
  * Normalizes a declared `metrics_meta.unit` (Prometheus `# UNIT` / OTLP UCUM)
  * onto a canonical unit id. Unrecognized values fall through to name inference.
  */
-const DECLARED_UNIT_ALIASES = {
+const DECLARED_UNIT_ALIASES: Record<string, string> = {
   s: "seconds",
   sec: "seconds",
   secs: "seconds",
@@ -200,7 +293,7 @@ const DECLARED_UNIT_ALIASES = {
  * Rated mapping applied to an *observation* unit when the card kind is a
  * counter. Anything not listed rates to count/sec.
  */
-const RATED_BY_OBSERVATION = {
+const RATED_BY_OBSERVATION: Record<string, string> = {
   bytes: "bytes-per-sec",
   seconds: "none",
   milliseconds: "ms-per-sec",
@@ -223,7 +316,7 @@ const RATED_BY_OBSERVATION = {
  * when `unit === "custom"`; see `getUnitOptions` in useColumnFormatting.ts for
  * the authoritative list of ids the formatter understands.
  */
-const O2_UNIT_MAP = {
+const O2_UNIT_MAP: Record<string, O2Unit> = {
   seconds: { unit: "seconds", unitCustom: null },
   milliseconds: { unit: "milliseconds", unitCustom: null },
   microseconds: { unit: "microseconds", unitCustom: null },
@@ -251,12 +344,14 @@ const O2_UNIT_MAP = {
 /* Small helpers                                                              */
 /* -------------------------------------------------------------------------- */
 
-const lower = (v) => (typeof v === "string" ? v.trim().toLowerCase() : "");
+const lower = (v: unknown): string =>
+  typeof v === "string" ? v.trim().toLowerCase() : "";
 
-const segmentsOf = (metricName) => lower(metricName).split("_").filter(Boolean);
+const segmentsOf = (metricName: string): string[] =>
+  lower(metricName).split("_").filter(Boolean);
 
 /** The trailing OpenMetrics member suffix, or "" for a bare name. */
-export function familySuffixOf(metricName) {
+export function familySuffixOf(metricName: string): string {
   const parts = segmentsOf(metricName);
   if (parts.length < 2) return "";
   const last = parts[parts.length - 1];
@@ -268,7 +363,7 @@ export function familySuffixOf(metricName) {
  * The family base name: the metric name minus its OpenMetrics member suffix.
  * `foo_seconds_bucket` -> `foo_seconds`; a bare name is its own base.
  */
-export function baseNameOf(metricName) {
+export function baseNameOf(metricName: string): string {
   const suffix = familySuffixOf(metricName);
   if (!suffix) return metricName;
   return metricName.slice(0, metricName.length - (suffix.length + 1));
@@ -279,7 +374,7 @@ export function baseNameOf(metricName) {
  * on *either* the member or the family changes the dispatch, so they win over a
  * generic type from the other source.
  */
-function pickTypeEvidence(ownType, familyType) {
+function pickTypeEvidence(ownType: string, familyType: string): string {
   const SPECIFIC = ["gaugehistogram", "exponentialhistogram"];
   if (SPECIFIC.includes(ownType)) return ownType;
   if (SPECIFIC.includes(familyType)) return familyType;
@@ -304,7 +399,11 @@ function pickTypeEvidence(ownType, familyType) {
  * @param {{streamNames?: Set<string>, familyType?: string}} [ctx]
  * @returns {string} one of CARD_KIND
  */
-export function resolveCardKind(metricName, metricType, ctx) {
+export function resolveCardKind(
+  metricName: string,
+  metricType: string | undefined,
+  ctx?: CardKindContext,
+): string {
   const own = lower(metricType);
   const fam = lower(ctx?.familyType);
   const suffix = familySuffixOf(metricName);
@@ -368,11 +467,18 @@ export function resolveCardKind(metricName, metricType, ctx) {
 /* PromQL construction                                                         */
 /* -------------------------------------------------------------------------- */
 
+/** The four matchers PromQL defines. */
+type PromqlOperator = "=" | "!=" | "=~" | "!~";
+
 const LABEL_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-const VALID_OPERATORS = ["=", "!=", "=~", "!~"];
+
+/** Narrows an arbitrary string to a PromQL operator. */
+function isPromqlOperator(op: string): op is PromqlOperator {
+  return op === "=" || op === "!=" || op === "=~" || op === "!~";
+}
 
 /** Escapes a PromQL double-quoted string literal. */
-function escapePromqlString(value) {
+function escapePromqlString(value: unknown): string {
   return String(value ?? "")
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
@@ -400,7 +506,11 @@ function escapePromqlString(value) {
  * @param {Record<string,string>} [extraMatchers] appended verbatim as `=` matchers
  * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`
  */
-export function buildSelector(metricName, filters, extraMatchers) {
+export function buildSelector(
+  metricName: string,
+  filters?: FiltersArg,
+  extraMatchers?: Record<string, string>,
+): string {
   if (!metricName) throw new Error("buildSelector: metricName is required");
 
   const matchers = normalizeMatchers(filters, extraMatchers).map(
@@ -425,8 +535,11 @@ export function buildSelector(metricName, filters, extraMatchers) {
  * @param {Record<string,string>} [extraMatchers] appended as `=` matchers
  * @returns {Array<{label: string, operator: string, value: string}>}
  */
-function normalizeMatchers(filters, extraMatchers) {
-  const list = [];
+function normalizeMatchers(
+  filters?: FiltersArg,
+  extraMatchers?: Record<string, string>,
+): NormalizedMatcher[] {
+  const list: FilterInput[] = [];
   if (Array.isArray(filters)) {
     list.push(...filters);
   } else if (filters && typeof filters === "object") {
@@ -450,7 +563,7 @@ function normalizeMatchers(filters, extraMatchers) {
         throw new Error(`buildSelector: invalid label name "${label}"`);
       }
       const operator = f.operator ?? "=";
-      if (!VALID_OPERATORS.includes(operator)) {
+      if (!isPromqlOperator(operator)) {
         throw new Error(`buildSelector: invalid operator "${operator}"`);
       }
       return { label, operator, value: String(f.value ?? "") };
@@ -471,7 +584,7 @@ function normalizeMatchers(filters, extraMatchers) {
  *
  * @returns {Array<{label: string, op: string, value: string}>}
  */
-export function builderLabelsOf(filters) {
+export function builderLabelsOf(filters?: FiltersArg): PromqlLabelMatcher[] {
   return normalizeMatchers(filters).map(({ label, operator, value }) => ({
     label,
     op: operator,
@@ -501,7 +614,7 @@ const RATE_FREE_KINDS = [
  * @param {string} cardKind one of CARD_KIND
  * @returns {boolean}
  */
-export function isRateBasedKind(cardKind) {
+export function isRateBasedKind(cardKind: string): boolean {
   return !RATE_FREE_KINDS.includes(cardKind);
 }
 
@@ -530,7 +643,10 @@ export function isRateBasedKind(cardKind) {
  * @param {Array<{label: string, value: string, operator?: string}>} [filters]
  * @returns {string} PromQL
  */
-export function buildPresenceQuery(streamName, filters) {
+export function buildPresenceQuery(
+  streamName: string,
+  filters?: FiltersArg,
+): string {
   return `count(${buildSelector(streamName, filters)})`;
 }
 
@@ -549,7 +665,7 @@ export function buildPresenceQuery(streamName, filters) {
  * Applied only as a RETRY, after a plain first query has actually come back
  * all-NaN. Doing it up front would make every query needlessly complex.
  */
-function withNanGuard(selector) {
+function withNanGuard(selector: string): string {
   return `(${selector} and ${selector} > -Inf)`;
 }
 
@@ -558,10 +674,10 @@ function withNanGuard(selector) {
 /* -------------------------------------------------------------------------- */
 
 /** Serializes whole seconds as a PromQL duration, e.g. 3660 -> "1h1m". */
-export function formatPromDuration(totalSeconds) {
+export function formatPromDuration(totalSeconds: number): string {
   let s = Math.max(1, Math.ceil(Number(totalSeconds) || 0));
-  const parts = [];
-  const units = [
+  const parts: string[] = [];
+  const units: Array<[string, number]> = [
     ["d", 86400],
     ["h", 3600],
     ["m", 60],
@@ -583,9 +699,9 @@ export function formatPromDuration(totalSeconds) {
  * @param {number} [maxDataPoints] roughly the chart's pixel width, capped
  */
 export function computeStepSeconds(
-  rangeSeconds,
-  maxDataPoints = MAX_DATA_POINTS,
-) {
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+): number {
   const points = Math.min(
     MAX_DATA_POINTS,
     Math.max(1, Math.round(Number(maxDataPoints) || MAX_DATA_POINTS)),
@@ -617,10 +733,10 @@ export function computeStepSeconds(
  * @returns {string} a PromQL duration, e.g. "4m"
  */
 export function computeRateWindow(
-  rangeSeconds,
-  maxDataPoints = MAX_DATA_POINTS,
-  scrapeIntervalSeconds = DEFAULT_SCRAPE_INTERVAL_SECONDS,
-) {
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+  scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+): string {
   const step = computeStepSeconds(rangeSeconds, maxDataPoints);
   const w = Math.max(4 * scrapeIntervalSeconds, step + scrapeIntervalSeconds);
   return formatPromDuration(w);
@@ -651,7 +767,7 @@ const DEFAULT_RATE_WINDOW = formatPromDuration(
 /* Rule set B — unit inference                                                 */
 /* -------------------------------------------------------------------------- */
 
-function lookupSegment(segment) {
+function lookupSegment(segment: string | undefined): UnitRule | null {
   if (!segment) return null;
   for (const rule of UNIT_RULES) {
     if (rule.match.includes(segment)) return rule;
@@ -670,12 +786,15 @@ function lookupSegment(segment) {
  * @param {{rated?: boolean}} [opts]
  * @returns {string} canonical unit id
  */
-export function inferUnit(metricName, opts) {
+export function inferUnit(
+  metricName: string,
+  opts?: { rated?: boolean },
+): string {
   const rated = !!opts?.rated;
   const parts = segmentsOf(metricName);
   const last = parts[parts.length - 1];
 
-  let candidates;
+  let candidates: Array<string | undefined>;
   if (last === "count" || last === "gcount") {
     candidates = []; // counts events, never the observed quantity
   } else if (LOOKBACK_SUFFIXES.includes(last)) {
@@ -692,19 +811,21 @@ export function inferUnit(metricName, opts) {
 }
 
 /** Normalizes a declared unit onto a canonical id, or null if unrecognized. */
-export function normalizeDeclaredUnit(declaredUnit) {
+export function normalizeDeclaredUnit(
+  declaredUnit: string | undefined,
+): string | null {
   const raw = typeof declaredUnit === "string" ? declaredUnit.trim() : "";
   if (!raw) return null;
   return DECLARED_UNIT_ALIASES[raw.toLowerCase()] ?? null;
 }
 
 /** Applies the rated mapping to an observation unit. */
-function rateUnit(observationUnit) {
+function rateUnit(observationUnit: string): string {
   return RATED_BY_OBSERVATION[observationUnit] ?? "count-per-sec";
 }
 
 /** Canonical unit id -> `{ unit, unitCustom }` for a panel's config. */
-export function toO2Unit(canonicalUnit) {
+export function toO2Unit(canonicalUnit: string): O2Unit {
   return O2_UNIT_MAP[canonicalUnit] ?? { unit: "numbers", unitCustom: null };
 }
 
@@ -713,7 +834,11 @@ export function toO2Unit(canonicalUnit) {
  * inference; a counter's observation unit is then converted through the rated
  * mapping.
  */
-function resolveUnit(metricName, cardKind, declaredUnit) {
+function resolveUnit(
+  metricName: string,
+  cardKind: string,
+  declaredUnit: string | undefined,
+): string {
   // `_created` is seconds-since-epoch by definition, whatever anyone declared.
   if (cardKind === CARD_KIND.TIMESTAMP) return "seconds";
   if (cardKind === CARD_KIND.INFO) return "short";
@@ -755,27 +880,40 @@ function resolveUnit(metricName, cardKind, declaredUnit) {
  * identical — `metricDefaults.builder.spec.ts` renders every builder descriptor
  * through the real query modeller and diffs it against `expr`.
  */
-const q = (expr, legendTemplate, builder) => {
-  const out = { expr };
+const q = (
+  expr: string,
+  legendTemplate?: string,
+  builder?: PromqlBuilderQuery,
+): VariantQuery => {
+  const out: VariantQuery = { expr };
   if (legendTemplate !== undefined) out.legendTemplate = legendTemplate;
   if (builder !== undefined) out.builder = builder;
   return out;
 };
 
 /* The builder's operation vocabulary. `operations[0]` is the innermost call. */
-const RATE = (window) => ({ id: PromqlStepId.Rate, params: [window] });
-const INCREASE = (window) => ({ id: PromqlStepId.Increase, params: [window] });
+const RATE = (window: string): PromqlStep => ({
+  id: PromqlStepId.Rate,
+  params: [window],
+});
+const INCREASE = (window: string): PromqlStep => ({
+  id: PromqlStepId.Increase,
+  params: [window],
+});
 /** Aggregations take their `by (...)` labels as the LAST param. */
-const AGG = (id, byLabels = []) => ({ id, params: [[...byLabels]] });
-const TOPK = (k, byLabels = []) => ({
+const AGG = (id: PromqlStepId, byLabels: string[] = []): PromqlStep => ({
+  id,
+  params: [[...byLabels]],
+});
+const TOPK = (k: number, byLabels: string[] = []): PromqlStep => ({
   id: PromqlStepId.TopK,
   params: [k, [...byLabels]],
 });
-const QUANTILE = (ratio, byLabels = []) => ({
+const QUANTILE = (ratio: number, byLabels: string[] = []): PromqlStep => ({
   id: PromqlStepId.Quantile,
   params: [ratio, [...byLabels]],
 });
-const HISTOGRAM_QUANTILE = (ratio) => ({
+const HISTOGRAM_QUANTILE = (ratio: number): PromqlStep => ({
   id: PromqlStepId.HistogramQuantile,
   params: [ratio],
 });
@@ -786,7 +924,7 @@ const GAUGE_PERCENTILES = [50, 75, 90, 95, 99];
 /**
  * Internal labels a top-k breakdown must never group by.
  */
-function resolveTopkLabel(labels) {
+function resolveTopkLabel(labels: string[] | undefined): string | null {
   if (!Array.isArray(labels) || labels.length === 0) return null;
   const excluded = new Set(["le", "quantile"]);
   const eligible = labels
@@ -807,12 +945,14 @@ function resolveTopkLabel(labels) {
  * Variants are card-kind aware: info/`_created`/GaugeHistogram cards get none,
  * and an ExponentialHistogram fallback gets only its count line.
  */
-function buildVariants(cardKind, ctx) {
+function buildVariants(
+  cardKind: string,
+  ctx: BuildVariantsContext,
+): Variant[] {
   const {
     metricName,
     base,
     sel,
-    baseSel,
     countSel,
     w,
     labels,
@@ -826,7 +966,10 @@ function buildVariants(cardKind, ctx) {
    * expressed in the builder's vocabulary — which is the case whenever the
    * NaN guard has rewritten the selector into `(x and x > -Inf)`.
    */
-  const b = (metric, operations) =>
+  const b = (
+    metric: string,
+    operations: PromqlStep[],
+  ): PromqlBuilderQuery | undefined =>
     builderSafe ? { metric, labels: builderLabels, operations } : undefined;
 
   switch (cardKind) {
@@ -1241,7 +1384,12 @@ const FOOTER_LABEL = {
  *   applyNanGuard?: boolean, // retry mode: guard the selector against NaN samples
  * }} [ctx]
  */
-export function getMetricDefaults(metricName, metricType, declaredUnit, ctx) {
+export function getMetricDefaults(
+  metricName: string,
+  metricType: string | undefined,
+  declaredUnit: string | undefined,
+  ctx?: MetricDefaultsContext,
+) {
   const cardKind = resolveCardKind(metricName, metricType, ctx);
   const base = baseNameOf(metricName);
   const filters = ctx?.filters ?? [];
@@ -1249,7 +1397,7 @@ export function getMetricDefaults(metricName, metricType, declaredUnit, ctx) {
 
   const supportsNanGuard = RATE_FREE_KINDS.includes(cardKind);
   const guarded = !!ctx?.applyNanGuard && supportsNanGuard;
-  const guard = guarded ? withNanGuard : (selector) => selector;
+  const guard = guarded ? withNanGuard : (selector: string) => selector;
 
   const sel = guard(buildSelector(metricName, filters));
   const baseSel = guard(buildSelector(base, filters));
@@ -1287,7 +1435,9 @@ export function getMetricDefaults(metricName, metricType, declaredUnit, ctx) {
   const previewable =
     !!defaultVariant && defaultVariant.previewable !== false && !unsupported;
 
-  const chartType = previewable ? (defaultVariant.chartType ?? "line") : "none";
+  const chartType = previewable
+    ? (defaultVariant?.chartType ?? "line")
+    : "none";
 
   return {
     type: cardKind,
@@ -1303,7 +1453,7 @@ export function getMetricDefaults(metricName, metricType, declaredUnit, ctx) {
     // while cell intensity is count/s. config.unit alone cannot carry both.
     bucketUnit: cardKind === CARD_KIND.CLASSIC_HISTOGRAM_BUCKETS ? unit : null,
 
-    defaultQuery: previewable ? defaultVariant.queries[0].expr : "",
+    defaultQuery: previewable ? (defaultVariant?.queries[0]?.expr ?? "") : "",
     chartType,
     previewable,
     unsupported,
@@ -1329,7 +1479,11 @@ export function getMetricDefaults(metricName, metricType, declaredUnit, ctx) {
  *
  * @returns {{variant: object, queries: Array<{expr,legendTemplate,builder}>, chartType: string, unit: string} | null}
  */
-export function resolveVariant(defaults, variantId, options) {
+export function resolveVariant(
+  defaults: ResolvedVariantSource,
+  variantId: string,
+  options?: { percentiles?: number[] },
+) {
   const variant =
     defaults.variants.find((v) => v.id === variantId) ??
     defaults.variants[0] ??

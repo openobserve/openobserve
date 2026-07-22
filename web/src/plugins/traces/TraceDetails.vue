@@ -186,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-center space-x-4 w-fit!">
             <!-- Back button -->
             <OButton
-              v-if="mode === 'standalone' && showBackButton"
+              v-if="isStandaloneMode && showBackButton"
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex justify-end items-center space-x-3 w-fit!">
             <!-- Apply filters button (standalone mode, right side) -->
             <OButton
-              v-if="mode === 'standalone' && areFiltersAdded"
+              v-if="isStandaloneMode && areFiltersAdded"
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
@@ -368,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Share button (standalone mode) -->
             <share-button
-              v-if="mode === 'standalone' && showShareButton"
+              v-if="isStandaloneMode && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Close button -->
             <OButton
-              v-if="mode === 'standalone' && showCloseButton"
+              v-if="isStandaloneMode && showCloseButton"
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
@@ -630,7 +630,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :spanDimensions="spanDimensions"
                         :spanMap="spanMap"
                         :leftWidth="leftWidth"
-                        :scrollContainer="traceScrollContainer"
+                        :scrollContainer="scrollContainerForTree"
                         ref="traceTreeRef"
                         class="bg-card-glass-bg!"
                         :search-query="searchQuery"
@@ -947,8 +947,6 @@ import { contextRegistry } from "@/composables/contextProviders";
 import {
   formatTimeWithSuffix,
   getImageURL,
-  convertTimeFromNsToMs,
-  convertTimeFromNsToUs,
 } from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
@@ -961,12 +959,16 @@ import { resolveSessionId } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
-import { createTreeVisualizationEngine } from "@/utils/traces/treeVisualizationEngine";
-import { generateTracePatternTooltipContent } from "@/utils/traces/treeTooltipHelpers";
+import type { TreeNode as PatternTreeNode } from "@/composables/useTreeVisualization";
+import type { EnrichedSpan } from "@/ts/interfaces/traces/span.types";
+import type { AcceptableValue } from "reka-ui";
+import {
+  createTreeVisualizationEngine,
+  type TreeVisualizationData,
+  type TreeNode as EngineTreeNode,
+} from "@/utils/traces/treeVisualizationEngine";
 import {
   SPAN_KIND_MAP,
-  SPAN_KIND_UNSPECIFIED,
-  SPAN_KIND_CLIENT,
 } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -1001,7 +1003,6 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { resolveSpanIdentity } from "@/utils/traces/spanIdentity";
 import {
   TRACE_SERVICE_DETECTION_KEY,
   useSpanServiceDetection,
@@ -1139,8 +1140,6 @@ export default defineComponent({
     const {
       searchObj,
       getUrlQueryParams,
-      buildQueryDetails,
-      navigateToLogs,
       navigateToCorrelatedLogs,
     } = useTraces();
 
@@ -1153,7 +1152,7 @@ export default defineComponent({
     const splitterModel = ref(25);
     const timeRange: any = ref({ start: 0, end: 0 });
     const store = useStore();
-    const { getStreams, getStream } = useStreams();
+    const { getStreams } = useStreams();
 
     // Chart renderer ref for tooltip integration
     const chartRendererRef = ref<any>(null);
@@ -1191,22 +1190,37 @@ export default defineComponent({
 
     // Computed chart options that switches between pattern and span views
     const traceServiceMapChartOptions = computed(() => {
-      // Pattern view - use new pattern-based visualization
-      const chartOptions = generateEChartsOptions(
-        {
-          treeData: patternTreeData.value,
-          getNodeLabel: getPatternNodeLabel,
-          getNodeTooltip: getPatternNodeTooltip,
-          getNodeErrorRate: getPatternNodeErrorRate,
-          getNodeServiceColor: (node: any) =>
-            searchObj.meta.serviceColors[node.name],
-        },
-        {
-          layoutType: "horizontal",
-          isDarkMode: isDarkMode.value,
-          nodeSize: "fixed",
-        },
-      );
+        // Pattern view - use new pattern-based visualization
+        // Engine TreeNode makes errorRate/children optional while the pattern
+        // callbacks (useTreeVisualization) require errorRate; adapt each call to
+        // a compatible node (errorRate defaults to 0 — pattern nodes read only
+        // name/value/metadata, never errorRate/children).
+        const toPatternNode = (node: EngineTreeNode): PatternTreeNode => ({
+          id: node.id,
+          name: node.name,
+          label: node.label,
+          value: node.value,
+          errorRate: node.errorRate ?? 0,
+          metadata: node.metadata,
+        });
+        const chartOptions = generateEChartsOptions(
+          {
+            treeData: patternTreeData.value,
+            getNodeLabel: (node: EngineTreeNode) =>
+              getPatternNodeLabel(toPatternNode(node)),
+            getNodeTooltip: (node: EngineTreeNode) =>
+              getPatternNodeTooltip(toPatternNode(node)),
+            getNodeErrorRate: (node: EngineTreeNode) =>
+              getPatternNodeErrorRate(toPatternNode(node)),
+            getNodeServiceColor: (node: EngineTreeNode) =>
+              searchObj.meta.serviceColors[node.name]
+          },
+          {
+            layoutType: 'horizontal',
+            isDarkMode: isDarkMode.value,
+            nodeSize: 'fixed'
+          }
+        );
 
       // Wrap in the format expected by ChartRenderer
       return {
@@ -1232,6 +1246,12 @@ export default defineComponent({
     };
     const parentContainer = ref<HTMLElement | null>(null);
     const traceScrollContainer = ref<HTMLElement | null>(null);
+    // TraceTree's `scrollContainer` prop is under-declared (default: null, no
+    // type → vue-tsc infers null | undefined). Forward the real element through
+    // this boundary accessor; runtime value is unchanged.
+    const scrollContainerForTree = computed(
+      () => traceScrollContainer.value as unknown as null | undefined,
+    );
     let parentHeight = ref(0);
     let currentHeight = 0;
     const updateHeight = async () => {
@@ -1247,9 +1267,9 @@ export default defineComponent({
 
     const { showErrorNotification } = useNotifications();
 
-    const logStreams = ref([]);
+    const logStreams = ref<string[]>([]);
 
-    const filteredStreamOptions = ref([]);
+    const filteredStreamOptions = ref<string[]>([]);
 
     const streamSearchValue = ref<string>("");
 
@@ -1261,6 +1281,7 @@ export default defineComponent({
 
     // ── Filter-from-trace-details state ──────────────────────────────────────
     const areFiltersAdded = ref(false);
+    const isStandaloneMode = computed(() => props.mode === "standalone");
     const showFilterPopover = ref(false);
     const filterDialogReady = ref(false);
     const localEditorValue = ref("");
@@ -1462,7 +1483,7 @@ export default defineComponent({
     // Use trace processing composable for FlameGraph
     // Pass traceTree (nested) instead of flat span list
     const treeForFlameGraph = computed(() => traceTree.value || []);
-    const flatSpans = ref([]);
+    const flatSpans = ref<EnrichedSpan[]>([]);
 
     // Calculate trace metadata for FlameGraph
     const traceMetadata = computed(() => {
@@ -1590,7 +1611,9 @@ export default defineComponent({
       () => props.spanListProp,
       (newSpanList) => {
         if (props.mode === "embedded" && newSpanList.length > 0) {
-          searchObj.data.traceDetails.spanList = newSpanList;
+          // spanList is never[] in useTraces state; widen container to accept spans.
+          (searchObj.data.traceDetails as { spanList: unknown[] }).spanList =
+            newSpanList;
           updateServiceColors();
           buildTracesTree();
         }
@@ -1609,7 +1632,10 @@ export default defineComponent({
       },
     );
 
-    const updateActiveTab = (tab: string) => {
+    const updateActiveTab = (
+      value: boolean | AcceptableValue | AcceptableValue[],
+    ) => {
+      const tab = String(value);
       activeTab.value = tab;
       if (tab === "map") {
         setupTooltips();
@@ -1634,15 +1660,12 @@ export default defineComponent({
         const chart = chartRendererRef.value?.chart;
         if (chart) {
           const { setupTraceNodeTooltips } = createTreeVisualizationEngine();
-          tooltipCleanup = setupTraceNodeTooltips(
-            chart,
-            {
-              treeData: patternTreeData.value,
-              getNodeTooltip: getPatternNodeTooltip,
-              getNodeErrorRate: getPatternNodeErrorRate,
-            },
-            isDarkMode.value,
-          );
+          // Tooltip setup never calls getNodeLabel, so it is omitted here.
+          tooltipCleanup = setupTraceNodeTooltips(chart, {
+            treeData: patternTreeData.value,
+            getNodeTooltip: getPatternNodeTooltip,
+            getNodeErrorRate: getPatternNodeErrorRate
+          } as TreeVisualizationData, isDarkMode.value);
         }
       }, 300);
     };
@@ -1728,7 +1751,9 @@ export default defineComponent({
       // If embedded mode with span list provided, skip fetching
       if (props.mode === "embedded" && props.spanListProp.length > 0) {
         // Use provided span list directly
-        searchObj.data.traceDetails.spanList = props.spanListProp;
+        // spanList is never[] in useTraces state; widen container to accept spans.
+        (searchObj.data.traceDetails as { spanList: unknown[] }).spanList =
+          props.spanListProp;
 
         // Set up minimal trace metadata from span list
         if (props.spanListProp.length > 0) {
@@ -1805,8 +1830,10 @@ export default defineComponent({
       return searchObj.data.traceDetails.showSpanDetails;
     });
 
-    const selectedSpanId = computed(() => {
-      return searchObj.data.traceDetails.selectedSpanId;
+    const selectedSpanId = computed<string | undefined>(() => {
+      // Child props declare String (string | undefined); the store keeps null —
+      // normalize null → undefined (truthy/equality checks are unchanged).
+      return searchObj.data.traceDetails.selectedSpanId ?? undefined;
     });
 
     const hoveredSpanId = ref("");
@@ -1999,7 +2026,8 @@ export default defineComponent({
             const deduplicatedTraceSpans = traceSpans.filter(
               (s: any) => !rumSpanIds.has(s.span_id),
             );
-            searchObj.data.traceDetails.spanList = [
+            // spanList is never[] in useTraces state; widen container to accept spans.
+            (searchObj.data.traceDetails as { spanList: unknown[] }).spanList = [
               ...rumSpans,
               ...deduplicatedTraceSpans,
             ];
@@ -2042,22 +2070,21 @@ export default defineComponent({
     };
 
     const updateServiceColors = () => {
-      searchObj.data.traceDetails.selectedTrace.service_name.forEach(
-        (service: any) => {
-          if (!searchObj.meta.serviceColors[service.service_name]) {
-            if (serviceColorIndex.value >= colors.value.length)
-              generateNewColor();
+      // service_name / services are stamped onto selectedTrace at runtime (see
+      // useTraces type); non-null asserts preserve the existing unguarded access.
+      const selected = searchObj.data.traceDetails.selectedTrace!;
+      selected.service_name!.forEach((service) => {
+        if (!searchObj.meta.serviceColors[service.service_name]) {
+          if (serviceColorIndex.value >= colors.value.length)
+            generateNewColor();
 
-            searchObj.meta.serviceColors[service.service_name] =
-              colors.value[serviceColorIndex.value];
+          searchObj.meta.serviceColors[service.service_name] =
+            colors.value[serviceColorIndex.value];
 
-            serviceColorIndex.value++;
-          }
-          (searchObj.data.traceDetails.selectedTrace as any).services[
-            service.service_name
-          ] = service.count;
-        },
-      );
+          serviceColorIndex.value++;
+        }
+        selected.services![service.service_name] = service.count;
+      });
     };
 
     const showTraceDetailsError = () => {
@@ -2087,7 +2114,7 @@ export default defineComponent({
     }
 
     const calculateTracePosition = () => {
-      const tics = [];
+      const tics: { value: number; label: string; left: string }[] = [];
       baseTracePosition.value["durationMs"] = timeRange.value.end;
       baseTracePosition.value["durationUs"] = timeRange.value.end * 1000;
       baseTracePosition.value["startTimeUs"] =
@@ -2862,6 +2889,7 @@ export default defineComponent({
       searchResults,
       parentContainer,
       traceScrollContainer,
+      scrollContainerForTree,
       parentHeight,
       updateHeight,
       getSpanKind,
@@ -2889,6 +2917,7 @@ export default defineComponent({
       handleDAGNodeClick,
       // Filter-from-trace-details
       areFiltersAdded,
+      isStandaloneMode,
       showFilterPopover,
       filterDialogReady,
       localEditorValue,

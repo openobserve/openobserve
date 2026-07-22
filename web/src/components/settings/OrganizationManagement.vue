@@ -71,8 +71,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @action="(id) => id === 'clear-filters' && (filterQuery = '')"
           />
         </template>
+        <template #cell-ai_credits_used="{ row }">
+          {{ formatCredits(row.credits_used) }}
+        </template>
+        <template #cell-ai_credits_total="{ row }">
+          {{ formatCredits(row.credits_limit) }}
+        </template>
         <template #cell-actions="{ row }">
           <div class="flex items-center gap-1 justify-center">
+            <OButton
+              variant="ghost"
+              size="icon-xs-circle"
+              icon-left="paid"
+              aria-label="Set AI Credits"
+              data-test="org-management-set-ai-credits-btn"
+              @click.stop="toggleAiCreditsDialog(row)"
+            >
+              <OTooltip content="Set AI Credits" />
+            </OButton>
             <OButton
               variant="ghost"
               size="icon-xs-circle"
@@ -179,6 +195,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OForm>
     </ODialog>
 
+    <!-- AI Credit Allowance Dialog -->
+    <ODialog
+      data-test="organization-management-ai-credits-dialog"
+      v-model:open="aiCreditsPrompt"
+      size="sm"
+      :title="`Set AI Credits for ${aiCreditsDataRow?.name}`"
+      sub-title="Set the organization's lifetime AI credit allowance."
+      :secondary-button-label="t('common.cancel')"
+      primary-button-label="Save Credits"
+      form-id="org-ai-credits-form"
+      @click:secondary="aiCreditsPrompt = false"
+    >
+      <OForm
+        id="org-ai-credits-form"
+        :schema="aiCreditsSchema"
+        :default-values="aiCreditsFormDefaults"
+        @submit="submitAiCredits"
+      >
+        <div class="flex flex-col gap-3">
+          <OFormInput
+            name="creditsLimit"
+            type="number"
+            data-test="ai-credits-limit-input"
+            label="Total AI Credits"
+            required
+          />
+          <div class="text-xs text-text-secondary">
+            Currently used: {{ formatCredits(aiCreditsDataRow?.credits_used) }} credits
+          </div>
+        </div>
+      </OForm>
+    </ODialog>
+
     <!-- External Contract Dialog -->
     <ODialog
       data-test="organization-management-contract-dialog"
@@ -252,8 +301,11 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import {
   makeContractSchema,
+  aiCreditsDefaults,
+  aiCreditsSchema,
   contractDefaults,
   extendTrialSchema,
+  type AiCreditsForm,
   type ContractForm,
   type ExtendTrialForm,
 } from "./OrganizationManagement.schema";
@@ -284,6 +336,13 @@ export default defineComponent({
     const tabledata = ref<any>([]);
     const resultTotal = ref(0);
     const filterQuery = ref("");
+
+    // AI credit allowance state
+    const aiCreditsPrompt = ref(false);
+    const aiCreditsDataRow = ref<any>({});
+    const aiCreditsFormDefaults = computed(() =>
+      aiCreditsDefaults(aiCreditsDataRow.value?.credits_limit ?? 0),
+    );
 
     // Contract management state
     const contractPrompt = ref(false);
@@ -368,6 +427,26 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "ai_credits_used",
+        header: "AI Credits Used",
+        accessorKey: "credits_used",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
+        id: "ai_credits_total",
+        header: "AI Credits Total",
+        accessorKey: "credits_limit",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.count,
+        meta: { align: "right" },
+      },
+      {
         id: "created_on",
         header: t("settings.created_on"),
         accessorKey: "created_at",
@@ -402,8 +481,8 @@ export default defineComponent({
         header: t("settings.actions"),
         isAction: true,
         pinned: "right",
-        size: 220,
-        meta: { align: "center", actionCount: 3 },
+        size: 240,
+        meta: { align: "center", actionCount: 5 },
       },
     ];
 
@@ -418,6 +497,9 @@ export default defineComponent({
       if (!micros || micros <= 0) return "-";
       return timestampToTimezoneDate(micros, "UTC", "yyyy-MM-dd");
     };
+
+    const formatCredits = (credits: number | undefined): string =>
+      Number(credits ?? 0).toLocaleString();
 
     const dateToMicros = (dateStr: string): number => {
       // Treat the picked date as end-of-day UTC so selecting today is still in the future.
@@ -447,6 +529,8 @@ export default defineComponent({
               identifier: responseData[i].identifier,
               plan: subscriptionPlans[responseData[i].plan],
               billing_provider: responseData[i].billing_provider || "-",
+              credits_used: Number(responseData[i].credits_used ?? 0),
+              credits_limit: Number(responseData[i].credits_limit ?? 0),
               created_at: timestampToTimezoneDate(
                 responseData[i].created_at,
                 "UTC",
@@ -488,6 +572,47 @@ export default defineComponent({
     const toggleExtendTrialDialog = (row: any) => {
       extendTrialPrompt.value = true;
       extendTrialDataRow.value = row;
+    };
+
+    const toggleAiCreditsDialog = (row: any) => {
+      aiCreditsDataRow.value = row;
+      aiCreditsPrompt.value = true;
+    };
+
+    const submitAiCredits = async (value: AiCreditsForm) => {
+      loading.value = true;
+      const dismiss = toast({
+        variant: "loading",
+        message: "Updating AI credits...",
+        timeout: 0,
+      });
+
+      try {
+        const response = await OrganizationServices.set_ai_usage_limit(
+          store.state.selectedOrganization.identifier,
+          {
+            org_id: aiCreditsDataRow.value.identifier,
+            credits_limit: Number(value.creditsLimit),
+          },
+        );
+        aiCreditsDataRow.value.credits_used = response.data.credits_used;
+        aiCreditsDataRow.value.credits_limit = response.data.credits_limit;
+        aiCreditsPrompt.value = false;
+        toast({
+          variant: "success",
+          message: "AI credits updated successfully.",
+        });
+      } catch (error: any) {
+        toast({
+          variant: "error",
+          message:
+            error.response?.data?.message || "Failed to update AI credits.",
+          timeout: 5000,
+        });
+      } finally {
+        loading.value = false;
+        dismiss();
+      }
     };
 
     const getTimestampInMicroseconds = (weeks: number) =>
@@ -742,6 +867,12 @@ export default defineComponent({
       extendTrialPrompt,
       toggleExtendTrialDialog,
       extendTrialDataRow,
+      aiCreditsPrompt,
+      aiCreditsDataRow,
+      aiCreditsFormDefaults,
+      aiCreditsSchema,
+      toggleAiCreditsDialog,
+      submitAiCredits,
       updateTrialPeriod,
       getData,
       getTimestampInMicroseconds,
@@ -753,6 +884,7 @@ export default defineComponent({
       confirmRevokeContract,
       toggleOrgStorage,
       formatMicrosToDate,
+      formatCredits,
       filterQuery,
       filterData,
       visibleRows,

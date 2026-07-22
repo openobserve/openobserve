@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import { flushPromises } from "@vue/test-utils";
 
@@ -85,12 +84,9 @@ Object.defineProperty(window, 'Worker', {
 });
 vi.stubGlobal('Worker', WorkerConstructor);
 
-import useHttpStreaming from "./useStreamingSearch";
 import { attemptTokenRefresh } from "@/services/http";
 
 describe("useHttpStreaming", () => {
-
-let onDataSpy: any;
 
   beforeEach(async () => {
     // Reset modules to clear the module-scoped streamWorker variable
@@ -123,7 +119,7 @@ let onDataSpy: any;
     // IMPORTANT: mock these if your composable uses `ref({})` internally
     httpStreaming.abortControllers.value = {};
     httpStreaming.traceMap.value = {};
-    onDataSpy = vi.spyOn(httpStreaming, "onData");
+    vi.spyOn(httpStreaming, "onData");
   });
 
   afterEach(() => {
@@ -163,7 +159,7 @@ let onDataSpy: any;
     };
     // TODO: Fix Worker mocking - the module-scoped streamWorker variable makes it difficult to properly mock
     it.skip("should successfully initiate a stream connection", async () => {
-        const onErrorSpy = vi.spyOn(httpStreaming, "onError");
+        vi.spyOn(httpStreaming, "onError");
 
         const mockStream = new MockReadableStream();
         const mockResponse = {
@@ -223,7 +219,7 @@ let onDataSpy: any;
       });
 
       it("should throw an error when the stream connection fails", async () => {
-        const onErrorSpy = vi.spyOn(httpStreaming, "onError");
+        vi.spyOn(httpStreaming, "onError");
       
         const mockStream = new MockReadableStream();
         const mockResponse = {
@@ -295,7 +291,7 @@ let onDataSpy: any;
           throw mockNetworkError;
         });
       
-        const onErrorSpy = vi.spyOn(httpStreaming, "onError");
+        vi.spyOn(httpStreaming, "onError");
         httpStreaming.traceMap.value[mockData.traceId] = {
           data: [],
           error: [mockHandlers.error],
@@ -331,7 +327,7 @@ let onDataSpy: any;
 
 
         const streamData = { ...mockData, traceId };
-        const streamPromise = httpStreaming.fetchQueryDataWithHttpStream(streamData, mockHandlers);
+        httpStreaming.fetchQueryDataWithHttpStream(streamData, mockHandlers);
 
         // Wait for worker to be initialized
         await flushPromises();
@@ -387,7 +383,7 @@ let onDataSpy: any;
         mockFetch.mockResolvedValueOnce(mockResponse);
 
         const streamData = { ...mockData, traceId: traceId1 };
-        const streamPromise = httpStreaming.fetchQueryDataWithHttpStream(streamData, mockHandlers);
+        httpStreaming.fetchQueryDataWithHttpStream(streamData, mockHandlers);
 
         // Wait for worker to be initialized
         await flushPromises();
@@ -436,7 +432,7 @@ let onDataSpy: any;
         mockFetch.mockResolvedValueOnce(mockResponse);
 
         const streamData = { ...mockData, traceId: traceId1 };
-        const streamPromise = httpStreaming.fetchQueryDataWithHttpStream(streamData, mockHandlers);
+        httpStreaming.fetchQueryDataWithHttpStream(streamData, mockHandlers);
 
         // Wait for worker to be initialized
         await flushPromises();

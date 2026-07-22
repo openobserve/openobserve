@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "office365";
-const store = useStore();
-const { endpoint, securityContent, securityDocURLs } = useIngestion();
+const { securityContent, securityDocURLs } = useIngestion();
 const content = securityContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = securityDocURLs[name];
 </script>

@@ -18,6 +18,6 @@ export const makeExternalDestinationSchema = (t: (_key: string) => string) =>
       .min(1, t("pipeline.selectExternalDestination")),
   });
 
-export type ExternalDestinationForm = z.infer<
-  ReturnType<typeof makeExternalDestinationSchema>
->;
+export type ExternalDestinationForm = {
+  selectedDestination: string;
+};

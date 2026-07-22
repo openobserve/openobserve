@@ -494,10 +494,11 @@ export default defineComponent({
           emit("update:list");
         }
       } catch (error) {
-        if (error.response.status != 403) {
+        const e = error as { response: { status: number; data?: { message?: string } } };
+        if (e.response.status != 403) {
           toast({
             message:
-              error.response?.data?.message ||
+              e.response?.data?.message ||
               (props.isEdit
                 ? t("settings.addRegexPattern.updateFailed")
                 : t("settings.addRegexPattern.createFailed")),
@@ -527,8 +528,9 @@ export default defineComponent({
           response.data.results[0],
         );
       } catch (error) {
+        const e = error as { response?: { data?: { message?: string } } };
         toast({
-          message: error.response?.data?.message || t("settings.addRegexPattern.testFailed"),
+          message: e.response?.data?.message || t("settings.addRegexPattern.testFailed"),
           variant: "error",
         });
       } finally {

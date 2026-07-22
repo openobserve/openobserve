@@ -216,7 +216,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -237,7 +236,6 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
-    OSpinner,
     OSearchInput,
     OTooltip,
     OIcon,
@@ -484,7 +482,9 @@ export default defineComponent({
       return formatToReadable(timestamp);
     };
 
-    const formatDimensions = (dimensions: Record<string, string>) => {
+    const formatDimensions = (
+      dimensions: Record<string, string> | undefined,
+    ) => {
       if (!dimensions || Object.keys(dimensions).length === 0) {
         return "Unknown";
       }
@@ -493,7 +493,9 @@ export default defineComponent({
         .join(", ");
     };
 
-    const getSortedDimensions = (dimensions: Record<string, string>) => {
+    const getSortedDimensions = (
+      dimensions: Record<string, string> | undefined,
+    ) => {
       if (!dimensions || Object.keys(dimensions).length === 0) return [];
       return Object.keys(dimensions)
         .sort()

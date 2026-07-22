@@ -79,12 +79,6 @@ interface RawBooleanSplitRow {
   healthy?: number | string;
 }
 
-interface RawBooleanTrendRow {
-  bucket?: string | number;
-  total?: number | string;
-  trues?: number | string;
-}
-
 function valueOf<T = any>(
   row: any,
   camel: string,

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import config from "../aws-exports";
 
 const organizations = {
   os_list: (
@@ -23,7 +22,7 @@ const organizations = {
     sort_by: string,
     desc: boolean,
     name: string,
-    org_identifier: string,
+    _org_identifier: string,
   ) => {
     return http().get(
       `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
@@ -87,6 +86,12 @@ const organizations = {
   },
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
+  },
+  set_ai_usage_limit: (
+    orgIdentifier: string,
+    data: { org_id: string; credits_limit: number },
+  ) => {
+    return http().put(`/api/${orgIdentifier}/ai/usage_limit`, data);
   },
   rename_organization: (orgIdentifier: string, newOrgName: string) => {
     return http().put(`/api/${orgIdentifier}/rename`, {

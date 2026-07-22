@@ -51,6 +51,7 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use serde_json::Map;
 
+pub mod agent_signals;
 pub mod inferred;
 pub mod otel;
 pub mod schema_compat;

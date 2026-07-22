@@ -1,11 +1,9 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import SearchHistory from "./SearchHistory.vue";
 import searchService from "@/services/search";
-import useLogs from "@/composables/useLogs";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter } from "vue-router";
 
 // Mock Toast
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -307,11 +305,6 @@ describe("SearchHistory Component", () => {
 
   describe("UI Elements", () => {
     it("shows expanded row details correctly", async () => {
-      const testRow = {
-        uuid: "test-uuid",
-        sql: "SELECT * FROM logs"
-      };
-
       wrapper.vm.onExpandedIdsChange(["test-uuid"]);
       expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
     });

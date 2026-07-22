@@ -28,7 +28,6 @@ vi.mock('@/aws-exports', () => ({
 vi.mock('@/utils/zincutils', () => ({
   getIngestionURL: vi.fn(),
   getEndPoint: vi.fn(),
-  b64EncodeStandard: vi.fn(),
 }))
 
 // Mock ContentCopy component
@@ -43,8 +42,7 @@ vi.mock('@/components/CopyContent.vue', () => ({
 // Import the actual module to get the mocked functions
 import * as zincutils from '@/utils/zincutils'
 const mockGetIngestionURL = vi.mocked(zincutils.getIngestionURL)
-const mockGetEndPoint = vi.mocked(zincutils.getEndPoint)  
-const mockB64EncodeStandard = vi.mocked(zincutils.b64EncodeStandard)
+const mockGetEndPoint = vi.mocked(zincutils.getEndPoint)
 
 describe('OtelConfig.vue', () => {
   let wrapper: VueWrapper<any>
@@ -72,7 +70,6 @@ describe('OtelConfig.vue', () => {
     // Setup default mock returns
     mockGetIngestionURL.mockReturnValue('https://localhost:5080')
     mockGetEndPoint.mockReturnValue(mockEndpoint)
-    mockB64EncodeStandard.mockReturnValue('dGVzdEBleGFtcGxlLmNvbTpwYXNzY29kZQ==')
   })
 
   afterEach(() => {
@@ -152,31 +149,6 @@ describe('OtelConfig.vue', () => {
     })
   })
 
-  describe('Store Integration', () => {
-    it('should access Vuex store correctly', () => {
-      wrapper = createWrapper()
-      const vm = wrapper.vm
-      
-      expect(vm.store).toBeDefined()
-      expect(vm.store.state).toBeDefined()
-      expect(vm.store.state.organizationData).toBeDefined()
-    })
-
-    it('should use organization passcode from store', () => {
-      store.state.organizationData.organizationPasscode = 'test-passcode'
-      wrapper = createWrapper()
-      
-      // Access the computed property to trigger the function call
-      const vm = wrapper.vm
-      const accessKey = vm.accessKey
-      
-      // Verify that b64EncodeStandard is called with correct parameters
-      expect(mockB64EncodeStandard).toHaveBeenCalledWith(
-        'test@example.com:test-passcode'
-      )
-    })
-  })
-
   describe('Utility Functions Integration', () => {
     it('should call getIngestionURL on mount', () => {
       wrapper = createWrapper()
@@ -232,61 +204,6 @@ describe('OtelConfig.vue', () => {
       expect(vm.endpoint.host).toBe('custom')
       expect(vm.endpoint.port).toBe('8080')
       expect(vm.endpoint.protocol).toBe('http')
-    })
-  })
-
-  describe('Access Key Computed Property', () => {
-    it('should compute access key correctly', () => {
-      store.state.organizationData.organizationPasscode = 'test-passcode'
-      wrapper = createWrapper()
-      const vm = wrapper.vm
-      
-      expect(vm.accessKey).toBe('dGVzdEBleGFtcGxlLmNvbTpwYXNzY29kZQ==')
-    })
-
-    it('should update when user email changes', async () => {
-      // Ensure passcode is empty for this test
-      store.state.organizationData.organizationPasscode = ''
-      wrapper = createWrapper({ currUserEmail: 'new-user@example.com' })
-      
-      // Access the computed property to trigger the function call
-      const vm = wrapper.vm
-      const accessKey = vm.accessKey
-      
-      expect(mockB64EncodeStandard).toHaveBeenCalledWith(
-        'new-user@example.com:'
-      )
-    })
-
-    it('should update when organization passcode changes', async () => {
-      wrapper = createWrapper()
-      
-      // Clear previous mock calls
-      mockB64EncodeStandard.mockClear()
-      
-      // Change store state
-      store.state.organizationData.organizationPasscode = 'new-passcode'
-      await wrapper.vm.$nextTick()
-      
-      // Access the computed property to trigger recalculation
-      const vm = wrapper.vm
-      const accessKey = vm.accessKey
-      
-      // Verify that b64EncodeStandard is called with the updated passcode
-      expect(mockB64EncodeStandard).toHaveBeenCalledWith(
-        'test@example.com:new-passcode'
-      )
-    })
-
-    it('should handle empty passcode', () => {
-      store.state.organizationData.organizationPasscode = ''
-      wrapper = createWrapper()
-      
-      // Access the computed property to trigger the function call
-      const vm = wrapper.vm
-      const accessKey = vm.accessKey
-      
-      expect(mockB64EncodeStandard).toHaveBeenCalledWith('test@example.com:')
     })
   })
 
@@ -457,20 +374,6 @@ service:
       expect(vm.getOtelHttpConfig).toContain('/api/updated-org')
       expect(vm.getOtelGrpcConfig).toContain('organization: updated-org')
     })
-
-    it('should update access key when user email changes', async () => {
-      // Ensure passcode is empty for this test
-      store.state.organizationData.organizationPasscode = ''
-      wrapper = createWrapper({ currUserEmail: 'initial@example.com' })
-      
-      await wrapper.setProps({ currUserEmail: 'updated@example.com' })
-      
-      // Access the computed property to trigger the function call
-      const vm = wrapper.vm
-      const accessKey = vm.accessKey
-      
-      expect(mockB64EncodeStandard).toHaveBeenCalledWith('updated@example.com:')
-    })
   })
 
   describe('Edge Cases', () => {
@@ -482,36 +385,12 @@ service:
       expect(vm.getOtelGrpcConfig).toContain('organization: null')
     })
 
-    it('should handle null user email', () => {
-      // Ensure passcode is empty for this test
-      store.state.organizationData.organizationPasscode = ''
-      wrapper = createWrapper({ currUserEmail: null })
-      
-      // Access the computed property to trigger the function call
-      const vm = wrapper.vm
-      const accessKey = vm.accessKey
-      
-      expect(mockB64EncodeStandard).toHaveBeenCalledWith('null:')
-    })
-
     it('should handle special characters in organization identifier', () => {
       wrapper = createWrapper({ currOrgIdentifier: 'org-with-special@chars#123' })
       const vm = wrapper.vm
       
       expect(vm.getOtelHttpConfig).toContain('/api/org-with-special@chars#123')
       expect(vm.getOtelGrpcConfig).toContain('organization: org-with-special@chars#123')
-    })
-
-    it('should handle special characters in user email', () => {
-      // Ensure passcode is empty for this test
-      store.state.organizationData.organizationPasscode = ''
-      wrapper = createWrapper({ currUserEmail: 'user+test@example-domain.com' })
-      
-      // Access the computed property to trigger the function call
-      const vm = wrapper.vm
-      const accessKey = vm.accessKey
-      
-      expect(mockB64EncodeStandard).toHaveBeenCalledWith('user+test@example-domain.com:')
     })
   })
 
@@ -537,13 +416,6 @@ service:
       const exposedData = wrapper.vm
       
       expect(exposedData.ingestionURL).toBe('https://localhost:5080')
-    })
-
-    it('should expose accessKey computed', () => {
-      wrapper = createWrapper()
-      const exposedData = wrapper.vm
-      
-      expect(exposedData.accessKey).toBe('dGVzdEBleGFtcGxlLmNvbTpwYXNzY29kZQ==')
     })
 
     it('should expose getOtelGrpcConfig computed', () => {

@@ -91,8 +91,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       @generation-end="handleGenerationEnd"
                       @generation-success="handleGenerationSuccess"
                     />
+                    <!-- Typewriter placeholder for an empty editor.
+                         Deliberately NOT gated on `!forcedLanguage`: a forced
+                         language is no reason to drop the placeholder. transType
+                         is locked to the forced language (see the mounted hook),
+                         so the ternary below still picks the right one, and
+                         `!formData.function` already hides this whenever a host
+                         seeded `defaultCode`. Excluding forced hosts left the
+                         pipeline Function node with a blank editor — it forces
+                         vrl but passes no defaultCode. -->
                     <div
-                      v-if="!formData.function && functionEditorPlaceholderFlag && !forcedLanguage"
+                      v-if="!formData.function && functionEditorPlaceholderFlag"
                       class="absolute inset-0 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] pointer-events-none z-1 select-none"
                     >
                       <span class="font-mono text-[var(--text-sm)] [line-height:1.3125rem] text-text-placeholder whitespace-nowrap overflow-hidden [text-overflow:ellipsis]">{{
@@ -241,9 +250,6 @@ export default defineComponent({
   components: {
     OSplitter,
     OForm,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
     UnifiedQueryEditor: defineAsyncComponent(
       () => import("@/components/QueryEditor.vue"),
     ),
@@ -559,7 +565,9 @@ export default defineComponent({
     };
 
     // Unified Query Editor: Handle language change
-    const handleLanguageChange = (newLanguage: 'vrl' | 'javascript') => {
+    const handleLanguageChange = (
+      newLanguage: 'sql' | 'promql' | 'vrl' | 'javascript',
+    ) => {
       // transType is form-owned — write it straight to the form; the useStore
       // reads above make the editor + tooltip react.
       const tt = newLanguage === 'javascript' ? '1' : '0';

@@ -250,7 +250,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  onBeforeMount,
   watch,
   defineAsyncComponent,
   computed,
@@ -262,9 +261,6 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { useI18n } from "vue-i18n";
-import alertsService from "@/services/alerts";
-import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
 import NoData from "@/components/shared/grid/NoData.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -275,7 +271,7 @@ import {
   verifyOrganizationStatus,
   convertUnixToDateFormat,
 } from "@/utils/zincutils";
-import type { Alert, AlertListItem } from "@/ts/interfaces/index";
+import type { Alert } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import actions from "@/services/action_scripts";
 import useActions from "@/composables/useActions";
@@ -285,7 +281,6 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -325,7 +320,6 @@ export default defineComponent({
     OSpinner,
     OInput,
     OSearchInput,
-    OCheckbox,
     OTooltip,
     OSelect,
     OForm,
@@ -346,7 +340,6 @@ export default defineComponent({
     const alerts: Ref<Alert[]> = ref([]);
     const actionsScriptRows: Ref<ActionScriptList[]> = ref([]);
     const formData: Ref<Alert | {}> = ref({});
-    const toBeClonedAlert: Ref<Alert | {}> = ref({});
     const showAddActionScriptDialog: any = ref(false);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
@@ -367,6 +360,9 @@ export default defineComponent({
 
     const { getStreams } = useStreams();
 
+    // Clone-dialog bindings referenced by the template; nothing opens the dialog yet.
+    const showForm = ref(false);
+    const submitForm = () => {};
     const toBeCloneAlertName = ref("");
     const toBeCloneUUID = ref("");
     const toBeClonestreamType = ref("");
@@ -731,22 +727,6 @@ export default defineComponent({
       }
     };
 
-    const filterColumns = (options: any[], val: String, update: Function) => {
-      let filteredOptions: any[] = [];
-      if (val === "") {
-        update(() => {
-          filteredOptions = [...options];
-        });
-        return filteredOptions;
-      }
-      update(() => {
-        const value = val.toLowerCase();
-        filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1,
-        );
-      });
-      return filteredOptions;
-    };
     const updateStreamName = (selectedOption: any) => {
       toBeClonestreamName.value = selectedOption;
     };
@@ -780,20 +760,6 @@ export default defineComponent({
         .catch(() => Promise.reject())
         .finally(() => (isFetchingStreams.value = false));
     };
-    const filterStreams = (val: string, update: any) => {
-      streamNames.value = filterColumns(indexOptions.value, val, update);
-    };
-
-    const routeTo = (name: string) => {
-      router.push({
-        name: name,
-        query: {
-          action: "add",
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
-    };
-
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
       terms = terms.toLowerCase();
@@ -851,6 +817,10 @@ export default defineComponent({
       showDeleteDialogFn,
       maxRecordToReturn,
       showAddActionScriptDialog,
+      showForm,
+      submitForm,
+      updateStreams,
+      updateStreamName,
       toBeCloneAlertName,
       toBeCloneUUID,
       toBeClonestreamType,

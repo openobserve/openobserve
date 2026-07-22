@@ -168,6 +168,7 @@ import { useI18n } from "vue-i18n";
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -270,14 +271,14 @@ function ensureScorerEnvelope(item: any): Record<string, any> {
   return item.scorer;
 }
 
-function updateName(itemIndex: number, value: string) {
+function updateName(itemIndex: number, value: string | number) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].name = value;
   syncEditor(arr);
 }
 
-function updateType(itemIndex: number, value: ScorerType) {
+function updateType(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -285,7 +286,7 @@ function updateType(itemIndex: number, value: ScorerType) {
   syncEditor(arr);
 }
 
-function updateScoreConfigRef(itemIndex: number, value: string) {
+function updateScoreConfigRef(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -298,7 +299,7 @@ function updateScoreConfigRef(itemIndex: number, value: string) {
   syncEditor(arr);
 }
 
-function updateProviderRef(itemIndex: number, value: string) {
+function updateProviderRef(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -338,7 +339,6 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     for (const e of item.errors) {
       const raw: any = rawItems[e.itemIndex] ?? {};
       const scorer = raw.scorer ?? raw;
-      const params = scorer?.params ?? {};
 
       if ((e.field === "name" || e.field === "nameConflict") && nameFixers[e.itemIndex] === undefined) {
         nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";

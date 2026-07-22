@@ -322,6 +322,9 @@
   --color-label-chip-url-text:   #575FC5;
   --color-label-chip-num-bg:     #FFF4EB;
   --color-label-chip-num-text:   #A14916;
+  /* Amber highlight for pattern variables (inline masks) */
+  --color-pattern-var-bg:        #F8D88A;
+  --color-pattern-var-text:      #7A4D00;
   --color-label-chip-float-bg:   #FFF4EB;
   --color-label-chip-float-text: #A14916;
   --color-label-chip-hex-bg:     #FFFAEB;

@@ -15,7 +15,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
-import { ref, reactive } from "vue";
+import { reactive } from "vue";
 
 // Create reactive mock data that mimics the real composable structure
 const createMockDashboardPanelData = () =>

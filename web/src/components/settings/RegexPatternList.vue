@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { ref, onMounted, watch, defineComponent, computed } from "vue";
+import { ref, onMounted, defineComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { convertUnixToDateFormat } from "@/utils/zincutils";

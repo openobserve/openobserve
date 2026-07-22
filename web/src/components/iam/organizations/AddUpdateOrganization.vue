@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="showLabelOnTop mt-2"
           :help-text="t('organization.nameHelpText')"
           data-test="org-name"
-          maxlength="100"
+          :maxlength="100"
         />
 
         <OFormCheckbox
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed } from "vue";
+import { defineComponent, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";

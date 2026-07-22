@@ -97,9 +97,38 @@ pub enum Error {
     OtherError(#[from] anyhow::Error),
     #[error("Expired Trial Period")]
     TrialPeriodExpired,
+    #[error("QueueError# {0}")]
+    QueueError(#[from] QueueError),
 }
 
 unsafe impl Send for Error {}
+
+#[derive(ThisError, Debug)]
+pub enum QueueError {
+    #[error("queue topic {0} not found, create it first")]
+    TopicNotFound(String),
+    #[error("queue topic {0} already exists with a different configuration")]
+    TopicConfigConflict(String),
+    #[error("queue topic {0} already has an active consumer")]
+    ConsumerAlreadyActive(String),
+    #[error(
+        "queue message too large: requested {requested_bytes} bytes exceeds the total queue capacity {limit_bytes} bytes"
+    )]
+    MessageTooLarge {
+        requested_bytes: u64,
+        limit_bytes: u64,
+    },
+    #[error(
+        "queue full: requested {requested_bytes} bytes, used {used_bytes} of {limit_bytes} bytes"
+    )]
+    QueueFull {
+        requested_bytes: u64,
+        used_bytes: u64,
+        limit_bytes: u64,
+    },
+    #[error("queue is closed")]
+    QueueClosed,
+}
 
 #[derive(ThisError, Debug)]
 #[error("cannot parse \"{value}\" as {ty}")]

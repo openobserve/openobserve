@@ -249,7 +249,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch, onMounted } from "vue";
+import { computed, defineComponent, ref, watch, onMounted, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -260,6 +260,16 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import DOMPurify from "dompurify";
 import { copyToClipboard } from "@/utils/clipboard";
+
+interface QueryInspectorQuery {
+  originalQuery: string;
+  query: string;
+  tabName?: string;
+  queryType?: string;
+  startTime?: number;
+  endTime?: number;
+  variables?: { type: string; [key: string]: unknown }[];
+}
 
 export default defineComponent({
   name: "QueryInspector",
@@ -273,7 +283,7 @@ export default defineComponent({
       default: false,
     },
     metaData: {
-      type: Object,
+      type: Object as PropType<Record<string, any> | null>,
       required: true,
     },
     data: {
@@ -284,14 +294,16 @@ export default defineComponent({
   setup(props: any) {
     const { t } = useI18n();
     const store = useStore();
-    const queryData = computed(() => props.metaData?.queries || []);
+    const queryData = computed<QueryInspectorQuery[]>(
+      () => props.metaData?.queries || [],
+    );
     const searchQuery = ref("");
     const colorizedQueries = ref<Record<string, string>>({});
 
     const totalQueries = computed(() => queryData.value.length);
     const dataTitle = computed(() => props.data.title);
 
-    const formatTimestamp = (ts: number) => {
+    const formatTimestamp = (ts: number | undefined) => {
       if (!ts) return "-";
       const formatted = timestampToTimezoneDate(
         ts / 1000,
@@ -337,7 +349,10 @@ export default defineComponent({
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
 
-    const highlightSearch = (html: string, isColorized: boolean) => {
+    const highlightSearch = (
+      html: string | undefined,
+      isColorized: boolean,
+    ) => {
       if (!html) return "";
       const safeHtml = isColorized
         ? DOMPurify.sanitize(html)
@@ -361,7 +376,7 @@ export default defineComponent({
       }
     };
 
-    const getQueryTypeDisplay = (queryType: string) => {
+    const getQueryTypeDisplay = (queryType: string | undefined) => {
       if (!queryType) return "SQL";
       const type = queryType.toLowerCase();
       if (type === "sql") return "SQL";
@@ -369,7 +384,7 @@ export default defineComponent({
       return queryType.toUpperCase();
     };
 
-    const copyText = (text: string) => {
+    const copyText = (text: string | undefined) => {
       if (!text) return;
       copyToClipboard(text, { silent: true });
     };

@@ -271,7 +271,10 @@ class="mr-1" />
         class="relative"
         :style="{ height: totalSize + 'px' }"
       >
-        <template v-for="virtualRow in virtualRows" :key="virtualRow.id">
+        <template
+          v-for="virtualRow in virtualRows"
+          :key="formattedRows[virtualRow.index]?.id"
+        >
           <tr
             :data-test="`logs-search-result-detail-${
               (tableRows[virtualRow.index] as any)[
@@ -449,13 +452,13 @@ class="mr-1" />
                 </template>
                 <span
                   v-if="
-                    processedResults[
+                    processedResultsMap[
                       `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                     ]
                   "
                   :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
                   v-html="
-                    processedResults[
+                    processedResultsMap[
                       `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                     ]
                   "
@@ -498,6 +501,7 @@ import {
   FlexRender,
   type ColumnDef,
   type SortingState,
+  type TableOptionsWithReactiveData,
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
@@ -577,7 +581,8 @@ const props = defineProps({
     required: false,
   },
   selectedStreamFtsKeys: {
-    type: Array as PropType<StreamField[]>,
+    // Receives field-name strings (see SearchResult selectedStreamFullTextSearchKeys).
+    type: Array as PropType<string[]>,
     default: () => [],
   },
   selectedStreamFields: {
@@ -622,8 +627,13 @@ const emits = defineEmits([
 const sorting = ref<SortingState>([]);
 
 const store = useStore();
-const { isFTSColumn } = useTextHighlighter();
+useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
+
+// Typed view of the highlighter cache for indexed template lookups.
+const processedResultsMap = computed<Record<string, string>>(
+  () => processedResults.value,
+);
 
 const getSortingHandler = (e: Event, fn: any) => {
   return fn(e);
@@ -782,7 +792,9 @@ let table: any = useVueTable({
   },
   columnResizeMode,
   enableColumnResizing: true,
-});
+  // aggregationFns et al. are injected by TanStack's feature models at runtime;
+  // its option type marks them required, so assert the reactive-data shape.
+} as TableOptionsWithReactiveData<Record<string, unknown>>);
 
 const columnSizeVars = computed(() => {
   const headers = table?.getFlatHeaders();
@@ -862,7 +874,7 @@ const isResizingHeader = ref(false);
 
 const headerGroups = computed(() => table?.getHeaderGroups()[0]);
 
-const headers = computed(() => headerGroups.value.headers);
+const headers = computed<any[]>(() => headerGroups.value.headers);
 
 // Skeleton loading helpers — mirrors OTable shimmer pattern
 const SKEL_ROW_COUNT = 30;

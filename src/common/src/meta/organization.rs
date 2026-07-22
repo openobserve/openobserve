@@ -181,6 +181,10 @@ pub struct AllOrgListDetails {
     pub org_type: String,
     #[serde(default)]
     pub plan: i32,
+    #[cfg(feature = "cloud")]
+    pub credits_used: u64,
+    #[cfg(feature = "cloud")]
+    pub credits_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -212,6 +216,13 @@ pub struct AllOrganizationResponse {
 pub struct ExtendTrialPeriodRequest {
     pub org_id: String,
     pub new_end_date: i64,
+}
+
+#[cfg(feature = "cloud")]
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct SetAiUsageLimitRequest {
+    pub org_id: String,
+    pub credits_limit: u64,
 }
 
 #[cfg(feature = "cloud")]
@@ -791,6 +802,10 @@ mod tests {
             updated_at: 1640995260,
             org_type: "standard".to_string(),
             plan: Default::default(),
+            #[cfg(feature = "cloud")]
+            credits_used: 125,
+            #[cfg(feature = "cloud")]
+            credits_limit: 1_000,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -843,6 +858,10 @@ mod tests {
             updated_at: 1640995260,
             org_type: "basic".to_string(),
             plan: 0,
+            #[cfg(feature = "cloud")]
+            credits_used: 0,
+            #[cfg(feature = "cloud")]
+            credits_limit: 1_000,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -860,6 +879,10 @@ mod tests {
             updated_at: 1640995360,
             org_type: "premium".to_string(),
             plan: 1,
+            #[cfg(feature = "cloud")]
+            credits_used: 250,
+            #[cfg(feature = "cloud")]
+            credits_limit: 2_500,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -888,6 +911,17 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
+    }
+
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn test_set_ai_usage_limit_request_roundtrip() {
+        let json = r#"{"org_id":"org-ai","credits_limit":2500}"#;
+        let request: SetAiUsageLimitRequest = serde_json::from_str(json).unwrap();
+
+        assert_eq!(request.org_id, "org-ai");
+        assert_eq!(request.credits_limit, 2_500);
+        assert_eq!(serde_json::to_string(&request).unwrap(), json);
     }
 
     #[cfg(feature = "cloud")]
@@ -932,6 +966,10 @@ mod tests {
             updated_at: 1640995260,
             org_type: "custom".to_string(),
             plan: 3, // ExternalContract
+            #[cfg(feature = "cloud")]
+            credits_used: 400,
+            #[cfg(feature = "cloud")]
+            credits_limit: 5_000,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -945,6 +983,11 @@ mod tests {
         assert_eq!(v["contract_end_date"], 1893456000000000_i64);
         assert_eq!(v["billing_provider"], "no_op");
         assert_eq!(v["plan"], 3);
+        #[cfg(feature = "cloud")]
+        {
+            assert_eq!(v["credits_used"], 400);
+            assert_eq!(v["credits_limit"], 5_000);
+        }
 
         let without_contract = AllOrgListDetails {
             id: 8,
@@ -954,6 +997,10 @@ mod tests {
             updated_at: 1640995260,
             org_type: "custom".to_string(),
             plan: 0,
+            #[cfg(feature = "cloud")]
+            credits_used: 0,
+            #[cfg(feature = "cloud")]
+            credits_limit: 1_000,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),

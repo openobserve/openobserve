@@ -34,7 +34,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :key="labelFilterKey(filter)"
         type="fieldTag"
         value="primarysm"
-        shape="rounded-default"
         class="max-w-62.5"
       >
         <span class="font-mono text-xs truncate"
@@ -70,7 +69,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         type="fieldTag"
         value="primarysm"
-        shape="rounded-default"
         class="min-w-0 max-w-62.5"
         :data-test="`metrics-explorer-label-chip-${filter.label}`"
       >
@@ -105,7 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       type="countChip"
       value="neutral"
       size="sm"
-      shape="rounded-default"
       clickable
       class="shrink-0 h-7"
       role="button"

@@ -32,7 +32,6 @@
  */
 
 import { useStore } from "vuex";
-import useLogs from "./useLogs";
 import { escapeHtml } from "@/utils/html";
 
 /**
@@ -51,8 +50,7 @@ export interface TextSegment {
  * Composable for text highlighting and semantic colorization
  */
 export function useTextHighlighter() {
-  // Initialize store within the composable for accessing configuration
-  const store = useStore();
+  useStore();
 
   /**
    * Extracts keywords from SQL query strings
@@ -249,7 +247,7 @@ export function useTextHighlighter() {
       hasColons: text.includes(":"),
       hasSlashes: text.includes("/"),
       hasHyphens: text.includes("-"),
-      hasParentheses: /[()\[\]]/.test(text),
+      hasParentheses: /[()[\]]/.test(text),
       dotSeparatedNumbers: (text.match(/\d+/g) || []).length,
       startsWithUppercase: /^[A-Z]/.test(text),
       isThreeDigitStatusCode: /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(text),
@@ -356,127 +354,6 @@ export function useTextHighlighter() {
       return true;
     }
     return false;
-  }
-
-  /**
-   * Splits text into semantic segments (IPs, emails, URLs, etc.)
-   * @param text - Text to split into semantic parts
-   * @returns Array of text parts with their positions
-   */
-  function splitTextBySemantic(
-    text: string,
-  ): Array<{ text: string; start: number; end: number; type: string }> {
-    if (!text || typeof text !== "string") {
-      return [
-        {
-          text: text || "",
-          start: 0,
-          end: (text || "").length,
-          type: "default",
-        },
-      ];
-    }
-
-    const semanticPatterns = [
-      { pattern: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, type: "ip" },
-      { pattern: /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/g, type: "email" },
-      { pattern: /\bhttps?:\/\/[^\s]+\b/g, type: "url" },
-      {
-        pattern: /\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g,
-        type: "http_method",
-      },
-      { pattern: /\b(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))\b/g, type: "status_code" },
-      {
-        pattern:
-          /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g,
-        type: "uuid",
-      },
-      { pattern: /\b\d{13,}\b/g, type: "timestamp" },
-      {
-        pattern: /\b\d+(\.\d+)?\s*(KB|MB|GB|TB|bytes?)\b/gi,
-        type: "file_size",
-      },
-      { pattern: /\/[^\s]*(?:\?[^\s]*)?(?:#[^\s]*)?\b/g, type: "path" },
-    ];
-
-    const matches: Array<{
-      text: string;
-      start: number;
-      end: number;
-      type: string;
-    }> = [];
-
-    // Find all semantic matches
-    semanticPatterns.forEach(({ pattern, type }) => {
-      // Reset regex lastIndex to ensure proper matching
-      pattern.lastIndex = 0;
-      let match;
-      while ((match = pattern.exec(text)) !== null) {
-        matches.push({
-          text: match[0],
-          start: match.index,
-          end: match.index + match[0].length,
-          type,
-        });
-      }
-    });
-
-    // Sort by position
-    matches.sort((a, b) => a.start - b.start);
-
-    // Remove overlapping matches (prioritize by pattern order - first wins)
-    const filteredMatches = [];
-    for (const match of matches) {
-      const hasOverlap = filteredMatches.some(
-        (existing) =>
-          (match.start >= existing.start && match.start < existing.end) ||
-          (match.end > existing.start && match.end <= existing.end) ||
-          (existing.start >= match.start && existing.start < match.end),
-      );
-      if (!hasOverlap) {
-        filteredMatches.push(match);
-      }
-    }
-
-    // Create segments with semantic and non-semantic parts
-    const segments = [];
-    let lastEnd = 0;
-
-    for (const match of filteredMatches) {
-      // Add text before this match (only if non-empty)
-      if (match.start > lastEnd) {
-        const beforeText = text.slice(lastEnd, match.start);
-        if (beforeText.trim()) {
-          segments.push({
-            text: beforeText,
-            start: lastEnd,
-            end: match.start,
-            type: "default",
-          });
-        }
-      }
-
-      // Add the semantic match
-      segments.push(match);
-      lastEnd = match.end;
-    }
-
-    // Add remaining text (only if non-empty)
-    if (lastEnd < text.length) {
-      const remainingText = text.slice(lastEnd);
-      if (remainingText.trim()) {
-        segments.push({
-          text: remainingText,
-          start: lastEnd,
-          end: text.length,
-          type: "default",
-        });
-      }
-    }
-
-    return segments.length > 0
-      ? segments
-      : [{ text, start: 0, end: text.length, type: "default" }];
   }
 
   /**

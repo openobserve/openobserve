@@ -373,7 +373,7 @@ const useSearchWebSocket = () => {
   const resetAuthToken = async () => {
     // console.log("reset auth token");
     isInDrainMode.value = true;
-    return new Promise(async (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       authService.refresh_token().then((res: any) => {
         isInDrainMode.value = false;
         // Retry the request

@@ -74,7 +74,7 @@ export const getUserInfo = (loginString: string) => {
 };
 
 export const invalidateLoginData = () => {
-  userService.logout().then((res: any) => {});
+  userService.logout().then(() => {});
 };
 
 export const getDecodedAccessToken = (token: string) => {
@@ -100,6 +100,7 @@ export const getDecodedUserInfo = () => {
     }
   } catch (e) {
     console.log("Error: Error while pull sessionstorage value.");
+    return undefined;
   }
 };
 
@@ -146,7 +147,10 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     to.name !== "iam" &&
     emptyDataAllowedPaths.indexOf(normalizePath(to.path)) === -1 &&
     trialPeriodAllowedPath.indexOf(to.name) === -1 &&
-    store.state.zoConfig.hasOwnProperty("restricted_routes_on_empty_data") &&
+    Object.prototype.hasOwnProperty.call(
+      store.state.zoConfig,
+      "restricted_routes_on_empty_data"
+    ) &&
     store.state.zoConfig.restricted_routes_on_empty_data === true &&
     store.state.organizationData.isDataIngested === false
   ) {
@@ -176,7 +180,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   }
 };
 
-export const verifyOrganizationStatus = (Organizations: any, Router: any) => {};
+export const verifyOrganizationStatus = (_Organizations: any, _Router: any) => {};
 
 export const generateTraceContext = () => {
   const traceId = getUUIDv7(true);

@@ -308,7 +308,9 @@ import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
@@ -353,14 +355,14 @@ export default defineComponent({
     const destinationTypes = ["http", "email"];
     const destinationMethods = ["post", "get", "put"];
 
-    const userSelectedTemplates = ref<string[]>([]);
+    const userSelectedTemplates = ref<SelectModelValue[]>([]);
     const userSelectedDestinationType = ref<any[]>([]);
     const userSelectedDestinationMethod = ref<any[]>([]);
     const userSelectedDestinationName = ref<any[]>([]);
     const userSelectedDestinationUrl = ref<any[]>([]);
     const userSelectedEmails = ref<any[]>([]);
     const userSelectedActionId = ref<any[]>([]);
-    const userSelectedSkipTlsVerify = ref<boolean[]>([]);
+    const userSelectedSkipTlsVerify = ref<SwitchValue[]>([]);
     const filteredTemplates = ref<string[]>([]);
     const filteredActions = ref<any[]>([]);
     const templateErrors = reactive<Record<number, string>>({});
@@ -445,7 +447,7 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationName = (destinationName: string, index: number) => {
+    const updateDestinationName = (destinationName: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = destinationName;
         // Directly update jsonStr without triggering editor re-render
@@ -469,7 +471,7 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationTemplate = (template: string, index: number) => {
+    const updateDestinationTemplate = (template: SelectModelValue, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].template = template;
         // Directly update jsonStr without triggering editor re-render
@@ -481,7 +483,7 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationAction = (id: string, index: number) => {
+    const updateDestinationAction = (id: SelectModelValue, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].action_id = id;
         // Directly update jsonStr without triggering editor re-render
@@ -493,9 +495,10 @@ export default defineComponent({
       }
     };
 
-    const updateDestinationEmails = (emails: string, index: number) => {
+    const updateDestinationEmails = (emails: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].emails = emails
+        // OInput is a text field here, so the emitted value is always a string.
+        baseImportRef.value.jsonArrayOfObj[index].emails = (emails as string)
           .split(",")
           .map((email) => email.trim());
         // Directly update jsonStr without triggering editor re-render
@@ -507,7 +510,7 @@ export default defineComponent({
       }
     };
 
-    const updateSkipTlsVerify = (value: boolean, index: number) => {
+    const updateSkipTlsVerify = (value: SwitchValue, index: number) => {
       userSelectedSkipTlsVerify.value[index] = value;
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].skip_tls_verify = value;
@@ -785,7 +788,7 @@ export default defineComponent({
 
         // Validate headers should not be present for email type
         if (
-          input.hasOwnProperty("headers") &&
+          Object.prototype.hasOwnProperty.call(input, "headers") &&
           Object.keys(input.headers).length !== 0
         ) {
           destinationErrors.push(

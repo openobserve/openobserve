@@ -39,7 +39,6 @@ export function usePanelDrilldown({
   metadata,
   data,
   panelData,
-  filteredData,
   resultMetaData,
   store,
   route,
@@ -125,7 +124,7 @@ export function usePanelDrilldown({
     // if the str is same as the key, return it's value(it can be an string or array).
     for (const key in obj) {
       // ${varName} == str or {{varName}} == str
-      if (`\$\{${key}\}` == str || `{{${key}}}` == str) {
+      if (`$\{${key}}` === str || `{{${key}}}` === str) {
         return obj[key];
       }
     }
@@ -152,7 +151,7 @@ export function usePanelDrilldown({
     str = normalizeVariableSyntax(str);
     // If str is exactly equal to a key, return its value directly
     for (const key in obj) {
-      if (`\$\{${key}\}` === str || `{{${key}}}` === str) {
+      if (`$\{${key}}` === str || `{{${key}}}` === str) {
         let value = obj[key];
 
         // Ensure string values are wrapped in quotes
@@ -339,7 +338,7 @@ export function usePanelDrilldown({
             value: queryType === "sql" ? value : variable.value.join("|"),
           },
           {
-            placeHolder: `\$${variable.name}`,
+            placeHolder: `$${variable.name}`,
             value: queryType === "sql" ? value : variable.value.join("|"),
           },
         ];
@@ -611,16 +610,8 @@ export function usePanelDrilldown({
         if (panelSchema.value?.type === "table" && drilldownParams[1]?.[0]) {
           // Table: row data is directly available
           const rowData = drilldownParams[1][0];
-          const panelFields: any = [
-            ...(panelSchema.value.queries?.[0]?.fields?.x || []),
-            ...(panelSchema.value.queries?.[0]?.fields?.y || []),
-            ...(panelSchema.value.queries?.[0]?.fields?.z || []),
-          ];
           for (const lf of linkFields) {
             const alias = lf.alias || lf.name;
-            const pf = panelFields.find(
-              (f: any) => f.alias === alias || f.label === lf.name,
-            );
             const val = rowData[alias] ?? rowData[lf.name];
             if (val !== undefined && val !== null) {
               fieldName = lf.name;
@@ -933,7 +924,9 @@ export function usePanelDrilldown({
               query: Object.fromEntries(logsUrl.searchParams.entries()),
             });
           }
-        } catch (error) {}
+        } catch {
+          /* ignore: best-effort navigation */
+        }
       };
 
       // need to change dynamic variables to it's value using current variables, current chart data(params)
@@ -1037,7 +1030,9 @@ export function usePanelDrilldown({
             replacePlaceholders(drilldownData.data.url, drilldownVariables),
             drilldownData.targetBlank ? "_blank" : "_self",
           );
-        } catch (error) {}
+        } catch {
+          /* ignore: best-effort window.open */
+        }
       } else if (drilldownData.type == "logs") {
         try {
           navigateToLogs();
@@ -1162,6 +1157,7 @@ export function usePanelDrilldown({
         }
       }
     }
+    return;
   };
 
   // Cross-linking: fetch cross-links when the executed query (with variables resolved) changes

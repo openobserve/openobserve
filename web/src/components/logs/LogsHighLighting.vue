@@ -39,7 +39,8 @@ Usage Examples:
 </template>
 
 <script setup lang="ts">
-import { computed, withDefaults } from "vue";
+// withDefaults is a compiler macro; importing it conflicts with the macro declaration
+import { computed } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";

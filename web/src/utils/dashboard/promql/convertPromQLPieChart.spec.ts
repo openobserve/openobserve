@@ -55,7 +55,7 @@ vi.mock("./shared/gridBuilder", () => ({
 
 vi.mock("../colorPalette", () => ({
   getSeriesColor: vi.fn(
-    (colorConfig, name, values, min, max, theme, colorBySeries) => {
+    (colorConfig, name) => {
       // Simple mock that returns colors based on name
       const colors: Record<string, string> = {
         series1: "#FF0000",

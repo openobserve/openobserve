@@ -537,7 +537,7 @@ export const usePanelSQLExecutor = (ctx: {
                 }
               },
               error: handleSearchError,
-              complete: async (payload: any) => {
+              complete: async () => {
                 state.loading = false;
                 saveCurrentStateToCache();
                 removeTraceId(traceId);
@@ -703,6 +703,7 @@ export const usePanelSQLExecutor = (ctx: {
 
       log("logaData: state.data", state.data);
       log("logaData: state.metadata", state.metadata);
+      return;
     } finally {
       // abort on done
       if (abortControllerRef) {
@@ -1101,7 +1102,7 @@ export const usePanelSQLExecutor = (ctx: {
         }
       },
       error: handleSearchError,
-      complete: async (_payload: any) => {
+      complete: async () => {
         state.loading = false;
         saveCurrentStateToCache();
         removeTraceId(traceId);

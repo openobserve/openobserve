@@ -13,25 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { resolveDefaultColumns } from "./useLogs";
 import { flushPromises, mount } from "@vue/test-utils";
-import { createStore } from "vuex";
 import { useRouter } from "vue-router";
 import { createI18n } from "vue-i18n";
 import type { AxiosResponse } from "axios";
 import { defineComponent, nextTick } from "vue";
 import useLogs from "../composables/useLogs";
 import searchService from "../services/search";
-import savedviewsService from "../services/saved_views";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import * as zincutils from "../utils/zincutils";
 
 // Import functions from their respective composables
-import { useHistogram } from "../composables/useLogs/useHistogram";
 import useStreamFields from "../composables/useLogs/useStreamFields";
 import useSearchBar from "../composables/useLogs/useSearchBar";
-import { usePagination } from "../composables/useLogs/usePagination";
 import { useSearchStream } from "../composables/useLogs/useSearchStream";
 import { searchState } from "../composables/useLogs/searchState";
 import useNotifications from "../composables/useNotifications";
@@ -592,8 +587,6 @@ describe("Use Logs Composable", () => {
     describe("clearSearchObj", () => {
       it("should clear and reset search object to default state", () => {
         // Set some values in searchObj first
-        const originalOrganizationId =
-          wrapper.vm.searchObj.organizationIdentifier;
         wrapper.vm.searchObj.data = wrapper.vm.searchObj.data || {};
         wrapper.vm.searchObj.data.query = "test query";
         wrapper.vm.searchObj.loading = true;
@@ -885,7 +878,7 @@ describe("Use Logs Composable", () => {
         const { fnParsedSQL } = wrapper.vm;
 
         if (fnParsedSQL) {
-          const result = fnParsedSQL();
+          fnParsedSQL();
           // Since we can't directly mock the internal parser, just verify the function exists
           // and returns something reasonable (could be undefined, array, or object)
           expect(typeof fnParsedSQL).toBe("function");
@@ -900,7 +893,7 @@ describe("Use Logs Composable", () => {
         const { fnParsedSQL } = wrapper.vm;
 
         if (fnParsedSQL) {
-          const result = fnParsedSQL(customQuery);
+          fnParsedSQL(customQuery);
           // Just verify the function can be called with a parameter
           expect(typeof fnParsedSQL).toBe("function");
         } else {
@@ -913,7 +906,7 @@ describe("Use Logs Composable", () => {
 
         if (fnParsedSQL) {
           // Test with invalid SQL
-          const result = fnParsedSQL("INVALID SQL SYNTAX");
+          fnParsedSQL("INVALID SQL SYNTAX");
           // Function should not throw, regardless of result
           expect(typeof fnParsedSQL).toBe("function");
         } else {
@@ -925,7 +918,7 @@ describe("Use Logs Composable", () => {
         const { fnParsedSQL } = wrapper.vm;
 
         if (fnParsedSQL) {
-          const result = fnParsedSQL();
+          fnParsedSQL();
           // Should handle null/undefined gracefully - result can be anything
           expect(fnParsedSQL).toBeDefined();
         } else {
@@ -1792,7 +1785,7 @@ describe("Use Logs Composable", () => {
 
     describe("getRegionInfo", () => {
       it("should return current region information", async () => {
-        const result = wrapper.vm.getRegionInfo();
+        wrapper.vm.getRegionInfo();
 
         // Just check the function exists and doesn't throw
         expect(typeof wrapper.vm.getRegionInfo).toBe("function");
@@ -2095,7 +2088,6 @@ describe("Use Logs Composable", () => {
       });
 
       it("should handle dashboard panel data", () => {
-        const dashboardData = { data: { config: { chart_type: "bar" } } };
         const { updateUrlQueryParams } = wrapper.vm;
         expect(typeof updateUrlQueryParams).toBe("function");
         expect(true).toBe(true);
@@ -2203,7 +2195,6 @@ describe("Use Logs Composable", () => {
 
     describe("addTraceId", () => {
       it("should add trace ID to search object", () => {
-        const traceId = "trace-123-456";
         const { addTraceId } = wrapper.vm;
         expect(typeof addTraceId).toBe("function");
         expect(true).toBe(true);
@@ -2263,7 +2254,7 @@ describe("Use Logs Composable", () => {
       it("should initialize search connection", () => {
         const payload = { query: "test query", stream: "test-stream" };
 
-        const result = wrapper.vm.initializeSearchConnection(payload);
+        wrapper.vm.initializeSearchConnection(payload);
 
         expect(typeof wrapper.vm.initializeSearchConnection).toBe("function");
       });
@@ -2271,7 +2262,7 @@ describe("Use Logs Composable", () => {
       it("should handle connection initialization errors", () => {
         const payload = null;
 
-        const result = wrapper.vm.initializeSearchConnection(payload);
+        wrapper.vm.initializeSearchConnection(payload);
 
         expect(typeof wrapper.vm.initializeSearchConnection).toBe("function");
       });

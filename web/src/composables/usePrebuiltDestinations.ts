@@ -22,7 +22,6 @@ import templatesService from '@/services/alert_templates';
 // Types and configurations
 import {
   PREBUILT_DESTINATION_TYPES,
-  PREBUILT_CONFIGS,
   getPrebuiltConfig,
   isPrebuiltType,
   detectPrebuiltTypeFromUrl,
@@ -43,13 +42,11 @@ import {
 const systemTemplatesCache = ref<Map<string, any>>(new Map());
 
 import type {
-  PrebuiltType,
-  PrebuiltFormData,
   ValidationResult,
   TestResult,
-  PrebuiltTypeId,
-  DestinationWithPrebuilt
+  PrebuiltTypeId
 } from '@/utils/prebuilt-templates/types';
+import type { Destination } from '@/ts/interfaces/alert';
 
 // Store
 import { useStore } from 'vuex';
@@ -136,7 +133,7 @@ export function usePrebuiltDestinations() {
   /**
    * Get a cached system template by type
    */
-  function getSystemTemplate(type: PrebuiltTypeId): any | null {
+  function getSystemTemplate(type: string): Record<string, any> | null {
     const templateName = `prebuilt_${type}`;
     return systemTemplatesCache.value.get(templateName) || null;
   }
@@ -144,7 +141,7 @@ export function usePrebuiltDestinations() {
   /**
    * Validate credentials for a specific prebuilt destination type
    */
-  function validateCredentials(type: PrebuiltTypeId, credentials: Record<string, any>): ValidationResult {
+  function validateCredentials(type: string, credentials: Record<string, any>): ValidationResult {
     const config = getPrebuiltConfig(type);
     if (!config) {
       return {
@@ -177,7 +174,7 @@ export function usePrebuiltDestinations() {
       if (field.validator && value) {
         const validationResult = field.validator(value.toString());
         if (validationResult !== true) {
-          errors[field.key] = t(validationResult.key, validationResult.params);
+          errors[field.key] = t(validationResult.key, validationResult.params ?? {});
         }
       }
     }
@@ -191,7 +188,7 @@ export function usePrebuiltDestinations() {
   /**
    * Generate preview data for template preview
    */
-  async function generatePreview(type: PrebuiltTypeId, credentials?: Record<string, any>): Promise<string> {
+  async function generatePreview(type: string, credentials?: Record<string, any>): Promise<string> {
     const config = getPrebuiltConfig(type);
     if (!config) return '';
 
@@ -278,7 +275,7 @@ export function usePrebuiltDestinations() {
   /**
    * Test a prebuilt destination by sending a sample notification
    */
-  async function testDestination(type: PrebuiltTypeId, credentials: Record<string, any>): Promise<TestResult> {
+  async function testDestination(type: string, credentials: Record<string, any>): Promise<TestResult> {
     try {
       isTestInProgress.value = true;
 
@@ -443,7 +440,7 @@ export function usePrebuiltDestinations() {
    * destinations of the same prebuilt type use different message bodies.
    */
   async function createDestination(
-    type: PrebuiltTypeId,
+    type: string,
     name: string,
     credentials: Record<string, any>,
     headers: Record<string, string> = {},
@@ -576,7 +573,7 @@ export function usePrebuiltDestinations() {
    * destination type.
    */
   async function updateDestination(
-    type: PrebuiltTypeId,
+    type: string,
     originalName: string,
     name: string,
     credentials: Record<string, any>,
@@ -742,10 +739,10 @@ export function usePrebuiltDestinations() {
       isLoading.value = true;
 
       // Get existing destination
-      const existing = await alertDestinationService.get_by_name({
+      const existing = (await alertDestinationService.get_by_name({
         org_identifier: organizationIdentifier.value,
         destination_name: destinationName
-      });
+      })) as unknown as Destination;
 
       const config = getPrebuiltConfig(targetType);
       if (!config) {

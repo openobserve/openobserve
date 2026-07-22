@@ -159,7 +159,7 @@ export function useLLMStreamQuery() {
               metadataHits.push(...hits);
             }
           },
-          error: (response: any, _traceId: any) => {
+          error: (response: any) => {
             activeTraceIds.delete(traceId);
             // useStreamingSearch wraps the server error body as
             // `{ content: { ...errorBody, trace_id }, type: "error" }`.

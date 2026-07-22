@@ -36,7 +36,7 @@
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
-import { defineComponent } from "vue";
+import { computed, defineComponent } from "vue";
 import AscSort from "@/components/icons/AscSort.vue";
 import DescSort from "@/components/icons/DescSort.vue";
 import { inject } from "vue";
@@ -63,8 +63,11 @@ export default defineComponent({
       dashboardPanelDataPageKey,
     );
 
+    // same object reference as props.fieldObj; nested mutation is unchanged
+    const fieldObjModel = computed(() => props.fieldObj);
+
     const updateSortOption = (value: any) => {
-      props.fieldObj.sortBy = value;
+      fieldObjModel.value.sortBy = value;
     };
 
     return {

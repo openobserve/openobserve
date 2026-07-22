@@ -371,7 +371,7 @@ const _anomalyCache = new Map<
   { ts: number; startTime: number; endTime: number; data: any[] }
 >();
 import { useI18n } from "vue-i18n";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "@/services/alerts";
@@ -413,7 +413,9 @@ function loadSavedTime() {
   try {
     const raw = localStorage.getItem(LS_TIME_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    /* ignore: corrupt/absent saved time falls back to null */
+  }
   return null;
 }
 
@@ -885,9 +887,9 @@ const goToService = (svc: any, e?: MouseEvent) => {
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {
-    org_identifier: orgId.value,
+    org_identifier: orgId.value ?? "",
     tab: "spans",
-    query: b64EncodeUnicode(filter),
+    query: b64EncodeUnicode(filter) ?? "",
     stream: svc.stream_name ?? graphStream.value,
   };
 
@@ -901,7 +903,7 @@ const goToService = (svc: any, e?: MouseEvent) => {
   router.push({ name: "traces", query });
 };
 
-const openServicePanel = (svc: any, _e?: MouseEvent) => {
+const openServicePanel = (svc: any) => {
   // The card's own click handler (behaviour swapped with the info icon):
   // clicking the card body opens the latency/info side panel.
   selectedService.value = svc;
@@ -961,10 +963,6 @@ const goToServiceGraph = () => {
     query.to = timeRange.value.endTime.toString();
   }
   router.push({ name: "traces", query });
-};
-
-const goToAlertHistory = () => {
-  router.push({ name: "alertHistory", query: { org_identifier: orgId.value } });
 };
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────

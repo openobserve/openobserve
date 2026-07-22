@@ -212,9 +212,10 @@ export function fillMissingTimestamps(
  * @param aggregation - Aggregation function to apply
  * @returns Aggregated single value
  */
+// Unknown aggregation strings from panel config fall through to the `last` default case
 export function applyAggregation(
   values: Array<[number, string]>,
-  aggregation: AggregationFunction = "last",
+  aggregation: AggregationFunction | (string & {}) = "last",
 ): number {
   if (!values || values.length === 0) return 0;
 

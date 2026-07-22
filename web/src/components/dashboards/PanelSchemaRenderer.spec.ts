@@ -435,18 +435,6 @@ describe("PanelSchemaRenderer", () => {
     it("should display different error messages based on error code", () => {
       wrapper = createWrapper();
 
-      // Test 4xx error (client error)
-      const clientErrorDetail = {
-        message: "Bad request",
-        code: "400"
-      };
-      
-      // Test 5xx error (server error)  
-      const serverErrorDetail = {
-        message: "Internal server error",
-        code: "500"
-      };
-
       // Verify error code handling logic exists
       expect(wrapper.vm.errorDetail).toBeDefined();
       
@@ -605,14 +593,6 @@ describe("PanelSchemaRenderer", () => {
   });
 
   describe("Download Functionality", () => {
-    let mockShowErrorNotification: any;
-    let mockShowPositiveNotification: any;
-
-    beforeEach(() => {
-      mockShowErrorNotification = vi.fn();
-      mockShowPositiveNotification = vi.fn();
-    });
-
     it("should have downloadDataAsCSV method", () => {
       wrapper = createWrapper();
 
@@ -674,9 +654,6 @@ describe("PanelSchemaRenderer", () => {
 
       // Mock the data for the component
       wrapper.vm.data = { value: mockPromQLData };
-
-      // Mock the exportFile function to return true
-      const originalExportFile = vi.fn().mockReturnValue(true);
 
       // Mock showPositiveNotification
       wrapper.vm.showPositiveNotification = vi.fn();
@@ -1259,12 +1236,7 @@ describe("PanelSchemaRenderer", () => {
 
     it("should emit update:initialVariableValues during drilldown navigation", () => {
       wrapper = createWrapper();
-      
-      const mockInitialValues = {
-        service: "web",
-        environment: "production"
-      };
-      
+
       // Test that the component can emit initial variable values
       expect(wrapper.vm.openDrilldown).toBeTypeOf("function");
     });
@@ -1323,7 +1295,7 @@ describe("PanelSchemaRenderer", () => {
       const mockObserve = vi.fn();
 
       // Create a mock ResizeObserver
-      const MockResizeObserver = vi.fn(function(this: any, callback: ResizeObserverCallback) {
+      const MockResizeObserver = vi.fn(function(this: any) {
         this.observe = mockObserve;
         this.disconnect = mockDisconnect;
         this.unobserve = vi.fn();

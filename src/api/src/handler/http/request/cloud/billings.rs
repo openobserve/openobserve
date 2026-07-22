@@ -497,7 +497,7 @@ pub async fn handle_stripe_event(headers: HeaderMap, payload: axum::body::Bytes)
         ("org_id" = String, Path, description = "Organization name"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "Success", content_type = "application/json", body = crate::service::trial_quota::AiUsageResponse),
     )
 )]
 pub async fn get_ai_usage(Path(org_id): Path<String>) -> Response {

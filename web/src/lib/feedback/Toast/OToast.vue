@@ -323,7 +323,7 @@ onUnmounted(() => {
            :key on the outer div ensures Vue remounts it (restarting the CSS animation)
            whenever timerKey increments (i.e. a duplicate toast resets the timer). -->
       <div
-        v-if="timeout > 0"
+        v-if="(timeout ?? 0) > 0"
         :key="timerKey"
         class="absolute bottom-0 left-0 right-0 h-0.5"
         aria-hidden="true"

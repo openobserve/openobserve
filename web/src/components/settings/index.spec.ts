@@ -17,7 +17,6 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import SettingsIndex from "./index.vue";
 import i18n from "@/locales";
-import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 // Mock external dependencies

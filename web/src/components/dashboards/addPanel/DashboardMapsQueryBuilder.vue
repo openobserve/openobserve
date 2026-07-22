@@ -284,13 +284,10 @@ import {
   watch,
   computed,
   inject,
-  nextTick,
 } from "vue";
 import { useI18n } from "vue-i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { getImageURL } from "../../../utils/zincutils";
-import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
@@ -311,8 +308,6 @@ export default defineComponent({
     OButtonGroup,
     OButton,
     ODropdown,
-    SortByBtnGrp,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
@@ -320,7 +315,7 @@ export default defineComponent({
     OTooltip,
   },
   props: ["dashboardData"],
-  setup(props) {
+  setup() {
     const { t } = useI18n();
     const { showErrorNotification } = useNotifications();
 
@@ -474,11 +469,11 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
 
@@ -507,7 +502,7 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-    const Hint = computed((e: any) => {
+    const Hint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "maps":
           return t("dashboard.oneFieldMessage");

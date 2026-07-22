@@ -249,7 +249,7 @@ describe("JsonEditor", () => {
       const modified = JSON.stringify({ id: "hacked", name: "original" });
       (wrapper.vm as any).handleEditorChange(modified);
       await nextTick();
-      const errors: string[] = (wrapper.vm as any).validationErrors;
+      const errors: string[] = (wrapper.vm as any).localValidationErrors;
       expect(errors.some((e: string) => e.includes("Cannot modify"))).toBe(true);
     });
 
@@ -267,19 +267,19 @@ describe("JsonEditor", () => {
       wrapper = createWrapper();
       (wrapper.vm as any).handleEditorChange("not-valid-json{{{");
       await nextTick();
-      expect((wrapper.vm as any).validationErrors).toContain("Invalid JSON format");
+      expect((wrapper.vm as any).localValidationErrors).toContain("Invalid JSON format");
     });
 
     it("clears previous protected-field errors when JSON is valid and no changes", async () => {
       const data = { id: "1", name: "a" };
       wrapper = createWrapper({ data, type: "alerts" });
-      (wrapper.vm as any).validationErrors = [
+      (wrapper.vm as any).localValidationErrors = [
         "Cannot modify id field directly , will be reverted to the original value",
       ];
       const goodJson = JSON.stringify({ id: "1", name: "a" });
       (wrapper.vm as any).handleEditorChange(goodJson);
       await nextTick();
-      const errors: string[] = (wrapper.vm as any).validationErrors;
+      const errors: string[] = (wrapper.vm as any).localValidationErrors;
       expect(errors.some((e: string) => e.startsWith("Cannot modify"))).toBe(false);
     });
   });
@@ -314,7 +314,7 @@ describe("JsonEditor", () => {
       (wrapper.vm as any).jsonContent = "{ invalid json }";
       (wrapper.vm as any).saveChanges();
       await nextTick();
-      expect((wrapper.vm as any).validationErrors).toContain("Invalid JSON format");
+      expect((wrapper.vm as any).localValidationErrors).toContain("Invalid JSON format");
     });
 
     it("does not emit 'saveJson' when jsonContent is invalid JSON", async () => {

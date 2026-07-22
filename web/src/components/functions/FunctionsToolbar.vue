@@ -119,6 +119,7 @@
 import {
   ref,
   computed,
+  type PropType,
 } from "vue";
 import { inject } from "vue";
 import { useI18n } from "vue-i18n";
@@ -155,7 +156,7 @@ const props = defineProps({
     default: true,
   },
   transformTypeOptions: {
-    type: Array,
+    type: Array as PropType<{ label: string; value: string | number }[]>,
     default: () => [],
   },
   // Hides the VRL/JS language toggle entirely (used when a host forces a single

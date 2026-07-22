@@ -109,7 +109,6 @@ describe("AlertSummary", () => {
       },
     });
 
-    const scrollButton = wrapper.find(".scroll-to-bottom-btn");
     // Button exists but is hidden (v-show)
     expect(wrapper.vm.showScrollToBottom).toBe(false);
   });

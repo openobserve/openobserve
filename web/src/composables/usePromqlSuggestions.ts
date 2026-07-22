@@ -10,8 +10,8 @@ const usePromqlSuggestions = () => {
       cursorIndex: 0,
     },
     popup: {
-      open: (val: string) => {},
-      close: (val: string) => {},
+      open: (_val: string) => {},
+      close: (_val: string) => {},
     },
     dateTime: {
       startTime: new Date().getTime() * 1000,
@@ -115,7 +115,7 @@ const usePromqlSuggestions = () => {
     // Extract labels
     let match;
     while (hasCurlyBraces && (match = keyValuePairRegex.exec(query)) !== null) {
-      const [fullMatch, key, val, value] = match;
+      const [fullMatch, key, , value] = match;
       const start = match.index;
       const end = start + fullMatch.length;
       // Detect cursor position for labels and values

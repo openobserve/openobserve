@@ -155,7 +155,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const store = useStore();
 const { t } = useI18n();
 
-interface SemanticGroup {
+export interface SemanticGroup {
   id: string;
   display: string;
   group?: string;
@@ -266,14 +266,6 @@ const filteredGroups = computed(() => {
     (group) =>
       normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
-});
-
-// Group ID options for fingerprint selection
-const groupIdOptions = computed(() => {
-  return localGroups.value.map((group) => ({
-    label: group.display,
-    value: group.id,
-  }));
 });
 
 // Generate a short unique ID for new groups using first 8 chars of UUID

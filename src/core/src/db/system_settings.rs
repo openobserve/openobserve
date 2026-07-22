@@ -473,6 +473,81 @@ pub fn get_default_semantic_field_groups() -> Vec<config::meta::correlation::Fie
     }
 }
 
+/// Get the agent-signals failure taxonomy for an organization.
+///
+/// Resolution order (highest wins):
+/// 1. Org-level override in system settings
+/// 2. Repo file default (enterprise, fetched + cached with embedded fallback)
+/// 3. OSS minimal default (`status_message`, no rules → everything `unclassified`)
+///
+/// An invalid or malformed org override is logged and ignored — we fall through
+/// to the default rather than crash or emit unsafe SQL.
+pub async fn get_agent_signals_taxonomy(
+    org_id: &str,
+) -> config::meta::agent_signals::AgentSignalsTaxonomy {
+    use config::meta::{
+        agent_signals::AgentSignalsTaxonomy, system_settings::keys::AGENT_SIGNALS_TAXONOMY,
+    };
+
+    if let Ok(Some(setting)) = get_resolved(Some(org_id), None, AGENT_SIGNALS_TAXONOMY).await {
+        match serde_json::from_value::<AgentSignalsTaxonomy>(setting.setting_value) {
+            Ok(taxonomy) => match taxonomy.normalize_and_validate() {
+                Ok(taxonomy) => return taxonomy,
+                Err(e) => {
+                    log::warn!("Ignoring invalid agent-signals taxonomy for org {org_id}: {e}")
+                }
+            },
+            Err(e) => log::warn!("Ignoring malformed agent-signals taxonomy for org {org_id}: {e}"),
+        }
+    }
+
+    get_default_agent_signals_taxonomy()
+}
+
+/// Save the agent-signals failure taxonomy for an organization.
+///
+/// Validates before persisting — org input is compiled into generated SQL, so an
+/// invalid taxonomy is rejected here rather than at query time.
+pub async fn set_agent_signals_taxonomy(
+    org_id: &str,
+    user_id: &str,
+    taxonomy: config::meta::agent_signals::AgentSignalsTaxonomy,
+) -> Result<SystemSetting> {
+    use config::meta::system_settings::{SettingCategory, keys::AGENT_SIGNALS_TAXONOMY};
+
+    let taxonomy = taxonomy.normalize_and_validate().map_err(|e| {
+        infra::errors::Error::Message(format!("invalid agent-signals taxonomy: {e}"))
+    })?;
+
+    let value = serde_json::to_value(taxonomy)?;
+    let mut setting = SystemSetting::new_org(org_id, AGENT_SIGNALS_TAXONOMY, value)
+        .with_category(SettingCategory::Correlation)
+        .with_description("Agent-signals failure taxonomy (error-detail fields + rules)");
+    setting.updated_by = Some(user_id.to_string());
+
+    set(&setting).await
+}
+
+/// Get the default agent-signals taxonomy.
+///
+/// For enterprise builds, loads from the repo file (fetched + cached) with an
+/// embedded fallback. For OSS builds, returns a minimal default: `status_message`
+/// as the sole error-detail column and no rules (classifier labels everything
+/// `unclassified`).
+pub fn get_default_agent_signals_taxonomy() -> config::meta::agent_signals::AgentSignalsTaxonomy {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::common::agent_signals_config::load_defaults_from_file()
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        config::meta::agent_signals::AgentSignalsTaxonomy {
+            error_detail_fields: vec!["status_message".to_string()],
+            failure_rules: vec![],
+        }
+    }
+}
+
 /// Normalize a semantic group category name to a consistent identity set ID
 ///
 /// Converts category names to lowercase, dash-separated format while maintaining

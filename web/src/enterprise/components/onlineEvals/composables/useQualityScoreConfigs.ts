@@ -26,7 +26,14 @@ import {
   thresholdForConfig,
 } from "../utils/scoreThreshold";
 
-export type ConfigStatus = "healthy" | "unhealthy" | "noThreshold" | "noData";
+// "unhealthy" | "warn" | "noThreshold" are legacy — no longer produced here,
+// but QualityConfigSidebar still branches on them.
+export type ConfigStatus =
+  | "healthy"
+  | "noData"
+  | "unhealthy"
+  | "warn"
+  | "noThreshold";
 
 export interface ScoreConfigRow {
   config: ScoreConfig;
@@ -47,6 +54,10 @@ export interface ScoreConfigRow {
   status: ConfigStatus;
   statusPriority: number;
   trendSparkline: number[];
+  /** Legacy field kept for QualityConfigSidebar, which guards on its absence.
+      `hasThreshold` is declared above and IS populated, so it is not repeated
+      here — the merge briefly had it twice. */
+  unhealthyPct?: number | null;
 }
 
 interface AggRow {

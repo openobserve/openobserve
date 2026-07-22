@@ -1182,8 +1182,6 @@ import {
   defineAsyncComponent,
   provide,
   nextTick,
-  onBeforeMount,
-  onBeforeUnmount,
 } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -1215,8 +1213,6 @@ import searchService from "@/services/search";
 import {
   b64EncodeUnicode,
   getUUID,
-  convertTimeFromNsToMs,
-  convertTimeFromMicroToMilli,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
 import {
@@ -1227,14 +1223,11 @@ import {
   type SubjectButton,
 } from "@/composables/useMetricSubjectButtons";
 import {
-  INTENT_DEFINITIONS,
   filterByIntent,
-  getEssentialStreams,
   pickDefaultIntent,
   type IntentId,
 } from "@/utils/metrics/metricIntent";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
@@ -1250,11 +1243,8 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -1486,44 +1476,6 @@ const computedTraceEndTime = computed(() => {
 });
 
 // Table columns for span list (direct trace correlation)
-const spanTableColumns = [
-  {
-    name: "service_name",
-    label: "Service",
-    field: "service_name",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "operation_name",
-    label: "Operation",
-    field: "operation_name",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "duration",
-    label: "Duration",
-    field: "duration",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "span_status",
-    label: "Status",
-    field: "span_status",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "start_time",
-    label: "Start Time",
-    field: "start_time",
-    align: "left" as const,
-    sortable: true,
-  },
-];
-
 // Use external tab control in embedded mode, otherwise manage internally
 const activeTab = computed({
   get: () =>
@@ -1959,29 +1911,8 @@ const streamsForActivePill = computed<StreamInfo[]>(() => {
   return filterByIntent(scoped, activeIntent.value, props.matchedSetId, activeSubjectButtonId.value);
 });
 
-const pillDescriptors = computed(() => {
-  const scoped = applyScopeFilter(uniqueMetricStreams.value);
-  return INTENT_DEFINITIONS.map((def) => {
-    const matches = filterByIntent(scoped, def.id, props.matchedSetId, activeSubjectButtonId.value);
-    return { ...def, count: matches.length, disabled: def.id === "essentials" && matches.length === 0 };
-  });
-});
-
-const essentialStreamNames = computed<Set<string>>(() => {
-  const ess = getEssentialStreams(uniqueMetricStreams.value, props.matchedSetId, activeSubjectButtonId.value);
-  return new Set(ess.map((s) => s.stream_name));
-});
-
 const applyActivePill = () => {
   selectedMetricStreams.value = applyUnstableDimensionDefaults(streamsForActivePill.value);
-};
-
-const setActiveIntent = (id: IntentId) => {
-  if (activeIntent.value === id) return;
-  activeIntent.value = id;
-  applyActivePill();
-  dashboardData.value = null;
-  loadDashboard();
 };
 
 let lastIntentInitKey: string | null = null;
@@ -2323,9 +2254,7 @@ const applyDimensionChanges = () => {
 
     // For each filter in the stream, find its semantic dimension ID
     // and update with the new value from activeDimensions
-    for (const [filterKey, _filterValue] of Object.entries(
-      stream.filters ?? {},
-    )) {
+    for (const [filterKey] of Object.entries(stream.filters ?? {})) {
       const dimensionId = fieldToDimensionId.get(filterKey);
       if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
         const newValue = activeDimensions.value[dimensionId];
@@ -2414,8 +2343,9 @@ const loadDashboard = async () => {
     }
   } catch (err: any) {
     // console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
-    error.value = err.message || t("correlation.failedToLoad");
-    showErrorNotification(error.value);
+    const message: string = err.message || t("correlation.failedToLoad");
+    error.value = message;
+    showErrorNotification(message);
   } finally {
     loading.value = false;
   }
@@ -2436,7 +2366,6 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
   try {
     // Get current panels
     const currentPanels = dashboardData.value.tabs[0].panels;
-    const existingCount = currentPanels.length;
     const timestamp = Date.now();
 
     // Separate streams into cached and new ones
@@ -2567,9 +2496,6 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       }, 100);
     }
 
-    // Log cache usage for debugging
-    if (cachedPanels.length > 0) {
-    }
   } catch (err: any) {
     console.error(
       "[TelemetryCorrelationDashboard] Error adding metric panels, falling back to full reload:",
@@ -2827,7 +2753,9 @@ const extractTraceIdFromLog = (): string | null => {
 
   // 4. Fallback: Scan ALL string fields for embedded trace_id patterns
   // This catches cases where trace_id is embedded in non-FTS fields
-  const scannedFields = new Set(ftsFieldsToScan.map((f) => f.toLowerCase()));
+  const scannedFields = new Set(
+    ftsFieldsToScan.map((f: string) => f.toLowerCase()),
+  );
 
   for (const [key, val] of Object.entries(logRecord)) {
     // Skip fields we already scanned and non-string values
@@ -3039,8 +2967,17 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
  * Open traces screen in new window with trace_id filter
  * @param traceIdOrEvent - trace_id string to use, or event object (when called from @click without args)
  */
-const openTraceInNewWindow = (trace) => {
+const openTraceInNewWindow = (
+  trace:
+    | string
+    | {
+        trace_id?: string;
+        trace_start_time?: number;
+        trace_end_time?: number;
+      },
+) => {
   // Handle case where event object is passed instead of trace_id (e.g., from @click without args)
+  const traceObj = typeof trace === "string" ? undefined : trace;
   const traceId = typeof trace === "string" ? trace : trace.trace_id;
   const targetTraceId = traceId || extractedTraceId.value;
   if (!targetTraceId) return;
@@ -3052,11 +2989,11 @@ const openTraceInNewWindow = (trace) => {
   const queryParams: any = {
     stream: traceStream,
     trace_id: targetTraceId,
-    from: trace?.trace_start_time
-      ? trace.trace_start_time - 10000000
+    from: traceObj?.trace_start_time
+      ? traceObj.trace_start_time - 10000000
       : props.timeRange.startTime.toString(),
-    to: trace?.trace_end_time
-      ? trace.trace_end_time + 10000000
+    to: traceObj?.trace_end_time
+      ? traceObj.trace_end_time + 10000000
       : props.timeRange.endTime.toString(),
     org_identifier: org,
   };
@@ -3147,8 +3084,9 @@ const loadCorrelatedTraces = async () => {
       tracesForDimensions.value = await fetchTracesByDimensions();
     }
   } catch (err: any) {
-    tracesError.value = err.message || t("correlation.tracesError");
-    showErrorNotification(tracesError.value);
+    const message: string = err.message || t("correlation.tracesError");
+    tracesError.value = message;
+    showErrorNotification(message);
   } finally {
     tracesLoading.value = false;
   }

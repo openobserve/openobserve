@@ -764,29 +764,5 @@ describe("EditScript", () => {
     it("loads service accounts on mount", () => {
       expect(wrapper.vm.filteredServiceAccounts).toBeDefined();
     });
-
-    it("filterColumns returns all options for an empty query", () => {
-      const update = (fn: Function) => fn();
-      expect(
-        wrapper.vm.filterColumns(["a", "b", "c"], "", update),
-      ).toHaveLength(3);
-    });
-
-    it("filterColumns filters case-insensitively", () => {
-      const update = (fn: Function) => fn();
-      const res = wrapper.vm.filterColumns(
-        ["Apple", "APPLICATION", "banana"],
-        "app",
-        update,
-      );
-      expect(res).toHaveLength(2);
-    });
-
-    it("isRequiredKey / isRequiredValue validate presence", () => {
-      expect(wrapper.vm.isRequiredKey("k")).toBe(true);
-      expect(wrapper.vm.isRequiredKey("")).toBe("Key is required");
-      expect(wrapper.vm.isRequiredValue("v")).toBe(true);
-      expect(wrapper.vm.isRequiredValue("   ")).toBe("Value is required");
-    });
   });
 });
