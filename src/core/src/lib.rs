@@ -41,6 +41,8 @@ pub mod functions;
 pub mod github;
 pub mod grpc;
 pub mod http;
+#[cfg(feature = "enterprise")]
+pub mod incidents;
 pub mod ingestion;
 pub mod ingestion_tokens;
 pub mod ingestion_types;

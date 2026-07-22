@@ -430,7 +430,7 @@ pub async fn trigger_incident_rca(
 
     // Emit AIAnalysisBegin — all error paths below this point must emit Complete to
     // clear the in-flight guard, otherwise it stays locked until the stale threshold.
-    let _ = infra::table::incident_events::append(
+    let _ = openobserve_core::incidents::append_event(
         &org_id,
         &incident_id,
         config::meta::alerts::incidents::IncidentEvent::ai_analysis_begin(),
@@ -444,7 +444,7 @@ pub async fn trigger_incident_rca(
         {
             Ok(Some(i)) => i,
             Ok(None) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -457,7 +457,7 @@ pub async fn trigger_incident_rca(
                 return MetaHttpResponse::not_found("Incident not found");
             }
             Err(e) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -489,7 +489,7 @@ pub async fn trigger_incident_rca(
         match crate::service::organization::get_sre_agent_credentials(&org_id).await {
             Ok(creds) => creds,
             Err(e) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -509,7 +509,7 @@ pub async fn trigger_incident_rca(
         Some(c) => c,
         None => {
             // Emit failure event instead of misleading Complete event
-            let _ = infra::table::incident_events::append(
+            let _ = openobserve_core::incidents::append_event(
                 &org_id,
                 &incident_id,
                 config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -526,7 +526,7 @@ pub async fn trigger_incident_rca(
     // Check agent health
     if let Err(e) = client.health(&auth_header).await {
         // Emit failure event instead of misleading Complete event
-        let _ = infra::table::incident_events::append(
+        let _ = openobserve_core::incidents::append_event(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -568,7 +568,7 @@ pub async fn trigger_incident_rca(
                 );
 
                 // Emit failure event for manual reanalysis background task
-                if let Err(emit_err) = infra::table::incident_events::append(
+                if let Err(emit_err) = openobserve_core::incidents::append_event(
                     &org_id_bg,
                     &incident_id_bg,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -603,12 +603,13 @@ pub async fn trigger_incident_rca(
             (*client).clone(),
             context,
             auth_header.clone(),
+            openobserve_core::incidents::append_event_send,
         )
         .await
         {
             Ok(s) => s,
             Err(e) => {
-                let _ = infra::table::incident_events::append(
+                let _ = openobserve_core::incidents::append_event(
                     &org_id,
                     &incident_id,
                     config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -635,7 +636,7 @@ pub async fn trigger_incident_rca(
             match rca_service::analyze_incident((*client).clone(), context, &auth_header).await {
                 Ok(content) => content,
                 Err(e) => {
-                    let _ = infra::table::incident_events::append(
+                    let _ = openobserve_core::incidents::append_event(
                         &org_id,
                         &incident_id,
                         config::meta::alerts::incidents::IncidentEvent::ai_analysis_failed(
@@ -650,7 +651,7 @@ pub async fn trigger_incident_rca(
             };
 
         // Emit AIAnalysisComplete on success
-        let _ = infra::table::incident_events::append(
+        let _ = openobserve_core::incidents::append_event(
             &org_id,
             &incident_id,
             config::meta::alerts::incidents::IncidentEvent::ai_analysis_complete(),
@@ -694,7 +695,7 @@ pub async fn post_incident_comment(
 
     let event = IncidentEvent::comment(user_email.user_id, body.comment);
 
-    match infra::table::incident_events::append(&org_id, &incident_id, event).await {
+    match openobserve_core::incidents::append_event(&org_id, &incident_id, event).await {
         Ok(()) => MetaHttpResponse::ok("Comment added"),
         Err(e) => MetaHttpResponse::internal_error(format!("Failed to add comment: {e}")),
     }
