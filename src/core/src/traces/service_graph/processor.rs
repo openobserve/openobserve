@@ -654,6 +654,7 @@ pub(crate) async fn run_graph_search(
         use_cache: false,
         clear_cache: false,
         local_mode: Some(false),
+        agent_options: None,
     };
 
     let trace_id = config::ider::generate();
