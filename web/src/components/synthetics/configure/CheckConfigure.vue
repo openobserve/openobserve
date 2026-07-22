@@ -21,6 +21,8 @@ const props = defineProps<{
   destinations?: string[]
   folders?: SyntheticsFolder[]
   validationErrors?: Record<string, string>
+  /** Protocol checks show the private-locations subsection + setup CTA. */
+  allowPrivateLocations?: boolean
 }>()
 
 const { t } = useI18n()
@@ -44,6 +46,7 @@ const showAuthNetwork = computed(() => ['browser', 'http', 'api'].includes(props
 const emit = defineEmits<{
   'update:check': [value: BrowserCheck]
   'refresh:destinations': []
+  'setup-agent': []
 }>()
 
 function handleUpdate(value: BrowserCheck) {
@@ -86,8 +89,10 @@ function handleUpdate(value: BrowserCheck) {
       <CheckLocations
         :check="check"
         :locations="locations ?? []"
+        :allow-private="allowPrivateLocations"
         data-test="synthetics-check-configure-locations"
         @update:check="handleUpdate"
+        @setup-agent="emit('setup-agent')"
       />
       <CheckBrowserDevices
         v-if="(checkType ?? 'browser') === 'browser'"

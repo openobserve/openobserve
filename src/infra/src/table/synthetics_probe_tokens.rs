@@ -72,8 +72,10 @@ pub async fn add(record: &SyntheticsProbeTokenRecord) -> Result<(), errors::Erro
     Ok(())
 }
 
-/// Find an enabled probe token by value (global — no org_id filter).
-/// Used by the validator on `/synthetics/jobs/*` paths (no org_id in URL).
+/// Find an enabled probe token by value (global — no org_id filter). The
+/// validator uses this to authenticate the token; the handler then asserts the
+/// token's org equals the `{org_id}` in the `/{org}/synthetics/{jobs,agent}/*`
+/// path (the tenant boundary).
 pub async fn find_global(token: &str) -> Result<Option<SyntheticsProbeTokenRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let record = Entity::find()
