@@ -23,25 +23,22 @@
 
 #![cfg(feature = "enterprise")]
 
-use o2_enterprise::enterprise::{
-    agent_signals::{
-        build_cost_sql, build_failure_sql, build_loop_ratio_sql, map_cost_hits, map_failure_hits,
-        map_loop_hits,
-    },
-    common::config::get_config as get_o2_config,
+use o2_enterprise::enterprise::agent_signals::{
+    build_cost_sql, build_failure_sql, build_loop_ratio_sql, map_cost_hits, map_failure_hits,
+    map_loop_hits,
 };
 
 /// Run the three bounded passes for one stream+window and self-ingest the results.
-/// Early-returns Ok when the feature is disabled (no query issued).
+///
+/// Agent signals are always on (no enable flag); the work self-limits via the
+/// stream-level LLM gate below (skip non-gen_ai streams) and the per-span activity
+/// gate in the SQL, so a non-LLM instance issues no meaningful queries.
 pub async fn process_agent_signals_stream(
     org_id: &str,
     stream_name: &str,
     start_time: i64,
     end_time: i64,
 ) -> Result<(), anyhow::Error> {
-    if !get_o2_config().agent_signals.enabled {
-        return Ok(());
-    }
     let ts = end_time; // stamp records at window end
 
     // Schema-gate each pass: streams from different frameworks carry different
@@ -59,6 +56,20 @@ pub async fn process_agent_signals_stream(
             .map(|s| s.field_with_name(name).is_ok())
             .unwrap_or(false)
     };
+
+    // Stream-level LLM gate: skip streams whose schema carries no gen_ai columns at
+    // all — they are plain service/HTTP trace streams (e.g. an OTel demo app), not
+    // agent telemetry, so none of the three passes can produce a meaningful signal.
+    // Mirrors the service-graph's `has_gen_ai` gate (keyed on `gen_ai_operation_name`
+    // presence), keeping the two rollups' notion of "is this an LLM stream" in sync
+    // and avoiding three wasted searches per window on non-agent streams. This is a
+    // coarse schema-level filter; the per-span `gen_ai_activity` predicate in the
+    // failure/cost SQL is what removes non-agent spans on a MIXED stream (where the
+    // column exists but most spans are infra traffic).
+    if !has_field("gen_ai_operation_name") {
+        return Ok(());
+    }
+
     // Failure classification reads the resolved taxonomy (org override → repo file
     // → embedded fallback), not a hardcoded set. Keep ONLY the configured columns
     // that actually exist on this stream — referencing a missing column is a hard
@@ -73,6 +84,11 @@ pub async fn process_agent_signals_stream(
     let has_failure_cols = !detail_fields.is_empty();
     let has_tool = has_field("gen_ai_tool_name");
     let has_cost = has_field("gen_ai_usage_cost");
+    // The failure/cost passes gate out non-agent (infra) spans via the gen_ai
+    // activity predicate, which references gen_ai_agent_id. Frameworks that never
+    // emit an agent id don't carry that column, so schema-gate it here — a missing
+    // column in the predicate would be a hard search error.
+    let has_agent_id = has_field("gen_ai_agent_id");
 
     let mut records = Vec::new();
 
@@ -85,6 +101,7 @@ pub async fn process_agent_signals_stream(
             end_time,
             &detail_fields,
             &taxonomy.failure_rules,
+            has_agent_id,
         );
         match crate::service::traces::service_graph::run_graph_search(
             org_id, sql, start_time, end_time,
@@ -111,7 +128,7 @@ pub async fn process_agent_signals_stream(
     }
     // R4 cost/diagnosis — needs gen_ai_usage_cost.
     if has_cost {
-        let sql = build_cost_sql(stream_name, start_time, end_time);
+        let sql = build_cost_sql(stream_name, start_time, end_time, has_agent_id);
         match crate::service::traces::service_graph::run_graph_search(
             org_id, sql, start_time, end_time,
         )
@@ -127,10 +144,12 @@ pub async fn process_agent_signals_stream(
 
 #[cfg(all(test, feature = "enterprise"))]
 mod test {
-    // process_agent_signals_stream must early-return Ok when disabled — no panic, no query.
+    // A stream that doesn't exist (no schema, so no gen_ai columns) must hit the
+    // stream-level LLM gate and return Ok without attempting any search — no panic,
+    // no query. Agent signals are always on, so the gate (not an enable flag) is
+    // what makes this a no-op.
     #[tokio::test]
-    async fn test_process_stream_noop_when_disabled() {
-        // enabled defaults to false; the fn must return Ok without attempting a search.
+    async fn test_process_stream_noop_for_non_llm_stream() {
         let r = super::process_agent_signals_stream("default", "nostream", 0, 1).await;
         assert!(r.is_ok());
     }
