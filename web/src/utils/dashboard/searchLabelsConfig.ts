@@ -16,7 +16,7 @@ const SECTION_DEFS = [
   { id: "general", icon: "settings" },
   { id: "promqlTable", icon: "table-chart" },
   { id: "geographic", icon: "location-on" },
-  { id: "legend", icon: "stacked-line-chart" },
+  { id: "legend", icon: "format-list-bulleted" },
   { id: "data", icon: "data-object" },
   { id: "axis", icon: "analytics" },
   { id: "labels", icon: "label" },
@@ -25,14 +25,14 @@ const SECTION_DEFS = [
   { id: "pivotTable", icon: "table-view" },
   { id: "valueTransformations", icon: "transform" },
   { id: "fieldOverrides", icon: "tune" },
-  { id: "map", icon: "layers" },
+  { id: "map", icon: "location-on" },
   { id: "gauge", icon: "speed" },
   { id: "layout", icon: "dashboard" },
   { id: "colors", icon: "palette" },
   { id: "drilldown", icon: "ads-click" },
   { id: "comparison", icon: "compare-arrows" },
   { id: "markLines", icon: "timeline" },
-  { id: "background", icon: "image" },
+  { id: "background", icon: "color-lens" },
 ] as const satisfies ReadonlyArray<SectionDef>;
 
 export type SectionId = (typeof SECTION_DEFS)[number]["id"];

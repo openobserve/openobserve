@@ -1219,7 +1219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.configSectionValueTransformations")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1248,7 +1248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.configSectionFieldOverrides")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1690,7 +1690,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.drilldown")
         }}</span>
         <OIcon
@@ -1729,7 +1729,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.comparisonAgainst")
         }}</span>
         <OIcon
@@ -1796,7 +1796,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-compact font-medium text-collapsible-label">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.markLines")
         }}</span>
         <OIcon

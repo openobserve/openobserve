@@ -123,25 +123,25 @@ watch(
         <OIcon
           v-if="icon && isOIcon"
           :name="(icon as any)"
-          size="md"
+          size="sm"
           class="text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
         />
         <span
           v-else-if="icon"
-          class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
+          class="material-icons-outlined text-icon-sm text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
           aria-hidden="true"
           >{{ icon }}</span
         >
 
         <span
           v-if="hasCustomTrigger"
-          class="flex flex-1 items-center gap-2 min-w-0"
+          class="flex flex-1 items-center gap-2 min-w-0 group-data-[state=open]:text-collapsible-icon-open"
         >
           <slot name="trigger" :open="isOpen" />
         </span>
         <span v-else class="flex flex-col flex-1 min-w-0">
           <span
-            class="font-medium text-collapsible-label truncate text-compact"
+            class="font-medium text-collapsible-label truncate text-compact group-data-[state=open]:text-collapsible-icon-open"
             >{{ label }}</span
           >
           <span
@@ -153,7 +153,7 @@ watch(
 
         <OIcon
           name="chevron-right"
-          size="md"
+          size="sm"
           class="shrink-0 text-collapsible-icon transition-transform duration-200 group-data-[state=open]:text-collapsible-icon-open"
           :class="isOpen ? 'rotate-90' : 'rotate-0'"
         />
