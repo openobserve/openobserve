@@ -364,6 +364,8 @@
   },
   "common": {
     "beta": "Beta",
+    "play": "Play",
+    "pause": "Pause",
     "close": "Close",
     "cancel": "Cancel",
     "ok": "OK",
@@ -903,6 +905,9 @@
     "synthetic": "Synthetics"
   },
   "rum": {
+    "noSessionReplay": "No session replay available",
+    "seek": "Seek",
+    "playbackSpeed": "Playback speed",
     "title": "Real User Monitoring",
     "subtitle": "Monitor real-user sessions, errors, and frontend performance",
     "issueColumn": "Issue",
@@ -1011,6 +1016,7 @@
     "desktop": "Desktop",
     "mobile": "Mobile",
     "tablet": "Tablet",
+    "platform": "Platform",
     "vsPreviousPeriod": "vs previous period",
     "seeSessions": "See the sessions",
     "openErrorTracking": "Open in Error Tracking",
