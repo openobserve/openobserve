@@ -155,6 +155,12 @@ export default class DashboardFavorites {
     await this.getRowDeleteBtn(dashboardName).click();
     await this.deleteConfirmBtn.waitFor({ state: "visible", timeout: 15000 });
     await this.deleteConfirmBtn.click();
+    // Wait for the dialog to actually close before the caller asserts on
+    // the resulting list state, instead of racing the close animation.
+    await this.page
+      .locator('[data-test="dashboard-confirm-dialog"]')
+      .waitFor({ state: "detached", timeout: 10000 })
+      .catch(() => {});
   }
 
   async selectDashboard(dashboardName) {

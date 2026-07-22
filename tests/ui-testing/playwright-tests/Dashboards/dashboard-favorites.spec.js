@@ -29,8 +29,10 @@ test.describe("dashboard favorites testcases", () => {
     testLogger.debug("Test setup - beforeEach hook executing");
     await login(page);
     await page.waitForTimeout(1000);
+    // Favorites tests never query the ingested stream (no panels/search
+    // involved), so there's no need to wait out log-indexing lag here —
+    // ingestion() itself already awaits the POST response.
     await ingestion(page);
-    await page.waitForTimeout(2000);
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
@@ -46,7 +48,8 @@ test.describe("dashboard favorites testcases", () => {
     await pm.dashboardFolder.createFolder(folderName);
     await pm.dashboardFolder.searchFolder(folderName);
     await pm.dashboardFolder.openFolderByName(folderName);
-    await page.waitForTimeout(1000);
+    // No fixed settle wait needed — createDashboard() below already waits
+    // for the "New Dashboard" button to be visible before acting.
 
     await pm.dashboardCreate.createDashboard(dashboardName);
     await pm.dashboardCreate.backToDashboardList();
@@ -114,6 +117,9 @@ test.describe("dashboard favorites testcases", () => {
     await pm.dashboardFavorites.selectDashboard(dashboardName);
     await pm.dashboardFavorites.bulkDeleteSelected();
 
+    // Positive check: the delete actually succeeded server-side, not just
+    // that the row disappeared from an optimistic UI update.
+    await pm.dashboardFavorites.verifySuccessToast();
     await pm.dashboardFavorites.verifyNoErrorToast();
     await pm.dashboardFavorites.verifyDashboardNotPresent(dashboardName);
   });
@@ -128,6 +134,7 @@ test.describe("dashboard favorites testcases", () => {
 
     // Delete it from the folder it actually lives in.
     await pm.dashboardFavorites.deleteDashboardFromRow(dashboardName);
+    await pm.dashboardFavorites.verifySuccessToast();
     await pm.dashboardFavorites.verifyDashboardNotPresent(dashboardName);
 
     // Favorites must not keep a ghost row for it.
@@ -147,6 +154,7 @@ test.describe("dashboard favorites testcases", () => {
     await pm.dashboardFavorites.openFavoritesFolder();
     await pm.dashboardFavorites.selectDashboard(dashboardName);
     await pm.dashboardFavorites.bulkDeleteSelected();
+    await pm.dashboardFavorites.verifySuccessToast();
     await pm.dashboardFavorites.verifyNoErrorToast();
 
     // Navigate back to the source folder WITHOUT reloading — a reload would
