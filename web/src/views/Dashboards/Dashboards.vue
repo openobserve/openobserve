@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div
-                class="flex w-full justify-between items-center py-1"
+                class="flex w-full justify-between items-center gap-4 py-1"
               >
                 <div
                   class="text-xs font-normal flex items-center shrink-0"
