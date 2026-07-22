@@ -4,7 +4,7 @@
     "rawVarInComponent": 584,
     "arbZ": 0,
     "darkMechanism": 20,
-    "unscopedStyle": 7,
+    "unscopedStyle": 2,
     "stylePxUnit": 84
   },
   "files": {
@@ -65,17 +65,11 @@
     "components/anomaly_detection/AnomalySummary.vue": {
       "rawVarInComponent": 7
     },
-    "components/common/BaseImport.vue": {
-      "unscopedStyle": 1
-    },
     "components/dashboards/QueryInspector.vue": {
       "rawVarInComponent": 4
     },
     "components/dashboards/addPanel/DrilldownUserGuide.vue": {
       "rawVarInComponent": 2
-    },
-    "components/dashboards/panels/HTMLRenderer.vue": {
-      "unscopedStyle": 2
     },
     "components/dashboards/panels/TableRenderer.vue": {
       "rawVarInComponent": 8
@@ -327,11 +321,7 @@
     "views/Dashboards/DashboardSettings.vue": {
       "rawVarInComponent": 3
     },
-    "views/Dashboards/ImportDashboard.vue": {
-      "unscopedStyle": 1
-    },
     "views/Dashboards/RenderDashboardCharts.vue": {
-      "unscopedStyle": 1,
       "rawVarInComponent": 4
     },
     "views/Dashboards/ScheduledDashboards.vue": {
