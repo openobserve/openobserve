@@ -41,12 +41,18 @@ pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>)
     let status =
         StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     match err {
-        errors::Error::ErrorCode(code) => (
-            status,
-            [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-            Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-        )
-            .into_response(),
+        errors::Error::ErrorCode(code) => {
+            let mut body = MetaHttpResponse::error_code_with_trace_id(code, trace_id);
+            // attach hint/did-you-mean suggestions where the code carries
+            // enough information (no-op for the rest)
+            crate::error_suggest::enrich(&mut body, code);
+            (
+                status,
+                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
+                Json(body),
+            )
+                .into_response()
+        }
         // These errors don't carry a structured error code, so we don't set the
         // `X-Error-Message` header (it should only carry error codes). The full
         // message is still returned in the JSON response body.
