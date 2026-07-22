@@ -137,8 +137,13 @@ function deleteSelectedSteps() {
   selectedStepIds.value = []
 }
 
-// Clear selection when the step list changes, filter changes, or replay starts
-watch(() => props.modelValue.length, () => { selectedStepIds.value = [] })
+// Clear selection when the step list changes, filter changes, or replay starts.
+// Also clear replay banner when all steps are deleted so stale pass/fail banners
+// don't linger after the user removes every step.
+watch(() => props.modelValue.length, (newLen) => {
+  selectedStepIds.value = []
+  if (newLen === 0) emit('clear-results')
+})
 watch(filterQuery, () => { selectedStepIds.value = [] })
 watch(() => props.replayPhase, (phase) => {
   if (phase === 'running') {
