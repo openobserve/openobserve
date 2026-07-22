@@ -134,6 +134,7 @@ describe("IngestLogs Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "loongcollector",
       ]);
     });
   });
@@ -250,6 +251,18 @@ describe("IngestLogs Component", () => {
       const tw = mount(IngestLogs, buildMountOptions());
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "syslogNg",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
+    it("should push with org_identifier query when route is 'loongcollector'", () => {
+      mockRouter.currentRoute.value.name = "loongcollector";
+      const tw = mount(IngestLogs, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "loongcollector",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
         },
