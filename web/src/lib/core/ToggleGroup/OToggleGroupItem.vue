@@ -26,7 +26,9 @@ const props = withDefaults(defineProps<ToggleGroupItemProps>(), {
 
 const slots = defineSlots<ToggleGroupItemSlots>();
 
-const context = inject<ComputedRef<ToggleGroupContext>>(
+// An item may be used standalone (no OToggleGroup parent), so the context is
+// optional and every read below is guarded.
+const context = inject<ComputedRef<ToggleGroupContext> | undefined>(
   TOGGLE_GROUP_CONTEXT_KEY,
   undefined,
 );
