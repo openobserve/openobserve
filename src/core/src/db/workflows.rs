@@ -22,7 +22,7 @@ use config::get_config;
 use infra::{
     coordinator::get_coordinator,
     db::Event,
-    table::workflows::{Workflow, WorkflowRunErrors},
+    table::workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors},
 };
 use tokio::sync::RwLock;
 
@@ -299,6 +299,89 @@ pub async fn send_workflow_trigger(trigger: WorkflowTrigger) -> Result<(), anyho
                         trigger.trigger_type,
                         trigger.workflow_id,
                         trigger.trace_id
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn associate_workflow(
+    org_id: &str,
+    workflow_id: &str,
+    entity_id: &str,
+    entity_type: String,
+    trigger_type: String,
+) -> Result<(), anyhow::Error> {
+    let assoc = WorkflowAssociation {
+        id: 0,
+        org_id: org_id.to_string(),
+        entity_id: entity_id.to_string(),
+        entity_type,
+        workflow_id: workflow_id.to_string(),
+        trigger_type,
+        created_at: chrono::Utc::now().timestamp_micros(),
+    };
+    infra::table::workflows::add_workflow_association(assoc.clone()).await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::send_workflow_association(
+                serde_json::to_string(&assoc)?,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent workflow association notification to super cluster queue for org: {} type {} entity_id: {} workflow_id: {}",
+                        assoc.org_id,
+                        assoc.trigger_type,
+                        assoc.entity_id,
+                        assoc.workflow_id
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending workflow association notification to super cluster queue for org: {} type {} entity_id: {} workflow_id: {} : {e}",
+                        assoc.org_id,
+                        assoc.trigger_type,
+                        assoc.entity_id,
+                        assoc.workflow_id
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn delete_workflow_association(
+    org_id: &str,
+    workflow_id: &str,
+    entity_id: &str,
+) -> Result<(), anyhow::Error> {
+    infra::table::workflows::delete_workflow_association(org_id, workflow_id, entity_id).await?;
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::delete_workflow_association(
+                format!("{org_id}/{entity_id}/{workflow_id}"),
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent workflow association delete notification to super cluster queue for org: {org_id} entity_id: {entity_id} workflow_id: {workflow_id}",
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending workflow association delete notification to super cluster queue for org: {org_id} entity_id: {entity_id} workflow_id: {workflow_id} : {e}",
                     );
                 }
             }

@@ -27,7 +27,7 @@ use infra::{
             search_jobs::JobOperator,
         },
         source_maps::SourceMap,
-        workflows::{Workflow, WorkflowRunErrors},
+        workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors},
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
@@ -218,6 +218,60 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                     None,
                 )
                 .await?;
+        }
+
+        MessageType::WorkflowAssociationPut => {
+            let assoc: WorkflowAssociation = json::from_slice(&msg.value.unwrap())?;
+            let org_id = assoc.org_id.clone();
+            let wid = assoc.workflow_id.clone();
+            let eid = assoc.entity_id.clone();
+            let ttyp = assoc.trigger_type.clone();
+            log::info!(
+                "received workflow association store notification for {org_id} trigger_type: {ttyp} entity_id {eid} workflow_id {wid}"
+            );
+            match infra::table::workflows::add_workflow_association(assoc).await {
+                Ok(_) => {
+                    log::info!(
+                        "successfully handled workflow association store notification for {org_id} trigger_type: {ttyp} entity_id {eid} workflow_id {wid}"
+                    );
+                }
+                Err(e) => {
+                    log::info!(
+                        "error in handling workflow association store notification for {org_id} trigger_type: {ttyp} entity_id {eid} workflow_id {wid}: {e}"
+                    );
+                }
+            }
+        }
+
+        MessageType::WorkflowAssociationDelete => {
+            let key = msg.value.unwrap();
+            let key = String::from_utf8_lossy(&key);
+            let parts: Vec<_> = key.split("/").collect();
+            if parts.len() < 3 {
+                log::error!("invalid key received in workflow association delete message : {key}");
+                return Ok(());
+            }
+            let org_id = parts[0];
+            let entity_id = parts[1];
+            let workflow_id = parts[2];
+            match infra::table::workflows::delete_workflow_association(
+                org_id,
+                workflow_id,
+                entity_id,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully handled workflow association delete notification for {org_id} entity_id {entity_id} workflow_id {workflow_id}"
+                    );
+                }
+                Err(e) => {
+                    log::info!(
+                        "error in handling workflow association delete notification for {org_id} entity_id {entity_id} workflow_id {workflow_id}: {e}"
+                    );
+                }
+            }
         }
 
         _ => {

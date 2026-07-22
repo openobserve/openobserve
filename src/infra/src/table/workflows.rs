@@ -21,7 +21,10 @@ use super::{
     entity::{workflow_errors, workflow_run_data, workflows},
     get_lock,
 };
-use crate::db::{ORM_CLIENT, connect_to_orm};
+use crate::{
+    db::{ORM_CLIENT, connect_to_orm},
+    table::entity::workflow_associations,
+};
 
 #[derive(Deserialize, Serialize, Clone)]
 pub struct Workflow {
@@ -109,6 +112,31 @@ impl From<workflow_run_data::Model> for WorkflowRunData {
             run_id: value.run_id,
             triggered_at: value.triggered_at,
             data: value.data,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct WorkflowAssociation {
+    pub id: i32,
+    pub org_id: String,
+    pub entity_id: String,
+    pub entity_type: String,
+    pub workflow_id: String,
+    pub trigger_type: String,
+    pub created_at: i64,
+}
+
+impl From<workflow_associations::Model> for WorkflowAssociation {
+    fn from(value: workflow_associations::Model) -> Self {
+        Self {
+            id: value.id,
+            org_id: value.org_id,
+            entity_id: value.entity_id,
+            entity_type: value.entity_type,
+            workflow_id: value.workflow_id,
+            trigger_type: value.trigger_type,
+            created_at: value.created_at,
         }
     }
 }
@@ -409,6 +437,73 @@ pub async fn save_workflow_run_data(entry: WorkflowRunData) -> Result<(), anyhow
         ..Default::default()
     };
     workflow_run_data::Entity::insert(model)
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_all_associations_for_workflow(
+    org_id: &str,
+    workflow_id: &str,
+) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let ret = workflow_associations::Entity::find()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::WorkflowId.eq(workflow_id))
+        .all(client)
+        .await?;
+    let res = ret.into_iter().map(Into::into).collect();
+    Ok(res)
+}
+
+pub async fn get_all_associations_for_entity(
+    org_id: &str,
+    entity_id: &str,
+    entity_type: &str,
+) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let ret = workflow_associations::Entity::find()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::EntityId.eq(entity_id))
+        .filter(workflow_associations::Column::EntityType.eq(entity_type))
+        .all(client)
+        .await?;
+    let res = ret.into_iter().map(Into::into).collect();
+    Ok(res)
+}
+
+pub async fn add_workflow_association(entry: WorkflowAssociation) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    let model = workflow_associations::ActiveModel {
+        org_id: Set(entry.org_id),
+        workflow_id: Set(entry.workflow_id),
+        entity_id: Set(entry.entity_id),
+        entity_type: Set(entry.entity_type),
+        trigger_type: Set(entry.trigger_type),
+        ..Default::default()
+    };
+    workflow_associations::Entity::insert(model)
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_workflow_association(
+    org_id: &str,
+    workflow_id: &str,
+    entity_id: &str,
+) -> Result<(), anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let _lock = get_lock().await;
+
+    workflow_associations::Entity::delete_many()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::WorkflowId.eq(workflow_id))
+        .filter(workflow_associations::Column::EntityId.eq(entity_id))
         .exec(client)
         .await?;
     Ok(())
