@@ -148,9 +148,6 @@ import OButton from '@/lib/core/Button/OButton.vue';
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OCard from "@/lib/core/Card/OCard.vue";
-import OCardSection from "@/lib/core/Card/OCardSection.vue";
 export default defineComponent({
   name: "SyntaxGuideMetrics",
   components: { OButton, OIcon, ODropdown },

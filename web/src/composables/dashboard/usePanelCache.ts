@@ -110,9 +110,9 @@ export const usePanelCache = (
 ) => {
   if (!(folderId && dashboardId && panelId)) {
     const savePanelCache = async (
-      key: any,
-      data: any,
-      cacheTimeRange: any,
+      _key: any,
+      _data: any,
+      _cacheTimeRange: any,
     ): Promise<void> => {
       // do nothing
     };

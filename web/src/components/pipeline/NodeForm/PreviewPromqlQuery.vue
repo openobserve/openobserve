@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   const chartPanelRef = ref(null);
   const chartData = ref({});
   
-  const store = useStore();
+  useStore();
   
   const refreshData = () => {
   

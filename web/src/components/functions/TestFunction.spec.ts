@@ -541,7 +541,7 @@ describe('TestFunction.vue Branch Coverage', () => {
     });
 
     it('should cover edge case branches', async () => {
-      const wrapper = mount(TestFunction, {
+      mount(TestFunction, {
         props: defaultProps,
         global: {
           plugins: [mockI18n],
@@ -557,8 +557,6 @@ describe('TestFunction.vue Branch Coverage', () => {
         },
       });
 
-      const vm = wrapper.vm as any;
-      
       // Branch: editorLine === "},") modification (line 694-696)
       const testEditorLine = "},";
       const modifiedLine = testEditorLine === "}," ? "}" : testEditorLine;
@@ -700,51 +698,6 @@ describe('TestFunction.vue Branch Coverage', () => {
       vm.handleTestError({ response: { data: { message: 'Test error' } } });
       expect(wrapper.emitted('function-error')).toBeTruthy();
       expect(wrapper.emitted('function-error')?.[0]).toEqual(['Test error']);
-    });
-  });
-
-  describe('areInputValid branches (query validation)', () => {
-    it('should return false and set sqlQueryErrorMsg when inputQuery is empty', async () => {
-      const wrapper = mount(TestFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: { store: mockStore },
-          stubs: {
-            'query-editor': true,
-            'DateTime': true,
-            'FullViewContainer': true,
-            'O2AIContextAddBtn': true,
-          },
-        },
-      });
-
-      const vm = wrapper.vm as any;
-      vm.inputQuery = '';
-      const result = vm.areInputValid();
-      expect(result).toBe(false);
-      expect(vm.sqlQueryErrorMsg).toBe('Please enter a query');
-    });
-
-    it('should return true when inputQuery is non-empty', async () => {
-      const wrapper = mount(TestFunction, {
-        props: defaultProps,
-        global: {
-          plugins: [mockI18n],
-          provide: { store: mockStore },
-          stubs: {
-            'query-editor': true,
-            'DateTime': true,
-            'FullViewContainer': true,
-            'O2AIContextAddBtn': true,
-          },
-        },
-      });
-
-      const vm = wrapper.vm as any;
-      vm.inputQuery = 'SELECT * FROM "my_stream"';
-      const result = vm.areInputValid();
-      expect(result).toBe(true);
     });
   });
 

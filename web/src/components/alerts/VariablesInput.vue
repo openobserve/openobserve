@@ -109,12 +109,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { inject, ref } from "vue";
+import type { Ref } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from '@/lib/core/Button/OButton.vue';
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+
+interface VariableRow {
+  key: string;
+  value: string;
+}
 
 const props = defineProps({
   /**
@@ -146,13 +152,13 @@ const resolvePath = (obj: any, path: string): any =>
 
 // ⚠️ MUST be form.useStore (reactive) — NOT form.state.values (a snapshot a
 // computed won't track; playbook §2).
-const formRows = injectedForm
+const formRows: Ref<VariableRow[]> = injectedForm
   ? injectedForm.useStore((s: any) =>
       props.namePrefix ? (resolvePath(s.values, props.namePrefix) ?? []) : [],
     )
-  : ref<any[]>([]);
+  : ref<VariableRow[]>([]);
 
-const makeVariableRow = () => ({ key: "", value: "" });
+const makeVariableRow = (): VariableRow => ({ key: "", value: "" });
 
 const addFormRow = () =>
   injectedForm?.pushFieldValue(props.namePrefix, makeVariableRow());

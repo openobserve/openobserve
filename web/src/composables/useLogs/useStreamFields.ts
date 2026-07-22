@@ -37,14 +37,11 @@ import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import {
   resolveFieldGroup,
-  getGroupLabel,
-  groupSortOrder,
   buildSemanticIndex,
   discoverPrefixes,
   applyFieldGrouping,
   shouldApplyFieldGrouping,
   CATEGORY,
-  type SemanticIndex,
   type FieldObj,
 } from "@/utils/fieldCategories";
 import type { KeyFieldsConfig, FieldGroupingConfig } from "@/composables/useServiceCorrelation";
@@ -161,7 +158,6 @@ export const useStreamFields = () => {
       if (searchObj.data.streamResults.list.length > 0) {
         const timestampField = store.state.zoConfig.timestamp_column;
         const allField = store.state.zoConfig?.all_fields_name;
-        const schemaInterestingFields: string[] = [];
         let userDefineSchemaSettings: any = [];
         const schemaMaps: any = [];
         const commonSchemaMaps: any = [];
@@ -172,7 +168,6 @@ export const useStreamFields = () => {
         let commonSchemaFieldsIndex: number = -1;
         let fieldObj: any = {};
         const localInterestingFields: any = useLocalInterestingFields();
-        const streamInterestingFields: any = [];
         let streamInterestingFieldsLocal: any = [];
 
         const selectedStreamValues = searchObj.data.stream.selectedStream
@@ -284,7 +279,6 @@ export const useStreamFields = () => {
               searchObj.loadingStream = false;
               searchObj.data.errorMsg = t("search.noFieldFound");
               throw new Error(searchObj.data.errorMsg);
-              return;
             }
 
             stream.settings = { ...streamData.settings };
@@ -323,7 +317,7 @@ export const useStreamFields = () => {
 
             let environmentInterestingFields = new Set();
             if (
-              store.state.zoConfig.hasOwnProperty("default_quick_mode_fields")
+              Object.prototype.hasOwnProperty.call(store.state.zoConfig, "default_quick_mode_fields")
             ) {
               environmentInterestingFields = new Set(
                 store.state?.zoConfig?.default_quick_mode_fields,
@@ -331,17 +325,17 @@ export const useStreamFields = () => {
             }
 
             if (
-              stream.settings.hasOwnProperty("defined_schema_fields") &&
+              Object.prototype.hasOwnProperty.call(stream.settings, "defined_schema_fields") &&
               userDefineSchemaSettings.length > 0
             ) {
               searchObj.meta.hasUserDefinedSchemas = true;
-              if (store.state.zoConfig.hasOwnProperty("timestamp_column")) {
+              if (Object.prototype.hasOwnProperty.call(store.state.zoConfig, "timestamp_column")) {
                 userDefineSchemaSettings.push(
                   store.state.zoConfig?.timestamp_column,
                 );
               }
 
-              if (store.state.zoConfig.hasOwnProperty("all_fields_name")) {
+              if (Object.prototype.hasOwnProperty.call(store.state.zoConfig, "all_fields_name")) {
                 userDefineSchemaSettings.push(
                   store.state.zoConfig?.all_fields_name,
                 );
@@ -416,9 +410,9 @@ export const useStreamFields = () => {
               stream.name,
             )
               ? [
-                  ...localInterestingFields.value?.[
+                  ...(localInterestingFields.value?.[
                     searchObj.organizationIdentifier + "_" + stream.name
-                  ],
+                  ] ?? []),
                   ...filteredEnvironmentInterestingFields,
                 ]
               : [...filteredEnvironmentInterestingFields];
@@ -487,7 +481,7 @@ export const useStreamFields = () => {
               if (
                 store.state.zoConfig.user_defined_schemas_enabled &&
                 searchObj.meta.useUserDefinedSchemas == "user_defined_schema" &&
-                stream.settings.hasOwnProperty("defined_schema_fields") &&
+                Object.prototype.hasOwnProperty.call(stream.settings, "defined_schema_fields") &&
                 userDefineSchemaSettings.length > 0
               ) {
                 if (userDefineSchemaSettings.includes(field)) {
@@ -497,7 +491,7 @@ export const useStreamFields = () => {
                     fieldObj.group = "common";
 
                     if (
-                      schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
+                      Object.prototype.hasOwnProperty.call(schemaMaps[schemaFieldsIndex], "streams") &&
                       schemaMaps[schemaFieldsIndex].streams.length > 0
                     ) {
                       fieldObj.streams.push(
@@ -609,7 +603,7 @@ export const useStreamFields = () => {
                 if (schemaFieldsIndex > -1) {
                   fieldObj.group = "common";
                   if (
-                    schemaMaps[schemaFieldsIndex].hasOwnProperty("streams") &&
+                    Object.prototype.hasOwnProperty.call(schemaMaps[schemaFieldsIndex], "streams") &&
                     schemaMaps[schemaFieldsIndex].streams.length > 0
                   ) {
                     fieldObj.streams.push(
@@ -744,7 +738,7 @@ export const useStreamFields = () => {
 
             // check for user defined schema is false then only consider checking new fields from result set
             if (
-              searchObj.data.queryResults.hasOwnProperty("hits") &&
+              Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "hits") &&
               searchObj.data.queryResults?.hits.length > 0 &&
               searchObj.data.stream.selectedStream.length == 1 &&
               (!store.state.zoConfig.user_defined_schemas_enabled ||
@@ -1137,8 +1131,9 @@ export const useStreamFields = () => {
         searchObj.meta.resultGrid.manualRemoveFields = false;
         if (
           (searchObj.meta.sqlMode == true &&
-            parsedSQL.hasOwnProperty("columns") &&
-            searchObj.data.queryResults?.hits[0].hasOwnProperty(
+            Object.prototype.hasOwnProperty.call(parsedSQL, "columns") &&
+            Object.prototype.hasOwnProperty.call(
+              searchObj.data.queryResults?.hits[0] ?? {},
               store.state.zoConfig.timestamp_column,
             )) ||
           searchObj.meta.sqlMode == false ||
@@ -1192,7 +1187,7 @@ export const useStreamFields = () => {
       } else {
         if (
           searchObj.data.queryResults.hits?.some((item: any) =>
-            item.hasOwnProperty(store.state.zoConfig.timestamp_column),
+            Object.prototype.hasOwnProperty.call(item, store.state.zoConfig.timestamp_column),
           ) ||
           searchObj.data.hasSearchDataTimestampField ||
           selectedFields.includes(store.state.zoConfig.timestamp_column)
@@ -1227,15 +1222,17 @@ export const useStreamFields = () => {
         }
 
         let sizes: any;
+        // selectedStream array is coerced to its comma-joined string form as key
         if (
           searchObj.data.resultGrid.colSizes &&
-          searchObj.data.resultGrid.colSizes.hasOwnProperty(
-            searchObj.data.stream.selectedStream,
+          Object.prototype.hasOwnProperty.call(
+            searchObj.data.resultGrid.colSizes,
+            searchObj.data.stream.selectedStream.join(","),
           )
         ) {
           sizes =
             searchObj.data.resultGrid.colSizes[
-              searchObj.data.stream.selectedStream
+              searchObj.data.stream.selectedStream.join(",")
             ];
         }
 
@@ -1244,7 +1241,7 @@ export const useStreamFields = () => {
 
         for (const field of selectedFields) {
           if (field != store.state.zoConfig.timestamp_column) {
-            let foundKey, foundValue;
+            let foundValue;
 
             if (sizes?.length > 0) {
               Object.keys(sizes[0]).forEach((key) => {
@@ -1252,7 +1249,6 @@ export const useStreamFields = () => {
                   .replace(/^--(header|col)-/, "")
                   .replace(/-size$/, "");
                 if (trimmedKey === field) {
-                  foundKey = key;
                   foundValue = sizes[0][key];
                 }
               });
@@ -1311,7 +1307,7 @@ export const useStreamFields = () => {
         itemHits = {};
         // searchObj.data.stream.selectedFields.forEach((field) => {
         for (const field of searchObj.data.stream.selectedFields) {
-          if (hit.hasOwnProperty(field)) {
+          if (Object.prototype.hasOwnProperty.call(hit, field)) {
             itemHits[field] = hit[field];
           }
         }

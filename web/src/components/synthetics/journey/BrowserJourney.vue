@@ -377,7 +377,7 @@ function handleInsertBelow(row: BrowserStep) {
   const idx = findIndex(row)
   if (idx < 0) return
   const next = [...props.modelValue]
-  next.splice(idx + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 })
+  next.splice(idx + 1, 0, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000, code: '' })
   emit('update:modelValue', next)
 }
 function handleRowReorder(reordered: BrowserStep[]) {
@@ -390,7 +390,7 @@ function handleUpdateExpanded(ids: string[]) {
   expandedStepIds.value = ids
 }
 function addStep() {
-  emit('update:modelValue', [...props.modelValue, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000 }])
+  emit('update:modelValue', [...props.modelValue, { id: getUUIDv7(true), action: 'click', name: '', timeout: 30000, code: '' }])
 }
 function duplicateCapturedStep(index: number, step: BrowserStep) {
   capturedSteps.value.splice(index + 1, 0, { ...step, id: getUUIDv7(true) })

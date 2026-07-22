@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -230,11 +230,6 @@ const createFreshMockData = (overrides = {}) => {
 
 describe("DashboardQueryEditor", () => {
   let wrapper: any;
-
-  const defaultProps = {
-    dashboardPanelData: createFreshMockData(),
-    promqlMode: false,
-  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -558,8 +553,6 @@ describe("DashboardQueryEditor", () => {
     it("should handle query text changes", async () => {
       wrapper = createWrapper();
 
-      const initialQuery = wrapper.vm.dashboardPanelData.data.queries[0].query;
-
       // Simulate query change
       wrapper.vm.dashboardPanelData.data.queries[0].query =
         "SELECT * FROM updated_table";
@@ -639,8 +632,6 @@ describe("DashboardQueryEditor", () => {
   describe("Performance and Optimization", () => {
     it("should handle component updates efficiently", async () => {
       wrapper = createWrapper();
-
-      const initialRenderCount = wrapper.vm.$el ? 1 : 0;
 
       // Update panel data
       wrapper.vm.dashboardPanelData.data.queries[0].query = "Updated query";

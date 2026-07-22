@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import PatternDetailsDialog from "./PatternDetailsDialog.vue";
+import { PATTERN_VOLUME_CACHE } from "./usePatternVolume";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
@@ -94,9 +95,22 @@ const WildcardValuePopoverStub = {
   template: '<span data-test-stub="wildcard-value-popover"><slot /></span>',
 };
 
+/** Volume the rows would already have cached for the pattern under test. */
+const CACHED_VOLUME_TOTAL = 78_000;
+
+const volumeCacheStub = {
+  request: () => Promise.resolve(),
+  get: () => ({
+    buckets: [CACHED_VOLUME_TOTAL],
+    total: CACHED_VOLUME_TOTAL,
+    intervalSecs: 1680,
+    loading: false,
+  }),
+};
+
 const globalConfig = {
   plugins: [i18n],
-  provide: { store },
+  provide: { store, [PATTERN_VOLUME_CACHE as symbol]: volumeCacheStub },
   stubs: {
     ODrawer: ODrawerStub,
     OButton: OButtonStub,
@@ -148,6 +162,37 @@ describe("PatternDetailsDialog", () => {
 
   it("should mount PatternDetailsDialog component", () => {
     expect(wrapper.exists()).toBe(true);
+  });
+
+  describe("Panel actions (moved from each row)", () => {
+    it("renders include, exclude, and create-alert buttons", () => {
+      expect(wrapper.find('[data-test="pattern-detail-include-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="pattern-detail-exclude-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="pattern-detail-create-alert-btn"]').exists()).toBe(true);
+    });
+
+    it("emits add-to-search 'include' and closes the drawer on include click", async () => {
+      await wrapper.find('[data-test="pattern-detail-include-btn"]').trigger("click");
+      expect(wrapper.emitted("add-to-search")![0]).toEqual([
+        mockSelectedPattern.pattern,
+        "include",
+      ]);
+      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+    });
+
+    it("emits add-to-search 'exclude' on exclude click", async () => {
+      await wrapper.find('[data-test="pattern-detail-exclude-btn"]').trigger("click");
+      expect(wrapper.emitted("add-to-search")![0]).toEqual([
+        mockSelectedPattern.pattern,
+        "exclude",
+      ]);
+    });
+
+    it("emits create-alert and closes the drawer on create-alert click", async () => {
+      await wrapper.find('[data-test="pattern-detail-create-alert-btn"]').trigger("click");
+      expect(wrapper.emitted("create-alert")![0]).toEqual([mockSelectedPattern.pattern]);
+      expect(wrapper.emitted("update:modelValue")![0]).toEqual([false]);
+    });
   });
 
   describe("ODrawer wrapper", () => {
@@ -211,10 +256,14 @@ describe("PatternDetailsDialog", () => {
   });
 
   describe("Statistics Section", () => {
-    it("should display occurrences with locale formatting", () => {
+    // The panel must show the pattern's real window-wide volume straight away.
+    // It used to render `pattern.frequency` (the extraction sample — a few
+    // hundred) while its own query ran, so the number visibly jumped.
+    it("shows the cached window volume, never the extraction sample", () => {
       const text = wrapper.text();
       expect(text).toContain("Occurrences");
-      expect(text).toContain("1,234");
+      expect(text).toContain("~78K");
+      expect(text).not.toContain("1,234");
     });
 
     it("should display percentage with 2 decimal places", () => {

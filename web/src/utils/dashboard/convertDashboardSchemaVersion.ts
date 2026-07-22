@@ -178,6 +178,7 @@ export function convertDashboardSchemaVersion(data: any) {
       // remove layouts key from data
       delete data.layouts;
     }
+    // falls through — each migration step feeds the next
     case 2: {
       // layout width migration from 12 col number to 48 col number
       data.panels.forEach((panelItem: any) => {
@@ -199,6 +200,7 @@ export function convertDashboardSchemaVersion(data: any) {
       // update the version
       data.version = 3;
     }
+    // falls through — each migration step feeds the next
     case 3: {
       data.tabs.forEach((tabItem: any) => {
         tabItem.panels.forEach((panelItem: any) => {
@@ -218,6 +220,7 @@ export function convertDashboardSchemaVersion(data: any) {
       // update the version
       data.version = 4;
     }
+    // falls through — each migration step feeds the next
     case 4: {
       // Migrate the filter property from an array of {type, values, column, operator, value} to
       // an object with filterType: "group", logicalOperator: "AND", and conditions: [...]
@@ -263,6 +266,7 @@ export function convertDashboardSchemaVersion(data: any) {
       // update the version
       data.version = 5;
     }
+    // falls through — each migration step feeds the next
     case 5: {
       // layout width migration from 48 col number to 192 col number
       // layout height migration from 34px per row to 17px per row -> height will be doubled
@@ -277,6 +281,7 @@ export function convertDashboardSchemaVersion(data: any) {
       // update the version
       data.version = 6;
     }
+    // falls through — each migration step feeds the next
     case 6: {
       // Fix for existing v6 dashboards: Y coordinate was not scaled during v5->v6 migration
       // Since cell height changed from 34px to 17px (halved), and h was doubled,
@@ -293,6 +298,7 @@ export function convertDashboardSchemaVersion(data: any) {
       data.version = 7;
     }
 
+    // falls through — each migration step feeds the next
     case 7: {
       // need to traverse all panels
       // for each panel

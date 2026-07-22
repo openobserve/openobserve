@@ -67,7 +67,6 @@ import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceTree from "@/plugins/traces/TraceTree.vue";
 
 const mockStore = createStore({

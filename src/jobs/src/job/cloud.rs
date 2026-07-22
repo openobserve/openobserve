@@ -161,6 +161,7 @@ async fn run_trial_quota_flush() {
     loop {
         interval.tick().await;
         crate::service::trial_quota::flush_to_db().await;
+        crate::service::trial_quota::refresh_limits_from_db().await;
     }
 }
 
@@ -214,7 +215,11 @@ async fn check_all_orgs_ai_quota() {
             }
         };
 
-        let is_paid = trial_quota::org_has_active_subscription(&org_id).await;
+        let policy =
+            o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                &org_id,
+            )
+            .await;
         let used = trial_quota::get_used(&org_id);
         let limit = trial_quota::get_limit(&org_id);
 
@@ -226,9 +231,10 @@ async fn check_all_orgs_ai_quota() {
             }
         };
 
-        let (subject, body) = trial_quota::build_quota_email_message(
-            &org_id, &org_name, checkpoint, is_paid, used, limit,
-        );
+        let (subject, body) =
+            o2_enterprise::enterprise::cloud::ai_credits::build_ai_credit_quota_email(
+                &org_id, &org_name, checkpoint, policy, used, limit,
+            );
 
         let email = Email {
             recipients: vec![admin.email.clone()],

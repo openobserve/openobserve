@@ -41,7 +41,7 @@ const props = defineProps({
   },
 })
 
-const { removeEdges, getSelectedEdges, addSelectedEdges, removeSelectedEdges } = useVueFlow()
+useVueFlow()
 
 const path = computed(() => getBezierPath(props))
 

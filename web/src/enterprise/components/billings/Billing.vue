@@ -176,13 +176,11 @@ import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OSelect from '@/lib/forms/Select/OSelect.vue'
 import OButton from '@/lib/core/Button/OButton.vue'
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, computed, onMounted, provide, reactive, watch } from "vue";
+import { defineComponent, ref, computed, onMounted, provide, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import Usage from "./usage.vue";
 import { getImageURL } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -198,7 +196,7 @@ import { getConsumableRelativeTime } from "@/utils/date";
 export default defineComponent({
   name: "PageIngestion",
   components: {
-    OPageLayout, OTabs, ORouteTab, ConfirmDialog, Usage, AppTabs, OSelect,
+    OPageLayout, OTabs, ORouteTab, AppTabs, OSelect,
     OIcon, OSplitter, OButton, UsageMemberList, DateTimePickerDashboard },
   setup() {
     const { t } = useI18n();

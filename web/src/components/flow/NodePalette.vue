@@ -27,19 +27,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     title       — header label (defaults to "Nodes")
     testPrefix  — data-test prefix, so each editor keeps its existing selectors
 -->
-<script>
+<script lang="ts">
 // Palette styling lives in its own token-driven stylesheet (see the note at the
 // top of node-palette.css for why it cannot be scoped). Imported here rather
 // than through an SFC style block, so this component carries none at all.
 import "@/components/flow/node-palette.css";
 import { useI18n } from "vue-i18n";
+import type { PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+interface NodePaletteItem {
+  subtype?: string;
+  io_type?: string;
+  isSectionHeader?: boolean;
+  label?: string;
+  tooltip?: string;
+  icon?: string;
+  [key: string]: unknown;
+}
+
 export default {
   props: {
-    items: { type: Array, default: () => [] },
+    items: { type: Array as PropType<NodePaletteItem[]>, default: () => [] },
     title: { type: String, default: "" },
     testPrefix: { type: String, default: "flow-node-palette" },
     onDragStart: { type: Function, default: undefined },

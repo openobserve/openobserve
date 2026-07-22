@@ -496,23 +496,20 @@ describe("AlertHistory.vue", () => {
     });
   });
 
-  describe("formatDate()", () => {
+  describe("formatHistoryDate()", () => {
     it("returns dash for null / undefined / 0", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
-      expect(vm.formatDate(null)).toBe("-");
-      expect(vm.formatDate(undefined)).toBe("-");
-      expect(vm.formatDate(0)).toBe("-");
+      expect(vm.formatHistoryDate(null)).toBe("-");
+      expect(vm.formatHistoryDate(undefined)).toBe("-");
+      expect(vm.formatHistoryDate(0)).toBe("-");
     });
 
-    it("returns a truthy string for a valid timestamp (delegates to utils/date)", async () => {
-      // NOTE: The component's local formatDate shadows the imported formatDate and
-      // calls formatDate(dateObj, ...) which is itself — infinite recursion in the
-      // real runtime. In test we simply verify the function exists and handles nullish.
+    it("returns a formatted string for a valid timestamp (delegates to utils/date)", async () => {
       await mountComponent();
-      // Already covered by null/0 tests above — skip calling with real timestamp
-      // to avoid the infinite-recursion bug in the component source.
-      expect(typeof (wrapper.vm as any).formatDate).toBe("function");
+      const result = (wrapper.vm as any).formatHistoryDate(1710000000000000);
+      expect(typeof result).toBe("string");
+      expect(result.length).toBeGreaterThan(0);
     });
   });
 

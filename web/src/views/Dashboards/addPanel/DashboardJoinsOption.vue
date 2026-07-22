@@ -81,7 +81,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, inject, onMounted, computed, watchEffect } from "vue";
+import { defineComponent, inject, onMounted, computed } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -141,8 +141,6 @@ const JOIN_TYPES = {
   LEFT: "left",
   RIGHT: "right",
 } as const;
-
-const JOIN_OPERATIONS = ["=", "!=", ">", "<", ">=", "<="] as const;
 
 export default defineComponent({
   name: "DashboardJoinOption",

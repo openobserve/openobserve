@@ -13,15 +13,13 @@
 <script lang="ts">
 import { computed, defineComponent } from 'vue';
 import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
 import config from '@/aws-exports';
 
 export default defineComponent({
   name: 'LicensePeriod',
   emits: ['updateLicense'],
-  setup(emits) {
+  setup() {
     const store = useStore();
-    const router = useRouter();
     const showLicenseExpiryWarning = computed(() => {
       if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();

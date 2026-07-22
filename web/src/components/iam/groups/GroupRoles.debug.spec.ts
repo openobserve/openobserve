@@ -1,5 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, vi } from "vitest";
 import GroupRoles from "@/components/iam/groups/GroupRoles.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";

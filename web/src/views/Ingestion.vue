@@ -195,10 +195,11 @@ import { copyToClipboard } from "@/utils/clipboard";
 import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
-import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { getImageURL } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -238,7 +239,7 @@ export default defineComponent({
     watch(
       tokenOptions,
       (opts) => {
-        if (opts.length > 0 && !opts.find((o) => o.value === selectedTokenName.value)) {
+        if (opts.length > 0 && !opts.find((o: { value: string }) => o.value === selectedTokenName.value)) {
           selectedTokenName.value = opts[0].value;
           const tokens = store.state.organizationData.orgTokens || [];
           const token = tokens.find((t: any) => t.name === opts[0].value);
@@ -249,7 +250,7 @@ export default defineComponent({
       },
       { immediate: true },
     );
-    const onTokenSelected = (name: string) => {
+    const onTokenSelected = (name: SelectModelValue) => {
       const tokens = store.state.organizationData.orgTokens || [];
       const token = tokens.find((t: any) => t.name === name);
       if (token?.token) {
@@ -501,7 +502,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           store.state.organizationData.rumToken.id,
         )
-        .then((res) => {
+        .then(() => {
           getRUMToken();
           toast({
             variant: "success",
@@ -542,50 +543,6 @@ export default defineComponent({
       { name: "languages", label: t("ingestion.languagesLabel") },
       { name: "ai-integrations", label: t("ingestion.aiLabel") },
       { name: "others", label: t("ingestion.otherLabel") },
-    ];
-
-    // Recommended sub-tabs
-    const recommendedSubTabs = [
-      {
-        name: "ingestFromKubernetes",
-        label: t("ingestion.kubernetes"),
-        parentTab: "recommended",
-      },
-      {
-        name: "ingestFromWindows",
-        label: t("ingestion.windows"),
-        parentTab: "recommended",
-      },
-      {
-        name: "ingestFromLinux",
-        label: t("ingestion.linux"),
-        parentTab: "recommended",
-      },
-      {
-        name: "AWSConfig",
-        label: t("ingestion.awsconfig"),
-        parentTab: "recommended",
-      },
-      {
-        name: "GCPConfig",
-        label: t("ingestion.gcpconfig"),
-        parentTab: "recommended",
-      },
-      {
-        name: "AzureConfig",
-        label: t("ingestion.azure"),
-        parentTab: "recommended",
-      },
-      {
-        name: "ingestFromTraces",
-        label: t("ingestion.tracesotlp"),
-        parentTab: "recommended",
-      },
-      {
-        name: "frontendMonitoring",
-        label: t("ingestion.rum"),
-        parentTab: "recommended",
-      },
     ];
 
     // Watch for search changes and navigate

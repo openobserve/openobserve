@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :disabled="isGridMode && (refreshing || grid.loading.value)"
           :loading="isGridMode && refreshing"
           data-test="metrics-explorer-refresh"
-          @click="onRefresh"
+          @click="() => onRefresh()"
         >
           {{ t("metrics.explorer.refresh") }}
         </OButton>
@@ -477,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                collide. -->
           <div
             v-for="row in virtualizer.getVirtualItems()"
-            :key="row.key"
+            :key="(row.key as string | number)"
             class="absolute top-0 left-0 w-full pb-3"
             :class="isGrid ? 'grid gap-3' : 'flex flex-col gap-3'"
             :style="{
@@ -575,6 +575,7 @@ import {
   ref,
   watch,
 } from "vue";
+import type { AcceptableValue } from "reka-ui";
 import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -592,7 +593,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import OTag from "@/lib/core/Badge/OTag.vue";
 import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -665,7 +665,6 @@ export default defineComponent({
     OSearchInput,
     OSpinner,
     OEmptyState,
-    OTag,
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
@@ -794,7 +793,7 @@ export default defineComponent({
     const isGridMode = computed(
       () => mode.value === "explore" || mode.value === "workspace",
     );
-    const setMode = (v: string | number | undefined) => {
+    const setMode = (v: boolean | AcceptableValue | AcceptableValue[]) => {
       if (v !== "explore" && v !== "visualize" && v !== "workspace") return;
       // Pause BEFORE the mode flips, synchronously. The watcher below also keeps
       // `paused` in sync, but it runs after the DOM has begun tearing the grid
@@ -916,7 +915,7 @@ export default defineComponent({
     // shows; it never collapses to nothing. OToggleGroup emits `undefined` on a
     // re-click (it models a deselect); we IGNORE that so the active facet stays
     // put and the panel never blanks. Default is prefix (grid composable).
-    const selectRail = (id: string | number | undefined) => {
+    const selectRail = (id: boolean | AcceptableValue | AcceptableValue[]) => {
       if (!id) return;
       grid.activeRail.value = id as "prefix" | "suffix" | "type";
     };

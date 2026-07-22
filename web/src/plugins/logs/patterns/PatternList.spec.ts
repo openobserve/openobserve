@@ -100,8 +100,6 @@ describe("PatternList", () => {
 
     it("should emit open-details event when PatternCard is clicked", async () => {
       // Trigger click on first pattern card
-      const card = wrapper.findComponent({ name: "OVirtualScroll" });
-
       // Since we're using virtual scroll, we need to check if the component
       // would emit the event properly
       await wrapper.vm.$emit("open-details", mockPatterns[0], 0);
@@ -270,7 +268,6 @@ describe("PatternList", () => {
 
   describe("Table Header", () => {
     it("should render the Pattern column header", () => {
-      const text = wrapper.text();
       // i18n key search.patternColumnHeader is rendered
       expect(wrapper.find(".flex.items-center.border-b").exists() ||
         wrapper.text().length > 0).toBe(true);

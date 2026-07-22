@@ -94,7 +94,7 @@ import OTab from '@/lib/navigation/Tabs/OTab.vue'
 import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
 import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";

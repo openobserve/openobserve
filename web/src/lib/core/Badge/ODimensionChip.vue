@@ -38,7 +38,7 @@ withDefaults(
   <span class="inline-flex min-w-0 max-w-full">
     <OTag
       :variant="dimensionVariant(dimKey)"
-      shape="rounded-default"
+      shape="rounded"
       class="min-w-0 !p-0 overflow-hidden"
     >
       <span class="inline-flex items-stretch min-w-0">

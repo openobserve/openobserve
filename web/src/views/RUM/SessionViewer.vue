@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OPageLayout
     class="qp-2"
     :title="sessionDetails.id || t('rum.sessionReplay')"
-    :back="{ onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
+    :back="{ label: t('rum.sessionReplay'), onClick: () => router.back(), dataTest: 'session-viewer-back-btn' }"
     bleed
   >
       <template #subtitle>
@@ -140,9 +140,9 @@ const defaultEvent = {
   displayTime: "",
   loading_time: "",
   loading_type: "",
-  user: {},
-  frustration_type: null,
-  frustration_types: [],
+  user: {} as Record<string, any>,
+  frustration_type: null as string | null,
+  frustration_types: [] as string[],
 };
 
 const sessionId = ref("1");
@@ -151,17 +151,13 @@ const router = useRouter();
 const store = useStore();
 const { t } = useI18n();
 const isLoading = ref<boolean[]>([]);
-const { buildQueryPayload, getTimeInterval, parseQuery } = useQuery();
+const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
 const { sessionState } = useSessionsReplay();
 const videoPlayerRef = ref<any>(null);
 const splitterSize = ref(600);
-const errorCount = ref(10);
 const { performanceState } = usePerformance();
-
-const session_start_time = 1692884313968;
-const session_end_time = 1692884769270;
 
 const getSessionId = computed(() => router.currentRoute.value.params.id);
 
@@ -238,7 +234,7 @@ watch(
       segmentsCount > 0 &&
       eventsCount > 0 &&
       relativeTime &&
-      relativeTime[0] > 0
+      Number(relativeTime[0]) > 0
     ) {
       // Clear any existing timer
       if (seekTimer !== null) {
@@ -495,7 +491,7 @@ const getSessionErrorLogs = () => {
         return hit.date >= Number(sessionState.data.selectedSession.start_time);
       });
 
-      events.forEach((hit: any, index: number) => {
+      events.forEach((hit: any) => {
         hit.type = "error";
         hit.error_id = getUUID();
         hit.error_message = hit.message;

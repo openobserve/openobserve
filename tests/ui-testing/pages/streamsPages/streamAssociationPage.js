@@ -80,49 +80,41 @@ export class StreamAssociationPage {
     }
     testLogger.info(`Found stream cell for: ${streamName}`);
 
-    // Navigate to parent row
-    const streamRow = streamCell.locator('..');
-    testLogger.info('Got parent row');
-
-    // Wait for the row to be fully rendered
-    await this.page.waitForTimeout(500);
-
-    // Find the Stream Detail button in that row - try multiple times
-    let detailButton = streamRow.getByRole('button', { name: 'Stream Detail' });
-    let buttonCount = await detailButton.count();
-    testLogger.info(`Stream Detail button count (by role): ${buttonCount}`);
-
-    // If not found, wait and retry up to 3 times
-    for (let retry = 0; retry < 3 && buttonCount === 0; retry++) {
-      testLogger.info(`Waiting 1 second and retrying (attempt ${retry + 2})...`);
-      await this.page.waitForTimeout(1000);
-      detailButton = streamRow.getByRole('button', { name: 'Stream Detail' });
-      buttonCount = await detailButton.count();
-      testLogger.info(`Stream Detail button count (after wait ${retry + 1}): ${buttonCount}`);
-    }
-
-    if (buttonCount === 0) {
-      testLogger.error('Stream Detail button not found! Taking screenshot...');
-      await this.page.screenshot({ path: `test-results/no-stream-detail-button-${Date.now()}.png` });
-      throw new Error('Stream Detail button not found in the row');
-    }
-
     const updateSettingsButton = this.page.locator('[data-test="schema-update-settings-button"]');
 
-    // The revamped Reka-based streams table re-renders/detaches rows mid-animation,
-    // so a one-shot Playwright `click()` can spin on actionability until the 45s
-    // actionTimeout, and a single JS click can race the sidebar-open on a slow cloud.
-    // Re-resolve the row's Stream Detail button FRESH each attempt (the row may have
-    // detached), fire a native DOM click (no actionability polling to hang on), and
-    // verify the detail sidebar actually opened — retry the whole sequence until it
-    // does. Deterministic: keyed to the real "sidebar open" signal, not blind waits.
-    await expect(async () => {
-      const btn = streamRow.getByRole('button', { name: 'Stream Detail' }).first();
-      await expect(btn).toBeVisible({ timeout: 5000 });
-      await btn.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
-      await btn.evaluate((el) => el.click());
-      await expect(updateSettingsButton).toBeVisible({ timeout: 5000 });
-    }).toPass({ timeout: 45000 });
+    // Open the stream's detail sidebar. Two changes vs. the old approach that dead-waited
+    // the 45s actionTimeout under cloud load (SDR multipleSDRPatterns:165 hard fail +
+    // ingestionTimeHash:93 flake):
+    //   1) Resolve the action button by its stable data-test (log-stream-schema-btn) rather
+    //      than the icon button's title text — the revamped OTable can render the name cell
+    //      before its action buttons, so a title-name match intermittently resolves nothing.
+    //   2) When the button stays absent / the sidebar doesn't open, RELOAD + re-search the
+    //      streams list (the missing recovery — the previous toPass only re-clicked the same
+    //      possibly-detached row) so a stuck or half-rendered row is forced to re-render.
+    // Keyed to the real "detail sidebar open" signal (schema-update-settings-button visible).
+    let opened = false;
+    for (let attempt = 1; attempt <= 4 && !opened; attempt++) {
+      const streamRow = this.page.getByRole('cell', { name: streamName }).first().locator('..');
+      const detailBtn = streamRow.locator('[data-test="log-stream-schema-btn"]').first();
+      opened = await (async () => {
+        await expect(detailBtn).toBeVisible({ timeout: 10000 });
+        await detailBtn.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
+        await detailBtn.evaluate((el) => el.click());
+        await expect(updateSettingsButton).toBeVisible({ timeout: 8000 });
+        return true;
+      })().catch(() => false);
+      if (!opened && attempt < 4) {
+        testLogger.info(`Stream Detail did not open for "${streamName}" (attempt ${attempt}) — reloading + re-searching streams list`);
+        await this.navigateToStreams();
+        await this.searchForStream(streamName);
+      }
+    }
+
+    if (!opened) {
+      testLogger.error('Stream Detail sidebar never opened! Taking screenshot...');
+      await this.page.screenshot({ path: `test-results/no-stream-detail-button-${Date.now()}.png` });
+      throw new Error(`openStreamDetail: could not open Stream Detail for "${streamName}" after reload + re-search retries`);
+    }
 
     testLogger.info('Stream detail sidebar opened successfully');
   }

@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center h-11">
           <OSwitch
-            v-model="config.alert_enabled"
+            v-model="configModel.alert_enabled"
             :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
             data-test="anomaly-alert-enabled"
           />
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex flex-col">
           <div class="flex items-center">
             <OSelect
-              v-model="config.alert_destination_ids"
+              v-model="configModel.alert_destination_ids"
               :options="destinations"
               labelKey="name"
               valueKey="name"
@@ -145,7 +145,7 @@ class="mt-px flex-shrink-0" />
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from "vue";
+import { computed, defineComponent, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -155,6 +155,7 @@ import OSelect from '@/lib/forms/Select/OSelect.vue';
 import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
 export default defineComponent({
   name: "AnomalyAlerting",
@@ -169,7 +170,7 @@ export default defineComponent({
       required: true,
     },
     destinations: {
-      type: Array as PropType<any[]>,
+      type: Array as PropType<(SelectOption & { name: string })[]>,
       default: () => [],
     },
   },
@@ -180,6 +181,29 @@ export default defineComponent({
     const { t } = useI18n();
     const router = useRouter();
     const store = useStore();
+
+    // Alias for the config prop; same reference, mutation stays identical.
+    const configModel = computed(() => props.config);
+
+    // Dynamically decide how many chips to show based on text length.
+    // Restored from pre-refactor version; the template still depends on it.
+    const MAX_CHARS = 42;
+    const visibleChipCount = computed(() => {
+      const ids = props.config.alert_destination_ids;
+      if (!ids || ids.length === 0) return 0;
+      if (ids.length === 1) return 1;
+      // Resolve names from destinations list
+      const getName = (id: string) => {
+        const dest = props.destinations.find((d) => d.name === id);
+        return dest ? dest.name : id;
+      };
+      const firstLen = getName(ids[0]).length;
+      if (firstLen > MAX_CHARS) return 1;
+      const secondLen = getName(ids[1]).length;
+      // Show 2 chips if both fit within budget
+      if (firstLen + secondLen <= MAX_CHARS) return 2;
+      return 1;
+    });
 
     const openAddDestination = () => {
       const route = router.resolve({
@@ -192,7 +216,9 @@ export default defineComponent({
     return {
       t,
       store,
+      configModel,
       openAddDestination,
+      visibleChipCount,
     };
   },
 });

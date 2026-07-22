@@ -14,7 +14,6 @@ import {
   ref,
   onMounted,
   onBeforeUnmount,
-  watch,
   useSlots,
 } from "vue";
 import OTableBodyCell from "./OTableBodyCell.vue";
@@ -361,6 +360,7 @@ function onRowBlur() {
           :row="row.original"
           :value="cell.getValue()"
           :column="cell.column.columnDef"
+          :index="row.index"
         />
       </template>
     </OTableBodyCell>

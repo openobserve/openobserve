@@ -367,7 +367,7 @@ const submit = async () => {
   if (createNewFunction.value) return null; // still in the inline editor
   validated.value = null;
   await form.handleSubmit();
-  const values = validated.value;
+  const values = validated.value as AssociateFunctionForm | null;
   if (!values?.selectedFunction) return null;
   return props.showFlatten
     ? { name: values.selectedFunction, after_flatten: !!values.afterFlattening }

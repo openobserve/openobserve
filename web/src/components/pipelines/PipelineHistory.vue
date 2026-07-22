@@ -498,6 +498,7 @@ import http from "@/services/http";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 const { t } = useI18n();
 const store = useStore();
@@ -549,7 +550,7 @@ const selectedRow = ref<any>(null);
 const errorMessage = ref<any>(null);
 
 // Table columns
-const columns = ref([
+const columns = ref<OTableColumnDef[]>([
   {
     id: "pipeline_name",
     header: "Pipeline Name",
@@ -692,22 +693,15 @@ const fetchPipelinesList = async () => {
           label: pipeline.name,
           value: pipeline.pipeline_id,
         }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        .sort((a: { label: string; value: string }, b: { label: string; value: string }) =>
+          a.label.localeCompare(b.label),
+        );
       filteredPipelineOptions.value = [...allPipelines.value];
     }
   } catch (error: any) {
     console.error("Error fetching pipelines list:", error);
     // Silently fail - user can still type pipeline names manually
   }
-};
-
-const filterPipelineOptions = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredPipelineOptions.value = allPipelines.value.filter((v) =>
-      v.label.toLowerCase().includes(needle),
-    );
-  });
 };
 
 const onPipelineSelected = (val: any) => {
@@ -853,16 +847,6 @@ const formatDuration = (microseconds: number) => {
     return `${minutes}m ${seconds % 60}s`;
   }
   return `${seconds}s`;
-};
-
-const showDetailsDialog = (row: any) => {
-  selectedRow.value = row;
-  detailsDialog.value = true;
-};
-
-const showErrorDialog = (error: any) => {
-  errorMessage.value = error;
-  errorDialog.value = true;
 };
 
 const closeErrorDialog = () => {

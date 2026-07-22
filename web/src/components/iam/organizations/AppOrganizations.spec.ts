@@ -748,8 +748,6 @@ describe("AppOrganizations.vue", () => {
     });
 
     it("should handle watcher immediate option correctly", async () => {
-      const watcherSpy = vi.fn();
-      
       wrapper = mount(AppOrganizations, {
         global: {
           plugins: [store, i18n],

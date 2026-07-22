@@ -15,14 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "ansible";
-const store = useStore();
-const { endpoint, devopsContent, devopsDocURLs } = useIngestion();
+const { devopsContent, devopsDocURLs } = useIngestion();
 const content = devopsContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = devopsDocURLs[name];
 </script>

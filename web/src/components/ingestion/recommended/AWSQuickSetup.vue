@@ -552,7 +552,7 @@ export default defineComponent({
       });
     };
 
-    const launchStackSet = (organizationId: string) => {
+    const launchStackSet = (_organizationId?: string) => {
       // StackSets console doesn't support URL pre-fill — open the console and show param helper
       const consoleUrl = `https://console.aws.amazon.com/cloudformation/home?region=${selectedRegion.value}#/stacksets/create`;
       window.open(consoleUrl, "_blank", "noopener,noreferrer");

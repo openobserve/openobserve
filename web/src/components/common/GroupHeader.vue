@@ -48,7 +48,7 @@ export default defineComponent({
       default: true,
     }
   },
-  setup(props, { emit }) {
+  setup(props) {
     const icon = computed(() => {
       return getImageURL(props.iconPath)
     })

@@ -400,6 +400,27 @@ describe("Organizations Service", () => {
     });
   });
 
+  describe("set_ai_usage_limit", () => {
+    it("should set an organization's AI credit limit through the meta org", async () => {
+      const data = { org_id: "target-org", credits_limit: 5000 };
+      const mockResponse = {
+        data: { credits_used: 120, credits_limit: 5000 },
+      };
+
+      mockHttp.mockReturnValue({
+        put: vi.fn().mockResolvedValue(mockResponse),
+      } as any);
+
+      const result = await organizations.set_ai_usage_limit(mockOrgId, data);
+
+      expect(mockHttp().put).toHaveBeenCalledWith(
+        `/api/${mockOrgId}/ai/usage_limit`,
+        data,
+      );
+      expect(result).toEqual(mockResponse);
+    });
+  });
+
   describe("Error Handling", () => {
     it("should handle network errors", async () => {
       const networkError = new Error("Network connection failed");

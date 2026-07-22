@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OSelect
         :model-value="pagination.rowsPerPage"
-        @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
+        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', val)"
         :options="formattedPaginationOptions"
         size="sm"
         class="w-fit!"
@@ -93,6 +93,7 @@ import { defineComponent, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 export default defineComponent({
   name: "TablePaginationControls",
   components: { OButton, OSelect },

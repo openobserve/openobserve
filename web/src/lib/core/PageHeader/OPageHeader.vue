@@ -163,7 +163,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
-  label: string;
+  /** Optional; button falls back to plain "Back" aria-label when omitted. */
+  label?: string;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;

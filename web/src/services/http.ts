@@ -61,6 +61,7 @@ export const attemptTokenRefresh = (requestUrl: string = ""): Promise<void> => {
           if (res.status !== 200) {
             return Promise.reject(new Error("Refresh returned non-200"));
           }
+          return undefined;
         })
         .catch(() => {
           return refreshInstance

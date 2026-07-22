@@ -1,7 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import useDnD from '@/plugins/pipelines/useDnD';
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 // The condition-group logic these tests exercise now lives in the shared
 // ConditionBuilder (Condition.vue is a thin drawer wrapper around it).

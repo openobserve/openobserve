@@ -28,7 +28,7 @@ vi.mock("vuex", () => ({
 }));
 
 vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
-  processVariableContent: vi.fn((content, variables, context) => {
+  processVariableContent: vi.fn((content, variables) => {
     // Simple mock implementation that replaces {{variable}} patterns
     if (!content || typeof content !== 'string') return content;
 
@@ -59,7 +59,7 @@ vi.mock("marked", () => ({
       .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
       .replace(/\*(.*)\*/gim, '<em>$1</em>')
       .replace(/^\* (.*$)/gim, '<li>$1</li>')
-      .replace(/\[([^\]]*)\]\(([^\)]*)\)/gim, '<a href="$2">$1</a>');
+      .replace(/\[([^\]]*)\]\(([^)]*)\)/gim, '<a href="$2">$1</a>');
   }),
 }));
 

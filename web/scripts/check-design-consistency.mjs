@@ -210,8 +210,13 @@ function countFile(file, rel) {
   const isSpec = rel.includes(".spec.");
 
   if (isVue) {
+    // A component `shape="rounded"` prop (BadgeShape = "pill" | "rounded" |
+    // "square") is a first-class API value, NOT a bare Tailwind `rounded` radius
+    // class — strip these prop bindings before scanning so bareRounded doesn't
+    // false-match them. Real `class="… rounded …"` violations are untouched.
+    const scan = text.replace(/:?\bshape=(["'])[^"']*\1/g, "");
     for (const [k, re] of Object.entries(WHOLE)) {
-      const n = (text.match(re) || []).length;
+      const n = (scan.match(re) || []).length;
       if (n) counts[k] = n;
     }
     const sb = styleBlocks(text);

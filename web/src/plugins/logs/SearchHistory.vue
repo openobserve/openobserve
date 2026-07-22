@@ -251,18 +251,16 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, watch, onMounted, nextTick, computed, onUnmounted } from "vue";
+import { ref, watch, onMounted, computed, onUnmounted } from "vue";
 import {
   timestampToTimezoneDate,
   b64EncodeUnicode,
-  convertDateToTimestamp,
   getUUID,
 } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
 import { defineAsyncComponent, defineComponent } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
-import TenstackTable from "../../plugins/logs/TenstackTable.vue";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";
 import { colorizeQuery } from "@/utils/query/colorizeQuery";
@@ -285,7 +283,6 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
@@ -298,11 +295,9 @@ export default defineComponent({
   components: {
     OEmptyState,
     DateTime,
-    NoData,
     AppTabs,
     QueryEditor,
     OButton,
-    OSpinner,
     OIcon,
     OTooltip,
     OTable,
@@ -321,7 +316,7 @@ export default defineComponent({
       this.$emit("closeSearchHistory");
     },
   },
-  setup(props, { emit }) {
+  setup(props) {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
@@ -339,7 +334,6 @@ export default defineComponent({
     const columnsToBeRendered = ref<OTableColumnDef[]>([]);
     const expandedIds = ref<string[]>([]);
     const isLoading = ref(false);
-    const isDateTimeChanged = ref(false);
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
@@ -464,13 +458,9 @@ export default defineComponent({
           hit.rawTook = hit.took;
           hit.took = formatTime(hit.took);
           hit.rawScanRecords = hit.scan_records;
-          hit.scan_records = hit.scan_records;
           hit.rawScanSize = hit.scan_size;
           hit.scan_size = hit.scan_size + hit.unit;
-          hit.cached_ratio = hit.cached_ratio;
           hit.rawCachedRatio = hit.cached_ratio;
-          hit.sql = hit.sql;
-          hit.function = hit.function;
           hit.rawExecutedTime = hit._timestamp;
           hit.executed_time = timestampToTimezoneDate(
             hit._timestamp / 1000,
@@ -503,7 +493,6 @@ export default defineComponent({
     });
 
     const updateDateTime = async (value: any) => {
-      const { startTime, endTime } = value;
       dateTimeToBeSent.value = value;
       searchDateTimeRef.value.setAbsoluteTime(value.startTime, value.endTime);
     };
@@ -596,11 +585,8 @@ export default defineComponent({
       }
     };
     const goToLogs = (row) => {
-      const duration_suffix = row.duration.split(" ")[1];
       // emit('closeSearchHistory');
       const stream: string = row.stream_name;
-      const from = row.toBeStoredStartTime;
-      const to = row.toBeStoredEndTime;
       const refresh = 0;
 
       const query = b64EncodeUnicode(row.sql);
@@ -620,7 +606,10 @@ export default defineComponent({
       };
       //here if we have function then we are adding fn_editor flag as true because it will open the function editor by default
       //else we are adding fn_editor flag as false because it will close the function editor by default
-      if (row.hasOwnProperty("function") && row.function) {
+      if (
+        Object.prototype.hasOwnProperty.call(row, "function") &&
+        row.function
+      ) {
         const functionContent = b64EncodeUnicode(row.function);
         queryObject["functionContent"] = functionContent;
         queryObject["fn_editor"] = "true";

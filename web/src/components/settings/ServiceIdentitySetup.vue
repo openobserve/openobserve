@@ -1130,7 +1130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="flex flex-1 min-h-0 py-3">
               <div
-                v-for="(dim, dimIdx) in (insightData as any).relatedDimensions"
+                v-for="(dim, dimIdx) in insightRelatedDimensions"
                 :key="dim.label + dimIdx"
                 class="flex-1 min-w-0 flex flex-col px-3"
                 :class="[
@@ -1224,16 +1224,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality_class ||
                 'Unknown'
               "
             >
-              {{ t("settings.serviceIdentitySetup.uniqueValues", { n: dimensionAnalytics[primaryDim?.group_id]?.cardinality || 0 }) }}
+              {{ t("settings.serviceIdentitySetup.uniqueValues", { n: dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality || 0 }) }}
             </OTag>
             <OTag
               type="cardinalityClass"
               :value="
-                dimensionAnalytics[primaryDim?.group_id]?.cardinality_class ||
+                dimensionAnalytics[primaryDim?.group_id ?? '']?.cardinality_class ||
                 'Unknown'
               "
             />
@@ -1258,7 +1258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span>{{
                   selectedStreamType ||
                   ["logs", "metrics", "traces"].find(
-                    (t) => selectedFieldAnalytics.sample_values[t],
+                    (t) => selectedFieldAnalytics?.sample_values[t],
                   )
                 }}</span>
                 <span class="text-text-label">{{ t("settings.serviceIdentitySetup.streams") }}</span>
@@ -1296,7 +1296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'logs',
                       'metrics',
                       'traces',
-                    ].filter((t) => selectedFieldAnalytics.sample_values[t])"
+                    ].filter((t) => selectedFieldAnalytics?.sample_values[t])"
                     :key="typeName"
                   >
                     <div
@@ -2293,6 +2293,22 @@ const insightData = computed(() => {
     streamTypes: group ? getValueStreamTypes(group.group_id, val) : [],
     streamDetails,
   };
+});
+
+/** Related-dimension column shown in the insight dialog. */
+interface RelatedDimension {
+  label: string;
+  level: string;
+  color: string;
+  values: string[];
+  groupId?: string;
+}
+
+/** Typed view of `insightData.relatedDimensions` for template iteration
+ *  (gives the v-for index a concrete `number` type). */
+const insightRelatedDimensions = computed<RelatedDimension[]>(() => {
+  const data = insightData.value as { relatedDimensions?: RelatedDimension[] };
+  return data.relatedDimensions ?? [];
 });
 
 /** Chart data for insight dialog — stream contribution donut */

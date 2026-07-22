@@ -96,7 +96,7 @@ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionCh
 import { useAiIcon } from "@/composables/useAiIcon";
 import { getImageURL } from "@/utils/zincutils";
 
-const props = defineProps<{ aiEnabled: boolean }>();
+defineProps<{ aiEnabled: boolean }>();
 const emit = defineEmits<{ "ask-ai": [] }>();
 
 const { t } = useI18n();

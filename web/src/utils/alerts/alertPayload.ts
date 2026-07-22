@@ -26,7 +26,7 @@ export interface PayloadFormData {
     conditions: any[];
     promql_condition?: any;
     sql: string;
-    vrl_function?: string;
+    vrl_function?: string | null;
   };
   stream_name: string;
   stream_type: string;

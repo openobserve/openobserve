@@ -60,8 +60,9 @@
   </ODialog>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import type { PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { useLoading } from "@/composables/useLoading";
@@ -74,20 +75,49 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { addAnnotationSchema } from "./AddAnnotation.schema";
+import type { AddAnnotationForm } from "./AddAnnotation.schema";
+
+interface AnnotationData {
+  annotation_id: string | null;
+  title: string;
+  text: string;
+  start_time: number | null;
+  end_time: number | null;
+  tags: string[];
+  panels: string[];
+}
+
+interface AnnotationPanel {
+  id: string;
+  title: string;
+  tabName?: string;
+}
+
 const props = defineProps({
   dashboardId: { type: String, required: true },
-  annotation: { type: Object, default: null, required: false },
-  panelsList: { type: Array, default: () => [], required: true },
+  annotation: {
+    type: Object as PropType<AnnotationData | null>,
+    default: null,
+    required: false,
+  },
+  panelsList: {
+    type: Array as PropType<AnnotationPanel[]>,
+    default: () => [],
+    required: true,
+  },
 });
 
-const emit = defineEmits(["remove", "close"]);
+const emit = defineEmits<{
+  (e: "remove"): void;
+  (e: "close"): void;
+}>();
 
 const store = useStore();
 const { t } = useI18n();
 const isOpen = ref(true);
 const showDeleteConfirm = ref(false);
 
-const annotationData = ref(
+const annotationData = ref<AnnotationData>(
   props.annotation || {
     annotation_id: null,
     title: "",
@@ -108,7 +138,7 @@ const addAnnotationDefaults = computed(() => ({
   panels: annotationData.value.panels ?? [],
 }));
 
-const groupedPanels = ref({});
+const groupedPanels = ref<Record<string, AnnotationPanel[]>>({});
 
 const groupedPanelsOptions = computed(() =>
   Object.entries(groupedPanels.value).flatMap(([tab, panels]) => [
@@ -122,12 +152,15 @@ const groupedPanelsOptions = computed(() =>
 );
 
 const groupPanels = () => {
-  groupedPanels.value = props.panelsList.reduce((acc, panel) => {
-    const tabName = panel.tabName || t('dashboard.addAnnotation.unknownTab');
-    if (!acc[tabName]) acc[tabName] = [];
-    acc[tabName].push({ id: panel.id, title: panel.title });
-    return acc;
-  }, {});
+  groupedPanels.value = props.panelsList.reduce(
+    (acc: Record<string, AnnotationPanel[]>, panel) => {
+      const tabName = panel.tabName || t('dashboard.addAnnotation.unknownTab');
+      if (!acc[tabName]) acc[tabName] = [];
+      acc[tabName].push({ id: panel.id, title: panel.title });
+      return acc;
+    },
+    {},
+  );
 };
 
 watch(
@@ -165,6 +198,15 @@ const handleClose = () => {
   emit("close");
 };
 
+// Caught errors are `unknown`; read `.message` when the error is object-like.
+const errorMessage = (error: unknown): string | undefined => {
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const { message } = error as { message?: unknown };
+    return typeof message === "string" ? message : undefined;
+  }
+  return undefined;
+};
+
 const organization = store.state.selectedOrganization.identifier;
 const { showErrorNotification } = useNotifications();
 const handleSave = async () => {
@@ -179,15 +221,16 @@ const handleSave = async () => {
           panels: annotationData.value.panels,
           tags: annotationData.value.tags,
         };
+        const annotationId = annotationData.value.annotation_id ?? "";
         const response = await annotationService.update_timed_annotations(
           organization,
           props.dashboardId,
-          annotationData.value.annotation_id,
+          annotationId,
           annotationToUpdate,
         );
       } catch (error) {
         showErrorNotification(
-          error?.message ?? t('dashboard.addAnnotation.failedUpdateAnnotation', { error: error.message }),
+          errorMessage(error) ?? t('dashboard.addAnnotation.failedUpdateAnnotation', { error: errorMessage(error) }),
         );
         return;
       }
@@ -201,7 +244,7 @@ const handleSave = async () => {
         );
       } catch (error) {
         showErrorNotification(
-          error?.message ?? t('dashboard.addAnnotation.failedCreateAnnotation', { error: error.message }),
+          errorMessage(error) ?? t('dashboard.addAnnotation.failedCreateAnnotation', { error: errorMessage(error) }),
         );
         return;
       }
@@ -216,10 +259,12 @@ const handleDeleteWithConfirm = () => {
 };
 
 const confirmDelete = async () => {
+  // Delete is reachable only for a persisted annotation, so `annotation_id` is a string.
+  const annotationId = annotationData.value.annotation_id ?? "";
   await annotationService.delete_timed_annotations(
     organization,
     props.dashboardId,
-    [annotationData.value.annotation_id],
+    [annotationId],
   );
 
   handleClose();
@@ -230,7 +275,7 @@ const confirmDelete = async () => {
 // those three back onto annotationData so handleSave (and the edit-update path)
 // reads consistent values. Plain async — OForm awaits it, and the ODialog
 // built-in primary button (form-id) auto-shows the Save spinner (no useLoading).
-const saveAnnotation = async (value) => {
+const saveAnnotation = async (value: AddAnnotationForm) => {
   if (value?.title != null) annotationData.value.title = value.title;
   annotationData.value.text = value?.text ?? "";
   annotationData.value.panels = value?.panels ?? [];

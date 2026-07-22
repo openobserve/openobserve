@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount } from "@vue/test-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { ref } from "vue";
 import TenstackTable from "./TenstackTable.vue";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";

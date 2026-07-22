@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, Mock } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { ref } from "vue";
 import DashboardJsonEditor from "./DashboardJsonEditor.vue";
@@ -51,16 +51,16 @@ vi.mock("@/components/CodeQueryEditor.vue", async () => {
   const { defineComponent } = await import("vue");
   const component = defineComponent({
     name: "QueryEditor",
-    template: '<div data-test="dashboard-json-editor" class="mocked-query-editor"><textarea v-model="query" @input="onInput"></textarea></div>',
+    template: '<div data-test="dashboard-json-editor" class="mocked-query-editor"><textarea v-model="queryModel" @input="onInput"></textarea></div>',
     props: ["debounceTime", "language", "editorId", "query"],
     emits: ["update:query"],
     setup(props: any, { emit }: any) {
-      const query = ref(props.query || "");
+      const queryModel = ref(props.query || "");
       const onInput = (event: Event) => {
         const target = event.target as HTMLTextAreaElement;
         emit("update:query", target.value);
       };
-      return { query, onInput };
+      return { queryModel, onInput };
     },
   });
 

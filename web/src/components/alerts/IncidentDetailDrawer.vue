@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="incidentDetails.title"
         >
           {{ incidentDetails.title }}
-          <OTooltip v-if="incidentDetails && incidentDetails.title.length > 35" :content="incidentDetails.title" />
+          <OTooltip v-if="incidentDetails && (incidentDetails.title?.length ?? 0) > 35" :content="incidentDetails.title" />
         </span>
       </template>
 
@@ -980,7 +980,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Traces Tab Content -->
         <div v-if="activeTab === 'traces'" class="flex flex-col flex-1 overflow-hidden h-full">
           <!-- Refresh Button (shown when traces data is loaded) -->
-          <div v-if="hasCorrelatedData && !correlationLoading && correlationData?.traceStreams?.length > 0" class="px-4 py-2 border-b border-solid border-card-glass-border flex items-center gap-2">
+          <div v-if="hasCorrelatedData && !correlationLoading && (correlationData?.traceStreams?.length ?? 0) > 0" class="px-4 py-2 border-b border-solid border-card-glass-border flex items-center gap-2">
             <span class="text-xs">{{ t('alerts.incidents.showingCorrelatedTraces') }}</span>
             <OButton
               variant="ghost"
@@ -1048,7 +1048,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
 import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import { defineComponent, ref, watch, computed, PropType, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
+import { defineComponent, ref, watch, computed, nextTick, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -1063,8 +1063,8 @@ import incidentsService, {
 import streamService from "@/services/stream";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
+  type CorrelationResponse,
 } from "@/services/service_streams";
-import { getImageURL } from "@/utils/zincutils";
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
@@ -1118,7 +1118,7 @@ export default defineComponent({
     const copiedField = ref<string | null>(null);
 
     // Copy to clipboard function with visual feedback
-    const copyToClipboard = (text: string, fieldName: string) => {
+    const copyToClipboard = (text: string | undefined, fieldName: string) => {
       if (!text) return;
 
       copyToClipboardUtil(text, {
@@ -1137,7 +1137,10 @@ export default defineComponent({
 
     const loading = ref(false);
     const updating = ref(false);
-    const incidentDetails = ref<IncidentWithAlerts | null>(null);
+    // Backend also returns a top-level correlation_reason not declared on IncidentWithAlerts.
+    const incidentDetails = ref<
+      (IncidentWithAlerts & { correlation_reason?: string }) | null
+    >(null);
     const triggers = ref<IncidentAlert[]>([]);
     const alerts = ref<any[]>([]);
 
@@ -1469,6 +1472,7 @@ export default defineComponent({
     // Build fallback correlation using first alert's stream schema
     const buildFallbackCorrelation = async (org: string, incident: Incident) => {
       try {
+        const groupValues: Record<string, string> = incident.group_values ?? {};
         // Get first alert to determine source stream
         const firstAlert = alerts.value?.[0];
         if (!firstAlert) {
@@ -1491,7 +1495,7 @@ export default defineComponent({
         const schemaFieldsArray = (schema.uds_schema && schema.uds_schema.length > 0)
           ? schema.uds_schema
           : (schema.schema || schema.fields || []);
-        const schemaFields = new Set(schemaFieldsArray.map((f: any) => f.name));
+        const schemaFields = new Set<string>(schemaFieldsArray.map((f: any) => f.name));
 
         // Step 3: Get semantic groups to resolve dimension names to field patterns
         const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
@@ -1500,7 +1504,7 @@ export default defineComponent({
         const filters: Record<string, string> = {};
 
         // Step 4: For each dimension, find the matching schema field
-        for (const [dimId, dimValue] of Object.entries(incident.group_values)) {
+        for (const [dimId, dimValue] of Object.entries(groupValues)) {
           let matchedField = null;
 
           // Get semantic group
@@ -1554,23 +1558,24 @@ export default defineComponent({
 
         // Build correlation response with only the source stream type
         correlationData.value = {
-          serviceName: `dimension-match-${incident.group_values.service || 'unknown'}`,
-          matchedDimensions: incident.group_values,
+          serviceName: `dimension-match-${groupValues.service || 'unknown'}`,
+          matchedDimensions: groupValues,
           additionalDimensions: {},
           logStreams: streamType === 'logs' ? [streamInfo] : [],
           metricStreams: streamType === 'metrics' ? [streamInfo] : [],
           traceStreams: streamType === 'traces' ? [streamInfo] : [],
           correlationData: {
-            service_name: `dimension-match-${incident.group_values.service || 'unknown'}`,
-            matched_dimensions: incident.group_values,
+            service_name: `dimension-match-${groupValues.service || 'unknown'}`,
+            matched_dimensions: groupValues,
             additional_dimensions: {},
             related_streams: {
               logs: streamType === 'logs' ? [streamInfo] : [],
               metrics: streamType === 'metrics' ? [streamInfo] : [],
               traces: streamType === 'traces' ? [streamInfo] : [],
             },
+            // Extra marker consumed downstream; not part of CorrelationResponse.
             correlation_method: "frontend-fallback"
-          }
+          } as CorrelationResponse
         };
       } catch (fallbackError) {
         console.error("[Fallback Correlation] Failed to build fallback:", fallbackError);
@@ -2011,7 +2016,7 @@ export default defineComponent({
     // Title editing functions
     const startTitleEdit = () => {
       if (!incidentDetails.value) return;
-      editableTitle.value = incidentDetails.value.title;
+      editableTitle.value = incidentDetails.value.title ?? "";
       isEditingTitle.value = true;
       nextTick(() => {
         titleInputRef.value?.focus();
@@ -2484,7 +2489,7 @@ export default defineComponent({
             const match = currentLine.match(/^-\s+\*\*([^*]+)\*\*:\s*(.+)$/);
 
             if (match) {
-              tableRows.push({ key: match[1], value: match[2] });
+              tableRows.push({ key: match[1] ?? "", value: match[2] ?? "" });
               j++;
             } else if (currentLine === '' && j < lines.length - 1) {
               // Allow one blank line within the list
@@ -2537,7 +2542,7 @@ export default defineComponent({
       // Configure marked with custom renderer using marked.use() extension API
       marked.use({
         renderer: {
-          heading({ tokens, depth, text }: any) {
+          heading({ tokens, depth }: any) {
             // Parse inline tokens to get the heading text
             const parsedText = this.parser.parseInline(tokens);
 
@@ -2696,7 +2701,7 @@ export default defineComponent({
     };
 
     // Humanize key_type for display
-    const getCorrelationMethodLabel = (keyType: string) => {
+    const getCorrelationMethodLabel = (keyType: string | undefined) => {
       switch (keyType?.toLowerCase()) {
         case "primary":
           return t("alerts.incidents.correlatedByServiceDiscovery");

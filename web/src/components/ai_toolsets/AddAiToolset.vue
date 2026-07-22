@@ -525,9 +525,16 @@ export default defineComponent({
     // form change — used for the section toggle, the array v-for rows, the
     // Monaco editor value, and the submit-attempt-driven skill error.
     const selectedKind = form.useStore((s: any) => s.values.kind);
-    const mcpHeaders = form.useStore((s: any) => s.values.mcp?.headers ?? []);
-    const cliEnvVars = form.useStore((s: any) => s.values.cli?.env ?? []);
-    const cliCredFiles = form.useStore((s: any) => s.values.cli?.credFiles ?? []);
+    // Selector returns are annotated as arrays so the template v-for index is `number`.
+    const mcpHeaders = form.useStore(
+      (s: any): AddAiToolsetForm["mcp"]["headers"] => s.values.mcp?.headers ?? [],
+    );
+    const cliEnvVars = form.useStore(
+      (s: any): AddAiToolsetForm["cli"]["env"] => s.values.cli?.env ?? [],
+    );
+    const cliCredFiles = form.useStore(
+      (s: any): AddAiToolsetForm["cli"]["credFiles"] => s.values.cli?.credFiles ?? [],
+    );
     const skillContent = form.useStore((s: any) => s.values.skill?.content ?? "");
     const submitted = form.useStore((s: any) => (s.submissionAttempts ?? 0) > 0);
 
@@ -585,7 +592,8 @@ export default defineComponent({
     // the form API directly, and the `form.useStore` reads above re-render the
     // v-for rows (playbook §2).
     // -----------------------------------------------------------------------
-    // MCP headers
+    // MCP headers. (useOForm erases the form generic to Record<string, unknown>,
+    // so TanStack's array-field paths collapse to `never` — hence the casts.)
     const addHeader = () =>
       form.pushFieldValue("mcp.headers", { key: "", value: "", visible: false });
     const removeHeader = (i: number) => form.removeFieldValue("mcp.headers", i);
