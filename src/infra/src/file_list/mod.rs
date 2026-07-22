@@ -20,6 +20,7 @@ use config::{
     get_config,
     meta::{
         meta_store::MetaStore,
+        search::ScanStats,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     },
     utils::time::second_micros,
@@ -27,11 +28,25 @@ use config::{
 
 use crate::errors::{Error, Result};
 
+pub mod pending_delete;
 pub mod postgres;
 pub mod sqlite;
 
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
+
+#[inline]
+pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats> {
+    let mut stats = ScanStats::new();
+    stats.files = files.len() as i64;
+    for file in files {
+        stats.records += file.meta.records;
+        stats.original_size += file.meta.original_size;
+        stats.compressed_size += file.meta.compressed_size;
+        stats.idx_scan_size += file.meta.index_size;
+    }
+    Ok(stats)
+}
 
 pub fn connect_default() -> Box<dyn FileList> {
     match get_config().common.meta_store.as_str().into() {

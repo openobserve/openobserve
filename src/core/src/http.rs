@@ -36,67 +36,21 @@ use crate::{
 };
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
+    // the status code mapping lives on `infra::errors::Error` so that other
+    // consumers (e.g. audit logging) stay consistent with the HTTP responses
+    let status =
+        StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     match err {
-        errors::Error::ErrorCode(code) => match code {
-            errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
-                (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                    Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-                )
-                    .into_response()
-            }
-            errors::ErrorCodes::SearchTimeout(_) => (
-                StatusCode::REQUEST_TIMEOUT,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-            errors::ErrorCodes::InvalidParams(_)
-            | errors::ErrorCodes::SearchSQLExecuteError(_)
-            | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
-            | errors::ErrorCodes::SearchFunctionNotDefined(_)
-            | errors::ErrorCodes::FullTextSearchFieldNotFound
-            | errors::ErrorCodes::SearchFieldNotFound(_)
-            | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_)
-            | errors::ErrorCodes::SearchHistogramNotAvailable(_) => (
-                StatusCode::BAD_REQUEST,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-            errors::ErrorCodes::ServerInternalError(_)
-            | errors::ErrorCodes::SearchParquetFileNotFound => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-        },
+        errors::Error::ErrorCode(code) => (
+            status,
+            [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
+            Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+        )
+            .into_response(),
         // These errors don't carry a structured error code, so we don't set the
         // `X-Error-Message` header (it should only carry error codes). The full
         // message is still returned in the JSON response body.
-        errors::Error::ResourceError(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(MetaHttpResponse::error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                err,
-            )),
-        )
-            .into_response(),
-        // A JSON deserialization failure means the client sent a malformed
-        // request body, so surface it as 400 rather than a 500 server error.
-        errors::Error::SerdeJsonError(_) => (
-            StatusCode::BAD_REQUEST,
-            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
-        )
-            .into_response(),
-        _ => (
-            StatusCode::BAD_REQUEST,
-            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
-        )
-            .into_response(),
+        _ => (status, Json(MetaHttpResponse::error(status, err))).into_response(),
     }
 }
 
@@ -270,9 +224,9 @@ impl From<EvalJobError> for Response {
                 log::error!("[EvalJob] reconciler error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")
             }
-            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
-                MetaHttpResponse::bad_request(value)
-            }
+            EvalJobError::InvalidStatus(_)
+            | EvalJobError::InvalidStatusTransition { .. }
+            | EvalJobError::InvalidJob(_) => MetaHttpResponse::bad_request(value),
         }
     }
 }

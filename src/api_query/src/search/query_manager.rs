@@ -66,7 +66,7 @@ pub async fn cancel_multiple_query(Path(params): Path<String>, body: Bytes) -> R
 pub async fn query_status(Path(_params): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let res = crate::service::search::query_status().await;
+        let res = search_service::query_status().await;
         match res {
             Ok(query_status) => Json(query_status).into_response(),
             Err(e) => MetaHttpResponse::bad_request(e),
@@ -94,7 +94,7 @@ pub async fn cancel_query_inner(org_id: &str, trace_ids: &[&str]) -> Response {
                 o2_enterprise::enterprise::super_cluster::search::cancel_query(org_id, trace_id)
                     .await
             } else {
-                crate::service::search::cancel_query(org_id, trace_id).await
+                search_service::cancel_query(org_id, trace_id).await
             };
             match ret {
                 Ok(status) => res.push(status),
@@ -124,7 +124,7 @@ pub async fn cancel_query_internal(org_id: &str, trace_id: &str) {
     let ret = if get_o2_config().super_cluster.enabled {
         o2_enterprise::enterprise::super_cluster::search::cancel_query(org_id, trace_id).await
     } else {
-        crate::service::search::cancel_query(org_id, trace_id).await
+        search_service::cancel_query(org_id, trace_id).await
     };
     match ret {
         Ok(res) => {

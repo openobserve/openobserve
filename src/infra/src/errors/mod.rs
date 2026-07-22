@@ -278,7 +278,39 @@ impl std::fmt::Display for ErrorCodes {
     }
 }
 
+impl Error {
+    /// The HTTP status code this error maps to. This is the single source of
+    /// truth shared by the HTTP response mapping and audit logging.
+    pub fn http_status(&self) -> u16 {
+        match self {
+            Error::ErrorCode(code) => code.http_status(),
+            Error::ResourceError(_) => 503,
+            // A JSON deserialization failure means the client sent a malformed
+            // request body, so surface it as 400 rather than a 500 server error.
+            _ => 400,
+        }
+    }
+}
+
 impl ErrorCodes {
+    /// The HTTP status code this error code maps to.
+    pub fn http_status(&self) -> u16 {
+        match self {
+            ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
+            ErrorCodes::SearchTimeout(_) => 408,
+            ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
+            ErrorCodes::InvalidParams(_)
+            | ErrorCodes::SearchSQLExecuteError(_)
+            | ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
+            | ErrorCodes::SearchFunctionNotDefined(_)
+            | ErrorCodes::FullTextSearchFieldNotFound
+            | ErrorCodes::SearchFieldNotFound(_)
+            | ErrorCodes::SearchSQLNotValid(_)
+            | ErrorCodes::SearchStreamNotFound(_)
+            | ErrorCodes::SearchHistogramNotAvailable(_) => 400,
+        }
+    }
+
     pub fn get_code(&self) -> u16 {
         match self {
             ErrorCodes::ServerInternalError(_) => 10001,
