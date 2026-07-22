@@ -127,6 +127,31 @@ export default [
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
 
+      // Catches components used in <template> but never imported/registered
+      // (e.g. <date-time> instead of <DateTime>) — this class of bug is
+      // invisible to vue-tsc (unresolved tags aren't a template type error
+      // without vueCompilerOptions.strictTemplates) and wasn't caught before.
+      // Ignore patterns cover framework-global components (vue-router,
+      // vue-i18n, and Vue's own built-ins) that have no local import.
+      "vue/no-undef-components": [
+        "error",
+        {
+          ignorePatterns: [
+            "router-view",
+            "router-link",
+            "i18n-t",
+            "i18n-d",
+            "i18n-n",
+            "transition",
+            "transition-group",
+            "keep-alive",
+            "component",
+            "slot",
+            "teleport",
+          ],
+        },
+      ],
+
       // Dark-mode schema (O2_TOKEN_MIGRATION_PLAN §3.R.3) — warn now, error at Phase G.
       // The two sanctioned seams (useTheme.ts / chartTheme.ts) turn this off below.
       "no-restricted-syntax": [
