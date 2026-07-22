@@ -182,7 +182,7 @@ function onLoadRetry(actionId?: string) {
 
 onMounted(() => {
   // Warm detection so an already-installed extension lets Record skip setup.
-  probeExtension()
+  probeExtension({ reloadIfFailed: false })
     .then((installed) => { extensionReady.value = installed })
     .catch(() => { /* extension messaging unavailable — handled in setup screen */ })
 
@@ -247,7 +247,7 @@ const isGateUrlValid = computed(() => {
 async function onRecordClick() {
   if (!validateGateUrl()) return
   commitGate()
-  const installed = await probeExtension()
+  const installed = await probeExtension({ reloadIfFailed: false })
   extensionReady.value = installed
   if (installed) {
     autoRecord.value = true
@@ -605,7 +605,7 @@ function onClearResults() {
                     :loading="checkingExtension"
                     iconLeft="download"
                     data-test="synthetics-setup-recheck-btn"
-                    @click="probeExtension"
+                    @click="probeExtension({ reloadIfFailed: true })"
                   >
                     Add to Chrome
                   </OButton>
@@ -617,7 +617,7 @@ function onClearResults() {
                   :loading="checkingExtension"
                   iconLeft="refresh"
                   data-test="synthetics-setup-recheck-btn"
-                  @click="probeExtension"
+                  @click="probeExtension({ reloadIfFailed: true })"
                 >
                   {{ t('synthetics.createBrowserTest.setupCheckAgain') }}
                 </OButton>
