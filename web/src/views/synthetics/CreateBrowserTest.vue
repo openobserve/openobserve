@@ -378,6 +378,10 @@ async function saveCheck() {
       currentStep.value = 1
       journeyRef.value?.validateStepSelectors?.()
     }
+    toast({
+      variant: 'error',
+      message: t('synthetics.validation.fixHighlightedFields'),
+    })
     return
   }
 

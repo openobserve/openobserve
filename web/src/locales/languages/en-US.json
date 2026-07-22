@@ -10009,7 +10009,9 @@
         "checkName": "Name",
         "noChecks": "No checks are assigned to this location yet.",
         "notFound": "Location not found"
-      }
+      },
+      "urlRequired": "Starting URL is required",
+      "fixHighlightedFields": "Fix the highlighted fields before saving"
     }
   },
   "shortcuts": {
