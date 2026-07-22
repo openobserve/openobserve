@@ -539,7 +539,7 @@ const openDetail = (monitor: any) => {
   const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name }
   if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt)
   router.push({
-    name: 'synthetic-monitor-results',
+    name: 'synthetics-monitor-results',
     params: { id: String(monitor.id) },
     query,
   });
@@ -799,7 +799,7 @@ const onEmptyAction = (actionId: string) => {
 }
 
 const openCreate = (type: SyntheticCheckType = 'browser') =>
-  router.push({ name: 'synthetic-new', query: { folder: activeFolderId.value, type } })
+  router.push({ name: 'synthetics-new', query: { folder: activeFolderId.value, type } })
 
 const onTypeSelected = (type: SyntheticCheckType) => {
   showTypePicker.value = false
@@ -808,7 +808,7 @@ const onTypeSelected = (type: SyntheticCheckType) => {
 
 const openEdit = (m: any) => {
   router.push({
-    name: 'synthetic-new',
+    name: 'synthetics-new',
     query: { edit: String(m.id), folder: activeFolderId.value },
   })
 }

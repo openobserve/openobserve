@@ -226,7 +226,7 @@ async function saveCheck() {
       toast({ variant: 'success', message: t('synthetics.newCheck.saved') })
     }
     isDirty.value = false
-    router.push({ name: 'synthetic', query: { folder: check.value.folder } })
+    router.push({ name: 'synthetics', query: { folder: check.value.folder } })
   } catch (err: any) {
     dismiss()
     toast({
@@ -243,7 +243,7 @@ async function saveCheck() {
 <template>
   <OPageLayout
     :title="headerTitle"
-    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetics' }, dataTest: 'synthetics-create-back-btn' }"
     bleed
   >
 
@@ -275,7 +275,7 @@ async function saveCheck() {
       <!-- Sticky footer -->
       <div class="flex items-center px-3 py-2.5 gap-2 border-t border-border-default shrink-0 bg-surface-base">
         <span class="flex-1" aria-hidden="true" />
-        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
+        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetics' })">
           {{ t('common.cancel') }}
         </OButton>
         <OButton variant="primary" size="sm" :loading="isSaving" data-test="synthetics-create-save-btn" @click="saveCheck">

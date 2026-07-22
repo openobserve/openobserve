@@ -395,14 +395,14 @@ async function saveCheck() {
       dismiss()
       toast({ variant: 'success', message: t('synthetics.newCheck.updated') })
       isDirty.value = false
-      router.push({ name: 'synthetic', query: { folder: check.value.folder } })
+      router.push({ name: 'synthetics', query: { folder: check.value.folder } })
     } else {
       const res = await syntheticsService.create(org, apiPayload.value, check.value.folder)
       const savedId = res.data?.id ?? crypto.randomUUID()
       dismiss()
       toast({ variant: 'success', message: t('synthetics.newCheck.saved') })
       isDirty.value = false
-      router.push({ name: 'synthetic', query: { folder: check.value.folder } })
+      router.push({ name: 'synthetics', query: { folder: check.value.folder } })
     }
   } catch (err: any) {
     dismiss()
@@ -482,7 +482,7 @@ function onClearResults() {
     class="bg-surface-base"
     :title="headerTitle"
     :subtitle="folderName"
-    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetics' }, dataTest: 'synthetics-create-back-btn' }"
     bleed
   >
 
@@ -758,7 +758,7 @@ function onClearResults() {
           </template>
           <span class="flex-1" aria-hidden="true" />
 
-          <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
+          <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetics' })">
             {{ t('common.cancel') }}
           </OButton>
           <OButton variant="outline" size="sm" data-test="synthetics-create-continue-btn" @click="onContinueToConfigure">
@@ -781,7 +781,7 @@ function onClearResults() {
         <!-- Configure step: Cancel | Back + Save -->
         <template v-else-if="currentStep === 2">
           <span class="flex-1" aria-hidden="true" />
-          <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
+          <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetics' })">
             {{ t('common.cancel') }}
           </OButton>
           <OButton variant="outline" size="sm" data-test="synthetics-create-back-to-journey-btn" @click="currentStep = 1">
