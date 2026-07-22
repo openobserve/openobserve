@@ -498,10 +498,10 @@ export default defineComponent({
         }
 
         if (
-          rows[i]["name"].toLowerCase().includes(terms) ||
-          rows[i]["destination_type_name"].toLowerCase().includes(terms) ||
-          rows[i]["url"].toLowerCase().includes(terms) ||
-          rows[i]["method"].toLowerCase().includes(terms) ||
+          (rows[i]["name"] || "").toLowerCase().includes(terms) ||
+          (rows[i]["destination_type_name"] || "").toLowerCase().includes(terms) ||
+          (rows[i]["url"] || "").toLowerCase().includes(terms) ||
+          (rows[i]["method"] || "").toLowerCase().includes(terms) ||
           outputFormatStr.includes(terms)
         ) {
           filtered.push(rows[i]);

@@ -42,8 +42,8 @@ use proto::cluster_rpc::IngestionType;
 use transform::vrl::compiler::runtime::Runtime;
 
 use super::{
-    db::{alerts::alert, pipeline},
-    pipeline::batch_execution::ExecutablePipeline,
+    db::alerts::alert,
+    pipeline::{batch_execution::ExecutablePipeline, store as pipeline},
     self_reporting::publish_triggers_usage,
 };
 use crate::{

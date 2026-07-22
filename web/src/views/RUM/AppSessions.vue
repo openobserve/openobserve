@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Controls on the right -->
             <div class="flex items-start gap-1 shrink-0">
               <syntax-guide />
-              <date-time
+              <DateTime
                 auto-apply
                 menu-align="end"
                 :default-type="sessionState.data.datetime.valueType"
@@ -412,6 +412,7 @@ import { useStore } from "vuex";
 import useQuery from "@/composables/useQuery";
 import searchService from "@/services/search";
 import useSession from "@/composables/useSessionReplay";
+import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import SessionHealthCell from "@/components/rum/sessionReplay/SessionHealthCell.vue";

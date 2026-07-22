@@ -26,23 +26,19 @@ use config::{
     meta::user::UserRole,
     utils::{hash::get_passcode_hash, json},
 };
+pub use db::authz::{remove_ownership, set_ownership};
 use regex::Regex;
 #[cfg(feature = "enterprise")]
 use {
     crate::service::users::get_user, jsonwebtoken::TokenData, o2_dex::service::auth::get_dex_jwks,
-    o2_openfga::config::get_config as get_openfga_config, o2_openfga::meta::mapping::OFGA_MODELS,
-    serde_json::Value, std::str::FromStr,
+    o2_openfga::meta::mapping::OFGA_MODELS, serde_json::Value, std::str::FromStr,
 };
 
 #[cfg(feature = "enterprise")]
 use crate::common::meta::user::AuthTokensExt;
 use crate::common::{
-    infra::config::{ORG_USERS, PASSWORD_HASH},
-    meta::{
-        authz::Authz,
-        organization::DEFAULT_ORG,
-        user::{AuthTokens, UserOrgRole},
-    },
+    infra::config::PASSWORD_HASH,
+    meta::user::{AuthTokens, UserOrgRole},
 };
 
 pub const V2_API_PREFIX: &str = "v2";
@@ -156,12 +152,7 @@ pub fn get_hash(pass: &str, salt: &str) -> String {
     }
 }
 
-pub fn is_root_user(user_id: &str) -> bool {
-    match ORG_USERS.get(&format!("{DEFAULT_ORG}/{user_id}")) {
-        Some(user) => user.role.eq(&UserRole::Root),
-        None => false,
-    }
-}
+pub use ::db::user::is_root_user;
 
 #[cfg(feature = "enterprise")]
 pub async fn save_org_tuples(org_id: &str) {
@@ -201,60 +192,6 @@ pub fn get_role(role: &UserOrgRole) -> UserRole {
 pub fn get_role(_role: &UserOrgRole) -> UserRole {
     UserRole::Admin
 }
-
-#[cfg(feature = "enterprise")]
-pub async fn set_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_openfga_config().enabled {
-        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
-
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
-
-        let parent_type = if obj.parent_type.is_empty() {
-            ""
-        } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
-        };
-
-        // Default folder is already created in case of new org, this handles the case for old org
-        if obj_type.eq("folders")
-            && authorizer::authz::check_folder_exists(org_id, &obj.obj_id).await
-        {
-            // If the folder tuples are missing, it automatically creates them
-            // So we can return here
-            log::debug!(
-                "folder tuples already exists for org: {org_id}; folder: {}",
-                obj.obj_id
-            );
-            return;
-        } else if obj.parent_type.eq("folders") {
-            log::debug!("checking parent folder tuples for folder: {}", obj.parent);
-            // In case of dashboard, we need to check if the tuples for its folder exist
-            // If not, the below function creates the proper tuples for the folder
-            authorizer::authz::check_folder_exists(org_id, &obj.parent).await;
-        }
-        authorizer::authz::set_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
-    }
-}
-#[cfg(not(feature = "enterprise"))]
-pub async fn set_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
-
-#[cfg(feature = "enterprise")]
-pub async fn remove_ownership(org_id: &str, obj_type: &str, obj: Authz) {
-    if get_openfga_config().enabled {
-        use o2_openfga::{authorizer, meta::mapping::OFGA_MODELS};
-        let obj_str = format!("{}:{}", OFGA_MODELS.get(obj_type).unwrap().key, obj.obj_id);
-
-        let parent_type = if obj.parent_type.is_empty() {
-            ""
-        } else {
-            OFGA_MODELS.get(obj.parent_type.as_str()).unwrap().key
-        };
-
-        authorizer::authz::remove_ownership(org_id, &obj_str, &obj.parent, parent_type).await;
-    }
-}
-#[cfg(not(feature = "enterprise"))]
-pub async fn remove_ownership(_org_id: &str, _obj_type: &str, _obj: Authz) {}
 
 fn deserialize_trimmed<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
@@ -863,7 +800,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        common::meta::user::UserRequest,
+        common::meta::{organization::DEFAULT_ORG, user::UserRequest},
         service::{self, organization, users},
     };
 

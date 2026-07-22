@@ -32,8 +32,6 @@ use crate::{
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
-#[cfg(feature = "enterprise")]
-mod cipher;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -476,7 +474,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         .expect("short url cache failed");
 
     // initialize metadata watcher
-    tokio::task::spawn(db::schema::watch());
+    tokio::task::spawn(crate::service::schema::watch());
     tokio::task::spawn(db::functions::watch());
     tokio::task::spawn(db::compact::retention::watch());
     tokio::task::spawn(db::metrics::watch_prom_cluster_leader());
@@ -501,11 +499,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
     // pipeline not used on compactors
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(db::pipeline::watch());
+        tokio::task::spawn(crate::service::pipeline::store::watch());
     } else {
         // On nodes that do not run the heavy pipeline watch (e.g. routers), still maintain
         // PIPELINE_ID_TO_ORG so HTTP handlers can perform cross-org IDOR checks in O(1).
-        tokio::task::spawn(db::pipeline::watch_id_to_org());
+        tokio::task::spawn(crate::service::pipeline::store::watch_id_to_org());
     }
 
     // Dashboard id->org cache: maintained on every node type so HTTP handlers (e.g.
@@ -517,14 +515,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(db::enrichment_table::watch());
+        tokio::task::spawn(crate::service::enrichment_table::watch());
     }
 
     tokio::task::yield_now().await;
 
     // cache core metadata
     db::schema::cache().await.expect("stream cache failed");
-    db::functions::cache()
+    crate::service::functions::cache()
         .await
         .expect("functions cache failed");
     db::compact::retention::cache()
@@ -546,7 +544,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         // Sync built-in model pricing from GitHub (initial + periodic)
         if LOCAL_NODE.is_querier() {
             tokio::task::spawn(async {
-                if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                if let Err(e) =
+                    crate::service::model_pricing::sync_built_in_from_github(false).await
+                {
                     log::error!("[model_pricing] initial built-in sync failed: {e}");
                 }
             });
@@ -556,7 +556,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 );
                 loop {
                     tokio::time::sleep(interval).await;
-                    if let Err(e) = db::model_pricing_sync::sync_built_in_from_github(false).await {
+                    if let Err(e) =
+                        crate::service::model_pricing::sync_built_in_from_github(false).await
+                    {
                         log::error!("[model_pricing] periodic built-in sync failed: {e}");
                     }
                 }
@@ -936,14 +938,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
     {
         tokio::task::spawn(o2_enterprise::enterprise::pipeline::pipeline_job::run());
-        tokio::task::spawn(cipher::run());
+        tokio::task::spawn(db::keys::cache());
         tokio::task::spawn(db::keys::watch());
         tokio::task::spawn(org_storage::run());
-        tokio::task::spawn(db::org_storage_providers::watch());
-        tokio::task::spawn(db::workflows::clean());
+        tokio::task::spawn(crate::service::org_storage_providers::watch());
+        tokio::task::spawn(crate::service::workflows::runtime::clean());
         tokio::task::spawn(db::workflows::watch());
         if LOCAL_NODE.is_alert_manager() {
-            tokio::task::spawn(db::workflows::watch_workflow_triggers());
+            tokio::task::spawn(crate::service::workflows::runtime::watch_workflow_triggers());
         }
     }
 
@@ -1019,11 +1021,13 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Failed to clean up old JSON format enrichment tables");
 
-    db::schema::cache_enrichment_tables()
+    crate::service::enrichment_table::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards
-    db::pipeline::cache().await.expect("Pipeline cache failed");
+    crate::service::pipeline::store::cache()
+        .await
+        .expect("Pipeline cache failed");
 
     // Lightweight dashboard id->org cache for cross-org IDOR checks. Runs on every node.
     db::dashboards::cache_id_to_org()

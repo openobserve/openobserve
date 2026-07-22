@@ -1498,6 +1498,7 @@ pub async fn execute_anomaly_query(
         use_cache: false,
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     let parsed_stream_type = StreamType::from(stream_type);
