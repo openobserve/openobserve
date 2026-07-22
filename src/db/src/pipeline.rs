@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Only read-only accessors are re-exported here. Mutations must go through
+// `service::pipeline::store`, which keeps the executable-pipeline caches and
+// coordinator/super-cluster events in sync.
 pub use infra::pipeline::{
-    delete, get_by_id, get_by_stream, get_with_same_source_stream, list, list_by_org,
-    list_streams_with_pipeline, put,
+    get_by_id, get_by_stream, get_with_same_source_stream, list, list_by_org,
+    list_streams_with_pipeline,
 };

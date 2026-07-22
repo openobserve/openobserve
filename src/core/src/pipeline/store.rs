@@ -23,7 +23,7 @@ use config::{
         stream::StreamParams,
     },
 };
-use infra::{coordinator::pipelines::PIPELINES_WATCH_PREFIX, db};
+use infra::{coordinator::pipelines::PIPELINES_WATCH_PREFIX, db, pipeline as infra_pipeline};
 
 use crate::{
     common::infra::config::{
@@ -72,7 +72,7 @@ impl From<infra::errors::Error> for PipelineError {
 ///
 /// Pipeline validation should be handled by the caller.
 pub async fn set(pipeline: &Pipeline) -> Result<(), PipelineError> {
-    db_pipeline::put(pipeline).await?;
+    infra_pipeline::put(pipeline).await?;
     update_cache(PipelineTableEvent::Add(pipeline)).await;
 
     Ok(())
@@ -90,7 +90,7 @@ pub async fn update(
         update_cache(PipelineTableEvent::Remove(&pipeline.id)).await;
     }
 
-    db_pipeline::put(pipeline).await?;
+    infra_pipeline::put(pipeline).await?;
     update_cache(PipelineTableEvent::Add(pipeline)).await;
 
     Ok(())
@@ -233,7 +233,7 @@ pub async fn delete(pipeline_id: &str) -> Result<(), PipelineError> {
     // remove from cache first
     update_cache(PipelineTableEvent::Remove(pipeline_id)).await;
 
-    db_pipeline::delete(pipeline_id).await?;
+    infra_pipeline::delete(pipeline_id).await?;
 
     Ok(())
 }

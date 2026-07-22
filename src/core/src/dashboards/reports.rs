@@ -29,7 +29,7 @@ use config::{
                 ReportListFilters, ReportMediaType, ReportTimerangeType,
             },
         },
-        folder::Folder,
+        folder::{DEFAULT_FOLDER, Folder, FolderType},
     },
     utils::time::now_micros,
 };
@@ -51,6 +51,7 @@ use crate::{
         meta::authz::Authz,
         utils::auth::{is_ofga_unsupported, remove_ownership, set_ownership},
     },
+    folders,
     service::{db, short_url},
 };
 
@@ -229,6 +230,15 @@ pub async fn save(
     }
 
     if create {
+        // Provision the default reports folder if the report targets it and it
+        // doesn't exist yet.
+        if folder_id == DEFAULT_FOLDER
+            && !table::folders::exists(org_id, DEFAULT_FOLDER, FolderType::Reports)
+                .await
+                .map_err(|e| ReportError::DbError(anyhow::anyhow!(e)))?
+        {
+            create_default_reports_folder(org_id).await?;
+        }
         let report_id = db::dashboards::reports::create(conn, folder_id, report)
             .await
             .map_err(ReportError::DbError)?;
@@ -249,6 +259,17 @@ pub async fn save(
     }
 
     Ok(())
+}
+
+async fn create_default_reports_folder(org_id: &str) -> Result<Folder, ReportError> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: "default".to_owned(),
+        description: "default".to_owned(),
+    };
+    folders::save_folder(org_id, default_folder, FolderType::Reports, true)
+        .await
+        .map_err(|_| ReportError::CreateDefaultFolderError)
 }
 
 pub async fn get(org_id: &str, folder_id: &str, name: &str) -> Result<Report, ReportError> {

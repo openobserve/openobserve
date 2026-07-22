@@ -2738,7 +2738,7 @@ mod tests {
         assert!(trigger.retries > 0);
 
         // Clean up the invalid pipeline
-        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve::service::pipeline::store::delete(&pipeline.id).await;
     }
 
     // Test to handle case where pipeline triggers for invalid timerange where start time
@@ -2888,7 +2888,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve::service::pipeline::store::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = openobserve::service::db::scheduler::delete(
             "e2e",
@@ -3069,7 +3069,7 @@ mod tests {
         );
 
         // Clean up
-        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve::service::pipeline::store::delete(&pipeline.id).await;
         // Also delete the trigger job from scheduled jobs table
         let _ = openobserve::service::db::scheduler::delete(
             "e2e",
@@ -3097,7 +3097,7 @@ mod tests {
         let pipeline = pipeline.unwrap();
 
         // Clean up test pipelines
-        let _ = openobserve::service::db::pipeline::delete(&pipeline.id).await;
+        let _ = openobserve::service::pipeline::store::delete(&pipeline.id).await;
     }
 
     async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {

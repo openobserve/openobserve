@@ -163,6 +163,8 @@ mod tests {
     #[tokio::test]
     async fn test_downsampling() {
         const OFFSET: i64 = 100;
+        // set up the meta store that infra::db::init would normally create at startup
+        infra::db::create_table().await.unwrap();
         set_offset(
             "default",
             StreamType::Metrics,
@@ -173,6 +175,7 @@ mod tests {
         )
         .await
         .unwrap();
+        sync_cache_to_db().await.unwrap();
         assert_eq!(
             get_offset("default", StreamType::Metrics, "compact_file", (0, 100)).await,
             (OFFSET, "LOCAL".to_string())
@@ -181,5 +184,6 @@ mod tests {
             get_offset_from_cache("default", StreamType::Metrics, "compact_file", (0, 100)).await,
             Some((OFFSET, "LOCAL".to_string()))
         );
+        assert!(!list_offset().await.unwrap().is_empty());
     }
 }

@@ -79,15 +79,24 @@ pub async fn notify_workflow_upsert(workflow: &Workflow) -> Result<(), anyhow::E
         .await?;
 
     let config = o2_enterprise::enterprise::common::config::get_config();
-    if config.super_cluster.enabled
-        && let Err(e) =
-            o2_enterprise::enterprise::super_cluster::queue::add_workflow(workflow.clone()).await
-    {
-        log::error!(
-            "error in sending workflow notification to super cluster queue for {}/{} : {e}",
-            workflow.org_id,
-            workflow.id
-        );
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::add_workflow(workflow.clone()).await
+        {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow upsert notification to super cluster queue for {}/{}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow upsert notification to super cluster queue for {}/{} : {e}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+        }
     }
     Ok(())
 }
@@ -99,26 +108,46 @@ pub async fn notify_workflow_delete(id: &str) -> Result<(), anyhow::Error> {
         .await?;
 
     let config = o2_enterprise::enterprise::common::config::get_config();
-    if config.super_cluster.enabled
-        && let Err(e) = o2_enterprise::enterprise::super_cluster::queue::delete_workflow(id).await
-    {
-        log::error!(
-            "error in sending workflow delete notification to super cluster queue for {id} : {e}"
-        );
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::delete_workflow(id).await {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow delete notification to super cluster queue for {id}"
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow delete notification to super cluster queue for {id} : {e}"
+                );
+            }
+        }
     }
     Ok(())
 }
 
 pub async fn save_workflow_errors(mut errors: WorkflowRunErrors) -> Result<(), anyhow::Error> {
     infra::table::workflows::save_workflow_errors(errors.clone()).await?;
+
+    let org_id = errors.org_id.clone();
+    let wid = errors.workflow_id.clone();
+    let run_id = errors.run_id.clone();
+    // we reset the input data here so we don't need to sent it via nats
     errors.input_data = None;
 
     let config = o2_enterprise::enterprise::common::config::get_config();
-    if config.super_cluster.enabled
-        && let Err(e) =
-            o2_enterprise::enterprise::super_cluster::queue::add_workflow_errors(errors).await
-    {
-        log::error!("error in sending workflow errors notification to super cluster queue: {e}");
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::add_workflow_errors(errors).await {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow errors add notification to super cluster queue for {org_id}/{wid} : run {run_id}",
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow errors add notification to super cluster queue for {org_id}/{wid} : run {run_id} : {e}",
+                );
+            }
+        }
     }
     Ok(())
 }

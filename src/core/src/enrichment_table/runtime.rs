@@ -132,6 +132,8 @@ pub async fn get_enrichment_table_data(
     );
     request.set_local_mode(Some(true));
 
+    log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
+
     #[cfg(feature = "enterprise")]
     crate::service::search::SEARCH_SERVER
         .insert(
@@ -167,11 +169,20 @@ pub async fn get_enrichment_table_data(
         .await;
 
     match result {
-        Ok((batches, ..)) => Ok(crate::service::enrichment::storage::Values::RecordBatch(
-            batches,
-        )),
-        Err(err) => Err(anyhow::anyhow!(
-            "get enrichment table {org_id}/{name} error: {err}"
-        )),
+        Ok((batches, ..)) => {
+            log::info!(
+                "get enrichment table {org_id}/{name} data success with {} rows",
+                batches.iter().map(|b| b.num_rows()).sum::<usize>()
+            );
+            Ok(crate::service::enrichment::storage::Values::RecordBatch(
+                batches,
+            ))
+        }
+        Err(err) => {
+            log::error!("get enrichment table {org_id}/{name} data error: {err}");
+            Err(anyhow::anyhow!(
+                "get enrichment table {org_id}/{name} error: {err}"
+            ))
+        }
     }
 }
