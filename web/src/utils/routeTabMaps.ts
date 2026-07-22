@@ -120,6 +120,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     ingestLogsFromOtel: "ingestLogsFromOtel",
     logstash: "logstash",
     syslogNg: "syslogNg",
+    loongcollector: "loongcollector",
   },
 
   /** enterprise/components/billings/Billing.vue */

@@ -113,6 +113,7 @@ describe("IngestLogs Index Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "loongcollector",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
@@ -300,7 +301,8 @@ describe("IngestLogs Index Component", () => {
         "fluentbit", 
         "fluentd",
         "vector",
-        "syslogNg"
+        "syslogNg",
+        "loongcollector"
       ];
       
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);

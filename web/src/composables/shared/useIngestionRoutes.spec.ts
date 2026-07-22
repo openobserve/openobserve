@@ -27,6 +27,7 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 vi.mock("@/components/ingestion/logs/SyslogNg.vue", () => ({ default: {} }));
+vi.mock("@/components/ingestion/logs/LoongCollector.vue", () => ({ default: {} }));
 vi.mock("@/views/Ingestion.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/FluentBit.vue", () => ({ default: {} }));
 vi.mock("@/components/ingestion/logs/Fluentd.vue", () => ({ default: {} }));
@@ -197,6 +198,7 @@ describe("useIngestionRoutes", () => {
       expect(logRouteNames).toContain("ingestLogsFromOtel");
       expect(logRouteNames).toContain("logstash");
       expect(logRouteNames).toContain("syslogNg");
+      expect(logRouteNames).toContain("loongcollector");
     });
 
     it("should have metrics routes under custom", () => {
