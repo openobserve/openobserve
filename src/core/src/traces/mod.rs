@@ -878,6 +878,33 @@ pub async fn handle_otlp_request(
         return format_response(partial_success, req_type);
     }
 
+    // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
+    // Span attributes are flattened to top-level string fields (see
+    // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
+    // applies directly here.
+    #[cfg(feature = "vectorscan")]
+    {
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                for (stream, data) in json_data_by_stream.iter_mut() {
+                    if let Err(e) = pattern_manager.process_at_ingestion(
+                        org_id,
+                        StreamType::Traces,
+                        stream,
+                        &mut data.0,
+                    ) {
+                        log::error!(
+                            "[TRACES] error applying SDR patterns for stream {stream}: {e}"
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+            }
+        }
+    }
+
     if let Err(e) = write_traces_by_stream(
         org_id,
         (started_at, &start),
@@ -1171,6 +1198,33 @@ pub async fn ingest_json(
     // if no data, fast return
     if json_data_by_stream.is_empty() {
         return format_response(partial_success, req_type);
+    }
+
+    // Apply sensitive-data redaction (SDR) regex patterns to trace records before writing.
+    // Span attributes are flattened to top-level string fields (see
+    // finalize_and_buffer_trace_span), so the same field-level pattern engine used for logs
+    // applies directly here.
+    #[cfg(feature = "vectorscan")]
+    {
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                for (stream, data) in json_data_by_stream.iter_mut() {
+                    if let Err(e) = pattern_manager.process_at_ingestion(
+                        org_id,
+                        StreamType::Traces,
+                        stream,
+                        &mut data.0,
+                    ) {
+                        log::error!(
+                            "[TRACES] error applying SDR patterns for stream {stream}: {e}"
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+            }
+        }
     }
 
     if let Err(e) = write_traces_by_stream(
