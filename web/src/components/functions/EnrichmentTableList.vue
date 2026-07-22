@@ -276,6 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline-destructive"
                     size="sm"
                     icon-left="delete"
+                    :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
                   >
                     Delete
@@ -432,6 +433,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref<boolean>(false);
     const selectedEnrichmentTables = ref<any[]>([]);
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
@@ -738,6 +740,7 @@ export default defineComponent({
     };
 
     const bulkDeleteEnrichmentTables = () => {
+      bulkDeleteLoading.value = true;
       const selectedItems = selectedEnrichmentTables.value;
       const promises: Promise<any>[] = [];
 
@@ -795,6 +798,9 @@ export default defineComponent({
           getLookupTables(true);
           selectedEnrichmentTables.value = [];
           confirmBulkDelete.value = false;
+        })
+        .finally(() => {
+          bulkDeleteLoading.value = false;
         });
     };
 
@@ -957,6 +963,7 @@ export default defineComponent({
       handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteEnrichmentTables,
+      bulkDeleteLoading,
       selectedFilter,
       showUrlJobsDialog,
       showUrlJobsDialogState,

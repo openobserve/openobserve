@@ -135,6 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline-destructive"
             size="sm"
             icon-left="delete"
+            :loading="bulkDeleteLoading"
             @click="openBulkDeleteDialog"
           >
             Delete
@@ -306,6 +307,7 @@ export default defineComponent({
       data: null,
     });
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const router = useRouter();
@@ -555,6 +557,7 @@ export default defineComponent({
     };
 
     const bulkDeleteDestinations = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
         message: "Deleting destinations...",
@@ -627,6 +630,8 @@ export default defineComponent({
             message: errorMessage,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
@@ -669,6 +674,7 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteDestinations,
       confirmBulkDelete,
+      bulkDeleteLoading,
       selectedDestinations,
       formatOutputFormat,
     };

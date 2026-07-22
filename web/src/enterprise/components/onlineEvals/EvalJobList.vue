@@ -81,6 +81,7 @@
             class="ml-3"
             icon-left="delete"
             data-test="eval-job-bulk-delete-btn"
+            :loading="actionLoading"
             @click="handleBulkDelete"
           >
             {{ t("onlineEvals.job.deleteBulkButton") }} ({{ selectedIds.length }})
@@ -184,6 +185,8 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
+  /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
+  actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */
   pendingStatusId?: string | null;
 }>();
