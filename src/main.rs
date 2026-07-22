@@ -60,7 +60,6 @@ use openobserve::{
         db::{self, scheduler::TriggerModule::QueryRecommendations},
         metadata,
         node::NodeService,
-        search::SEARCH_SERVER,
         self_reporting,
     },
 };
@@ -78,6 +77,7 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
+use search_service::SEARCH_SERVER;
 use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
