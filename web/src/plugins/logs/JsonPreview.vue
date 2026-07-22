@@ -500,26 +500,6 @@ export default {
 
     // Dropdown state for multi-link fields
     const crossLinkDropdownVisible = ref(false);
-    const crossLinkDropdownX = ref(0);
-    const crossLinkDropdownY = ref(0);
-    const crossLinkDropdownItems = ref<
-      Array<{ name: string; resolvedUrl: string }>
-    >([]);
-
-    const onCrossLinkClick = (event: MouseEvent, fieldName: string) => {
-      const links = getCrossLinksForField(fieldName);
-      if (links.length === 0) return;
-
-      if (links.length === 1) {
-        window.open(links[0].resolvedUrl, "_blank");
-        return;
-      }
-
-      crossLinkDropdownItems.value = links;
-      crossLinkDropdownX.value = event.clientX;
-      crossLinkDropdownY.value = event.clientY;
-      crossLinkDropdownVisible.value = true;
-    };
 
     const openCrossLink = (url: string) => {
       window.open(url, "_blank");
@@ -690,7 +670,7 @@ export default {
       loading.value = true;
 
       try {
-        const { traceparent, traceId } = generateTraceContext();
+        const { traceparent } = generateTraceContext();
 
         const res = await searchService.search(
           {
@@ -784,7 +764,7 @@ export default {
     };
 
     const filteredTabs = computed(() => {
-      return tabs.filter((tab) => {
+      return tabs.filter(() => {
         if (
           props.value._o2_id == undefined ||
           searchAggData.hasAggregation ||

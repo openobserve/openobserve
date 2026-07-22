@@ -265,65 +265,6 @@ const fetchFilterValues = async () => {
   }
 };
 
-// Filter functions for dropdowns
-const filterVersions = (val: string, update: (fn: () => void) => void) => {
-  update(() => {
-    if (val === '') {
-      filteredVersionOptions.value = versionOptions.value;
-    } else {
-      const needle = val.toLowerCase();
-      filteredVersionOptions.value = versionOptions.value.filter(
-        v => v.toLowerCase().includes(needle)
-      );
-    }
-  });
-};
-
-const filterServices = (val: string, update: (fn: () => void) => void) => {
-  update(() => {
-    if (val === '') {
-      filteredServiceOptions.value = serviceOptions.value;
-    } else {
-      const needle = val.toLowerCase();
-      filteredServiceOptions.value = serviceOptions.value.filter(
-        s => s.toLowerCase().includes(needle)
-      );
-    }
-  });
-};
-
-const filterEnvironments = (val: string, update: (fn: () => void) => void) => {
-  update(() => {
-    if (val === '') {
-      filteredEnvironmentOptions.value = environmentOptions.value;
-    } else {
-      const needle = val.toLowerCase();
-      filteredEnvironmentOptions.value = environmentOptions.value.filter(
-        e => e.toLowerCase().includes(needle)
-      );
-    }
-  });
-};
-
-// Add new value functions (for manual input)
-const addNewVersion = (val: string, done: (item?: string) => void) => {
-  if (val.length > 0) {
-    done(val);
-  }
-};
-
-const addNewService = (val: string, done: (item?: string) => void) => {
-  if (val.length > 0) {
-    done(val);
-  }
-};
-
-const addNewEnvironment = (val: string, done: (item?: string) => void) => {
-  if (val.length > 0) {
-    done(val);
-  }
-};
-
 // State
 const isLoading = ref(false);
 const sourceMaps = ref<any[]>([]);

@@ -467,7 +467,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
-import { add, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
@@ -660,7 +660,7 @@ const loadDomainSettings = async () => {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
 
-    const existingDomains = [];
+    const existingDomains: Domain[] = [];
 
     domains.splice(0, domains.length, ...existingDomains);
   }
@@ -792,20 +792,6 @@ const loadFunctions = async () => {
   } finally {
     loadingFunctions.value = false;
   }
-};
-
-// Filter functions for autocomplete
-const filterFunctions = (val: string, update: Function) => {
-  update(() => {
-    if (val === "") {
-      functionOptions.value = allFunctions.value;
-    } else {
-      const needle = val.toLowerCase();
-      functionOptions.value = allFunctions.value.filter(
-        (v) => v.toLowerCase().indexOf(needle) > -1
-      );
-    }
-  });
 };
 
 // Save claim parser function separately

@@ -20,6 +20,9 @@
 // via markdown frontmatter (ai/content/richCard/buildFromMarkdown), and in-repo
 // data sources via typed builders (setupCard/content/*, setupCard/registry).
 
+import type { FieldWidth } from "@/lib/forms/Input/OInput.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
 /**
  * Per-org values substituted into a card's code blocks. `token` is the
  * OpenObserve ingestion token: base64 of `email:<org ingestion passcode>`,
@@ -94,7 +97,7 @@ export interface RichCardStepAction {
   id: string;
   label: string;
   /** OIcon registry name rendered before the label. */
-  icon?: string;
+  icon?: IconName;
   /** Renders as a secondary button (default is primary). */
   variant?: "primary" | "secondary";
   /** Greys the button out — e.g. nothing selected yet. */
@@ -255,7 +258,7 @@ export interface RichCardInput {
   /** Helper text under the field. */
   help?: string;
   /** Width hint passed to OInput (e.g. "sm" | "md"). Defaults to "md". */
-  width?: string;
+  width?: FieldWidth;
 }
 
 export interface RichCardContent {

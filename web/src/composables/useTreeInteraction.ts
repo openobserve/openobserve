@@ -141,7 +141,7 @@ export function useTreeNodeHover() {
    * Set up hover effects for the tree chart
    * Configures emphasis behavior and edge dimming
    */
-  const setupHoverEffects = (chart: Ref<ECharts | null>) => {
+  const setupHoverEffects = (_chart?: unknown) => {
     // The hover effects are primarily handled by ECharts configuration:
     // emphasis: { focus: "relative" } - dims non-adjacent nodes
     // blur: { itemStyle: { opacity: 0.15 } } - dims non-related elements

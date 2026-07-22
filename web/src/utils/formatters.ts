@@ -22,7 +22,7 @@ export const b64DecodeUnicode = (str: string) => {
     return decodeURIComponent(
       Array.prototype.map
         .call(
-          atob(str.replace(/\-/g, "+").replace(/\_/g, "/").replace(/\./g, "=")),
+          atob(str.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "=")),
           function (c) {
             return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
           },
@@ -31,6 +31,7 @@ export const b64DecodeUnicode = (str: string) => {
     );
   } catch (e) {
     console.log("Error: getBase64Decode: error while decoding.");
+    return undefined;
   }
 };
 
@@ -42,7 +43,7 @@ export const b64DecodeUnicodeSafe = (str: string, fallback = ""): string => {
 const isBase64Encoded = (str: string): boolean => {
   if (!str || typeof str !== "string") return false;
 
-  const base64Pattern = /^[A-Za-z0-9\-_\.]+$/;
+  const base64Pattern = /^[A-Za-z0-9\-_.]+$/;
 
   if (!base64Pattern.test(str)) return false;
 
@@ -88,6 +89,7 @@ export const b64EncodeStandard = (str: string) => {
     );
   } catch (e) {
     console.log("Error: getBase64Encode: error while encoding.");
+    return undefined;
   }
 };
 
@@ -102,6 +104,7 @@ export const b64DecodeStandard = (str: string) => {
     );
   } catch (e) {
     console.log("Error: getBase64Decode: error while decoding.");
+    return undefined;
   }
 };
 
@@ -131,8 +134,8 @@ export const formatLargeNumber = (number: number) => {
   }
 };
 
-export const formatSizeFromMB = (sizeInMB: string) => {
-  let size = parseFloat(sizeInMB);
+export const formatSizeFromMB = (sizeInMB: string | number) => {
+  let size = parseFloat(String(sizeInMB));
 
   if (isNaN(size)) {
     return "0 MB";

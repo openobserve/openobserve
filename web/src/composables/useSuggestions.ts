@@ -114,16 +114,16 @@ const useSqlSuggestions = () => {
         `match_all_raw_ignore_case('${_keyword}')`,
     },
     {
-      label: (_keyword: string) =>
+      label: () =>
         `re_match(fieldname: string, regular_expression: string)`,
       kind: "Text",
-      insertText: (_keyword: string) => `re_match(fieldname, '')`,
+      insertText: () => `re_match(fieldname, '')`,
     },
     {
-      label: (_keyword: string) =>
+      label: () =>
         `re_not_match(fieldname: string, regular_expression: string)`,
       kind: "Text",
-      insertText: (_keyword: string) => `re_not_match(fieldname, '')`,
+      insertText: () => `re_not_match(fieldname, '')`,
     },
     {
       label: (_keyword: string) => `str_match(fieldname, '${_keyword}')`,
@@ -268,12 +268,15 @@ const useSqlSuggestions = () => {
   const autoCompleteData = ref({
     fieldValues: {} as any, // { kubernetes_host: new Set([value1, value2]) }
     query: "",
+    // Top-level cursor index (set by SearchBar / query editors); read first, with
+    // position.cursorIndex kept as a legacy fallback.
+    cursorIndex: undefined as number | undefined,
     position: {
       cursorIndex: 0,
     },
     popup: {
-      open: (val: string) => {},
-      close: (val: string) => {},
+      open: (_val: string) => {},
+      close: (_val: string) => {},
     },
     // Stream context — set by SearchBar.vue when a stream is selected.
     // Required to build the composite IDB key: "org|streamType|streamName|fieldName".

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import Group from "./Group.vue";
-import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
 
 // Mock AddCondition component

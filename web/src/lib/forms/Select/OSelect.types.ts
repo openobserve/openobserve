@@ -40,6 +40,13 @@ export interface SelectOption {
   [key: string]: unknown;
 }
 
+/**
+ * Anything accepted by the `options` prop. Primitive entries (strings,
+ * numbers, …) are normalized at runtime into `{ label, value }` pairs by
+ * OSelect's normalizeOption().
+ */
+export type SelectOptionInput = SelectOption | SelectValue;
+
 // ── Root ──────────────────────────────────────────────────────────────────
 
 export interface SelectProps {
@@ -50,7 +57,7 @@ export interface SelectProps {
    * automatically. For grouped or custom-rendered options, use the `default`
    * slot instead.
    */
-  options?: SelectOption[];
+  options?: readonly SelectOptionInput[];
   /** Allows selecting multiple options */
   multiple?: boolean;
   /**
@@ -165,6 +172,8 @@ export interface SelectSlots {
   empty?: () => unknown;
   /** Content before the options list */
   "before-options"?: () => unknown;
+  /** Content after the options list */
+  "after-options"?: () => unknown;
   /** Icon content inside the trigger on the left — matches OButton's `#icon-left` pattern */
   "icon-left"?: () => unknown;
   /**

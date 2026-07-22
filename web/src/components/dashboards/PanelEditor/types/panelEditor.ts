@@ -157,6 +157,7 @@ export interface PanelEditorDashboardData {
   tabs?: any[];
   variables?: {
     list?: any[];
+    showDynamicFilters?: boolean;
   };
   defaultDatetimeDuration?: {
     type?: "relative" | "absolute";

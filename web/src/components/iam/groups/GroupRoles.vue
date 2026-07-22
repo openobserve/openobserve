@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { watch, onBeforeMount, computed } from "vue";
+import { watch, onBeforeMount } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -141,11 +141,11 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["add", "remove"]);
+defineEmits(["add", "remove"]);
 
 const users = ref([]);
 
-const { rolesState, groupsState } = usePermissions();
+usePermissions();
 
 const rows: Ref<any[]> = ref([]);
 
@@ -229,19 +229,17 @@ const updateUserTable = async (value: string) => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise(async (resolve) => {
-    const data: any = await getRoles(
-      store.state.selectedOrganization.identifier
-    );
+  const data: any = await getRoles(
+    store.state.selectedOrganization.identifier
+  );
 
-    users.value = cloneDeep(data.data).map((role: any) => {
-      return {
-        role_name: role,
-        isInGroup: groupUsersMap.value.has(role),
-      };
-    });
-    resolve(true);
+  users.value = cloneDeep(data.data).map((role: any) => {
+    return {
+      role_name: role,
+      isInGroup: groupUsersMap.value.has(role),
+    };
   });
+  return true;
 };
 
 const toggleUserSelection = (user: any) => {

@@ -28,7 +28,7 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
  */
 export function useTraceProcessing(
   spans: Ref<Span[] | any[]>,
-  spanMap: Ref<{ [key: string]: Span[] | any[] }>,
+  spanMap: Ref<{ [key: string]: Span }>,
   serviceDetectionConfig: Ref<ServiceDetectionConfig | null>,
 ) {
   const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);

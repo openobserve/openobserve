@@ -13,20 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import { convertDashboardSchemaVersion, CURRENT_DASHBOARD_SCHEMA_VERSION } from "@/utils/dashboard/convertDashboardSchemaVersion";
 
 describe("convertDashboardSchemaVersion", () => {
-  let mockData: any;
-
-  beforeEach(() => {
-    mockData = {
-      version: 1,
-      id: "dashboard-123",
-      title: "Test Dashboard"
-    };
-  });
-
   // Test 1: Basic functionality - constants
   it("should have correct current schema version", () => {
     expect(CURRENT_DASHBOARD_SCHEMA_VERSION).toBe(8);

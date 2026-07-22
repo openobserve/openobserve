@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig.meta_org &&
             usersDisplay == 'all'
           "
-          v-model="selectedOrg"
+          v-model="selectedOrgValue"
           :options="orgOptions"
           labelKey="label"
           valueKey="value"
@@ -148,6 +148,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
@@ -195,9 +196,34 @@ const usersDisplay = ref("selected");
 
 const store = useStore();
 const { t } = useI18n();
-const orgOptions = ref([{ label: t("iam.groupUsers.all"), value: "all" }]);
-const selectedOrg = ref(orgOptions.value[0]);
-const orgList = ref([...orgOptions.value]);
+// Org option rows: the "All" entry carries a `value`; real-org entries carry
+// identifier/id and other metadata, so every non-label field is optional.
+interface OrgOption {
+  label: string;
+  value?: string;
+  id?: string;
+  identifier?: string;
+  user_email?: string;
+  ingest_threshold?: number;
+  search_threshold?: number;
+  subscription_type?: string;
+  status?: string;
+  note?: string;
+}
+const orgOptions = ref<OrgOption[]>([
+  { label: t("iam.groupUsers.all"), value: "all" },
+]);
+const selectedOrg = ref<OrgOption>(orgOptions.value[0]);
+// OSelect's v-model is the primitive option value; keep `selectedOrg` (the full
+// option object) as the source of truth and bridge the two here.
+const selectedOrgValue = computed<SelectModelValue>({
+  get: () => selectedOrg.value?.value,
+  set: (val) => {
+    const match = orgOptions.value.find((org) => org.value === val);
+    if (match) selectedOrg.value = match;
+  },
+});
+const orgList = ref<OrgOption[]>([...orgOptions.value]);
 const usersDisplayOptions = [
   {
     label: t("iam.groupUsers.all"),
@@ -347,7 +373,8 @@ const updateOrganization = () => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise(async (resolve) => {
+  return new Promise((resolve, reject) => {
+    (async () => {
     const data: any = await usersState.getOrgUsers(
       store.state.selectedOrganization.identifier , { list_all: true }
     );
@@ -376,6 +403,7 @@ const getchOrgUsers = async () => {
       }
     );
     resolve(true);
+    })().catch(reject);
   });
 };
 

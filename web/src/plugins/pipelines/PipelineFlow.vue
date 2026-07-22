@@ -112,26 +112,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Add UI elements or buttons to interact with the methods -->
 </template>
 
-<script>
-import { ref, onMounted, onActivated, watch, computed, nextTick } from "vue";
+<script lang="ts">
+import { ref, onMounted, watch, computed } from "vue";
+import type { Ref } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
-import { ControlButton, Controls } from '@vue-flow/controls'
+import type { VueFlowStore } from "@vue-flow/core";
+import { Controls } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
 import CustomNode from "./CustomNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
-import EdgeWithButton from "./EdgeWithButton.vue";
 import { useI18n } from "vue-i18n";
 
 /* import the required styles */
 
 import { useStore } from "vuex";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-const { onInit } = useVueFlow();
 
 export default {
-  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls,ControlButton,EdgeWithButton,FlowEdge
+  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls, FlowEdge
    },
   setup() {
     const { t } = useI18n();
@@ -140,7 +140,6 @@ export default {
       onDragOver,
       onDrop,
       onDragLeave,
-      isDragOver,
       onNodeChange,
       onNodesChange,
       onEdgesChange,
@@ -150,15 +149,24 @@ export default {
     } = useDragAndDrop();
     const store = useStore();
 
-    const vueFlowRef = ref(null);
+    // Mirror the hook's drag-over state (pipelineObj.isDragOver) into a local
+    // ref so the dropzone highlight and "Drop here" hint react to dragging.
+    const isDragOver = ref(pipelineObj.isDragOver);
+    watch(
+      () => pipelineObj.isDragOver,
+      (value) => {
+        isDragOver.value = value;
+      },
+    );
+    const vueFlowRef: Ref<VueFlowStore | null> = ref(null);
     const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
     const showEdgeHelpNotification = ref(false);
-    let notificationTimeout = null;
+    let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const { setViewport, getSelectedEdges, addSelectedEdges, removeSelectedEdges, removeEdges } = useVueFlow()
+    const { setViewport } = useVueFlow()
 
     // Handle edge click events
-    const onEdgeClick = (event) => {
+    const onEdgeClick = () => {
 
       // Clear any existing timeout
       if (notificationTimeout) {
@@ -179,7 +187,7 @@ export default {
 
 
 
-    watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
+    watch(() => pipelineObj.currentSelectedPipeline, () => {
           if(pipelineObj.dirtyFlag){
             pipelineObj.dirtyFlag = false;
           }
@@ -200,11 +208,11 @@ function resetTransform() {
   setViewport({ x: 0, y: 0, zoom: 1 })
 }
     const zoomIn = () => {
-      vueFlowRef.value.zoomIn();
+      if (vueFlowRef.value) vueFlowRef.value.zoomIn();
     };
 
     const zoomOut = () => {
-      vueFlowRef.value.zoomOut();
+      if (vueFlowRef.value) vueFlowRef.value.zoomOut();
     };
 
     return {

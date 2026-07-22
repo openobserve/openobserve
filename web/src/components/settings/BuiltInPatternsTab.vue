@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OIcon name="error" style="width: 50px; height: 50px;" />
       <div class="mt-3 text-status-error-text">{{ error }}</div>
       <span class="mt-2">
-        <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
+        <OButton variant="ghost-primary" size="sm" @click="() => fetchPatterns()">
           {{ t("regex_patterns.try_again") }}
         </OButton>
       </span>
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTextarea
             :model-value="previewedPattern?.pattern"
             readonly
-            rows="3"
+            :rows="3"
           />
         </div>
 
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          v-if="previewedPattern?.examples?.Valid?.length > 0"
+          v-if="(previewedPattern?.examples?.Valid?.length ?? 0) > 0"
           class="mb-3"
         >
           <div class="font-bold mb-1">
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <ul class="flex flex-col divide-y divide-border border rounded-default">
             <li
-              v-for="(example, idx) in previewedPattern.examples.Valid.slice(0, 3)"
+              v-for="(example, idx) in previewedPattern?.examples?.Valid?.slice(0, 3)"
               :key="idx"
               class="flex items-center gap-2 px-3 py-1"
             >
@@ -228,7 +228,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch } from "vue";
+import { defineComponent, ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import regexPatternsService from "@/services/regex_pattern";

@@ -326,6 +326,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { type FileValue } from "@/lib/forms/File/OFile.types";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
@@ -398,7 +399,9 @@ const hasSelectedChanges = computed(() => {
   );
 });
 
-const loadFile = async (file: File | null) => {
+const loadFile = async (value: FileValue) => {
+  // OFile single-mode emits File | null
+  const file = value as File | null;
   if (!file) return;
 
   isLoading.value = true;

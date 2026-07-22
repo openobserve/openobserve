@@ -21,6 +21,29 @@ search · refresh · column-toggle toolbar, and the empty-state contract are in
 [§ Page anatomy & the listing-page recipe](#page-anatomy--the-listing-page-recipe)
 and [references/page-recipes.md](page-recipes.md).
 
+### Cards & stacked-panel pages — consistency over invention
+
+- **Never invent spacing.** Padding/margins/gaps are not a per-page decision:
+  a new panel copies the **exact** spacing classes of the sibling family it
+  joins (same header inset, same `gap-*`, same card classes), so the pages read
+  as one surface. If your panel "needed" a padding value no sibling uses,
+  that's the smell — go read the sibling, don't tune by eye.
+- **`card-container` styles nothing.** It's a bare marker class with no CSS
+  behind it — a card that relies on it alone renders as floating text (no
+  background, no border). Every card must carry explicit surface classes, e.g.
+  `bg-card-glass-bg rounded-default border border-border-default` (the AI
+  Observability panel family) or `bg-surface-base border border-border-default
+  rounded-default` (synthetics). Copy the class string from the sibling family
+  verbatim.
+- **A fixed set of stacked panels must not make the page scroll.** When a page
+  is N cards tall (dashboards, signal panels), give it the full-height split:
+  body `flex flex-col` (no `overflow-auto`), each card
+  `flex flex-col flex-1 min-h-0 overflow-hidden`, and each `OTable` in
+  fill-height mode with `class="flex-1 min-h-0"`. Rows scroll **inside** the
+  table; the pagination bar stays pinned to the card; the page itself never
+  scrolls. Empty states fill the card without forcing overflow (OTableEmpty's
+  `min-h-75` floor applies only to non-fill-height tables).
+
 ### Dialog Spacing (`ODialog`)
 
 - Title comes from the `:title` prop — don't render a manual `<h*>` title.

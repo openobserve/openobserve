@@ -31,7 +31,7 @@ vi.mock("@/constants/features", () => ({
       },
     },
   ],
-  getFeatureNameKey: vi.fn((_feature: unknown) => "features.test_feature"),
+  getFeatureNameKey: vi.fn(() => "features.test_feature"),
 }));
 
 describe("FeatureComparisonTable", () => {

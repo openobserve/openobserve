@@ -747,6 +747,7 @@ function parseCondition(condition: any) {
         };
       }
     }
+    return undefined;
   } catch (error) {
     return {
       filterType: "group",
@@ -1325,7 +1326,12 @@ export const parseWhereClauseToFilter = async (
       };
     }
 
-    return filters || defaultFilter;
+    // Non-condition results from convertWhereToFilter are always group-shaped
+    return (filters || defaultFilter) as {
+      filterType: string;
+      logicalOperator: string;
+      conditions: any[];
+    };
   } catch {
     return defaultFilter;
   }

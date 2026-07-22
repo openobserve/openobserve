@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTab name="overview" data-test="monitor-runs-tab-overview">
         {{ t('synthetics.runs.tabOverview') }}
       </OTab>
-      <OTab name="steps" data-test="monitor-runs-tab-steps"> {{ t('synthetics.runs.tabSteps') }} </OTab>
+      <OTab v-if="isBrowser" name="steps" data-test="monitor-runs-tab-steps"> {{ t('synthetics.runs.tabSteps') }} </OTab>
     </OTabs>
 
     <div class="flex-1 min-h-0">
@@ -295,9 +295,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Breakdown Cards — gated on runs query -->
             <template v-if="runsLoading || !runsHasLoadedOnce">
               <div class="px-page-edge">
-              <div class="grid grid-cols-3 gap-2">
+              <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
                 <div
-                  v-for="n in 3"
+                  v-for="n in (isBrowser ? 3 : 2)"
                   :key="n"
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
@@ -337,9 +337,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Breakdown Cards — runs query error state -->
             <template v-else-if="runsError">
               <div class="px-page-edge">
-              <div class="grid grid-cols-3 gap-2">
+              <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
                 <div
-                  v-for="dim in ['Browser','Location','Device']"
+                  v-for="dim in breakdownDimensions"
                   :key="dim"
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
                     <span class="font-bold text-sm text-text-heading">
-                      {{ dim === 'Browser' ? t('synthetics.runs.passRateByBrowser') : dim === 'Location' ? t('synthetics.runs.passRateByLocation') : t('synthetics.runs.passRateByDevice') }}
+                      {{ dim === 'Browser' ? t('synthetics.runs.passRateByBrowser') : dim === 'DurationByLocation' ? t('synthetics.runs.durationByLocation') : dim === 'Location' ? t('synthetics.runs.passRateByLocation') : t('synthetics.runs.passRateByDevice') }}
                     </span>
                   </div>
                   <div class="border-t border-border-default" />
@@ -363,8 +363,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div class="px-page-edge">
-              <div class="grid grid-cols-3 gap-2">
+              <div :class="['grid gap-2', isBrowser ? 'grid-cols-3' : 'grid-cols-2']">
                 <div
+                  v-if="isBrowser"
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
@@ -398,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- :style for dynamic bar width + computed color — inline required for per-breakdown values -->
                         <div
                           class="h-full rounded-full"
-                          :style="{ width: b.pct, background: b.barColor }"
+                          :style="{ width: b.barPct || b.pct, background: b.barColor }"
                         />
                       </div>
                       <span
@@ -447,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         <div
                           class="h-full rounded-full"
-                          :style="{ width: l.pct, background: l.barColor }"
+                          :style="{ width: l.barPct || l.pct, background: l.barColor }"
                         />
                       </div>
                       <span
@@ -460,6 +461,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                 </div>
                 <div
+                  v-if="!isBrowser"
                   class="card-container rounded-default flex flex-col bg-surface-base border border-border-default overflow-hidden"
                 >
                   <div
@@ -528,6 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
 
               <OSelect
+                v-if="isBrowser"
                 v-model="browserFilter"
                 :options="browserOptions"
                 icon-key="icon"
@@ -536,6 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="monitor-runs-filter-browser"
               />
               <OSelect
+                v-if="isBrowser"
                 v-model="deviceFilter"
                 :options="deviceOptions"
                 icon-key="icon"
@@ -976,6 +980,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -1070,6 +1075,22 @@ function locationIcon(region: string): string {
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
 
+// ── Monitor type resolution ──────────────────────────────────────────────
+const isBrowser = ref(true);
+let monitorTypeResolved = false;
+
+async function resolveMonitorType() {
+  try {
+    const res = await syntheticsService.get(orgIdentifier.value, props.monitorId);
+    const type = (res.data as any)?.type ?? "browser";
+    isBrowser.value = type === "browser";
+    monitorTypeResolved = true;
+  } catch {
+    // Default to browser on fetch failure — safe fallback
+    monitorTypeResolved = true;
+  }
+}
+
 // ── Seeded random (for fallback mock data in charts/timeline) ────────────
 function seedRand(seed: number) {
   let s = seed;
@@ -1116,8 +1137,8 @@ const errorFilter = ref<string | null>(null);
 const hasActiveFilters = computed(
   () =>
     statusFilter.value !== "all" ||
-    browserFilter.value !== "all" ||
-    deviceFilter.value !== "all" ||
+    (isBrowser.value && browserFilter.value !== "all") ||
+    (isBrowser.value && deviceFilter.value !== "all") ||
     locationFilter.value !== "all" ||
     errorFilter.value !== null,
 );
@@ -1527,10 +1548,17 @@ const timelineEndLabel = computed(() => {
 });
 
 // ── Breakdowns ───────────────────────────────────────────────────────────
+const breakdownDimensions = computed(() =>
+  isBrowser.value
+    ? ["Browser", "Location", "Device"]
+    : ["Location", "DurationByLocation"],
+);
+
 interface BreakdownItem {
   name: string;
   icon?: string;
   pct: string;
+  barPct?: string;
   barColor: string;
   textColor: string;
 }
@@ -1616,6 +1644,41 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
     };
   });
   });
+
+const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
+  const groups = new Map<string, { totalMs: number; count: number }>();
+  for (const run of allRuns.value) {
+    const key = run.location || 'Unknown';
+    const g = groups.get(key) ?? { totalMs: 0, count: 0 };
+    g.totalMs += run.duration;
+    g.count++;
+    groups.set(key, g);
+  }
+
+  function getIconForRegion(region: string): string {
+    const prefix = region.split('-')[0].toLowerCase();
+    if (prefix === 'aws') return 'img:' + awsSvgUrl;
+    if (prefix === 'gcp') return 'img:' + gcpSvgUrl;
+    if (/^[a-z]{2}-[a-z]+-\d+$/.test(region)) return 'img:' + awsSvgUrl;
+    if (/^[a-z]+-[a-z]+\d*$/.test(region)) return 'img:' + gcpSvgUrl;
+    return 'location-on';
+  }
+
+  const entries = Array.from(groups.entries()).map(([name, g]) => ({
+    name,
+    avgMs: g.count > 0 ? g.totalMs / g.count : 0,
+  }));
+  const maxAvg = Math.max(...entries.map((e) => e.avgMs), 1);
+
+  return entries.map(({ name, avgMs }) => ({
+    name,
+    icon: getIconForRegion(name),
+    pct: fmtDur(avgMs),
+    barPct: Math.round((avgMs / maxAvg) * 100) + '%',
+    barColor: 'var(--color-primary-500)',
+    textColor: 'var(--color-text-body)',
+  }));
+});
 
 // ── Status filter options ────────────────────────────────────────────────
 const statusOptions = [
@@ -1740,7 +1803,7 @@ const failedStepOptions = computed<SelectOption[]>(() => {
 // ── OTable columns ───────────────────────────────────────────────────────
 interface VisibleRun {
   id: number;
-  statusBadgeVariant: string;
+  statusBadgeVariant: BadgeVariant;
   statusIcon: string;
   statusLabel: string;
   scheduledTs: number;
@@ -1778,36 +1841,45 @@ const visibleRuns = computed<VisibleRun[]>(() => {
   });
 });
 
-const runColumns: OTableColumnDef[] = [
-  { id: "status", header: t('synthetics.table.status'), accessorKey: "status", size: 60 },
-  {
-    id: "last_run_at",
-    header: t('synthetics.table.lastRunAt'),
-    accessorKey: "lastRunTs",
-    size: 100,
-  },
-  {
-    id: "duration",
-    header: t('synthetics.results.duration'),
-    accessorKey: "duration",
-    size: 50,
-  },
-  { id: "location", header: t('synthetics.results.location'), accessorKey: "location", size: 110 },
-  { id: "browser", header: t('synthetics.results.steps.browser'), accessorKey: "browser", size: 100 },
-  { id: "device", header: t('synthetics.results.device'), accessorKey: "device", size: 90 },
-  {
-    id: "trigger_type",
-    header: t('synthetics.table.trigger'),
-    accessorKey: "triggerType",
-    size: 90,
-  },
-  {
-    id: "scheduled_at",
-    header: t('synthetics.table.scheduledAt'),
-    accessorKey: "scheduledTs",
-    size: 100,
-  },
-];
+const runColumns = computed<OTableColumnDef[]>(() => {
+  const cols: OTableColumnDef[] = [
+    { id: "status", header: t('synthetics.table.status'), accessorKey: "status", size: 60 },
+    {
+      id: "last_run_at",
+      header: t('synthetics.table.lastRunAt'),
+      accessorKey: "lastRunTs",
+      size: 100,
+    },
+    {
+      id: "duration",
+      header: t('synthetics.results.duration'),
+      accessorKey: "duration",
+      size: 50,
+    },
+    { id: "location", header: t('synthetics.results.location'), accessorKey: "location", size: 110 },
+  ];
+  if (isBrowser.value) {
+    cols.push(
+      { id: "browser", header: t('synthetics.results.steps.browser'), accessorKey: "browser", size: 100 },
+      { id: "device", header: t('synthetics.results.device'), accessorKey: "device", size: 90 },
+    );
+  }
+  cols.push(
+    {
+      id: "trigger_type",
+      header: t('synthetics.table.trigger'),
+      accessorKey: "triggerType",
+      size: 90,
+    },
+    {
+      id: "scheduled_at",
+      header: t('synthetics.table.scheduledAt'),
+      accessorKey: "scheduledTs",
+      size: 100,
+    },
+  );
+  return cols;
+});
 
 // ── Steps: real data from composable ────────────────────────────────────
 const stepGroupsData = computed(() => synthetics.stepStats.value.stepGroups);
@@ -2092,6 +2164,9 @@ function openRun(row: { id: number }) {
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
   timeRangeMicros.value = { startTime, endTime };
+  if (!monitorTypeResolved) {
+    resolveMonitorType();
+  }
   await synthetics.fetchAll(props.monitorId, startTime, endTime);
 }
 

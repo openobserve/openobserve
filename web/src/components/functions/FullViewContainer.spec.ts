@@ -382,7 +382,7 @@ describe('FullViewContainer.vue', () => {
       const icon = wrapper.find('.OIcon-stub');
       
       const clickEvent = new Event('click');
-      const stopPropagationSpy = vi.spyOn(clickEvent, 'stopPropagation');
+      vi.spyOn(clickEvent, 'stopPropagation');
       
       // The @click.stop directive should handle this
       await icon.trigger('click');

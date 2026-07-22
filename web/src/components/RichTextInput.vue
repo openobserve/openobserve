@@ -93,11 +93,6 @@ export default defineComponent({
     const detailCardContent = ref('');
     const cardPosition = ref({ top: 0, left: 0, below: false });
 
-    // Generate unique ID for chips
-    const generateId = (): string => {
-      return `chip-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    };
-
     // Helper to format JSON with syntax highlighting
     const formatContent = (content: string): string => {
       try {
@@ -105,7 +100,7 @@ export default defineComponent({
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
         return formatted
-          .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+          .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (match) => {
             let cls = 'json-number';
             if (/^"/.test(match)) {
               if (/:$/.test(match)) {

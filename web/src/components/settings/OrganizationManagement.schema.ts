@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schemas for the two self-owned dialogs in OrganizationManagement.vue
-// (meta-org admin): the External Contract dialog and the Extend-Trial dialog.
+// Validation schemas for the self-owned dialogs in OrganizationManagement.vue
+// (meta-org admin): External Contract, Extend Trial, and AI Credits.
 //
 // Validation timing is owned by OForm (submit-then-change via revalidateLogic);
 // these schemas only describe what is valid.
@@ -41,3 +41,24 @@ export const extendTrialSchema = z.object({
 export type ExtendTrialForm = z.infer<typeof extendTrialSchema>;
 
 export const extendTrialDefaults = (): ExtendTrialForm => ({ extendedTrial: 1 });
+
+// ── AI credit allowance dialog ───────────────────────────────────────────────
+export const aiCreditsSchema = z.object({
+  creditsLimit: z.preprocess(
+    (value) =>
+      value === "" || value === null || value === undefined
+        ? Number.NaN
+        : Number(value),
+    z
+      .number()
+      .int("AI credits must be a whole number.")
+      .min(0, "AI credits cannot be negative.")
+      .max(Number.MAX_SAFE_INTEGER, "AI credits exceed the supported maximum."),
+  ),
+});
+
+export type AiCreditsForm = z.infer<typeof aiCreditsSchema>;
+
+export const aiCreditsDefaults = (creditsLimit = 0): AiCreditsForm => ({
+  creditsLimit,
+});

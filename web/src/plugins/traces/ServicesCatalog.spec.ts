@@ -1992,8 +1992,8 @@ describe("ServicesCatalog", () => {
         const urlSafeSql = callArgs.queryReq.query.sql;
         const decodedSql = atob(
           urlSafeSql
-            .replace(/\-/g, "+")
-            .replace(/\_/g, "/")
+            .replace(/-/g, "+")
+            .replace(/_/g, "/")
             .replace(/\./g, "="),
         );
         expect(decodedSql).toContain('FROM "production-stream"');

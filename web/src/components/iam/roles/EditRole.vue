@@ -293,7 +293,6 @@ import {
   getAllRolePermissions,
   getRoleUsers,
 } from "@/services/iam";
-import streamService from "@/services/stream";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
@@ -313,7 +312,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
-import config from "@/aws-exports";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -595,6 +593,7 @@ const getResourceByName = (
   }
 
   if (!level) return null;
+  return undefined;
 };
 
 const setPermission = (resource: any, visited: Set<string>) => {
@@ -903,14 +902,14 @@ const updateRolePermissions = async (permissions: Permission[]) => {
 
       // This is just to handle dashboard permissions, need to fix this
       if (resource === "dashboard") {
-        const [folderId, dashboardId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         const dashResource = resourceMapper["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(dashResource as Entity);
       } else if (resource === "alert") {
-        const [folderId, alertId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         const alertResource = resourceMapper["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
@@ -1195,7 +1194,7 @@ const updateJsonInTable = () => {
       resourceDetails = resourceMapper.value[resource];
 
       if (resource === "dashboard") {
-        const [folderId, dashboardId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
@@ -1240,27 +1239,6 @@ const updateJsonInTable = () => {
         entity,
         permission.permission,
       );
-    }
-  });
-};
-
-const updateExpandedResources = (resources: (Resource | Entity)[]) => {
-  resources.forEach(async (resource) => {
-    // Check if the current item is an object and has the 'expand' key
-    if (
-      typeof resource === "object" &&
-      resource.expand &&
-      resource.has_entities
-    ) {
-      resource.is_loading = true;
-      await getResourceEntities(resource);
-      resource.is_loading;
-      // Perform additional actions as needed
-    }
-
-    // If the item itself contains a nested array, call the function recursively
-    if (Array.isArray(resource.entities)) {
-      updateExpandedResources(resource.entities);
     }
   });
 };
@@ -1432,42 +1410,6 @@ const updatePermissionVisibility = (
 //   });
 // };
 
-const filterRowsByResourceName = (
-  rows: (Resource | Entity)[],
-  resourceName: string,
-) => {
-  return rows.reduce(
-    (filteredRows: (Resource | Entity)[], row: Resource | Entity) => {
-      // Check if the current row matches the filter
-      if (row.resourceName === resourceName) {
-        // If the row has nested rows, filter those as well
-        if (row.entities && row.entities.length) {
-          row.entities = filterRowsByResourceName(
-            row.entities,
-            resourceName,
-          ) as Entity[];
-        }
-        // Add the row to the filtered list
-        filteredRows.push(row);
-      } else if (row.entities && row.entities.length) {
-        // Even if the current row doesn't match, there might be nested rows that do
-        const filteredEntities = filterRowsByResourceName(
-          row.entities,
-          resourceName,
-        );
-        // Only add the row if it has matching nested rows
-        if (filteredEntities.length) {
-          // Optionally, you might want to clone the row here to avoid mutating the original
-          const newRow = { ...row, entities: filteredEntities };
-          filteredRows.push(newRow as Resource);
-        }
-      }
-      return filteredRows;
-    },
-    [],
-  );
-};
-
 const onResourceChange = async () => {
   updatePermissionVisibility(permissionsState.permissions);
   countVisibleResources(permissionsState.permissions);
@@ -1573,30 +1515,32 @@ const getResourceEntities = (resource: Resource | Entity) => {
     logs_cache: getLogsCacheStreams,
   };
 
-  return new Promise(async (resolve, reject) => {
-    try {
-      if (!resource.entities?.length) {
-        resource.is_loading = true;
-        try {
-          const listEntities = resource.childName
-            ? listEntitiesFnMap[resource.childName]
-            : listEntitiesFnMap[resource.resourceName];
+  return new Promise((resolve, reject) => {
+    (async () => {
+      try {
+        if (!resource.entities?.length) {
+          resource.is_loading = true;
+          try {
+            const listEntities = resource.childName
+              ? listEntitiesFnMap[resource.childName]
+              : listEntitiesFnMap[resource.resourceName];
 
-          if (listEntities) {
-            await listEntities(resource);
+            if (listEntities) {
+              await listEntities(resource);
+            }
+          } finally {
+            resource.is_loading = false;
           }
-        } finally {
-          resource.is_loading = false;
+
+          // unncecessaryly we are updating the all resource entities, fix to update the current resource
+          updatePermissionVisibility(permissionsState.permissions);
         }
 
-        // unncecessaryly we are updating the all resource entities, fix to update the current resource
-        updatePermissionVisibility(permissionsState.permissions);
+        resolve(true);
+      } catch (err) {
+        reject(err);
       }
-
-      resolve(true);
-    } catch (err) {
-      reject(err);
-    }
+    })();
   });
 };
 
@@ -1605,7 +1549,7 @@ const getEnrichmentTables = async () => {
 
   updateResourceEntities("enrichment_table", ["name"], data.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1873,12 +1817,12 @@ const getLogs = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], logs.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
 
-const getLogsPatternStreams = async (resource: Resource | Entity) => {
+const getLogsPatternStreams = async () => {
   const logs: any = await getStreams("logs", false);
 
   updateResourceEntities("logs_pattern", ["name"], logs.list);
@@ -1888,7 +1832,7 @@ const getLogsPatternStreams = async (resource: Resource | Entity) => {
   });
 };
 
-const getLogsInsightsStreams = async (resource: Resource | Entity) => {
+const getLogsInsightsStreams = async () => {
   const logs: any = await getStreams("logs", false);
 
   updateResourceEntities("logs_insights", ["name"], logs.list);
@@ -1898,7 +1842,7 @@ const getLogsInsightsStreams = async (resource: Resource | Entity) => {
   });
 };
 
-const getLogsCacheStreams = async (resource: Resource | Entity) => {
+const getLogsCacheStreams = async () => {
   const logs: any = await getStreams("logs", false);
 
   updateResourceEntities("logs_cache", ["name"], logs.list);
@@ -1913,7 +1857,7 @@ const getIndexStreams = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], indices.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1923,7 +1867,7 @@ const getMetrics = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], metrics.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1933,17 +1877,17 @@ const getTraces = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], traces.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
 
-const getMetadataStreams = async (resource: Resource | Entity) => {
+const getMetadataStreams = async () => {
   const metadata: any = await getStreams("metadata", false);
 
   updateResourceEntities("metadata", ["name"], metadata.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1985,7 +1929,7 @@ const getStreamsTypes = async () => {
     );
   });
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -2056,7 +2000,7 @@ const getCipherKeys = async () => {
 
   updateResourceEntities("cipher_keys", ["name"], [...data.data.keys]);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -2074,7 +2018,7 @@ const getRePatterns = async () => {
     "name",
   );
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -2508,7 +2452,7 @@ const saveRole = () => {
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
-    .then(async (res) => {
+    .then(async () => {
       // combine permissionsHash and selectedPermissionsHash
 
       toast({
@@ -2568,31 +2512,6 @@ const saveRole = () => {
       }
       console.log(err);
     });
-};
-
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.label.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
-const filterResourceOptions = (val: string, update: any) => {
-  filteredResources.value = filterColumns(
-    resourceOptions.value,
-    val,
-    update,
-  ) as any[];
 };
 
 const updateEntityPermission = (

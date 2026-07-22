@@ -102,8 +102,11 @@ import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Define component props
+// `modelValue` is the owner form's `destination_type` field, which is a plain
+// string in the schema; accept `string` so the bound form value fits while the
+// emit side stays narrowed to real selections.
 interface Props {
-  modelValue?: PrebuiltTypeId | 'custom' | null;
+  modelValue?: PrebuiltTypeId | 'custom' | '' | null | string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -112,7 +115,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // Define component emits
 interface Emits {
-  (e: 'update:modelValue', value: PrebuiltTypeId | 'custom' | null): void;
+  (e: 'update:modelValue', value: PrebuiltTypeId | 'custom'): void;
   (e: 'select', value: PrebuiltTypeId | 'custom'): void;
 }
 
@@ -124,7 +127,8 @@ const { t } = useI18n();
 // Reactive state
 const selectedType = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
+  // Only user selections flow through the setter, so null/'' never get emitted.
+  set: (value: PrebuiltTypeId | 'custom') => emit('update:modelValue', value)
 });
 
 // Computed properties

@@ -49,7 +49,7 @@ const dashboardPanelDataObj: any = {};
 const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const store = useStore();
   const { showErrorNotification } = useNotifications();
-  const { getStreams, getStream } = useStreams();
+  const { getStream } = useStreams();
   const valuesWebSocket = useValuesWebSocket();
 
   // Initialize the state for this page key if it doesn't already exist
@@ -433,7 +433,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         no_count: true,
       };
 
-      const res = await valuesWebSocket.fetchFieldValues(
+      await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
         row,
@@ -478,7 +478,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         no_count: true,
       };
 
-      const response = await valuesWebSocket.fetchFieldValues(
+      await valuesWebSocket.fetchFieldValues(
         queryReq,
         dashboardPanelData,
         row,
@@ -1058,6 +1058,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       ].query = query;
       return query;
     }
+    return;
   };
   const { checkTimestampAlias } = logsUtils();
   // Replace the existing validatePanel function with a wrapper that calls the generic function
@@ -1079,8 +1080,6 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
       checkTimestampAlias,
     );
   };
-
-  const VARIABLE_PLACEHOLDER = "substituteValue";
 
   const validateQuery = (query: any, variables: any) => {
     // Helper to test one replacement (string or number)
@@ -1266,6 +1265,7 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
         }
       }
     }
+    return;
   };
 
   // Get or initialize per-query field cache in meta (never in data)
@@ -1372,8 +1372,8 @@ const useDashboardPanelData = (pageKey: string = "dashboard") => {
   const getResultSchema = async (
     query: string,
     abortSignal?: AbortSignal,
-    startISOTimestamp?: number,
-    endISOTimestamp?: number,
+    _startISOTimestamp?: number,
+    _endISOTimestamp?: number,
   ): Promise<{
     group_by: string[];
     projections: string[];

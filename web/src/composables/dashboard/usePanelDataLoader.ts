@@ -66,8 +66,9 @@ export const usePanelDataLoader = (
   regionClusterParams?: any,
   allowAnnotationsAPI?: any,
 ) => {
+  const PANEL_DATA_LOADER_DEBUG = false;
   const log = (...args: any[]) => {
-    if (false) {
+    if (PANEL_DATA_LOADER_DEBUG) {
       console.log(panelSchema?.value?.title + ": ", ...args);
     }
   };
@@ -140,7 +141,7 @@ export const usePanelDataLoader = (
     loading: false,
     errorDetail: {
       message: "",
-      code: "",
+      code: "" as string | number,
     },
     metadata: {
       queries: [] as any,
@@ -463,7 +464,7 @@ export const usePanelDataLoader = (
   watch(
     // Watching for changes in panelSchema, selectedTimeObj and forceLoad
     () => [selectedTimeObj?.value, forceLoad?.value],
-    async (newVal, oldVal) => {
+    async () => {
       log("PanelSchema/Time Wather: called");
 
       // If panelIdToBeRefreshed is set and doesn't match this panel, skip loading
@@ -803,7 +804,12 @@ export const usePanelDataLoader = (
     };
 
     const currentCacheKey = omit(getCacheKey(), keysToIgnore);
-    const savedCacheKey = omit(tempPanelCacheKey, keysToIgnore);
+    // tempPanelCacheKey is untyped (from the panel cache), so mirror the
+    // typed key shape rather than lodash's Omit<any, string> inference.
+    const savedCacheKey: typeof currentCacheKey = omit(
+      tempPanelCacheKey,
+      keysToIgnore,
+    );
 
     // Normalize variables in both keys before comparison
     const normalizedCurrentKey = {

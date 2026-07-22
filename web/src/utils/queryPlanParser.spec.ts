@@ -22,7 +22,6 @@ import {
   findRemoteExecNode,
   collapseProjections,
   type OperatorNode,
-  type SummaryMetrics,
 } from "./queryPlanParser";
 
 describe("queryPlanParser", () => {

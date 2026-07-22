@@ -1191,25 +1191,12 @@ describe("AddPanel.vue", () => {
     });
 
     it("should test getQueryParamsForDuration with relative time", () => {
-      // Test with relative time data
-      const relativeData = {
-        valueType: "relative",
-        relativeTimePeriod: "30m",
-      };
-
       // Since getQueryParamsForDuration is an internal method,
       // we need to test it through other methods that use it
       expect(wrapper.vm.selectedDate).toBeDefined();
     });
 
     it("should test getQueryParamsForDuration with absolute time", () => {
-      // Test with absolute time data
-      const absoluteData = {
-        valueType: "absolute",
-        startTime: "2023-01-01T00:00:00Z",
-        endTime: "2023-01-01T23:59:59Z",
-      };
-
       // Test that the method can handle different time types
       expect(wrapper.vm.selectedDate).toBeDefined();
     });
@@ -1687,10 +1674,6 @@ describe("AddPanel.vue", () => {
     it("should handle debounced chart config updates", async () => {
       // Test lines 1576-1587 - debouncedUpdateChartConfig
       // chartData starts as undefined ref and gets initialized during panel loading
-      const originalPanelData = JSON.parse(
-        JSON.stringify(wrapper.vm.dashboardPanelData.data),
-      );
-
       // Change panel data to trigger debounced update
       wrapper.vm.dashboardPanelData.data.title = "Updated Title";
       wrapper.vm.dashboardPanelData.data.type = "line";
@@ -1711,13 +1694,6 @@ describe("AddPanel.vue", () => {
       ];
       wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 0;
 
-      // Mock router currentRoute
-      const mockRouter = {
-        currentRoute: {
-          value: { name: "addPanel" },
-        },
-      };
-
       // Test that runQuery method exists and can be called
       expect(typeof wrapper.vm.runQuery).toBe("function");
 
@@ -1734,13 +1710,6 @@ describe("AddPanel.vue", () => {
       wrapper.vm.editMode = true;
       wrapper.vm.dashboardPanelData.data.title = "Test Panel";
       wrapper.vm.dashboardPanelData.data.type = "bar";
-
-      // Mock the updatePanel function
-      const mockStore = {
-        state: {
-          currentDashboardData: { data: { tabs: [{ tabId: "tab1" }] } },
-        },
-      };
 
       try {
         await wrapper.vm.saveDashboard();
@@ -1768,14 +1737,6 @@ describe("AddPanel.vue", () => {
       // Test error handling (lines 1227-1246)
       wrapper.vm.dashboardPanelData.data.title = "Test Panel";
 
-      // Mock error response
-      const mockError = {
-        response: {
-          status: 409,
-          data: { message: "Conflict error" },
-        },
-      };
-
       try {
         await wrapper.vm.saveDashboard();
       } catch (error) {
@@ -1797,17 +1758,6 @@ describe("AddPanel.vue", () => {
     it("should handle debouncedUpdateChartConfig when chartData differs", async () => {
       // Test lines 1576-1587 - debouncedUpdateChartConfig with different data
       const originalChartData = { ...wrapper.vm.chartData };
-      const newData = {
-        ...originalChartData,
-        title: "Modified Title",
-        type: "line",
-      };
-
-      // Mock isEqual to return false (data is different)
-      const mockIsEqual = vi.fn().mockReturnValue(false);
-
-      // Mock checkIfConfigChangeRequiredApiCallOrNot to return false
-      const mockCheckConfig = vi.fn().mockReturnValue(false);
 
       // Set up the component to use our mocked functions
       wrapper.vm.chartData = originalChartData;
@@ -1823,13 +1773,6 @@ describe("AddPanel.vue", () => {
     it("should handle getContext with valid stream data", async () => {
       // Test lines 1602-1644 - getContext with stream validation
 
-      // Mock router to be on addPanel page
-      const mockRouter = {
-        currentRoute: {
-          value: { name: "addPanel" },
-        },
-      };
-
       // Set up panel data with stream information
       wrapper.vm.dashboardPanelData.data.queries = [
         {
@@ -1840,12 +1783,6 @@ describe("AddPanel.vue", () => {
         },
       ];
       wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 0;
-
-      // Mock getStream function
-      const mockGetStream = vi.fn().mockResolvedValue({
-        schema: [{ name: "field1" }],
-        uds_schema: [{ name: "uds_field1" }],
-      });
 
       // Test that the method exists and handles stream data
       try {
@@ -1865,13 +1802,6 @@ describe("AddPanel.vue", () => {
 
     it("should handle getContext with no stream selected", async () => {
       // Test lines 1611-1614 - early return when no stream selected
-
-      // Mock router to be on addPanel page
-      const mockRouter = {
-        currentRoute: {
-          value: { name: "addPanel" },
-        },
-      };
 
       // Set up panel data without stream
       wrapper.vm.dashboardPanelData.data.queries = [
@@ -2066,14 +1996,6 @@ describe("AddPanel.vue", () => {
 
     it("should handle debouncedUpdateChartConfig with API call required", async () => {
       // Test the case where config change requires API call (line 1582)
-      const originalChartData = { ...wrapper.vm.chartData };
-      const newData = {
-        ...originalChartData,
-        queries: [
-          { ...originalChartData.queries?.[0], sql: "SELECT * FROM new_table" },
-        ],
-      };
-
       // Mock isEqual to return false (data is different)
       // Mock checkIfConfigChangeRequiredApiCallOrNot to return true (API call needed)
 
@@ -2290,8 +2212,6 @@ describe("AddPanel.vue", () => {
 
     it("should trigger dashboardPanelData.data.type watcher", async () => {
       // Test type watcher (lines 924-932)
-      const originalChartData = wrapper.vm.chartData;
-
       // Change panel type to trigger watcher
       wrapper.vm.dashboardPanelData.data.type = "line";
 
@@ -2516,13 +2436,6 @@ describe("AddPanel.vue", () => {
     it("should handle getContext - exact line coverage for 1602-1644", async () => {
       // Target the exact uncovered lines in getContext
 
-      // Mock router to be on addPanel page (line 1604)
-      const mockRouter = {
-        currentRoute: {
-          value: { name: "addPanel" },
-        },
-      };
-
       // Set up stream selection (lines 1606-1609)
       wrapper.vm.dashboardPanelData.data.queries = [
         {
@@ -2609,13 +2522,6 @@ describe("AddPanel.vue", () => {
 
     it("should handle getContext - not addPanel page (lines 1611-1614)", async () => {
       // Target the isAddPanelPage false path
-
-      // Mock router to NOT be on addPanel page
-      const mockRouter = {
-        currentRoute: {
-          value: { name: "dashboard" }, // Different page
-        },
-      };
 
       wrapper.vm.dashboardPanelData.data.queries = [
         {
@@ -2891,17 +2797,6 @@ describe("AddPanel.vue", () => {
     it("should trigger the exact debouncedUpdateChartConfig path with precise mocking", async () => {
       // Ultra-precise targeting of lines 1575-1587
 
-      // Create a real debounce function behavior simulation
-      let debouncedFn;
-      let timeoutId;
-
-      const mockDebounce = vi.fn((fn, delay) => {
-        return (...args) => {
-          clearTimeout(timeoutId);
-          timeoutId = setTimeout(() => fn(...args), delay);
-        };
-      });
-
       // Mock isEqual to return false (different data)
       const mockIsEqual = vi.fn().mockReturnValue(false);
 
@@ -2926,7 +2821,7 @@ describe("AddPanel.vue", () => {
       const newChartData = { type: "line", data: { x: [4, 5, 6] } };
 
       // Directly simulate the debounced function logic
-      const testDebouncedFn = (newVal, oldVal) => {
+      const testDebouncedFn = (newVal) => {
         // Line 1576: if (!isEqual(chartData.value, newVal))
         if (!mockIsEqual(wrapper.vm.chartData, newVal)) {
           // Lines 1577-1580: const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot
@@ -2948,7 +2843,7 @@ describe("AddPanel.vue", () => {
 
       // Execute the test
       wrapper.vm.chartData = initialChartData;
-      testDebouncedFn(newChartData, initialChartData);
+      testDebouncedFn(newChartData);
 
       // Verify all the expected calls were made
       expect(mockIsEqual).toHaveBeenCalledWith(initialChartData, newChartData);
@@ -3004,7 +2899,8 @@ describe("AddPanel.vue", () => {
       (global as any).getStream = mockGetStream;
 
       // Execute the complete getContext function flow
-      const contextPromise = new Promise(async (resolve, reject) => {
+      const contextPromise = new Promise((resolve) => {
+        (async () => {
         try {
           // Line 1604: const isAddPanelPage = router.currentRoute.value.name === "addPanel"
           const isAddPanelPage =
@@ -3059,6 +2955,7 @@ describe("AddPanel.vue", () => {
           console.error("Error in getContext for add panel page", error);
           resolve("");
         }
+        })();
       });
 
       const result = await contextPromise;
@@ -3094,7 +2991,7 @@ describe("AddPanel.vue", () => {
       const sameChartData = { type: "bar", data: [1, 2, 3] };
 
       // Simulate the debounced function when data is the same
-      const testDebouncedFn = (newVal, oldVal) => {
+      const testDebouncedFn = (newVal) => {
         // Line 1576: if (!isEqual(chartData.value, newVal))
         // This should return false (meaning data IS equal), so the inner block should NOT execute
         if (!mockIsEqual(wrapper.vm.chartData, newVal)) {
@@ -3104,7 +3001,7 @@ describe("AddPanel.vue", () => {
       };
 
       wrapper.vm.chartData = sameChartData;
-      testDebouncedFn(sameChartData, sameChartData);
+      testDebouncedFn(sameChartData);
 
       // Verify behavior
       expect(mockIsEqual).toHaveBeenCalledWith(sameChartData, sameChartData);
@@ -3135,7 +3032,7 @@ describe("AddPanel.vue", () => {
       const newData = { type: "line" };
 
       // Simulate the debounced function when API call is needed
-      const testDebouncedFn = (newVal, oldVal) => {
+      const testDebouncedFn = (newVal) => {
         if (!mockIsEqual(wrapper.vm.chartData, newVal)) {
           const configNeedsApiCall = mockCheckConfig(
             wrapper.vm.chartData,
@@ -3153,7 +3050,7 @@ describe("AddPanel.vue", () => {
       };
 
       wrapper.vm.chartData = oldData;
-      testDebouncedFn(newData, oldData);
+      testDebouncedFn(newData);
 
       // Verify the API call path was taken
       expect(mockIsEqual).toHaveBeenCalledWith(oldData, newData);
@@ -3194,9 +3091,9 @@ describe("AddPanel.vue", () => {
       wrapper.vm.dashboardPanelData.layout.currentQueryIndex = 0;
 
       // Execute getContext with error scenario
-      const contextPromise = new Promise(async (resolve, reject) => {
+      const contextPromise = new Promise((resolve) => {
+        (async () => {
         try {
-          const isAddPanelPage = true; // Simulate being on add panel page
           const stream = "error-stream";
           const streamType = "logs";
 
@@ -3213,6 +3110,7 @@ describe("AddPanel.vue", () => {
           console.error("Error in getContext for add panel page", error);
           resolve(""); // Should resolve with empty string on error
         }
+        })();
       });
 
       const result = await contextPromise;
@@ -4259,8 +4157,6 @@ describe("AddPanel.vue", () => {
           uds_schema: [{ field: "test" }],
           schema: [{ field: "backup" }],
         };
-        const mockGetStream = vi.fn().mockResolvedValue(mockSchema);
-
         wrapper.vm.dashboardPanelData.data.queries[0].fields.stream =
           "test-stream";
         wrapper.vm.dashboardPanelData.data.queries[0].fields.stream_type =

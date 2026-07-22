@@ -83,7 +83,7 @@
           orientation="horizontal"
           class="mt-0.5"
           data-test="score-config-datatype-radios"
-          @update:model-value="form.setFieldValue('dataType', $event)"
+          @update:model-value="onDataTypeChange"
         >
           <!-- `sc-dtype-radio` is kept purely as the hook for the ORadio
                :deep() keeper below; all of its own chrome is utilities. In edit
@@ -347,6 +347,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import type { RadioValue } from "@/lib/forms/Radio/ORadio.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -392,6 +393,12 @@ const drawerTitle = computed(() =>
 
 // Data-type radio options.
 const DATA_TYPES = ["numeric", "categorical", "boolean"] as const;
+
+const onDataTypeChange = (value: RadioValue) => {
+  if (value === "numeric" || value === "categorical" || value === "boolean") {
+    form.setFieldValue("dataType", value);
+  }
+};
 
 // Co-located Zod schema (factory keeps messages i18n-driven and branches the
 // create-only name-slug rule on `mode`).

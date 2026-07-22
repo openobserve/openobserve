@@ -477,7 +477,12 @@ const availableProviders = computed(() => {
   return providers;
 });
 
-const providerDefinitions = [
+const providerDefinitions: Array<{
+  label: string;
+  value: string;
+  image?: string;
+  icon?: string;
+}> = [
   {
     label: "AWS Credentials",
     value: "AwsCredentials",

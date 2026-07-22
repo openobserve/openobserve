@@ -5,7 +5,7 @@
  * are stored per-query in meta.queryFields[queryIndex] instead of shared singletons.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { reactive, nextTick, watch } from "vue";
+import { reactive } from "vue";
 
 vi.mock("vue", async () => {
   const actual = await vi.importActual("vue");

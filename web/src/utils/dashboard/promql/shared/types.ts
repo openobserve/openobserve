@@ -73,7 +73,8 @@ export interface PromQLChartConverter {
     extras: any,
     chartPanelRef?: any,
   ): {
-    series: any[];
+    // Optional: metric/table converters return values/columns instead of ECharts series
+    series?: any[];
     xAxis?: any;
     yAxis?: any;
     grid?: any;

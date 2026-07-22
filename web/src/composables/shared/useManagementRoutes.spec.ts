@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import useManagementRoutes from "./useManagementRoutes";
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
-import store from "../../test/unit/helpers/store";
 
 // Mock the config module
 vi.mock("@/aws-exports", () => ({

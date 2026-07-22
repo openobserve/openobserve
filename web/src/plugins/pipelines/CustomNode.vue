@@ -14,9 +14,9 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<script setup>
+<script setup lang="ts">
 import useDragAndDrop from "./useDnD";
-import { ref, computed } from "vue";
+import { ref, computed, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -25,26 +25,69 @@ import { defaultDestinationNodeWarningMessage } from "@/utils/pipelines/constant
 import { getTruncatedConditions as getTruncatedConditionsUtil } from "@/utils/conditionPreview";
 import { formatNodeErrorText } from "@/utils/pipelines/nodeErrors";
 
-import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 
+// Shapes are derived from the pipeline runtime (`useDnD` reactive store + API
+// payload). The shared store types `nodes`/`edges` as `any` and omits
+// `last_error`, so these local interfaces narrow what this node card reads.
+interface NodeData {
+  node_type?: string;
+  name?: string;
+  after_flatten?: boolean;
+  stream_type?: string;
+  stream_name?: string | { label?: string };
+  destination_name?: string;
+  condition?: unknown;
+  conditions?: unknown;
+  [key: string]: unknown;
+}
+
+interface NodeErrorInfo {
+  errors?: string[];
+  error_count?: number;
+  [key: string]: unknown;
+}
+
+interface PipelineNode {
+  id: string;
+  io_type?: string;
+  data: NodeData;
+  [key: string]: unknown;
+}
+
+interface PipelineEdge {
+  source?: string;
+  style?: Record<string, unknown>;
+  markerEnd?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface NodeType {
+  label: string;
+  icon: string;
+  subtype?: string;
+  io_type?: string;
+  [key: string]: unknown;
+}
 
 const props = defineProps({
   id: {
     type: String,
+    required: true,
   },
   data: {
-    type: Object,
+    type: Object as PropType<NodeData>,
+    required: true,
   },
   io_type: {
     type: String,
   },
 });
 
-const emit = defineEmits(["delete:node"]);
+defineEmits(["delete:node"]);
 const {
   pipelineObj,
   deletePipelineNode,
@@ -53,22 +96,38 @@ const {
 } = useDragAndDrop();
 const showButtons = ref(false);
 const showDeleteTooltip = ref(false);
-let hideButtonsTimeout = null;
+let hideButtonsTimeout: number | null = null;
+
+// last_error is set at runtime but absent from the base pipeline literal type;
+// narrow the dynamic value instead of asserting a shape.
+const getLastError = (): {
+  node_errors?: Record<string, NodeErrorInfo>;
+} | null => {
+  const pipeline: unknown = pipelineObj.currentSelectedPipeline;
+  if (!pipeline || typeof pipeline !== "object" || !("last_error" in pipeline))
+    return null;
+  const lastError: unknown = pipeline.last_error;
+  if (!lastError || typeof lastError !== "object") return null;
+  const nodeErrors =
+    "node_errors" in lastError ? lastError.node_errors : undefined;
+  return { node_errors: nodeErrors as Record<string, NodeErrorInfo> };
+};
 
 // Check if current node has errors
 const hasNodeError = computed(() => {
-  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
+  const lastError = getLastError();
   if (!lastError || !lastError.node_errors) return false;
 
   // node_errors is a JSON object with node IDs as keys
   const nodeErrors = lastError.node_errors;
-  return nodeErrors && nodeErrors[props.id];
+  return nodeErrors && props.id !== undefined && nodeErrors[props.id];
 });
 
 // Get error info for current node
 const getNodeErrorInfo = computed(() => {
-  const lastError = pipelineObj.currentSelectedPipeline?.last_error;
-  if (!lastError || !lastError.node_errors) return null;
+  const lastError = getLastError();
+  if (!lastError || !lastError.node_errors || props.id === undefined)
+    return null;
 
   const nodeError = lastError.node_errors[props.id];
   if (!nodeError) return null;
@@ -95,19 +154,23 @@ const getNodeErrorInfo = computed(() => {
 // url(), which terminates it early and breaks the arrowhead. Resolving the token
 // to a literal (getComputedStyle on :root) at call time is the fix, and would
 // also give these edges the dark-mode step they currently lack.
-const getNodeColor = (ioType) => {
-  const colorMap = {
+const getNodeColor = (ioType: string | undefined) => {
+  const colorMap: Record<string, string> = {
     input: "#3b82f6", // Blue    — pairs with --color-status-info-text
     output: "#22c55e", // Green   — pairs with --color-status-positive
     default: "#f59e0b", // Amber   — pairs with --color-status-warning-text
   };
-  return colorMap[ioType] || "var(--color-grey-500)";
+  return (ioType && colorMap[ioType]) || "var(--color-grey-500)";
 };
 
 // Function to update edge colors on node hover
-const updateEdgeColors = (nodeId, color, reset = false) => {
+const updateEdgeColors = (
+  nodeId: string | undefined,
+  color: string | null,
+  reset = false,
+) => {
   if (pipelineObj.currentSelectedPipeline?.edges) {
-    pipelineObj.currentSelectedPipeline.edges.forEach((edge) => {
+    pipelineObj.currentSelectedPipeline.edges.forEach((edge: PipelineEdge) => {
       if (edge.source === nodeId) {
         if (reset) {
           // Reset to default color
@@ -138,7 +201,10 @@ const updateEdgeColors = (nodeId, color, reset = false) => {
 };
 
 // Node hover handlers
-const handleNodeHover = (nodeId, ioType) => {
+const handleNodeHover = (
+  nodeId: string | undefined,
+  ioType: string | undefined,
+) => {
   const color = getNodeColor(ioType);
   updateEdgeColors(nodeId, color, false);
 
@@ -151,7 +217,7 @@ const handleNodeHover = (nodeId, ioType) => {
   showButtons.value = true;
 };
 
-const handleNodeLeave = (nodeId) => {
+const handleNodeLeave = (nodeId: string | undefined) => {
   updateEdgeColors(nodeId, null, true);
 
   // Add delay before hiding buttons
@@ -185,9 +251,14 @@ const handleDeleteTooltipLeave = () => {
 };
 
 // Navigate to function page to fix the error
-const navigateToFunction = (functionName) => {
+const navigateToFunction = (functionName: string | undefined) => {
   const errorInfo = getNodeErrorInfo.value;
-  const query = {
+  const query: {
+    action: string;
+    name: string | undefined;
+    org_identifier: string;
+    error?: string;
+  } = {
     action: "update",
     name: functionName,
     org_identifier: store.state.selectedOrganization.identifier,
@@ -214,10 +285,10 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
-const editNode = (id) => {
+const editNode = (id: string) => {
   //from id find the node from pipelineObj.currentSelectedPipelineData.nodes
   const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
-    (node) => node.id === id,
+    (node: PipelineNode) => node.id === id,
   );
   pipelineObj.isEditNode = true;
   pipelineObj.currentSelectedNodeData = fullNode;
@@ -226,15 +297,12 @@ const editNode = (id) => {
   pipelineObj.dialog.show = true;
 };
 
-const deleteNode = (id) => {
+const deleteNode = (id: string) => {
   openCancelDialog(id);
-};
-const functionInfo = (data) => {
-  return pipelineObj.functions[data.name] || null;
 };
 
 // Condition preview reuses the shared util (also used by workflow nodes).
-const getTruncatedConditions = (conditionData) =>
+const getTruncatedConditions = (conditionData: unknown) =>
   getTruncatedConditionsUtil(conditionData);
 
 const confirmDialogMeta = ref({
@@ -246,13 +314,13 @@ const confirmDialogMeta = ref({
   onConfirm: () => {},
 });
 
-const openCancelDialog = (id) => {
+const openCancelDialog = (id: string) => {
   confirmDialogMeta.value.show = true;
   confirmDialogMeta.value.title = t("common.delete");
   confirmDialogMeta.value.message = "Are you sure you want to delete node?";
   //here we will check if the destination node is added by default if yes then we will show a warning message to the user
   if (
-    props.data?.hasOwnProperty("node_type") &&
+    Object.prototype.hasOwnProperty.call(props.data ?? {}, "node_type") &&
     props.data.node_type === "stream" &&
     checkIfDefaultDestinationNode(id)
   ) {
@@ -273,10 +341,29 @@ const resetConfirmDialog = () => {
   confirmDialogMeta.value.onConfirm = () => {};
 };
 
-function getIcon(data, ioType) {
-  const searchTerm = data.node_type;
-  const node = pipelineObj.nodeTypes.find(
-    (node) => node.subtype === searchTerm && node.io_type === ioType,
+// The union `string | { label }` cannot be narrowed by `hasOwnProperty` in the
+// template; resolve the display label in script instead.
+const streamNameLabel = computed(() => {
+  const name = props.data?.stream_name;
+  if (name && typeof name === "object") return name.label;
+  return name;
+});
+
+// Error count for this node, read from the runtime-only `last_error` payload.
+const nodeErrorCount = computed<number | undefined>(() => {
+  const lastError = getLastError();
+  if (!lastError?.node_errors || props.id === undefined) return undefined;
+  return lastError.node_errors[props.id]?.error_count;
+});
+
+function getIcon(data: NodeData | undefined, ioType: string | undefined) {
+  const searchTerm = data?.node_type;
+  // nodeTypes is declared as an empty literal (never[]) in the shared store;
+  // narrow through unknown to its runtime element shape.
+  const nodeTypes = pipelineObj.nodeTypes as unknown as NodeType[];
+  const node = nodeTypes.find(
+    (node: NodeType) =>
+      node.subtype === searchTerm && node.io_type === ioType,
   );
   return node ? node.icon : undefined;
 }
@@ -291,7 +378,7 @@ function getIcon(data, ioType) {
       :has-output="io_type === 'input' || io_type === 'default'"
       :input-handle-test="`pipeline-node-${io_type}-input-handle`"
       :output-handle-test="`pipeline-node-${io_type}-output-handle`"
-      :data-test="`pipeline-node-${io_type}-${data.node_type.replace(/_/g, '-')}-node`"
+      :data-test="`pipeline-node-${io_type}-${(data.node_type ?? '').replace(/_/g, '-')}-node`"
       :data-node-type="data.node_type"
       class="btn-fixed-width"
       @mouseenter="handleNodeHover(id, io_type)"
@@ -314,7 +401,7 @@ function getIcon(data, ioType) {
             v-if="data.stream_name && data.stream_name.hasOwnProperty('label')"
             class="flex text-sm! font-bold! leading-[1.4]! text-left text-wrap w-auto text-ellipsis"
           >
-            {{ data.stream_type }} - {{ data.stream_name.label }}
+            {{ data.stream_type }} - {{ streamNameLabel }}
           </div>
           <div
             v-else
@@ -358,16 +445,10 @@ function getIcon(data, ioType) {
           <OIcon name="error" size="sm" />
           <span
             data-test="pipeline-node-error-count"
-            v-if="
-              pipelineObj.currentSelectedPipeline?.last_error?.node_errors?.[id]
-                ?.error_count
-            "
+            v-if="nodeErrorCount"
             class="absolute -top-1.5 -right-1.5 bg-status-negative text-white text-3xs font-bold min-w-3.5 h-3.5 rounded-full flex items-center justify-center px-0.75 border-[0.09375rem] border-solid border-white shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
           >
-            {{
-              pipelineObj.currentSelectedPipeline.last_error.node_errors[id]
-                .error_count
-            }}
+            {{ nodeErrorCount }}
           </span>
           <OTooltip side="top" align="center" :sideOffset="10" max-width="600px">
             <template #content>

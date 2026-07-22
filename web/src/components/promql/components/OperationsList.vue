@@ -15,7 +15,10 @@
           handle=".drag-handle"
           class="flex gap-2 flex-wrap items-center"
         >
-          <template v-for="(element, index) in props.operations">
+          <template
+            v-for="(element, index) in props.operations"
+            :key="getItemKey(element, index)"
+          >
             <div data-test="promql-operations-item">
               <OButtonGroup class="axis-field" radius="sm">
                 <OButton

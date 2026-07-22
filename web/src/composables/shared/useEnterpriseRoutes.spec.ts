@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import useEnterpriseRoutes from "./useEnterpriseRoutes";
-import store from "@/test/unit/helpers/store";
 
 // Mock the config module with mutable reference
 vi.mock("@/aws-exports", () => {

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import CustomNode from "./CustomNode.vue";
@@ -1114,27 +1114,6 @@ describe("CustomNode.vue", () => {
       // Should not throw
       const vm = wrapper.vm as any;
       expect(() => vm.updateEdgeColors("node-1", "#f00", false)).not.toThrow();
-    });
-  });
-
-  // =========================================================================
-  describe("functionInfo", () => {
-    it("returns function info from pipelineObj.functions when present", () => {
-      wrapper = createWrapper({}, {
-        functions: {
-          myFunc: { name: "myFunc", body: "." },
-        },
-      });
-      const vm = wrapper.vm as any;
-      const info = vm.functionInfo({ name: "myFunc" });
-      expect(info).toEqual({ name: "myFunc", body: "." });
-    });
-
-    it("returns null when function is not in pipelineObj.functions", () => {
-      wrapper = createWrapper();
-      const vm = wrapper.vm as any;
-      const info = vm.functionInfo({ name: "notExists" });
-      expect(info).toBeNull();
     });
   });
 

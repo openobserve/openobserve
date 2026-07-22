@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <span :title="formattedExactTime">{{ relativeTime }}</span>
 </template>
 
-<script>
+<script lang="ts">
 import { timestampToTimezoneDate } from "@/utils/zincutils";
 import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
 import { useStore } from "vuex";
@@ -36,14 +36,14 @@ export default {
       default: "",
     },
   },
-  setup(props, { root }) {
+  setup(props) {
     const store = useStore();
 
     const relativeTime = ref("");
-    let intervalId = null;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
 
     // Helper to convert timestamp to number
-    const getTimestampInMs = (timestamp) => {
+    const getTimestampInMs = (timestamp: number | string | Date | null) => {
       if (!timestamp) return null;
       if (typeof timestamp === "number") return timestamp;
       if (typeof timestamp === "string") return new Date(timestamp).getTime();
@@ -51,7 +51,7 @@ export default {
       return null;
     };
 
-    const getBestUnit = (diffInSeconds) => {
+    const getBestUnit = (diffInSeconds: number): { value: number; unit: Intl.RelativeTimeFormatUnit } => {
       if (diffInSeconds < 60) return { value: diffInSeconds, unit: "second" };
       if (diffInSeconds < 3600)
         return { value: Math.floor(diffInSeconds / 60), unit: "minute" };

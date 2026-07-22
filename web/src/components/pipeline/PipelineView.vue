@@ -44,12 +44,11 @@
     </div>
   </template>
   
-  <script>
-  import { getImageURL } from "@/utils/zincutils";
+  <script lang="ts">
+    import { getImageURL } from "@/utils/zincutils";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
-  import { defineComponent, computed, watch } from 'vue';
-  import { ControlButton, Controls } from '@vue-flow/controls'
-  import { VueFlow } from "@vue-flow/core";
+  import { defineComponent, computed, watch, type PropType } from 'vue';
+  import { VueFlow, type Node, type Edge } from "@vue-flow/core";
   import { ref, onMounted, nextTick } from "vue";
 import CustomNode from '@/plugins/pipelines/CustomNode.vue';
 import FlowEdge from "@/components/flow/FlowEdge.vue";
@@ -64,20 +63,34 @@ const externalOutputImage = getImageURL("images/pipeline/output_remote.png");
 const conditionImage = getImageURL("images/pipeline/transform_condition.png");
 const queryImage = getImageURL("images/pipeline/input_query.png");
 
-  
+  interface PipelineNode extends Node {
+    io_type?: string;
+  }
+
+  type PipelineEdge = Edge;
+
+  interface Pipeline {
+    name: string;
+    description: string;
+    source: { source_type: string };
+    nodes: PipelineNode[];
+    edges: PipelineEdge[];
+    org: string;
+  }
+
   export default defineComponent({
     props: {
-      pipeline: Object
+      pipeline: { type: Object as PropType<Pipeline>, required: true }
     },
-    components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge, ControlButton, Controls },
+    components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge },
     setup(props) {
       const {
       pipelineObj,
     } = useDragAndDrop();
-      const vueFlowRef = ref(null);
+      const vueFlowRef = ref<InstanceType<typeof VueFlow> | null>(null);
       // Computed properties for nodes and edges
       const lockedNodes = computed(() => {
-        return props.pipeline.nodes.map(node => ({
+        return props.pipeline.nodes.map((node: PipelineNode) => ({
           ...node,
           type: node.io_type
         }));

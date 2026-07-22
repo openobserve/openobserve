@@ -18,6 +18,11 @@ describe("required → auto asterisk", () => {
     expect(w.find("label").text()).not.toContain("*");
   });
 
+  it("OInput exposes the required state to assistive technology", () => {
+    const w = mount(OInput, { props: { label: "Name", required: true } });
+    expect(w.find("input").attributes("aria-required")).toBe("true");
+  });
+
   it("OTextarea shows * after the label when required", () => {
     const w = mount(OTextarea, { props: { label: "Desc", required: true } });
     expect(w.find("label").text()).toContain("*");

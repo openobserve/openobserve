@@ -221,7 +221,6 @@ import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
 import { formatTimestampNs } from "@/utils/date";
-import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
@@ -311,7 +310,7 @@ watch(
 );
 
 
-const highlightTextMatch = (text: string, query: string): string => {
+const highlightTextMatch = (text: string, query: string | undefined): string => {
   if (!query) return escapeHtml(text);
   try {
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

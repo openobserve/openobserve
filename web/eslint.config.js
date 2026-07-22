@@ -81,6 +81,19 @@ const gitignore = fs.existsSync(".gitignore")
   : [];
 
 export default [
+  // Global ignores — must be a standalone entry (no `files` key) so they apply
+  // to every config object, including js.configs.recommended. Vendored/minified
+  // assets and build output are not lintable source.
+  {
+    ignores: [
+      "**/*.min.js",
+      "packages/rrweb-player/**",
+      "dist/**",
+      "coverage/**",
+      "node_modules/**",
+      ".vscode/**",
+    ],
+  },
   js.configs.recommended,
   ...vue.configs["flat/essential"],
   {
@@ -135,40 +148,68 @@ export default [
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "no-undef": "off",
-      "no-prototype-builtins": "off",
-      "no-async-promise-executor": "off",
-      "no-empty": "off",
-      "no-self-assign": "off",
-      "no-useless-escape": "off",
-      "no-redeclare": "off",
-      "no-unsafe-optional-chaining": "off",
-      "no-import-assign": "off",
-      "no-useless-catch": "off",
-      "no-unreachable": "off",
-      "no-case-declarations": "off",
-      "no-shadow-restricted-names": "off",
+      "no-unused-vars": "off",
+      //
+      // Formatter / style — owned by the formatter + a separate team decision,
+      // not this lint gate.
+      "prettier/prettier": "off",
       "vue/max-attributes-per-line": "off",
-      "vue/no-mutating-props": "off",
-      "vue/no-unused-components": "off",
-      "vue/no-dupe-keys": "off",
-      "vue/no-side-effects-in-computed-properties": "off",
-      "vue/require-valid-default-prop": "off",
-      "vue/no-unused-vars": "off",
-      "vue/no-use-v-if-with-v-for": "off",
-      "vue/no-reserved-component-names": "off",
-      "vue/valid-v-for": "off",
-      "vue/valid-v-else-if": "off",
-      "vue/require-v-for-key": "off",
-      "vue/return-in-computed-property": "off",
-      "vue/require-toggle-inside-transition": "off",
-      "vue/no-deprecated-v-bind-sync": "off",
-      "vue/no-parsing-error": "off",
-      "vue/valid-next-tick": "off",
-      "vue/no-v-text-v-html-on-component": "off",
-      "vue/prefer-import-from-vue": "off",
-      "vue/valid-attribute-name": "off",
-      "vue/no-ref-as-operand": "off",
       "vue/multi-word-component-names": "off",
+      //
+      // Zero current violations → locked straight to "error".
+      "no-shadow-restricted-names": "error",
+      "vue/valid-v-else-if": "error",
+      "vue/no-deprecated-v-bind-sync": "error",
+      "vue/no-v-text-v-html-on-component": "error",
+      //
+      // Enforced ("error") — the rollout drove each of these to 0 violations.
+      // Three rules below stay "warn" (ratchet backlog); see their notes.
+      //
+      // Unused code (single source of truth; `_`-prefix opts out). Still "warn":
+      // ~4 stragglers are imports used only in template `as` casts, which
+      // eslint-plugin-vue cannot see (false positives) — TS keeps them honest.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrors: "none",
+        },
+      ],
+      // Bucket 1 — real bugs.
+      "no-unreachable": "error",
+      "no-self-assign": "error",
+      "no-redeclare": "error",
+      "no-case-declarations": "error",
+      "no-unsafe-optional-chaining": "error",
+      "no-import-assign": "error",
+      // Still "warn": 3 left are a prop + a same-named setup-return/computed;
+      // deduping would break the component's public prop API.
+      "vue/no-dupe-keys": "warn",
+      "vue/no-ref-as-operand": "error",
+      "vue/no-side-effects-in-computed-properties": "error",
+      "vue/return-in-computed-property": "error",
+      "vue/require-valid-default-prop": "error",
+      "vue/require-v-for-key": "error",
+      "vue/valid-v-for": "error",
+      "vue/valid-attribute-name": "error",
+      "vue/valid-next-tick": "error",
+      "vue/no-parsing-error": "error",
+      "vue/no-use-v-if-with-v-for": "error",
+      "vue/no-reserved-component-names": "error",
+      "vue/require-toggle-inside-transition": "error",
+      "vue/prefer-import-from-vue": "error",
+      // Bucket 2 — low-risk / mechanical.
+      "no-prototype-builtins": "error",
+      "no-useless-escape": "error",
+      "no-empty": "error",
+      "no-useless-catch": "error",
+      "no-async-promise-executor": "error",
+      // Bucket 4 — Vue correctness. Driven to 0 via the behavior-preserving
+      // computed-alias pattern (see the eslint-error-handling skill); now enforced.
+      "vue/no-mutating-props": "error",
+      "vue/no-unused-components": "error",
+      "vue/no-unused-vars": "error",
 
     },
   },

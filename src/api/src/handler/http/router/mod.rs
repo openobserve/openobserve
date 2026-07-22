@@ -973,6 +973,8 @@ pub fn service_routes() -> Router {
             // Topology
             .route("/{org_id}/traces/service_graph/topology/current", get(traces::get_current_topology))
             .route("/{org_id}/traces/service_graph/edge/history", get(traces::get_edge_history))
+            // Agent behavior signals (loop / failure / cost) — reads the derived _agent_signals stream
+            .route("/{org_id}/traces/agent_signals", get(traces::get_agent_signals))
 
             // Patterns
             .route("/{org_id}/streams/{stream_name}/patterns/extract", post(patterns::extract_patterns))
@@ -1097,6 +1099,10 @@ pub fn service_routes() -> Router {
                 get(cloud::billings::create_billing_portal_session),
             )
             .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
+            .route(
+                "/{org_id}/ai/usage_limit",
+                put(organization::org::set_ai_usage_limit),
+            )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
                 get(cloud::org_usage::get_org_usage),

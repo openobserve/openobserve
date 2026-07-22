@@ -58,7 +58,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 defineProps<{
-  icon: IconName;
+  icon: IconName | (string & {});
   label: string;
   sublabel?: string;
   hideChevron?: boolean;

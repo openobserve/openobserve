@@ -439,7 +439,7 @@ describe("ChunkedContent", () => {
       // Access the computed to trigger getChunkInfo call
       // (chunkInfo is lazy – it only runs when accessed)
       const vm = wrapper.vm as any;
-      const _info = vm.chunkInfo;
+      vm.chunkInfo;
       expect(mockGetChunkInfo).toHaveBeenCalledWith("special-field-key");
     });
   });

@@ -3,7 +3,7 @@ import type { CodeProps, CodeSlots } from "./OCode.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { ref } from "vue";
 
-const props = withDefaults(defineProps<CodeProps>(), {
+withDefaults(defineProps<CodeProps>(), {
   block: false,
   copyable: false,
   truncate: false,

@@ -245,7 +245,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -529,7 +529,16 @@ export default defineComponent({
     ];
 
     // Enterprise features list - all 21 features
-    const enterpriseFeatures = [
+    const enterpriseFeatures: {
+      name: string;
+      note: string;
+      icon: string;
+      link?: string;
+      requiresHA?: boolean;
+      beta?: boolean;
+      cloudOnly?: boolean;
+      cloudHidden?: boolean;
+    }[] = [
       {
         name: t("about.enterprise_offer.enterprise_features.single_sign_on.name"),
         note: t("about.enterprise_offer.enterprise_features.single_sign_on.note"),
@@ -819,8 +828,8 @@ export default defineComponent({
           return;
         }
 
-        const dates = [];
-        let values = [];
+        const dates: string[] = [];
+        let values: number[] = [];
         let dataUnit = 'GB'; // Default unit
         let unitDivisor = 1024; // Default: MB to GB
 
@@ -982,7 +991,7 @@ export default defineComponent({
             },
             series: [{
               type: 'bar',
-              data: values.map((value, index) => {
+              data: values.map((value) => {
                 // Color bars red if they exceed threshold, otherwise green
                 const exceeds = thresholdInDataUnit > 0 && value > thresholdInDataUnit;
                 return {

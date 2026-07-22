@@ -105,7 +105,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="handlePermissionChange(row, col)"
             />
           </template>
-          <template #expansion="{ row }">
+          <!-- expansion slot receives row.original (raw data), not the TanStack Row -->
+          <template #expansion="{ row }: { row: any }">
             <template v-if="row.entities">
               <PermissionsTable
                 :level="level + 1"
@@ -145,7 +146,6 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import NoData from "@/components/shared/grid/NoData.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps({
   selectedPermissionsHash: {
     type: Set,

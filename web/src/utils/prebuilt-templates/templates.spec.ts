@@ -188,7 +188,7 @@ describe('Template consistency', () => {
   });
 
   it('all configs have urlValidator or headers', () => {
-    templates.forEach(({ name, config }) => {
+    templates.forEach(({ config }) => {
       const hasValidator = typeof config.urlValidator === 'function';
       const hasHeaders = config.headers !== undefined;
       expect(hasValidator || hasHeaders).toBe(true);
@@ -196,14 +196,14 @@ describe('Template consistency', () => {
   });
 
   it('all configs have credential fields', () => {
-    templates.forEach(({ name, config }) => {
+    templates.forEach(({ config }) => {
       expect(config.credentialFields).toBeDefined();
       expect(Array.isArray(config.credentialFields)).toBe(true);
     });
   });
 
   it('all credential fields have required properties', () => {
-    templates.forEach(({ name, config }) => {
+    templates.forEach(({ config }) => {
       config.credentialFields?.forEach((field: any) => {
         expect(field).toHaveProperty('key');
         expect(field).toHaveProperty('labelKey');

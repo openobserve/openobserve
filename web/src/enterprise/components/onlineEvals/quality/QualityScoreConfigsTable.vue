@@ -173,10 +173,6 @@ function sparkClass(status: string): string {
   return 'text-text-secondary';
 }
 
-function rowClassOf(row: ScoreConfigRow): string {
-  return row.status === "noData" ? "opacity-[0.6] hover:opacity-[0.85]" : "";
-}
-
 const columns = computed(() => [
   {
     id: "status",

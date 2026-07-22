@@ -76,8 +76,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="max-h-7 h-7"
           >
             <!-- Row-field headers: first <tr> only, rowspan all levels -->
+            <template v-if="levelIdx === 0">
             <th
-              v-if="levelIdx === 0"
               v-for="col in pivotRowColumns"
               :key="'rh_' + col.name"
               :rowspan="pivotHeaderLevels.length"
@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               />
             </th>
+            </template>
             <!-- Pivot group / value headers -->
             <th
               v-for="(cell, cellIdx) in level.cells"
@@ -185,7 +186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="header in headerGroup.headers"
               :key="header.id"
               :id="header.id"
-              class="px-2 relative table-head text-ellipsis!"
+              class="px-2 relative table-head text-ellipsis! group"
               :class="[
                 (header.column.columnDef.meta as any)?.align === 'center'
                   ? 'text-center!'
@@ -391,7 +392,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <div
                   :data-test="`o2-table-add-data-from-column-${header.column.columnDef.header}`"
-                  class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex"
+                  class="invisible items-center absolute right-2 top-0 px-2 column-actions h-full flex group-hover:visible bg-[var(--color-table-header-bg)]"
                   v-if="
                     (header.column.columnDef.meta as any)?.closable ||
                     (header.column.columnDef.meta as any)?.showWrap
@@ -400,11 +401,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     v-if="(header.column.columnDef.meta as any).closable"
                     :data-test="`o2-table-th-remove-${header.column.columnDef.header}-btn`"
-                    name="cancel"
                     class="m-0 close-icon cursor-pointer text-icon-color"
+                    name="close"
                     :title="t('common.close')"
                     size="sm"
-                    @click="closeColumn(header.column.columnDef)"
+                    @click.stop="closeColumn(header.column.columnDef)"
                    />
                 </div>
               </div>
@@ -514,7 +515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="header.id"
                 class="px-2 overflow-hidden"
                 :class="c === 0 ? 'pl-4' : ''"
-                :style="skelTdStyle(header, c)"
+                :style="skelTdStyle(header)"
               >
                 <span
                   class="o2-skel-pill inline-block h-3 rounded-default"
@@ -522,7 +523,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     width:
                       c === 0
                         ? `${SKEL_TIMESTAMP_PX}px`
-                        : `${skelCellWidth(r - 1, c)}%`,
+                        : `${skelCellWidth(r - 1, Number(c))}%`,
                   }"
                   aria-hidden="true"
                 />
@@ -570,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @keydown="handleDataRowKeydown($event, row.original, idx as number)"
             >
               <td
-                v-for="(cell, cellIndex) in row.getVisibleCells()"
+                v-for="cell in row.getVisibleCells()"
                 :key="cell.id"
                 data-test="dashboard-data-row-cell"
                 class="py-1 px-2 overflow-hidden relative table-cell group/copy"
@@ -743,8 +744,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <!-- ── Virtual scroll rows (logs / traces only — no `data` prop) ────── -->
+          <template v-if="!showPagination && useVirtualScroll">
           <template
-            v-if="!showPagination && useVirtualScroll"
             v-for="virtualRow in virtualRows"
             :key="virtualRow.index"
           >
@@ -987,13 +988,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Logs: FTS-highlighted text -->
                         <span
                           v-else-if="
-                            processedResults[
+                            highlightedResults[
                               `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                             ]
                           "
                           :key="`${cell.column.id}_${calculateActualIndex(virtualRow.index)}`"
                           v-html="
-                            processedResults[
+                            highlightedResults[
                               `${cell.column.id}_${calculateActualIndex(virtualRow.index)}`
                             ]
                           "
@@ -1075,6 +1076,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </td>
               </template>
             </tr>
+          </template>
           </template>
           <!-- Empty slot: shown when rows is empty and not loading -->
           <tr v-if="!loading && tableRows.length === 0" class="w-full">
@@ -1176,7 +1178,7 @@ import {
   onBeforeUnmount,
   ComputedRef,
 } from "vue";
-import type { PropType } from "vue";
+import type { PropType, Ref } from "vue";
 import { useVirtualizer } from "@tanstack/vue-virtual";
 import {
   FlexRender,
@@ -1184,6 +1186,7 @@ import {
   type SortingState,
   type ColumnFiltersState,
   type Updater,
+  type TableOptionsWithReactiveData,
   useVueTable,
   getCoreRowModel,
   getSortedRowModel,
@@ -1494,8 +1497,11 @@ const clearColFilter = (colId: string) => {
 const sanitizeCssId = (id: string) => id.replace(/[^a-zA-Z0-9_-]/g, "_");
 
 const store = useStore();
-const { isFTSColumn } = useTextHighlighter();
+useTextHighlighter();
 const { processedResults, processHitsInChunks } = useLogsHighlighter();
+// Explicit alias so the template resolves the map's index signature (vue-tsc
+// otherwise infers `{}` for the destructured ref and rejects string keys).
+const highlightedResults: Ref<Record<string, string>> = processedResults;
 
 // ── Dashboard: sticky columns composable ─────────────────────────────────────
 // useStickyColumns reads props.columns (legacy column format when useVirtualScroll=false).
@@ -1835,10 +1841,6 @@ const isFunctionErrorOpen = ref(false);
 
 const activeCellActionId = ref("");
 
-const highlightQuery = computed(() => {
-  return props.highlightQuery;
-});
-
 const getRowStatusColor = (rowData: any) => {
   const statusInfo = extractStatusFromLog(rowData);
   return statusInfo.color;
@@ -1982,7 +1984,7 @@ let table: any = useVueTable({
   },
   columnResizeMode,
   enableColumnResizing: true,
-});
+} as unknown as TableOptionsWithReactiveData<Record<string, unknown>>);
 
 const columnSizeVars = computed(() => {
   const headers = table?.getFlatHeaders();
@@ -2116,7 +2118,7 @@ const skelCellWidth = (r: number, c: number): number => {
 // Mirror the exact width/flex logic of the real cells so skeleton columns align.
 // Source column (width:'auto' in real rows) → flex:1 to fill remaining space.
 // All other columns: fixed width from the CSS variable (same as real rows).
-const skelTdStyle = (header: any, c: number): Record<string, string> => {
+const skelTdStyle = (header: any): Record<string, string> => {
   const colId = header.column.id;
   const isStretchSource = colId === "source" && !header.column.getCanResize();
   if (isStretchSource) return { flex: "1 1 0", minWidth: "0" };

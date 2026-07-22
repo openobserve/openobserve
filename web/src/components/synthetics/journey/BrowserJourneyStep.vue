@@ -351,7 +351,7 @@ function toggleExpanded() {
           v-if="showStackTrace"
           class="mt-2 bg-code-bg rounded-default p-3 overflow-x-auto max-h-75 overflow-y-auto text-xs font-mono leading-relaxed m-0"
           data-test="synthetics-journey-step-stack-content"
-        >{{ se.stack }}</pre>
+        >{{ se?.stack }}</pre>
       </div>
 
       <!-- Info boxes -->

@@ -128,8 +128,7 @@ export default function (store: any) {
         next();
       }
     } else {
-      const sessionUserInfo = getDecodedUserInfo();
-      const userID = JSON.parse(String(sessionUserInfo)).email;
+      getDecodedUserInfo();
 
       segment.track("page view", {
         path: to.path,

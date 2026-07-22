@@ -317,6 +317,9 @@ export default defineComponent({
   setup(props: any, { emit }: any) {
     const { t } = useI18n();
 
+    // Alias preserves the same prop reference for in-place mutation.
+    const overrideConfigModel = computed(() => props.overrideConfig);
+
     const columnOverrides = ref<ColumnOverrideUI[]>([]);
     const selectedIdx = ref<number>(-1);
     const addOpenLeft = ref(false);
@@ -502,7 +505,7 @@ export default defineComponent({
 
     const saveOverrides = () => {
       const raw = serializeOverrides(columnOverrides.value);
-      props.overrideConfig.overrideConfigs = raw;
+      overrideConfigModel.value.overrideConfigs = raw;
       emit("save", raw);
       emit("close");
     };

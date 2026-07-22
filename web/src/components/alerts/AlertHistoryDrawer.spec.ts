@@ -381,7 +381,7 @@ describe("AlertHistoryDrawer.vue", () => {
     });
 
     it("should show empty state when no history", async () => {
-      vi.mocked(alertsService.getHistory).mockResolvedValueOnce({
+      vi.mocked(alertsService.getHistory).mockResolvedValue({
         data: { hits: [], total: 0 },
       } as any);
 
@@ -393,7 +393,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Error Handling", () => {
     it("should handle API errors gracefully", async () => {
-      vi.mocked(alertsService.getHistory).mockRejectedValueOnce(
+      vi.mocked(alertsService.getHistory).mockRejectedValue(
         new Error("API Error"),
       );
 
@@ -413,7 +413,7 @@ describe("AlertHistoryDrawer.vue", () => {
           },
         },
       };
-      vi.mocked(alertsService.getHistory).mockRejectedValueOnce(error);
+      vi.mocked(alertsService.getHistory).mockRejectedValue(error);
 
       await mountComponent();
       expect(wrapper.exists()).toBe(true);
@@ -596,37 +596,6 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(vm.getRowClass({ status: "error" })).toBe("!bg-status-error-bg");
       expect(vm.getRowClass({ status: "ok" })).toBe("");
       expect(vm.getRowClass({ status: "success" })).toBe("");
-    });
-
-    it("formatTimestamp should return N/A for falsy timestamps", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatTimestamp(0)).toBe("N/A");
-      expect(vm.formatTimestamp(null)).toBe("N/A");
-    });
-
-    it("formatTimestamp should format recent timestamps as relative minutes", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 5 minutes ago in microseconds
-      const fiveMinAgo = (Date.now() - 5 * 60 * 1000) * 1000;
-      expect(vm.formatTimestamp(fiveMinAgo)).toBe("5 min ago");
-    });
-
-    it("formatTimestamp should format hours-old timestamps as relative hours", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 3 hours ago in microseconds
-      const threeHoursAgo = (Date.now() - 3 * 3600 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeHoursAgo)).toBe("3h ago");
-    });
-
-    it("formatTimestamp should format days-old timestamps as relative days", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 3 days ago in microseconds
-      const threeDaysAgo = (Date.now() - 3 * 86400 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeDaysAgo)).toBe("3d ago");
     });
   });
 

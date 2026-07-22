@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ul class="flex flex-col divide-y divide-border">
             <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="flex items-center gap-2 p-4">
               <div class="flex flex-col flex-1 min-w-0">
-                <span class="text-sm font-bold">Job {{ index + 1 }}</span>
+                <span class="text-sm font-bold">Job {{ (index as number) + 1 }}</span>
                 <span class="block text-xs text-muted-foreground">{{ job.url }}</span>
                 <span class="block text-xs text-muted-foreground mt-2">
                   <OTag
@@ -389,7 +389,6 @@ import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -411,7 +410,6 @@ export default defineComponent({
     ODrawer,
     OSearchInput,
     OTooltip,
-    OCheckbox,
     OIcon,
     OTag,
     ONumberCell,
@@ -422,7 +420,7 @@ export default defineComponent({
     "update:changeRecordPerPage",
     "update:maxRecordToReturn",
   ],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
     const { t } = useI18n();
     const router = useRouter();

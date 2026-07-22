@@ -91,7 +91,8 @@ const totalSize = computed(() => virtualizer.value.getTotalSize());
 
 const rows = computed(() =>
   virtualizer.value.getVirtualItems().map((v) => ({
-    key: v.key,
+    // TanStack's Key includes bigint, which Vue's :key type doesn't accept
+    key: v.key as string | number,
     index: v.index,
     start: v.start,
     size: v.size,

@@ -38,6 +38,7 @@ export const useSearchPagination = () => {
   };
 
   const refreshPagination = (regenerateFlag: boolean = false) => {
+    void regenerateFlag;
     try {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
@@ -73,6 +74,7 @@ export const useSearchPagination = () => {
       notificationMsg.value = "Error while refreshing partition pagination.";
       return false;
     }
+    return;
   };
 
   const updateResult = async (
@@ -94,7 +96,7 @@ export const useSearchPagination = () => {
     }
 
     if (searchObj.meta.refreshInterval == 0) {
-      if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+      if (!Object.prototype.hasOwnProperty.call(queryReq.query, "track_total_hits")) {
         delete response.content.total;
       }
 
