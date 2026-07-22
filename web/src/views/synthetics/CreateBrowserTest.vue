@@ -191,6 +191,14 @@ onMounted(() => {
     })
     .catch(() => { /* extension messaging unavailable — handled in setup screen */ })
 
+  // Auto-detect when the content script is injected on demand (toolbar icon click
+  // after mid-session install). The content script sends 'oo-bridge-ready' when
+  // chrome.scripting.executeScript injects it, and the composable calls this back.
+  recorder.registerAutoDetect(() => {
+    extensionInstalled.value = true
+    extensionReady.value = true
+  })
+
   fetchFolders()
   fetchLocations()
   fetchDestinations()
@@ -597,29 +605,13 @@ function onClearResults() {
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
               :class="extensionReady ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse'"
             >2</span>
-            <div class="flex-1 min-w-0 flex justify-between">
-              <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
-                <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupStep2Description') }}</p>
-              </div>
-              <div class="flex items-center gap-3 px-3">
-                <OButton
-                  v-if="!extensionReady"
-                  variant="outline"
-                  size="sm"
-                  :loading="checkingExtension"
-                  iconLeft="refresh"
-                  data-test="synthetics-setup-icon-check-btn"
-                  @click="probeExtension"
-                >
-                  {{ t('synthetics.createBrowserTest.setupCheckAgain') }}
-                </OButton>
-                <span
-                  v-else
-                  class="text-sm font-medium text-status-success-text!"
-                  data-test="synthetics-setup-ready-label"
-                >{{ t('synthetics.createBrowserTest.setupReady') }}</span>
-              </div>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
+              <p class="text-xs text-text-secondary m-0">{{ t('synthetics.createBrowserTest.setupStep2Description') }}</p>
+              <p
+                v-if="extensionReady"
+                class="text-xs font-medium text-status-success-text! mt-2"
+              >{{ t('synthetics.createBrowserTest.setupConnected') }}</p>
             </div>
           </div>
 

@@ -65,10 +65,23 @@ const useSyntheticsRecorder = () => {
   let bridgeDataHandler: ((msg: any) => void) | null = null;
   let bridgeDisconnectHandler: (() => void) | null = null;
 
+  /** Callback invoked when content script announces itself (toolbar icon injection). */
+  let onAutoDetected: (() => void) | null = null;
+
   // Global message listener — processes all bridge messages from the content script.
   window.addEventListener('message', (event: MessageEvent) => {
     console.log("MEssage", event);
     if (event.source !== window) return;
+
+    // Content script announces itself when injected on demand (toolbar icon
+    // click after mid-session install). Auto-trigger detection.
+    if (event.data?.ch === 'oo-bridge-ready') {
+      detectExtension().then((installed: boolean) => {
+        if (installed) onAutoDetected?.();
+      }).catch(() => {});
+      return;
+    }
+
     if (event.data?.ch !== BRIDGE_CHANNEL) return;
     if (event.data?.dir !== 'to-page') return;
 
@@ -142,6 +155,7 @@ const useSyntheticsRecorder = () => {
     const status = await sendCommand<RecorderStatus>({ action: 'getStatus' })
     isInstalled.value = status !== null
     if (status?.isRecording) isRecording.value = true
+    console.log("detect extension ---", status, isInstalled.value);
     return isInstalled.value
   }
 
@@ -379,6 +393,7 @@ const useSyntheticsRecorder = () => {
     replayPhase,
     stepResults,
     activeStepId,
+    registerAutoDetect: (cb: (() => void) | null) => { onAutoDetected = cb; },
     detectExtension,
     startRecording,
     stopRecording,

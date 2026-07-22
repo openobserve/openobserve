@@ -9370,7 +9370,8 @@
       "setupIconActivateHint": "Click {icon} in your toolbar to activate the recorder for this page.",
       "setupStep3Title": "Enable incognito mode",
       "setupStep3IncognitoHint": "Open chrome://extensions, click {details}, then enable {setting}.",
-      "setupReady": "Connected ✓"
+      "setupReady": "Connected ✓",
+      "setupConnected": "Connected ✓"
     },
     "dialog": {
       "bulkDeleteBody": "Are you sure you want to delete {count} check(s)? This action cannot be undone.",
