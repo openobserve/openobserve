@@ -635,6 +635,42 @@ export default defineComponent({
       confirmBatchDelete.value = true;
     };
 
+    // Remove the successfully deleted streams from the cache and the rendered
+    // table immediately, instead of re-fetching the list. The stream-list
+    // endpoint is served from an in-memory schema cache that is evicted
+    // asynchronously by a watch handler, so an immediate re-fetch after a 200
+    // can still return the just-deleted streams. Pruning locally mirrors the
+    // dashboards delete flow and guarantees the rows disappear right away.
+    const removeStreamsFromTable = (
+      items: { name: string; stream_type: string }[],
+    ) => {
+      if (!items.length) return;
+
+      const removedKeys = new Set(
+        items.map((s) => `${s.name}-${s.stream_type}`),
+      );
+
+      // Prune the rendered table first so the UI updates even if the cache
+      // eviction below runs into an inconsistent index mapping.
+      const before = logStream.value.length;
+      logStream.value = logStream.value.filter(
+        (s: any) => !removedKeys.has(s._rowKey),
+      );
+      duplicateStreamList.value = duplicateStreamList.value.filter(
+        (s: any) => !removedKeys.has(s._rowKey),
+      );
+
+      const removedCount = before - logStream.value.length;
+      totalCount.value = Math.max(0, totalCount.value - removedCount);
+      resultTotal.value = logStream.value.length;
+
+      selectedIds.value = [];
+
+      items.forEach((stream) => {
+        removeStream(stream.name, stream.stream_type);
+      });
+    };
+
     const deleteStream = () => {
       isDeleting.value = true;
       streamService
@@ -650,9 +686,9 @@ export default defineComponent({
               message: "Stream deleted successfully.",
               variant: "success",
             });
-            removeStream(deleteStreamName, deleteStreamType);
-            selectedIds.value = [];
-            getLogStream();
+            removeStreamsFromTable([
+              { name: deleteStreamName, stream_type: deleteStreamType },
+            ]);
           }
         })
         .catch((err: any) => {
@@ -707,13 +743,9 @@ export default defineComponent({
             });
           }
 
-          // Remove deleted streams from the list
-          items.forEach((stream: any) => {
-            removeStream(stream.name, stream.stream_type);
-          });
-
-          selectedIds.value = [];
-          getLogStream();
+          // Prune the deleted streams from the table immediately rather than
+          // re-fetching (the list is served from an async-evicted cache).
+          removeStreamsFromTable(items);
         })
         .catch((error) => {
           if (error.response.status != 403) {

@@ -488,12 +488,15 @@ const useStreams = () => {
   // Don't add delete log here, it will create issue
   // This method is to remove specific stream from cache
   const removeStream = (streamName: string, streamType: string) => {
-    if (
-      Object.prototype.hasOwnProperty.call(
-        store.state.streams.streamsIndexMapping[streamType],
-        streamName,
-      )
-    ) {
+    const indexMapping = store.state.streams.streamsIndexMapping[streamType];
+
+    // The paginated stream list does not always populate the index mapping /
+    // cache for a given stream type, so bail out safely when it is missing.
+    if (!indexMapping || !streamsCache[streamType]) {
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(indexMapping, streamName)) {
       const indexToRemove =
         store.state.streams.streamsIndexMapping[streamType][streamName];
 
