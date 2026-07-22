@@ -23,14 +23,12 @@ use crate::self_reporting::CoreAuditPublisher;
 use crate::{self_reporting::persistence::CoreBatchPublisher, service::db::metas};
 
 pub async fn init() -> Result<(), anyhow::Error> {
-    // keeps the first registration instead of failing
-    if usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher)).is_err() {
-        log::warn!("usage batch publisher is already initialized, keeping existing one");
-    }
+    usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher))
+        .map_err(|_| anyhow::anyhow!("usage batch publisher is already initialized"))?;
     #[cfg(feature = "enterprise")]
-    if audit::set_audit_publisher(Arc::new(CoreAuditPublisher)).is_err() {
-        log::warn!("audit publisher is already initialized, keeping existing one");
-    }
+    audit::set_audit_publisher(Arc::new(CoreAuditPublisher))
+        .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
+
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

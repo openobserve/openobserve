@@ -73,7 +73,7 @@ pub async fn get_max_query_range(
     .filter_map(|settings| {
         settings.map(|settings| match &user {
             Some(user) => get_max_query_range_by_user_role(settings.max_query_range, user),
-            None => get_default_max_query_range(settings.max_query_range),
+            None => settings.max_query_range,
         })
     })
     .max()
