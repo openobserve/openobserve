@@ -900,7 +900,7 @@
     "language": "Language",
     "actions": "Actions",
     "keyboardShortcuts": "Keyboard Shortcuts",
-    "synthetic": "Synthetic"
+    "synthetic": "Synthetics"
   },
   "rum": {
     "title": "Real User Monitoring",
@@ -9517,7 +9517,7 @@
       "willBeCreatedIn": "Will be created in"
     },
     "pageSubtitle": "Proactively monitor uptime, performance, and user journeys from global locations",
-    "pageTitle": "Synthetic Checks",
+    "pageTitle": "Synthetics",
     "protocolConfig": {
       "http": {
         "addAssertion": "Add assertion",

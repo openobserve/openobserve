@@ -174,7 +174,7 @@ const useEnterpriseRoutes = () => {
       path: "synthetic",
       name: "synthetic",
       component: () => import("@/views/SyntheticMonitoring.vue"),
-      meta: { title: "Synthetic Monitoring" },
+      meta: { title: "Synthetics" },
       beforeEnter(to: any, from: any, next: any) {
         syntheticsRouteGuard(to, from, next);
       },
