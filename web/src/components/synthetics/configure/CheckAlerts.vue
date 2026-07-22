@@ -33,6 +33,13 @@ const localDestinations = computed({
     emit('update:check', { ...props.check, notifications: { destinations: v } }),
 })
 
+// ─── failure threshold ────────────────────────────────────────────────────────
+
+const failureThreshold = computed({
+  get: () => props.check.alertIfFails ?? 1,
+  set: (v: string | number) => emit('update:check', { ...props.check, alertIfFails: Number(v) }),
+})
+
 function routeToCreateDestination() {
   const url = router.resolve({
     name: 'alertDestinations',
@@ -98,6 +105,19 @@ const silenceMinutes = computed({
             {{ t('synthetics.scheduleAlert.addNewDestination') }}
           </OButton>
         </div>
+      </div>
+
+      <!-- ── Alert threshold ──────────────────────────────────────────── -->
+      <div class="flex items-center gap-2 flex-nowrap">
+        <label class="text-sm font-medium text-text-body whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</label>
+        <OInput
+          v-model="failureThreshold"
+          type="number"
+          class="w-25!"
+          placeholder="1"
+          data-test="synthetics-check-alerts-threshold-input"
+        />
+        <span class="text-sm text-text-body whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>
       </div>
 
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->

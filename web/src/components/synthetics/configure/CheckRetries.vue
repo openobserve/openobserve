@@ -22,11 +22,6 @@ const retryDelayMs = computed({
   get: () => props.check.waitBeforeRetrySecs ?? 0,
   set: (v: string | number) => emit('update:check', { ...props.check, waitBeforeRetrySecs: Number(v) }),
 })
-
-const failureThreshold = computed({
-  get: () => props.check.alertIfFails ?? 1,
-  set: (v: string | number) => emit('update:check', { ...props.check, alertIfFails: Number(v) }),
-})
 </script>
 
 <template>
@@ -63,18 +58,6 @@ const failureThreshold = computed({
         />
         <span class="text-sm text-text-body whitespace-nowrap">{{ t('synthetics.scheduleAlert.retryDelaySuffix') }}</span>
       </div>
-      <div class="flex items-center gap-2 flex-nowrap">
-        <label class="text-sm font-medium text-text-body whitespace-nowrap w-32">{{ t('synthetics.scheduleAlert.alertedIfFails') }}</label>
-        <OInput
-          v-model="failureThreshold"
-          type="number"
-          class="w-25!"
-          placeholder="1"
-          data-test="synthetics-check-retries-threshold-input"
-        />
-        <span class="text-sm text-text-body whitespace-nowrap">{{ t('synthetics.scheduleAlert.alertedIfFailsSuffix') }}</span>
-      </div>
-
       <!-- Validation error -->
       <p
         v-if="props.validationErrors?.retries"
