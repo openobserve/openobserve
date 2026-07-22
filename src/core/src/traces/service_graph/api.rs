@@ -283,6 +283,7 @@ pub async fn query_edges_from_stream_internal(
         use_cache: false,
         clear_cache: false,
         local_mode: Some(false),
+        agent_options: None,
     };
 
     // Check if stream exists (using Logs type since we write as logs stream)
@@ -421,6 +422,7 @@ pub async fn get_edge_history(
         use_cache: false,
         clear_cache: false,
         local_mode: Some(false),
+        agent_options: None,
     };
 
     // Return empty if stream doesn't exist yet
