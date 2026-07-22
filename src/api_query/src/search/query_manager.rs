@@ -22,7 +22,7 @@ use axum::{
 };
 #[cfg(feature = "enterprise")]
 use {
-    crate::common::meta::http::HttpResponse as MetaHttpResponse,
+    common::meta::http::HttpResponse as MetaHttpResponse,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 

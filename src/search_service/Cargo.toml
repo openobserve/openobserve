@@ -26,6 +26,7 @@ vortex = ["config/vortex", "o2_enterprise?/vortex", "search/vortex"]
 audit = { workspace = true, optional = true }
 common.workspace = true
 transform.workspace = true
+vector-enrichment.workspace = true
 search.workspace = true
 async-recursion.workspace = true
 arrow.workspace = true

@@ -21,10 +21,8 @@ use infra::errors::Result;
 use serde::Deserialize;
 
 use crate::{
-    common::meta::ingestion::{
-        HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType,
-    },
-    service::ingestion::check_ingestion_allowed,
+    ingestion::check_ingestion_allowed,
+    ingestion_types::{HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType},
 };
 
 #[derive(Deserialize, Clone)]

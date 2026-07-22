@@ -16,9 +16,8 @@
 use std::sync::Arc;
 
 use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey, spawn_pausable_job};
+use openobserve_core::compact;
 use tokio::sync::{Mutex, mpsc};
-
-use crate::service::compact;
 
 pub async fn run() -> Result<(), anyhow::Error> {
     if !LOCAL_NODE.is_flatten_compactor() {

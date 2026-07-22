@@ -26,23 +26,17 @@ use config::{
     },
     utils::time::now_micros,
 };
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{alerts::alert::get_by_id, auth::UserEmail};
+use search_service as SearchService;
+use search_service::query_range::get_settings_max_query_range;
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use tracing::{Instrument, Span};
 use utoipa::ToSchema;
 
-use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail, http::get_or_create_trace_id, stream::get_settings_max_query_range,
-        },
-    },
-    extractors::Headers,
-    service::{
-        alerts::alert::get_by_id,
-        search::{self as SearchService},
-    },
+use crate::common::{
+    meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -439,13 +433,13 @@ pub async fn get_alert_history(
     #[cfg(feature = "enterprise")]
     let permitted_alert_ids = {
         let user_id = &user_email.user_id;
-        use crate::common::utils::auth::is_root_user;
+        use db::user::is_root_user;
         if is_root_user(user_id) {
             None
         }
         // If RBAC is enabled, check permissions
         else if o2_openfga::config::get_config().enabled {
-            let user = match crate::service::users::get_user(Some(&org_id), user_id).await {
+            let user = match openobserve_core::users::get_user(Some(&org_id), user_id).await {
                 Some(user) => user,
                 None => {
                     return MetaHttpResponse::forbidden("User not found");
@@ -819,7 +813,7 @@ pub async fn get_all_anomaly_history(
 
     #[cfg(feature = "enterprise")]
     let permitted_config_ids = {
-        use crate::common::utils::auth::is_root_user;
+        use db::user::is_root_user;
         let user_id = &user_email.user_id;
         if is_root_user(user_id) {
             None

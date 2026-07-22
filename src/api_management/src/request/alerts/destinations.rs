@@ -21,20 +21,16 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
-use openobserve_core::http::destination_error_response;
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_permissions;
+use openobserve_core::{alerts::destinations, auth::UserEmail, http::destination_error_response};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::{auth::UserEmail, ssrf_guard::SsrfGuard},
-    },
-    extractors::Headers,
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::ssrf_guard::SsrfGuard},
     models::destinations::{Destination, DestinationType},
     request::{BulkDeleteRequest, BulkDeleteResponse},
-    service::alerts::destinations,
 };
 
 #[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
@@ -173,7 +169,7 @@ async fn test_http_destination(test_req: &TestDestinationRequest) -> Response {
         client_builder = client_builder.danger_accept_invalid_certs(true);
     }
 
-    let client = match crate::common::utils::ssrf_guard::build_safe_client(client_builder) {
+    let client = match common::utils::ssrf_guard::build_safe_client(client_builder) {
         Ok(client) => client,
         Err(e) => {
             return MetaHttpResponse::json(TestDestinationResponse {
@@ -438,7 +434,7 @@ pub async fn list_destinations(
                 _permitted = list;
             }
             Err(e) => {
-                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -607,9 +603,8 @@ pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response 
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
+    use db::alerts::destinations::DestinationError;
     use openobserve_core::http::destination_error_response;
-
-    use crate::service::db::alerts::destinations::DestinationError;
 
     fn status(err: DestinationError) -> StatusCode {
         destination_error_response(err).status()

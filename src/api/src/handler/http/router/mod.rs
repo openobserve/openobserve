@@ -24,6 +24,11 @@ use axum::{
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
+use openobserve_api_management::request::{
+    alerts, authz, dashboards, folders, organization, users,
+};
+use openobserve_api_query::{promql, search, traces};
+use openobserve_core::auth::AuthExtractor;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,
@@ -32,7 +37,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::self_reporting::audit,
+    audit::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
@@ -44,10 +49,7 @@ use {
 
 use super::request::*;
 use crate::{
-    common::{
-        meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-        utils::auth::AuthExtractor,
-    },
+    common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
         auth::validator::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
@@ -62,7 +64,7 @@ pub mod middlewares;
 pub mod openapi;
 pub mod ui;
 
-pub use crate::common::meta::http::ERROR_HEADER;
+pub use common::meta::http::ERROR_HEADER;
 
 /// Custom header name for O2 Assistant session tracking (UUID v7)
 pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =
@@ -390,10 +392,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .to_string()
             .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || crate::common::meta::ingestion_routes::is_ingestion_write(
-                &http_method,
-                ingestion_path,
-            ))
+            || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = {
@@ -495,24 +494,22 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
     // SSRF protection: validate the target URL (incl. DNS resolution) before issuing
     // the proxied request. The reqwest client is built via `build_safe_client` so
     // redirect chains and connect-time DNS are re-validated too.
-    if let Err(e) = crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
-        &params.target_url,
-    )
-    .await
+    if let Err(e) =
+        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&params.target_url)
+            .await
     {
         return (StatusCode::BAD_REQUEST, format!("URL blocked: {e}")).into_response();
     }
-    let client =
-        match crate::common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
-            Ok(c) => c,
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to build HTTP client: {e}"),
-                )
-                    .into_response();
-            }
-        };
+    let client = match common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build HTTP client: {e}"),
+            )
+                .into_response();
+        }
+    };
     match client.get(&params.target_url).send().await {
         Ok(resp) => {
             let status = StatusCode::from_u16(resp.status().as_u16())

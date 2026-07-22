@@ -14,21 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{auth::UserEmail, ingestion_tokens};
 use serde_json::json;
 
-use crate::{
-    common::{
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            organization::{
-                CreateOrgIngestionTokenRequest, OrgIngestionTokenEnableRequest,
-                OrgIngestionTokenListResponse, OrgIngestionTokenResponse,
-            },
-        },
-        utils::auth::UserEmail,
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    organization::{
+        CreateOrgIngestionTokenRequest, OrgIngestionTokenEnableRequest,
+        OrgIngestionTokenListResponse, OrgIngestionTokenResponse,
     },
-    extractors::Headers,
-    service::ingestion_tokens,
 };
 
 /// List all org-level ingestion tokens.
@@ -64,8 +59,8 @@ pub async fn list_ingestion_tokens(
     #[cfg(not(feature = "enterprise"))]
     {
         let user_id = _user_email.user_id.as_str();
-        if !crate::common::utils::auth::is_root_user(user_id) {
-            match crate::service::users::get_user(Some(&org_id), user_id).await {
+        if !db::user::is_root_user(user_id) {
+            match openobserve_core::users::get_user(Some(&org_id), user_id).await {
                 Some(initiator)
                     if initiator.role == config::meta::user::UserRole::Admin
                         || initiator.role == config::meta::user::UserRole::Root => {}
@@ -121,8 +116,8 @@ pub async fn create_ingestion_token(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        if !crate::common::utils::auth::is_root_user(user_id) {
-            match crate::service::users::get_user(Some(&org_id), user_id).await {
+        if !db::user::is_root_user(user_id) {
+            match openobserve_core::users::get_user(Some(&org_id), user_id).await {
                 Some(initiator)
                     if initiator.role == config::meta::user::UserRole::Admin
                         || initiator.role == config::meta::user::UserRole::Root => {}
@@ -180,8 +175,8 @@ pub async fn enable_disable_ingestion_token(
 
     #[cfg(not(feature = "enterprise"))]
     {
-        if !crate::common::utils::auth::is_root_user(_user_id) {
-            match crate::service::users::get_user(Some(&org_id), _user_id).await {
+        if !db::user::is_root_user(_user_id) {
+            match openobserve_core::users::get_user(Some(&org_id), _user_id).await {
                 Some(initiator)
                     if initiator.role == config::meta::user::UserRole::Admin
                         || initiator.role == config::meta::user::UserRole::Root => {}
