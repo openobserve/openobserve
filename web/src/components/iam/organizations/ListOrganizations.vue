@@ -365,11 +365,7 @@ export default defineComponent({
         ? organizationsService.get_admin_org("_meta")
         : organizationsService.list(0, 1000000, "name", false, "");
       request.then((res) => {
-        // Keep the Vuex organization list in sync with the listing. The header
-        // org selector (MainLayout) reads store.state.organizations, so without
-        // this the dropdown stays stale after add/delete until a full page
-        // reload. list()/os_list() hit the same endpoint, so res.data.data is
-        // exactly the shape the selector expects.
+        // Sync Vuex so the header org selector updates without a page reload.
         store.dispatch("setOrganizations", res.data.data);
 
         const billingPlans = {

@@ -490,8 +490,7 @@ const useStreams = () => {
   const removeStream = (streamName: string, streamType: string) => {
     const indexMapping = store.state.streams.streamsIndexMapping[streamType];
 
-    // The paginated stream list does not always populate the index mapping /
-    // cache for a given stream type, so bail out safely when it is missing.
+    // Bail out safely when the mapping/cache for this type isn't populated.
     if (!indexMapping || !streamsCache[streamType]) {
       return;
     }

@@ -635,12 +635,7 @@ export default defineComponent({
       confirmBatchDelete.value = true;
     };
 
-    // Remove the successfully deleted streams from the cache and the rendered
-    // table immediately, instead of re-fetching the list. The stream-list
-    // endpoint is served from an in-memory schema cache that is evicted
-    // asynchronously by a watch handler, so an immediate re-fetch after a 200
-    // can still return the just-deleted streams. Pruning locally mirrors the
-    // dashboards delete flow and guarantees the rows disappear right away.
+    // Prune deleted streams locally; re-fetch is racy (list is async-cached).
     const removeStreamsFromTable = (
       items: { name: string; stream_type: string }[],
     ) => {
@@ -650,8 +645,7 @@ export default defineComponent({
         items.map((s) => `${s.name}-${s.stream_type}`),
       );
 
-      // Prune the rendered table first so the UI updates even if the cache
-      // eviction below runs into an inconsistent index mapping.
+      // Prune the table first so the UI updates even if cache eviction fails.
       const before = logStream.value.length;
       logStream.value = logStream.value.filter(
         (s: any) => !removedKeys.has(s._rowKey),
@@ -743,8 +737,6 @@ export default defineComponent({
             });
           }
 
-          // Prune the deleted streams from the table immediately rather than
-          // re-fetching (the list is served from an async-evicted cache).
           removeStreamsFromTable(items);
         })
         .catch((error) => {
