@@ -171,6 +171,11 @@ describe("TraceDetails - Missing span_kind Field", () => {
   };
 
   beforeEach(async () => {
+    // The active tab and tab order persist to localStorage, so a test that
+    // switches tabs would otherwise leak its selection into every later test.
+    localStorage.removeItem("o2_trace_active_tab");
+    localStorage.removeItem("o2_trace_tab_order");
+
     // Mock router query params
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: {
@@ -397,6 +402,13 @@ describe("TraceDetails - Missing span_kind Field", () => {
   });
 
   describe("Critical: UI rendering with missing span_kind", () => {
+    // The trace tree and header render inside the waterfall view; the component
+    // defaults to the flame graph, so opt in explicitly.
+    beforeEach(async () => {
+      wrapper.vm.activeTab = "waterfall";
+      await wrapper.vm.$nextTick();
+    });
+
     it("should render operation name correctly", () => {
       const operationName = wrapper.find(
         '[data-test="trace-details-operation-name"]',
