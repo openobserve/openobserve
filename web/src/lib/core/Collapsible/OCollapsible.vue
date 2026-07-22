@@ -110,30 +110,21 @@ watch(
         triggerClass,
       ]"
     >
-      <!-- Sidebar custom-trigger path keeps the original left-side chevron -->
-      <OIcon
-        v-if="variant === 'sidebar' && hasCustomTrigger"
-        name="chevron-right"
-        size="md"
-        class="text-collapsible-icon transition-transform duration-200"
-        :class="isOpen ? 'rotate-90' : 'rotate-0'"
-      />
-
-      <!-- Custom trigger slot -->
-      <template v-if="hasCustomTrigger">
-        <slot name="trigger" :open="isOpen" />
-      </template>
-
-      <!-- Default trigger ΓÇö label / icon / caption / chevron -->
-      <template v-else>
-        <!-- OIcon registry name (kebab-case SVG icon) -->
+      <!--
+        Sidebar variant: one consistent frame for every section header —
+        [section icon] [content] [right chevron] — so sections that supply a
+        custom #trigger (e.g. with an info tooltip) match the icon+chevron
+        layout of the plain-label ones instead of falling back to a bare
+        left-chevron row.
+      -->
+      <template v-if="variant === 'sidebar'">
+        <!-- Leading section icon -->
         <OIcon
           v-if="icon && isOIcon"
           :name="(icon as any)"
           size="md"
           class="text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
         />
-        <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else-if="icon"
           class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0 group-data-[state=open]:text-collapsible-icon-open"
@@ -141,12 +132,16 @@ watch(
           >{{ icon }}</span
         >
 
-        <span class="flex flex-col flex-1 min-w-0">
+        <!-- Content: custom trigger slot, or the default label/caption column -->
+        <span
+          v-if="hasCustomTrigger"
+          class="flex flex-1 items-center gap-2 min-w-0"
+        >
+          <slot name="trigger" :open="isOpen" />
+        </span>
+        <span v-else class="flex flex-col flex-1 min-w-0">
           <span
-            :class="[
-              'font-medium text-collapsible-label truncate',
-              variant === 'sidebar' ? 'text-compact' : 'text-sm',
-            ]"
+            class="font-medium text-collapsible-label truncate text-compact"
             >{{ label }}</span
           >
           <span
@@ -158,19 +153,51 @@ watch(
 
         <!-- Right chevron -->
         <OIcon
-          v-if="variant === 'default'"
-          name="expand-more"
-          size="md"
-          class="text-collapsible-icon transition-transform duration-200"
-          :class="isOpen ? 'rotate-180' : 'rotate-0'"
-        />
-        <OIcon
-          v-else
           name="chevron-right"
           size="md"
           class="shrink-0 text-collapsible-icon transition-transform duration-200 group-data-[state=open]:text-collapsible-icon-open"
           :class="isOpen ? 'rotate-90' : 'rotate-0'"
         />
+      </template>
+
+      <!-- Default variant -->
+      <template v-else>
+        <!-- Custom trigger slot replaces label/icon/chevron -->
+        <template v-if="hasCustomTrigger">
+          <slot name="trigger" :open="isOpen" />
+        </template>
+        <template v-else>
+          <OIcon
+            v-if="icon && isOIcon"
+            :name="(icon as any)"
+            size="md"
+            class="text-collapsible-icon shrink-0"
+          />
+          <span
+            v-else-if="icon"
+            class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0"
+            aria-hidden="true"
+            >{{ icon }}</span
+          >
+
+          <span class="flex flex-col flex-1 min-w-0">
+            <span class="font-medium text-collapsible-label truncate text-sm">{{
+              label
+            }}</span>
+            <span
+              v-if="caption"
+              class="text-xs text-collapsible-caption truncate"
+              >{{ caption }}</span
+            >
+          </span>
+
+          <OIcon
+            name="expand-more"
+            size="md"
+            class="text-collapsible-icon transition-transform duration-200"
+            :class="isOpen ? 'rotate-180' : 'rotate-0'"
+          />
+        </template>
       </template>
     </CollapsibleTrigger>
 

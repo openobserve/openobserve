@@ -1209,7 +1209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label">{{
           t("dashboard.configSectionValueTransformations")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1238,7 +1238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label">{{
           t("dashboard.configSectionFieldOverrides")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1680,7 +1680,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label">{{
           t("dashboard.drilldown")
         }}</span>
         <OIcon
@@ -1719,7 +1719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label">{{
           t("dashboard.comparisonAgainst")
         }}</span>
         <OIcon
@@ -1786,7 +1786,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label">{{
           t("dashboard.markLines")
         }}</span>
         <OIcon
