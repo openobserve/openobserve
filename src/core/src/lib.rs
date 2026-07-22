@@ -34,7 +34,7 @@ pub mod enrichment_table;
 pub mod file_downloader;
 pub mod file_list;
 pub mod file_list_dump;
-pub mod folders;
+pub use ::db::folders;
 pub mod functions;
 mod functions_cache;
 pub mod github;

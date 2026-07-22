@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::authz::Authz;
 use config::{
     ider,
     meta::{
@@ -28,10 +29,9 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use o2_openfga::meta::mapping::OFGA_MODELS;
 
-use crate::common::{
-    meta::authz::Authz,
-    utils::auth::{remove_ownership, set_ownership},
-};
+#[cfg(feature = "enterprise")]
+use crate::authz::list_objects_for_user;
+use crate::authz::{remove_ownership, set_ownership};
 
 /// Errors that can occur when interacting with folders.
 #[derive(Debug, thiserror::Error)]
@@ -339,16 +339,15 @@ async fn permitted_folders(
     };
 
     // Get the list of folders that the user has `GET` permission on.
-    let mut folder_list =
-        crate::service::authz::list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
-            .await
-            .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
+    let mut folder_list = list_objects_for_user(org_id, user_id, "GET", folder_ofga_model)
+        .await
+        .map_err(|err| FolderError::PermittedFoldersValidator(err.to_string()))?;
 
     // In some cases, there might not be direct `GET` permission on the folder.
     // So, we need to check if the user has `GET` permission on any of the dashboards
     // inside the folder.
 
-    let permitted_dashboards = crate::service::authz::list_objects_for_user(
+    let permitted_dashboards = list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",

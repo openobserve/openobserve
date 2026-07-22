@@ -18,13 +18,13 @@ use std::str::FromStr;
 use chrono::FixedOffset;
 use config::meta::{
     dashboards::reports::{ListReportsParams, Report, ReportFrequencyType},
-    folder::Folder,
+    folder::{DEFAULT_FOLDER, Folder, FolderType},
 };
 use cron::Schedule;
 use infra::table;
 use sea_orm::{ConnectionTrait, TransactionTrait};
 
-use crate as db;
+use crate::{self as db, folders};
 
 pub async fn get<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
@@ -138,14 +138,17 @@ pub async fn update<C: ConnectionTrait + TransactionTrait>(
     Ok(())
 }
 
-/// Creates the report record. The caller is responsible for ensuring the
-/// target folder exists (see `service::dashboards::reports` for default-folder
-/// provisioning).
 pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     folder_snowflake_id: &str,
     report: Report,
 ) -> Result<String, anyhow::Error> {
+    // Check if the folder_id is default and if it already exists.
+    if folder_snowflake_id == DEFAULT_FOLDER
+        && !table::folders::exists(&report.org_id, DEFAULT_FOLDER, FolderType::Reports).await?
+    {
+        create_default_reports_folder(&report.org_id).await?;
+    }
     let (report_id, _) =
         table::reports::create_report(conn, folder_snowflake_id, report.clone(), None).await?;
     #[cfg(feature = "enterprise")]
@@ -157,6 +160,15 @@ pub async fn create_without_updating_trigger<C: ConnectionTrait + TransactionTra
     )
     .await?;
     Ok(report_id)
+}
+
+async fn create_default_reports_folder(org_id: &str) -> Result<Folder, anyhow::Error> {
+    let default_folder = Folder {
+        folder_id: DEFAULT_FOLDER.to_owned(),
+        name: "default".to_owned(),
+        description: "default".to_owned(),
+    };
+    Ok(folders::save_folder(org_id, default_folder, FolderType::Reports, true).await?)
 }
 
 pub async fn update_without_updating_trigger<C: ConnectionTrait + TransactionTrait>(

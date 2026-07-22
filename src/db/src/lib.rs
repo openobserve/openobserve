@@ -22,12 +22,14 @@ use {
 };
 
 pub mod alerts;
+pub mod authz;
 pub mod backfill;
 pub mod compact;
 pub mod dashboards;
 pub mod distinct_values;
 pub mod enrichment_table;
 pub mod file_list;
+pub mod folders;
 pub mod functions;
 #[cfg(feature = "enterprise")]
 pub mod keys;

@@ -163,26 +163,7 @@ pub async fn list_objects_for_user(
     permission: &str,
     object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
-    let openfga_config = o2_openfga::config::get_config();
-    if is_root_user(user_id) || !openfga_config.enabled || !openfga_config.list_only_permitted {
-        return Ok(None);
-    }
-
-    let role = crate::service::users::get_user(Some(org_id), user_id)
-        .await
-        .map(|user| user.role.to_string())
-        .unwrap_or_default();
-    let objects = o2_openfga::authorizer::authz::list_objects(
-        user_id,
-        permission,
-        object_type,
-        org_id,
-        &role,
-    )
-    .await
-    .map_err(|_| anyhow::anyhow!("Unauthorized Access"))?;
-    log::debug!("list_objects_for_user for user {user_id} from {org_id} org returns: {objects:#?}");
-    Ok(Some(objects))
+    db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -192,5 +173,5 @@ pub async fn list_objects_for_user(
     _permission: &str,
     _object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
-    Ok(None)
+    db::authz::list_objects_for_user(_org_id, _user_id, _permission, _object_type).await
 }

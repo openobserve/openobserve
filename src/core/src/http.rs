@@ -31,7 +31,6 @@ use crate::{
         alerts::alert::AlertError,
         dashboards::{DashboardError, reports::ReportError},
         db::alerts::{destinations::DestinationError, templates::TemplateError},
-        folders::FolderError,
         pipeline::PipelineError,
     },
 };
@@ -243,36 +242,6 @@ impl From<ReportError> for Response {
             ReportError::DbError(e) => MetaHttpResponse::internal_error(e),
             ReportError::SendReportError(e) => MetaHttpResponse::internal_error(e),
             ReportError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
-        }
-    }
-}
-
-impl From<FolderError> for Response {
-    fn from(value: FolderError) -> Self {
-        match value {
-            FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
-            FolderError::MissingName => {
-                MetaHttpResponse::bad_request("Folder name cannot be empty")
-            }
-            FolderError::UpdateDefaultFolder => {
-                MetaHttpResponse::bad_request("Can't update default folder")
-            }
-            FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
-                "Folder contains dashboards, please move/delete dashboards from folder",
-            ),
-            FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
-                "Folder contains alerts, please move/delete alerts from folder",
-            ),
-            FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
-                "Folder contains reports, please move/delete reports from folder",
-            ),
-            FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
-            FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
-            FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
-            FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
-                "Folder with this name already exists in this organization",
-            ),
         }
     }
 }
