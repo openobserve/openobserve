@@ -209,13 +209,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
-                <!-- One-click favorite toggle — filled rose heart when
+                <!-- One-click favorite toggle — filled gold star when
                      favorited, neutral outline otherwise. -->
                 <OButton
                   variant="ghost"
                   size="icon-xs-sq"
                   :icon-left="
-                    isFavorite(row.id) ? 'favorite' : 'favorite-border'
+                    isFavorite(row.id) ? 'star' : 'star-outline'
                   "
                   :class="
                     isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'

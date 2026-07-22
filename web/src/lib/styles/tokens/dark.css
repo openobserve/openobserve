@@ -537,9 +537,9 @@
   --color-status-error-bg: #402929;
   --color-status-success-text: #A0DBA5;
   --color-status-success-bg: #253627;
-  /* Favorite (filled heart) — lighter rose (rose-400) so it reads clearly on
-     dark surfaces without vibrating the way a saturated rose-500 would. */
-  --color-favorite: #FB7185;
+  /* Favorite (filled star) — lighter yellow (yellow-400) so it reads clearly on
+     dark surfaces without vibrating the way a saturated yellow-500 would. */
+  --color-favorite: #FACC15;
 }
 
 /* ── Domain data-viz: label chips, dark mode ── */

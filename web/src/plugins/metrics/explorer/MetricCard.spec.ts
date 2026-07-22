@@ -581,9 +581,11 @@ describe("MetricCard (ported to @/lib)", () => {
   });
 
   /**
-   * Right-click a data point -> Create Alert, the same gesture a dashboard panel
-   * offers. The card hands the alert page the same `panelData` contract
-   * usePanelActions builds, so a PromQL alert opens pre-filled.
+   * Create Alert (right-click → Create Alert) now lives in the panel component
+   * itself: the card renders through PanelSchemaRenderer (inside MetricCardChart)
+   * and opts in via `allow-alert-creation`, exactly as a dashboard panel does.
+   * The card's only responsibility is to enable it — the menu, the panelData
+   * contract and the navigation are the panel's (covered by its own tests).
    */
   describe("create alert from a right-click on the chart", () => {
     const QUERIES = [
@@ -591,63 +593,20 @@ describe("MetricCard (ported to @/lib)", () => {
     ];
     const TIME_RANGE = { start_time: 1_000, end_time: 2_000 };
 
-    beforeEach(() => routerPush.mockClear());
+    it("opts the chart into the panel's Create Alert menu", () => {
+      wrapper = createWrapper({
+        queries: QUERIES,
+        timeRange: TIME_RANGE,
+        preview: preview({
+          results: [{ result: [{ values: [[1, "1"]] }] }],
+        }),
+      });
 
-    const openMenu = (w: VueWrapper<any>, value = 42) => {
-      (w.vm as any).onChartContextMenu({ x: 10, y: 20, value });
-      return (w.vm as any).alertMenu;
-    };
-
-    it("opens the menu at the click, seeded with the clicked point's value", () => {
-      wrapper = createWrapper({ queries: QUERIES, timeRange: TIME_RANGE });
-
-      const menu = openMenu(wrapper, 42);
-      // The clicked value seeds the threshold — the alert opens on the number
-      // the user actually pointed at.
-      expect(menu).toMatchObject({ visible: true, x: 10, y: 20, value: 42 });
-    });
-
-    it("ignores a right-click that carries no numeric value", () => {
-      wrapper = createWrapper({ queries: QUERIES, timeRange: TIME_RANGE });
-
-      (wrapper.vm as any).onChartContextMenu({ x: 1, y: 2, value: NaN });
-
-      // Off-series right-clicks have no threshold to offer; a menu there would
-      // send NaN to the alert page.
-      expect((wrapper.vm as any).alertMenu.visible).toBe(false);
-    });
-
-    it("navigates to addAlert with the card's PromQL as the panelData contract", () => {
-      wrapper = createWrapper({ queries: QUERIES, timeRange: TIME_RANGE });
-      openMenu(wrapper, 42);
-
-      (wrapper.vm as any).onCreateAlert({ condition: ">=", threshold: 42 });
-
-      expect(routerPush).toHaveBeenCalledTimes(1);
-      const arg = routerPush.mock.calls[0][0];
-      expect(arg.name).toBe("addAlert");
-      expect(arg.query.fromPanel).toBe("true");
-
-      const panelData = JSON.parse(decodeURIComponent(arg.query.panelData));
-      // The same contract usePanelActions.handleCreateAlert builds — it is what
-      // the alert page reads.
-      expect(panelData.queryType).toBe("promql");
-      expect(panelData.queries[0].query).toBe(QUERIES[0].expr);
-      expect(panelData.executedQuery).toBe(QUERIES[0].expr);
-      expect(panelData.threshold).toBe(42);
-      expect(panelData.condition).toBe(">=");
-      expect(panelData.timeRange).toEqual(TIME_RANGE);
-      expect(panelData.panelTitle).toBe(CARD.name);
-      // Closing the menu is part of navigating.
-      expect((wrapper.vm as any).alertMenu.visible).toBe(false);
-    });
-
-    it("does not navigate when the card has no query to alert on", () => {
-      wrapper = createWrapper({ queries: [], timeRange: TIME_RANGE });
-
-      (wrapper.vm as any).onCreateAlert({ condition: ">=", threshold: 1 });
-
-      expect(routerPush).not.toHaveBeenCalled();
+      expect(
+        wrapper
+          .findComponent({ name: "MetricCardChart" })
+          .props("allowAlertCreation"),
+      ).toBe(true);
     });
   });
 });

@@ -28,7 +28,6 @@ const slots = defineSlots<ToggleGroupItemSlots>();
 
 const context = inject<ComputedRef<ToggleGroupContext>>(
   TOGGLE_GROUP_CONTEXT_KEY,
-  undefined,
 );
 
 /**
