@@ -174,6 +174,7 @@ import {
 import { useStore } from "vuex";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
+import useIncidents from "@/composables/useIncidents";
 
 import { setLanguage } from "../utils/cookies";
 import { getLocale } from "../locales";
@@ -375,9 +376,7 @@ export default defineComponent({
       );
     });
 
-    const isIncidentsEnabled = computed(() => {
-      return false;
-    });
+    const { isIncidentsEnabled } = useIncidents();
 
     const orgOptions = ref([{ label: Number, value: String }]);
     let slackURL = "https://short.openobserve.ai/community";

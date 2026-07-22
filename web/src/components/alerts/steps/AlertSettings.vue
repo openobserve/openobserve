@@ -389,8 +389,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       </template>
 
-      <!-- Creates Incident toggle — shown for all alert types -->
-      <div class="flex items-start alert-settings-row">
+      <!-- Creates Incident toggle — shown for all alert types when incidents are enabled -->
+      <div v-if="isIncidentsEnabled" class="flex items-start alert-settings-row">
         <div
           class="tw:font-semibold flex items-center"
           style="width: 190px; height: 28px"
@@ -426,6 +426,7 @@ import { defineComponent, ref, computed, watch, nextTick, type PropType } from "
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import useIncidents from "@/composables/useIncidents";
 import {
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
@@ -472,6 +473,8 @@ export default defineComponent({
     const { t } = useI18n();
     const store = useStore();
     const router = useRouter();
+
+    const { isIncidentsEnabled } = useIncidents();
 
     // Form ref
     const alertSettingsForm = ref(null);
@@ -915,6 +918,7 @@ export default defineComponent({
     return {
       t,
       store,
+      isIncidentsEnabled,
       queryType,
       localIsAggregationEnabled,
       localDestinations,
