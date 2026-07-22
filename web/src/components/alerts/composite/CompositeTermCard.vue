@@ -189,6 +189,7 @@ import { useI18n } from "vue-i18n";
 import useStreams from "@/composables/useStreams";
 import QueryConfig from "@/components/alerts/steps/QueryConfig.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -312,8 +313,8 @@ export default defineComponent({
     };
 
     // Only [A-Za-z0-9_] in the alias (it's the expression identifier).
-    const onAliasInput = (val: string) => {
-      props.term.name = (val || "").replace(/[^A-Za-z0-9_]/g, "");
+    const onAliasInput = (val: string | number) => {
+      props.term.name = String(val ?? "").replace(/[^A-Za-z0-9_]/g, "");
     };
 
     const onModeChange = (mode: string) => {
@@ -325,9 +326,10 @@ export default defineComponent({
       }
     };
 
-    const onMemberSelect = (val: string) => {
-      props.term.alert_id = val;
-      const opt = props.memberOptions.find((o) => o.value === val);
+    const onMemberSelect = (val: SelectModelValue) => {
+      const id = Array.isArray(val) ? "" : String(val ?? "");
+      props.term.alert_id = id;
+      const opt = props.memberOptions.find((o) => o.value === id);
       props.term.member_name = opt?.label || "";
       if (!props.term.name || /^[A-Za-z]$/.test(props.term.name)) {
         props.term.name = slugifyAlias(opt?.label || props.term.name);
@@ -365,16 +367,18 @@ export default defineComponent({
       }
     };
 
-    const onStreamTypeChange = (val: string) => {
-      props.term.draft.stream_type = val;
+    const onStreamTypeChange = (val: SelectModelValue) => {
+      const st = Array.isArray(val) ? "" : String(val ?? "");
+      props.term.draft.stream_type = st;
       props.term.draft.stream_name = "";
       columns.value = [];
-      loadStreamNames(val);
+      loadStreamNames(st);
     };
 
-    const onStreamNameChange = (val: string) => {
-      props.term.draft.stream_name = val;
-      loadStreamFields(val);
+    const onStreamNameChange = (val: SelectModelValue) => {
+      const sn = Array.isArray(val) ? "" : String(val ?? "");
+      props.term.draft.stream_name = sn;
+      loadStreamFields(sn);
     };
 
     onMounted(() => {

@@ -223,6 +223,7 @@ import CompositeTermCard from "@/components/alerts/composite/CompositeTermCard.v
 import { validateCompositeExpression } from "@/utils/alerts/compositeExpression";
 import alertsService from "@/services/alerts";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -447,19 +448,20 @@ export default defineComponent({
       });
     };
 
-    const removeTerm = (idx: number) => {
+    const removeTerm = (idx: number | string) => {
       if (props.composite.terms.length <= 2) return;
-      const [removed] = props.composite.terms.splice(idx, 1);
+      const [removed] = props.composite.terms.splice(Number(idx), 1);
       if (removed && props.composite.notify.on_term[removed.name]) {
         delete props.composite.notify.on_term[removed.name];
       }
     };
 
-    const setOnTerm = (name: string, val: string[]) => {
-      if (!val || val.length === 0) {
+    const setOnTerm = (name: string, val: SelectModelValue) => {
+      const arr = Array.isArray(val) ? (val as string[]) : [];
+      if (arr.length === 0) {
         delete props.composite.notify.on_term[name];
       } else {
-        props.composite.notify.on_term[name] = val;
+        props.composite.notify.on_term[name] = arr;
       }
     };
 
