@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mirrors the Databases leaf specs: content asserted on the pure builder, the
+// Mirrors LinuxConfig.spec.ts: content asserted on the pure builder, the
 // component test only proves the slug resolves through the shared renderer.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
@@ -21,8 +21,8 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import { ref } from "vue";
-import LinuxConfig from "./LinuxConfig.vue";
-import linuxCard from "@/components/ingestion/setupCard/content/linux";
+import MacOSConfig from "./MacOSConfig.vue";
+import macosCard from "@/components/ingestion/setupCard/content/macos";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
 const mockEndpoint = ref({
@@ -61,10 +61,10 @@ const SUBS = {
   token: "dGVzdEB0b2tlbg==",
 };
 
-describe("linuxCard builder", () => {
-  it("builds the Linux card metadata and step flow", () => {
-    const card = linuxCard(SUBS);
-    expect(card.provider.name).toBe("Linux");
+describe("macosCard builder", () => {
+  it("builds the macOS card metadata and step flow", () => {
+    const card = macosCard(SUBS);
+    expect(card.provider.name).toBe("macOS");
     expect(card.provider.metaBadges).toEqual(["Logs", "Metrics"]);
     expect(card.steps.map((s) => s.id)).toEqual(["install", "verify"]);
     // Host metrics fan out per metric, so detection is existence-based.
@@ -74,58 +74,58 @@ describe("linuxCard builder", () => {
     });
   });
 
-  it("offers generic and EC2 environments as one toggle", () => {
-    // Replaces two hand-built clickable <div> cards plus a conditional callout.
-    const install = linuxCard(SUBS).steps[0];
+  it("is a single command with no environment toggle", () => {
+    // Unlike Linux/Windows there is no mac/ec2 install script to switch to.
+    const install = macosCard(SUBS).steps[0];
     expect(install.required).toBe(true);
-    expect(install.variants?.map((v) => v.id)).toEqual(["generic", "ec2"]);
-    expect(install.variants!.every((v) => !!v.icon)).toBe(true);
+    expect(install.variants).toBeUndefined();
+    expect(install.code?.raw).toContain("/mac/install.sh");
   });
 
-  it("points each variant at its matching install script", () => {
-    const [generic, ec2] = linuxCard(SUBS).steps[0].variants!;
-    expect(generic.code.raw).toContain("/linux/install.sh");
-    expect(generic.code.raw).not.toContain("/ec2/");
-    expect(ec2.code.raw).toContain("/linux/ec2/install.sh");
-  });
-
-  it("carries the IAM prerequisite only on the EC2 variant", () => {
-    // Previously an amber callout rendered above the command for everyone.
-    const [generic, ec2] = linuxCard(SUBS).steps[0].variants!;
-    expect(ec2.note).toContain("ec2:DescribeTags");
-    expect(generic.note).not.toContain("ec2:DescribeTags");
-  });
-
-  it("offers the uninstall command", () => {
-    const uninstall = linuxCard(SUBS).extras?.uninstall;
-    expect(uninstall?.code.raw).toContain("/linux/uninstall.sh");
-    expect(uninstall?.code.lang).toBe("bash");
-    // One uninstall script serves both the generic and EC2 installs.
-    expect(uninstall?.code.raw).not.toContain("/ec2/");
+  it("uses curl, which macOS ships, rather than wget", () => {
+    const install = macosCard(SUBS).steps[0];
+    expect(install.code?.raw).toContain("curl -O");
+    expect(install.code?.raw).not.toContain("wget");
   });
 
   it("substitutes url/org and masks the ingestion token", () => {
-    const generic = linuxCard(SUBS).steps[0].variants![0];
-    expect(generic.code.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
-    expect(generic.code.raw).toContain(SUBS.token);
-    // The old page rendered a literal [BASIC_PASSCODE] placeholder instead.
-    expect(generic.code.raw).not.toContain("[BASIC_PASSCODE]");
-    expect(generic.code.masked).not.toContain(SUBS.token);
+    const install = macosCard(SUBS).steps[0];
+    expect(install.code?.raw).toContain(`${SUBS.url}/api/${SUBS.org}/`);
+    expect(install.code?.raw).toContain(SUBS.token);
+    expect(install.code?.raw).not.toContain("[BASIC_PASSCODE]");
+    expect(install.code?.masked).not.toContain(SUBS.token);
+  });
+
+  it("offers the uninstall command", () => {
+    const uninstall = macosCard(SUBS).extras?.uninstall;
+    expect(uninstall?.code.raw).toContain("/mac/uninstall.sh");
+    expect(uninstall?.code.lang).toBe("bash");
+    // Takes no arguments, so there is no token to mask.
+    expect(uninstall?.code.masked).toBeUndefined();
+    expect(uninstall?.description).toContain("launchd");
+  });
+
+  it("covers the unified log bridge and drops the EC2-only row", () => {
+    const rows = macosCard(SUBS).extras?.troubleshooting ?? [];
+    const questions = rows.map((r) => r.q).join(" | ");
+    expect(questions).toContain("no unified log entries");
+    // There is no EC2 variant for macOS, so that symptom would be noise.
+    expect(questions).not.toContain("instance id");
   });
 });
 
-describe("LinuxConfig.vue", () => {
+describe("MacOSConfig.vue", () => {
   let wrapper: VueWrapper<any>;
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
   });
 
-  it("renders the shared setup card for the linux slug", () => {
-    expect(getDataSourceCard("linux", SUBS)?.provider.name).toBe("Linux");
-    wrapper = mount(LinuxConfig, { global: { plugins: [mockStore, mockI18n] } });
+  it("renders the shared setup card for the macos slug", () => {
+    expect(getDataSourceCard("macos", SUBS)?.provider.name).toBe("macOS");
+    wrapper = mount(MacOSConfig, { global: { plugins: [mockStore, mockI18n] } });
     const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
     expect(stub.exists()).toBe(true);
-    expect((stub.props("content") as any).provider.name).toBe("Linux");
+    expect((stub.props("content") as any).provider.name).toBe("macOS");
   });
 });

@@ -77,6 +77,7 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     ingestFromKubernetes: "ingestFromKubernetes",
     ingestFromWindows: "ingestFromWindows",
     ingestFromLinux: "ingestFromLinux",
+    ingestFromMacOS: "ingestFromMacOS",
     AWSConfig: "AWSConfig",
     GCPConfig: "GCPConfig",
     AzureConfig: "AzureConfig",
