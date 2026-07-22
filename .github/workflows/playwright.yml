@@ -293,6 +293,7 @@ jobs:
                 "dashboard2.spec.js",
                 "dashboardtype.spec.js",
                 "dashboard-folder.spec.js",
+                "dashboard-favorites.spec.js",
                 "dashboard-import.spec.js",
                 "maxquery.spec.js",
                 "dashboard-chartJson.spec.js",
