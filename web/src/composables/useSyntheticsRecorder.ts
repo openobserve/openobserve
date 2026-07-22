@@ -51,7 +51,7 @@ const useSyntheticsRecorder = () => {
   // ---- Bridge transport ----
 
   const BRIDGE_CHANNEL = 'oo-bridge';
-  const COMMAND_TIMEOUT_MS = 20000;
+  const COMMAND_TIMEOUT_MS = 4000;
 
   let nonceCounter = 0;
   function nextNonce(): string {
@@ -150,7 +150,9 @@ const useSyntheticsRecorder = () => {
     // Give the content script time to open the port before sending the
     // first command. 150ms is generous for a local postMessage round-trip
     // and chrome.runtime.connect call.
-    await new Promise(r => setTimeout(r, 200));
+    // 500ms settle — if the SW just restarted (incognito toggle), it needs
+    // time to initialise. chrome.runtime.connect queues messages internally.
+    await new Promise(r => setTimeout(r, 500));
 
     const status = await sendCommand<RecorderStatus>({ action: 'getStatus' })
     isInstalled.value = status !== null
@@ -233,7 +235,7 @@ const useSyntheticsRecorder = () => {
     // ran (SW suspend, tab backgrounding, etc.). Sending the probe re-activates
     // the bridge before we send the startRecording command.
     window.postMessage({ ch: 'oo-bridge-probe' }, '*');
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 2000));
 
     bridgeConnect()
     bridgeDisconnectHandler = () => {
@@ -332,7 +334,7 @@ const useSyntheticsRecorder = () => {
     // died between stopRecording and replay (bfcache, SW suspend, etc.).
     // The probe re-activates the bridge before we send the replay command.
     window.postMessage({ ch: 'oo-bridge-probe' }, '*');
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 500));
 
     bridgeDisconnect() // discard any previous session
     bridgeConnect()
