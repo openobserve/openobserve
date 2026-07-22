@@ -213,7 +213,7 @@ describe("MonitorResults", () => {
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
+        name: "synthetics-new",
         query: { edit: "mon-1" },
       });
     });
@@ -308,7 +308,7 @@ describe("MonitorResults", () => {
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
+        name: "synthetics-new",
         query: { edit: "mon-1" },
       });
     });
