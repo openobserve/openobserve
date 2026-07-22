@@ -68,11 +68,7 @@
                 required
                 :disabled="mode === 'edit'"
                 data-test="job-form-name-input"
-              >
-                <template v-if="mode === 'edit'" #icon-left>
-                  <OIcon name="lock" size="xs" class="text-text-secondary" />
-                </template>
-              </OFormInput>
+              />
             </div>
 
             <div class="[&_textarea]:max-h-[7.5rem]">
@@ -129,11 +125,7 @@
                 required
                 :disabled="mode === 'edit'"
                 data-test="job-form-stream-select"
-              >
-                <template v-if="mode === 'edit'" #icon-left>
-                  <OIcon name="lock" size="xs" class="text-text-secondary" />
-                </template>
-              </OFormSelect>
+              />
             </div>
           </div>
         </section>
@@ -383,7 +375,6 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";

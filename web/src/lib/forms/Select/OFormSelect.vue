@@ -21,14 +21,16 @@ const props = withDefaults(defineProps<FormSelectProps>(), {
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormSelect] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormSelect] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
-  <component v-if="form" :is="form.Field" :name="props.name">
+  <component
+    v-if="form"
+    :is="form.Field"
+    :name="props.name"
+  >
     <template #default="{ field }">
       <!--
         Forward the whole typed props object rather than a hand-written prop
@@ -60,9 +62,6 @@ if (import.meta.env.DEV && !form) {
         </template>
         <template v-if="$slots.tooltip" #tooltip>
           <slot name="tooltip" />
-        </template>
-        <template v-if="$slots['icon-left']" #icon-left>
-          <slot name="icon-left" />
         </template>
       </OSelect>
     </template>

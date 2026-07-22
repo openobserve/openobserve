@@ -59,11 +59,7 @@
               required
               :disabled="mode === 'edit'"
               data-test="scorer-form-name-input"
-            >
-              <template v-if="mode === 'edit'" #icon-left>
-                <OIcon name="lock" size="xs" class="text-text-secondary" />
-              </template>
-            </OFormInput>
+            />
           </div>
 
           <div>
@@ -87,11 +83,7 @@
               :disabled="mode === 'edit'"
               data-test="scorer-form-score-config-select"
               @update:modelValue="handleScoreConfigSelection"
-            >
-              <template v-if="mode === 'edit'" #icon-left>
-                <OIcon name="lock" size="xs" class="text-text-secondary" />
-              </template>
-            </OFormSelect>
+            />
 
             <div v-if="selectedScoreConfig" class="flex items-center flex-wrap gap-x-2.5 gap-y-1.5 px-3 py-2 mt-2 border border-[color-mix(in_srgb,var(--color-status-info-text)_25%,transparent)] rounded-default bg-[color-mix(in_srgb,var(--color-status-info-text)_8%,transparent)] text-xs text-text-body">
               <span class="w-2 h-2 rounded-full bg-status-info-text shrink-0" />
@@ -657,7 +649,6 @@
 import { computed, onMounted, ref, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
