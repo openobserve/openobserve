@@ -52,21 +52,6 @@ const ConfirmDialogStub = {
   template: '<div class="confirm-dialog-stub" />',
 }
 
-// Minimal stubs for components used in the expansion slot and toolbar.
-const OSelectStub = {
-  props: ['modelValue', 'options', 'label', 'error', 'errorMessage'],
-  emits: ['update:modelValue'],
-  template: '<select v-bind="$attrs" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option></select>',
-}
-const OTooltipStub = {
-  props: ['content'],
-  template: '<span class="tooltip-stub" />',
-}
-const OCheckboxStub = {
-  props: ['modelValue', 'size', 'class'],
-  emits: ['update:modelValue'],
-  template: '<input type="checkbox" v-bind="$attrs" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" />',
-}
 
 const STUBS = {
   OButton: OButtonStub,
@@ -78,9 +63,6 @@ const STUBS = {
   OTooltip: OTooltipStub,
   JourneySteps: JourneyStepsStub,
   ConfirmDialog: ConfirmDialogStub,
-  OSelect: OSelectStub,
-  OTooltip: OTooltipStub,
-  OCheckbox: OCheckboxStub,
 }
 
 // ── Bridge transport helpers ──────────────────────────────────────────────
