@@ -9364,13 +9364,12 @@
       "stepJourney": "Journey",
       "untitledCheck": "Untitled check",
       "variablesHint": "Supports {variables} like {baseUrl}.",
-      "setupStep2Title": "Activate the recorder",
+      "setupStep2Title": "Click the OpenObserve Recorder icon in your toolbar",
       "setupIncognitoHint": "Open chrome://extensions, click {details}, then enable {setting}.",
-      "setupStep2Description": "Click the extension icon 🔲 in your toolbar to connect the recorder to this page.",
+      "setupStep2Description": "Chrome can't automatically connect to pages that were open before you installed the extension. Clicking the extension icon injects the recorder into this tab — a one-time step.",
       "setupIconActivateHint": "Click {icon} in your toolbar to activate the recorder for this page.",
       "setupStep3Title": "Enable incognito mode",
       "setupStep3IncognitoHint": "Open chrome://extensions, click {details}, then enable {setting}.",
-      "setupStep1Done": "Done",
       "setupReady": "Connected ✓"
     },
     "dialog": {

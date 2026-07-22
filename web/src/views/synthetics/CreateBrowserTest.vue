@@ -584,30 +584,18 @@ function onClearResults() {
         <div class="rounded-default border border-border-default divide-y divide-border-default mb-6">
           <!-- Step 1: Install the OpenObserve Recorder -->
           <div class="flex items-start gap-4 p-4">
-            <span
-            class="flex-shrink-0 w-7 h-7 rounded-full bg-primary-500 text-text-inverse flex items-center justify-center text-sm font-semibold"
-            :class="extensionInstalled ? 'bg-[var(--color-status-success-text)]!': ''"
-            >
-              1
-            </span>
-            <div class="flex-1 min-w-0 flex justify-between">
-              <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-text-heading m-0 pb-1">{{ t('synthetics.createBrowserTest.setupStep1Title') }}</h4>
-                <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupStep1Description') }}</p>
-              </div>
-              <OSwitch
-                v-model="extensionInstalled"
-                :label="t('synthetics.createBrowserTest.setupStep1Done')"
-                data-test="synthetics-setup-installed-switch"
-              />
+            <span class="flex-shrink-0 w-7 h-7 rounded-full bg-primary-500 text-text-inverse flex items-center justify-center text-sm font-semibold">1</span>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep1Title') }}</h4>
+              <p class="text-xs text-text-secondary m-0">{{ t('synthetics.createBrowserTest.setupStep1Description') }}</p>
             </div>
           </div>
 
           <!-- Step 2: Click the extension icon to activate -->
-          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
+          <div class="flex items-start gap-4 p-4">
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-              :class="extensionReady ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : extensionInstalled ? 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
+              :class="extensionReady ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse'"
             >2</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
@@ -621,7 +609,6 @@ function onClearResults() {
                   size="sm"
                   :loading="checkingExtension"
                   iconLeft="refresh"
-                  :disabled="!extensionInstalled"
                   data-test="synthetics-setup-icon-check-btn"
                   @click="probeExtension"
                 >
@@ -637,10 +624,10 @@ function onClearResults() {
           </div>
 
           <!-- Step 3: Enable incognito mode -->
-          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
+          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionReady }">
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
-              :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
+              :class="extensionReady ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
             >3</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
@@ -650,7 +637,7 @@ function onClearResults() {
               <OSwitch
                 v-model="incognitoAllowed"
                 :label="t('synthetics.createBrowserTest.setupIncognitoDone')"
-                :disabled="!extensionInstalled"
+                :disabled="!extensionReady"
                 data-test="synthetics-setup-incognito-switch"
               />
             </div>
@@ -661,7 +648,7 @@ function onClearResults() {
           variant="primary"
           size="lg"
           class="w-full mb-4"
-          :disabled="!extensionInstalled || !extensionReady || !incognitoAllowed"
+          :disabled="!extensionReady || !incognitoAllowed"
           data-test="synthetics-setup-open-record-btn"
           icon-left="smart-display"
           @click="onExtensionSetupRecord"
