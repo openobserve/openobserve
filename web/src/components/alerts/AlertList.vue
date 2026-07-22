@@ -231,7 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        independently and appear as ordinary rows. -->
                   <span
                     v-if="row.is_composite"
-                    class="rounded-default text-theme-accent bg-surface-subtle text-2xs inline-flex shrink-0 items-center gap-0.5 px-1.5 py-0.5 font-semibold"
+                    class="rounded-default text-badge-primary-soft-text bg-badge-primary-soft-bg text-2xs inline-flex shrink-0 items-center gap-0.5 px-1.5 py-0.5 font-semibold"
                     :data-test="`alert-list-${row.name}-composite-badge`"
                   >
                     <OIcon name="account-tree" size="xs" />
