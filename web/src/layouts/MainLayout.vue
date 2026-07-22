@@ -253,6 +253,11 @@ export default defineComponent({
     signout() {
       this.closeSocket();
 
+      // AI chat streams outlive their component by design, so navigating away
+      // doesn't kill an answer. Logout has to stop them explicitly — otherwise
+      // they keep streaming and writing chat history after sign-out.
+      window.dispatchEvent(new Event("o2:abort-ai-streams"));
+
       // Clear any open notifications so they don't carry over past logout.
       dismissAll();
 

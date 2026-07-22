@@ -1516,6 +1516,19 @@ const backgroundStreamMap = new Map<
 // doesn't hang forever after re-attaching. true = streaming, false/absent = done.
 const sessionStreamingState = reactive<Record<string, boolean>>({});
 
+// Detached streams deliberately outlive the component that started them, and
+// this registry is module scope, so nothing else will ever stop them. Call when
+// the turn is no longer authorized for what it is writing — org switch, logout
+// — never for ordinary navigation, which is the case detaching exists for.
+const abortBackgroundStreams = () => {
+  for (const controller of backgroundStreams) controller.abort();
+  backgroundStreams.clear();
+  backgroundStreamMap.clear();
+  for (const key of Object.keys(sessionStreamingState)) {
+    delete sessionStreamingState[key];
+  }
+};
+
 export default defineComponent({
   name: "O2AIChat",
   components: {
@@ -3112,11 +3125,6 @@ export default defineComponent({
           }
         }
 
-        // Flush any bytes the decoder held back for a possible multi-byte
-        // UTF-8 sequence split across the last chunk boundary, so the final
-        // SSE event isn't silently truncated when the stream ends mid-character.
-        buffer += decoder.decode();
-
         // Process any remaining complete data in buffer
         if (buffer.trim()) {
           const lines = buffer.split("\n");
@@ -3661,6 +3669,18 @@ export default defineComponent({
       currentStreamingMessage.value = "";
       currentTextSegment.value = "";
       displayedStreamingContent.value = "";
+    };
+
+    // Logout has to kill the foreground turn too, not just the detached ones.
+    // MainLayout.signout() fires this as a window event because it lives in the
+    // Options API half of that file and can't reach setup scope directly (same
+    // pattern as o2:home-switch-tab).
+    const abortAllStreams = () => {
+      abortBackgroundStreams();
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+      }
     };
 
     const toggleExpand = () => {
@@ -4404,20 +4424,22 @@ export default defineComponent({
       resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
+      // Mint the session id here rather than inside the try below. A new chat
+      // has none yet, and the cleanup on every exit path has to clear the flag
+      // for the SAME id we set it on — otherwise an instance that re-attached
+      // never sees the streaming->done transition and spins forever.
+      if (!currentSessionId.value) {
+        currentSessionId.value = getUUIDv7();
+      }
+      const streamSessionId = currentSessionId.value;
+
       // Mark this session as actively streaming in the cross-instance registry
       // so that if another instance re-attaches, it knows when to stop showing
       // its own loading indicator (see sessionStreamingState declaration).
-      if (currentSessionId.value) {
-        sessionStreamingState[currentSessionId.value] = true;
-      }
+      sessionStreamingState[streamSessionId] = true;
 
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
-
-      // Captured for the shared streaming-status cleanup that runs on ALL exit
-      // paths (success, abort, error) below — the inner `streamSessionId` is
-      // block-scoped to the try, so it isn't visible in the trailing cleanup.
-      let streamSessionIdForCleanup: string | null = null;
 
       try {
         // Don't add empty assistant message here - wait for actual content
@@ -4425,11 +4447,6 @@ export default defineComponent({
 
         let response: any;
         try {
-          // Ensure session ID exists for tracking this chat session
-          if (!currentSessionId.value) {
-            currentSessionId.value = getUUIDv7();
-          }
-
           // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
           response = await fetchAiChat(
             chatMessages.value,
@@ -4476,8 +4493,6 @@ export default defineComponent({
         // detachment and clean up after processStream
         const streamController = currentAbortController.value;
         const streamMsgs = chatMessages.value;
-        const streamSessionId = currentSessionId.value;
-        streamSessionIdForCleanup = streamSessionId;
 
         await processStream(reader);
 
@@ -4526,10 +4541,10 @@ export default defineComponent({
       // Mark the session's stream as finished in the cross-instance registry so
       // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
       // its own loading indicator. Runs on all exit paths (success/abort/error).
-      const doneSessionId = streamSessionIdForCleanup || currentSessionId.value;
-      if (doneSessionId) {
-        sessionStreamingState[doneSessionId] = false;
-      }
+      // Uses the id captured before the request, not currentSessionId — by the
+      // time an early failure lands here the user may have switched chats, and
+      // clearing the wrong session leaves the real one flagged as streaming.
+      sessionStreamingState[streamSessionId] = false;
 
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
@@ -5190,34 +5205,13 @@ export default defineComponent({
       () => store.state.selectedOrganization?.identifier,
       (newOrgId, oldOrgId) => {
         if (newOrgId && newOrgId !== oldOrgId) {
+          // A turn started under the old org must not keep streaming and
+          // writing chat history after the switch.
+          abortBackgroundStreams();
           addNewChat();
           if (props.isOpen) {
             loadHistory();
           }
-        }
-      },
-    );
-
-    // Keep an in-progress stream alive across user-initiated navigation
-    // (e.g. clicking a sidebar link), not just AI-triggered navigation
-    // (handleNavigationAction already detaches for that case).
-    watch(
-      () => route.fullPath,
-      () => {
-        // Was a turn actually streaming when the user navigated away?
-        const wasStreaming = !!currentAbortController.value;
-
-        detachCurrentStream();
-
-        // Seamless hand-off: the Home page runs the chat in its own inline
-        // AI tab (centeredStart) with the sidebar closed. When the user leaves
-        // Home mid-stream, this inline instance unmounts; to let the streamed
-        // turn keep rendering, the sidebar panel must come up so its O2AIChat
-        // instance can re-attach to the (now module-shared) background stream
-        // and continue the typewriter. Only the Home/centered instance opens
-        // the sidebar, and only when a turn was actually in flight.
-        if (wasStreaming && props.centeredStart && !store.state.isAiChatEnabled) {
-          store.dispatch("setIsAiChatEnabled", true);
         }
       },
     );
@@ -5227,11 +5221,16 @@ export default defineComponent({
     // closure and can't reset our isLoading), watch the shared streaming
     // registry and clear our own streaming UI once that session finishes.
     watch(
-      () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
-      (isStreaming, wasStreaming) => {
-        // Only react to a true→false transition (stream finished), and only if
-        // we're still showing the loading state for it.
-        if (wasStreaming === true && isStreaming === false && isLoading.value) {
+      () =>
+        currentSessionId.value
+          ? sessionStreamingState[currentSessionId.value]
+          : undefined,
+      (isStreaming) => {
+        // React to the session going false, not to a true->false transition: an
+        // instance that re-attached mid-stream never observed the `true`, so it
+        // would see undefined->false and skip the cleanup, spinning forever.
+        // isLoading guards against acting when we aren't showing a stream.
+        if (isStreaming === false && isLoading.value) {
           isLoading.value = false;
           activeToolCall.value = null;
           stopAnalyzingRotation();
@@ -5271,31 +5270,37 @@ export default defineComponent({
 
       // Load auto navigation preferences from localStorage
       loadAutoNavigationPreferences();
+
+      window.addEventListener("o2:abort-ai-streams", abortAllStreams);
     });
 
     onUnmounted(() => {
+      window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
       // Mark unmounting FIRST so any reactive watcher that fires during teardown
       // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
       // not re-attach the just-detached stream back to this dying instance.
       isUnmounting.value = true;
 
-      // Detach (not abort) any in-flight request on unmount: this component
-      // instance can be torn down by navigation (e.g. the Home page's
-      // v-if="activeHomeTab === 'ai'" O2AIChat, or a route change) and we
-      // want that turn to keep running in the background rather than die
-      // here. Relying solely on the route.fullPath watcher elsewhere in this
-      // file is not enough — Vue gives no ordering guarantee that the watcher
-      // fires before this unmount hook during the same navigation, so this
-      // detach is the backstop that actually prevents the interruption.
+      // Detach (not abort) any in-flight request: every mount site except
+      // MainLayout's sidebar is behind a v-if (Home's AI tab, the query-editor
+      // panels), so ordinary navigation tears this instance down and used to
+      // kill the answer mid-word. Unmount is the only hook that knows the
+      // component is actually going away — a route watcher can't tell the
+      // difference between "leaving" and "the page updated its query string".
       const wasStreaming = !!currentAbortController.value;
       detachCurrentStream();
 
-      // Backstop for the sidebar hand-off: if this Home/centered instance is
-      // being torn down mid-stream and the route.fullPath watcher didn't
-      // already open the sidebar (no ordering guarantee between the two),
-      // open it now so the sidebar instance can re-attach and keep rendering
-      // the streamed turn. Dispatching when already enabled is a no-op.
-      if (wasStreaming && props.centeredStart && !store.state.isAiChatEnabled) {
+      // Home runs the chat in its own inline tab with the sidebar closed. If we
+      // leave Home mid-stream, open the sidebar so its instance can re-attach
+      // and keep rendering. Skip when we're still on Home (the user only
+      // switched Home tabs) — MainLayout keeps the sidebar closed there, so
+      // opening it would show the panel and the Home AI tab at once.
+      if (
+        wasStreaming &&
+        props.centeredStart &&
+        route.name !== "home" &&
+        !store.state.isAiChatEnabled
+      ) {
         store.dispatch("setIsAiChatEnabled", true);
       }
 
