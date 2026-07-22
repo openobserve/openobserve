@@ -115,12 +115,16 @@ jobs:
           # engine workflow version). Cross-repo features live on same-named branches in both repos,
           # and the OSS side references enterprise code that only exists on the matching ENT branch
           # until it merges — building against ENT main would fail to COMPILE. Prefer same-named, else main.
+          # Only build against a same-named ENT branch when it has an OPEN ENT PR — that's what marks
+          # it as the live counterpart of this OSS PR. A bare branch (stale/abandoned/coincidental,
+          # or one whose PR already merged) is NOT trusted; fall back to main. An open PR also implies
+          # the branch exists, so this one check covers "branch AND PR open".
           ENT_CODE_REF=main
-          if gh api "repos/$REPO/branches/$HEAD_REF" >/dev/null 2>&1; then
+          if [ -n "$(gh pr list --repo "$REPO" --head "$HEAD_REF" --state open --json number -q '.[0].number' 2>/dev/null)" ]; then
             ENT_CODE_REF="$HEAD_REF"
-            echo "::notice::Matching ENT branch '$HEAD_REF' exists — building the enterprise binary against it."
+            echo "::notice::Open ENT PR on branch '$HEAD_REF' — building the enterprise binary against it."
           else
-            echo "::notice::No matching ENT branch '$HEAD_REF' — building against ENT main."
+            echo "::notice::No open ENT PR for '$HEAD_REF' — building against ENT main."
           fi
 
           # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
