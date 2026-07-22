@@ -308,6 +308,37 @@ describe("PipelinesDestinationList", () => {
       (wrapper!.vm as any).filterQuery = "zzz-no-match";
       expect((wrapper!.vm as any).visibleRows).toHaveLength(0);
     });
+
+    it("filters without crashing when a non-matching row has null type/url/method", async () => {
+      // Destinations without a type render "—" in the UI; those fields are
+      // null. A non-matching search term must still iterate past such a row,
+      // which used to throw in filterData and silently disable search
+      // (the whole list stayed visible regardless of the query).
+      (destinationService.list as any).mockResolvedValue({
+        data: [
+          makeDestination(1),
+          makeDestination(2, {
+            name: "no-type-dest",
+            destination_type_name: null,
+            url: null,
+            method: null,
+            output_format: null,
+          }),
+        ],
+      });
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Random string that matches nothing — must return [] without throwing.
+      (wrapper!.vm as any).filterQuery = "zzz-no-match";
+      expect((wrapper!.vm as any).visibleRows).toHaveLength(0);
+
+      // And a term matching only the fully-populated row still works.
+      (wrapper!.vm as any).filterQuery = "destination-1";
+      const rows = (wrapper!.vm as any).visibleRows;
+      expect(rows).toHaveLength(1);
+      expect(rows[0].name).toBe("destination-1");
+    });
   });
 
   // ── editor toggle ──────────────────────────────────────────────────────────

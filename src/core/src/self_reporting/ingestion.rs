@@ -151,9 +151,9 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                         // on error in ingesting usage data, push back the data
                         let curr_usages = curr_usages.clone();
                         for usage_data in curr_usages {
-                            if let Err(e) = super::queues::USAGE_QUEUE
-                                .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
-                            {
+                            if let Err(e) = usage_reporting::try_enqueue(ReportingData::Usage(
+                                Box::new(usage_data),
+                            )) {
                                 log::error!(
                                     "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
                                 );
@@ -168,8 +168,8 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     // on error in ingesting usage data, push back the data
                     let curr_usages = curr_usages.clone();
                     for usage_data in curr_usages {
-                        if let Err(e) = super::queues::USAGE_QUEUE
-                            .try_enqueue(ReportingData::Usage(Box::new(usage_data)))
+                        if let Err(e) =
+                            usage_reporting::try_enqueue(ReportingData::Usage(Box::new(usage_data)))
                         {
                             log::error!(
                                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"
@@ -203,9 +203,9 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 // on error in ingesting usage data, push back the data
                 tokio::spawn(async move {
                     for usage_data in curr_usages {
-                        if let Err(e) = super::queues::USAGE_QUEUE
-                            .enqueue(ReportingData::Usage(Box::new(usage_data)))
-                            .await
+                        if let Err(e) =
+                            usage_reporting::enqueue(ReportingData::Usage(Box::new(usage_data)))
+                                .await
                         {
                             log::error!(
                                 "[SELF-REPORTING] Error in pushing back un-ingested Usage data to UsageQueuer: {e}"

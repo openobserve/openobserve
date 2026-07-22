@@ -16,8 +16,7 @@
 use std::sync::Arc;
 
 use config::utils::time::now_micros;
-
-use crate::service::db::enrichment_table;
+use db::enrichment_table;
 
 pub mod storage;
 
@@ -66,7 +65,7 @@ pub async fn get_enrichment_table_inner(
         } else {
             db_stats.end_time + 1 // search query end time is not inclusive
         };
-        enrichment_table::get_enrichment_table_data(
+        crate::enrichment_table::get_enrichment_table_data(
             org_id,
             table_name,
             apply_primary_region_if_specified,

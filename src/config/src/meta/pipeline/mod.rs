@@ -148,6 +148,7 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
         &adjacency_list,
         &node_map,
         false,
+        false,
         &mut visited,
     )?;
 
@@ -190,7 +191,8 @@ impl Pipeline {
     /// 3. 1st node in nodes list is either StreamNode or QueryNode
     /// 4. non-empty `conditions` in all ConditionNode nodes in nodes list
     /// 5. every node is reachable
-    /// 6. all leaf nodes are of type StreamNode
+    /// 6. all leaf nodes are destination streams, except system evaluation pipelines may terminate
+    ///    at an LLM evaluation task publisher
     /// 7. In the same branch, unchecked `after_flattened` FunctionNode can't follow checked
     ///    `after_flattened` checked FunctionNode
     /// 8. EnrichmentTables can only be used in Scheduled pipelines
@@ -287,6 +289,7 @@ impl Pipeline {
             &adjacency_list,
             &node_map,
             false,
+            self.is_evaluation(),
             &mut visited,
         )?;
 
@@ -499,7 +502,8 @@ pub struct PipelineDependencyResponse {
 }
 
 /// DFS traversal to check:
-/// 1. all leaf nodes are of StreamNode
+/// 1. all leaf nodes are destination streams, except evaluation pipelines may terminate at an LLM
+///    evaluation task publisher
 /// 2. No `After Flattened` unchecked FunctionNode follows `After Flatten` checked FunctionNode in
 ///    the same branch
 ///
@@ -509,23 +513,37 @@ fn dfs_traversal_check(
     graph: &HashMap<String, Vec<String>>,
     node_map: &HashMap<String, NodeData>,
     mut flattened: bool,
+    allow_evaluation_leaf: bool,
     visited: &mut HashSet<String>,
 ) -> Result<()> {
     if visited.contains(current_id) {
         return Err(anyhow!("Cyclical pipeline detected."));
     }
     visited.insert(current_id.to_string());
+    let current_node = node_map
+        .get(current_id)
+        .ok_or_else(|| anyhow!("Node with id {} not found in node_map", current_id))?;
+    if matches!(current_node, NodeData::LlmEvaluation(_)) {
+        if !allow_evaluation_leaf {
+            return Err(anyhow!(
+                "LLM evaluation nodes are restricted to evaluation pipelines"
+            ));
+        }
+        if graph.contains_key(current_id) {
+            return Err(anyhow!(
+                "LLM evaluation nodes must terminate evaluation pipelines"
+            ));
+        }
+    }
     // Check if the current node is a leaf node
     if !graph.contains_key(current_id) {
-        // Ensure leaf nodes are Stream nodes
-        if let Some(node_data) = node_map.get(current_id) {
-            if !node_data.is_a_leaf_node() {
-                return Err(anyhow!(
-                    "All terminal nodes must be stream nodes or destination nodes"
-                ));
-            }
-        } else {
-            return Err(anyhow!("Node with id {} not found in node_map", current_id));
+        // Evaluation pipelines publish durable tasks instead of forwarding to a stream.
+        let valid_leaf = current_node.is_a_leaf_node()
+            || (allow_evaluation_leaf && matches!(current_node, NodeData::LlmEvaluation(_)));
+        if !valid_leaf {
+            return Err(anyhow!(
+                "All terminal nodes must be stream nodes or destination nodes"
+            ));
         }
         visited.remove(current_id);
         return Ok(());
@@ -540,7 +558,14 @@ fn dfs_traversal_check(
             }
             flattened |= func_params.after_flatten;
         };
-        dfs_traversal_check(next_node_id, graph, node_map, flattened, visited)?;
+        dfs_traversal_check(
+            next_node_id,
+            graph,
+            node_map,
+            flattened,
+            allow_evaluation_leaf,
+            visited,
+        )?;
     }
     visited.remove(current_id);
 
@@ -1306,6 +1331,60 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("All terminal nodes must be stream nodes or destination nodes")
+        );
+    }
+
+    #[test]
+    fn test_evaluation_pipeline_may_end_at_llm_evaluation_publisher() {
+        let source = Node::new(
+            "source".to_string(),
+            NodeData::Stream(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Traces,
+            )),
+            100.0,
+            100.0,
+            "input".to_string(),
+        );
+        let evaluator = Node::new(
+            "evaluator".to_string(),
+            NodeData::LlmEvaluation(components::LlmEvaluationParams {
+                name: "eval-job".to_string(),
+                sampling_rate: 1.0,
+                ..Default::default()
+            }),
+            200.0,
+            100.0,
+            "default".to_string(),
+        );
+        let edge = Edge::new(source.get_node_id(), evaluator.get_node_id());
+        let mut pipeline = Pipeline {
+            id: "evaluation-pipeline".to_string(),
+            version: 1,
+            enabled: true,
+            org: "test_org".to_string(),
+            name: "evaluation-pipeline".to_string(),
+            description: String::new(),
+            source: PipelineSource::Realtime(StreamParams::new(
+                "test_org",
+                "test_stream",
+                StreamType::Traces,
+            )),
+            kind: PipelineKind::Evaluation,
+            nodes: vec![source, evaluator],
+            edges: vec![edge],
+        };
+
+        assert!(pipeline.validate().is_ok());
+
+        pipeline.kind = PipelineKind::User;
+        assert!(
+            pipeline
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("LLM evaluation nodes are restricted to evaluation pipelines")
         );
     }
 

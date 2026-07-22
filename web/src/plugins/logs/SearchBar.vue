@@ -226,7 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSpinner size="xs" />
                 {{ t("confirmDialog.loading") }}
               </div>
-              <template v-else-if="sortedSavedViews.length">
+              <div
+                v-else-if="sortedSavedViews.length"
+                class="max-h-72 overflow-y-auto overscroll-contain"
+                data-test="logs-search-bar-saved-views-menu-list"
+              >
                 <ODropdownItem
                   v-for="view in sortedSavedViews"
                   :key="view.view_id"
@@ -261,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                 </ODropdownItem>
-              </template>
+              </div>
               <ODropdownItem v-else disabled>
                 {{ t("search.savedViewsNotFound") }}
               </ODropdownItem>

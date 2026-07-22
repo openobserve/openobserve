@@ -8525,7 +8525,7 @@
         "chipSampling": "샘플링 제어"
       },
       "descriptionPlaceholder": "이 작업은 무엇을 모니터링하나요?",
-      "samplingValueHelp": "JSON: rate는 0-1 사이의 숫자이고, count는 양의 정수입니다.",
+      "samplingValueHelp": "0에서 1 사이의 샘플링 비율을 입력하세요.",
       "samplingValueAllHelp": "모드가 All일 때는 적용되지 않습니다 — 일치한 모든 이벤트가 평가됩니다.",
       "samplingHelp": "필터 이후에 적용됩니다. 비용을 제어합니다 — 일치한 스팬만 비율에 집계됩니다.",
       "presets": {
@@ -8544,6 +8544,7 @@
         "sampling": "샘플링"
       },
       "targetSection": "타깃",
+      "filteringSection": "필터링",
       "scorersSection": "채점자 및 매핑",
       "nameLabel": "이름",
       "namePlaceholder": "프로덕션 충실도 모니터",
@@ -8553,7 +8554,7 @@
       "streamTypePlaceholder": "추적",
       "descriptionLabel": "설명",
       "samplingModeLabel": "샘플링 모드",
-      "samplingValueLabel": "샘플링 값 JSON",
+      "samplingValueLabel": "샘플링 비율",
       "samplingModes": {
         "rate": "요율",
         "all": "모두",
