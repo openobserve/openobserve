@@ -203,7 +203,7 @@ describe("MonitorResults", () => {
       expect(editBtn.exists()).toBe(true);
     });
 
-    it("should navigate to synthetic-new with edit query on click", async () => {
+    it("should navigate to synthetics-edit with id param on click", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 
