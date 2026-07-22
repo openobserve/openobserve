@@ -40,14 +40,14 @@ use config::{
 use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
 use http::HeaderMap;
+#[cfg(feature = "enterprise")]
+use search_service::sql::visitor::cipher_key::get_cipher_key_names;
 use tracing::{Instrument, Span};
 #[cfg(feature = "enterprise")]
 use utils::{StreamPermissionResourceType, check_stream_permissions};
 
 #[cfg(feature = "cloud")]
 use crate::service::organization::is_org_in_free_trial_period;
-#[cfg(feature = "enterprise")]
-use crate::service::search::sql::visitor::cipher_key::get_cipher_key_names;
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
@@ -126,27 +126,23 @@ async fn can_use_distinct_stream(
 
     // all the fields used in the query sent must be in the distinct stream
     #[allow(deprecated)]
-    let query_fields: Vec<String> = match crate::service::search::sql::Sql::new(
-        &(query.clone().into()),
-        org_id,
-        stream_type,
-        None,
-    )
-    .await
-    {
-        // if sql is invalid, we let it follow the original search and fail
-        Err(_) => return false,
-        Ok(sql) => {
-            // check if sql contains any filters from which field cannot be inferred.
-            // where clause can contain match_all and a valid field which is in distinct stream
-            // but since there is match_all, we cannot infer the field from the where clause
-            // so we need to return false
-            if sql.has_match_all {
-                return false;
+    let query_fields: Vec<String> =
+        match search_service::sql::Sql::new(&(query.clone().into()), org_id, stream_type, None)
+            .await
+        {
+            // if sql is invalid, we let it follow the original search and fail
+            Err(_) => return false,
+            Ok(sql) => {
+                // check if sql contains any filters from which field cannot be inferred.
+                // where clause can contain match_all and a valid field which is in distinct stream
+                // but since there is match_all, we cannot infer the field from the where clause
+                // so we need to return false
+                if sql.has_match_all {
+                    return false;
+                }
+                sql.columns.values().flatten().cloned().collect()
             }
-            sql.columns.values().flatten().cloned().collect()
-        }
-    };
+        };
 
     let all_query_fields_distinct = query_fields.iter().all(|f| {
         if DISTINCT_FIELDS.contains(f) {
@@ -320,7 +316,7 @@ pub async fn search(
     #[cfg(feature = "enterprise")]
     for stream in stream_names.iter() {
         {
-            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
                 return (
                     StatusCode::TOO_MANY_REQUESTS,
                     Json(MetaHttpResponse::error(
@@ -339,7 +335,7 @@ pub async fn search(
     if is_ui_histogram {
         histogram_breakdown_field = if !is_multi_stream_search {
             if let Some(stream_name) = stream_names.first() {
-                crate::service::search::sql::histogram::resolve_histogram_breakdown_field(
+                search_service::sql::histogram::resolve_histogram_breakdown_field(
                     &org_id,
                     stream_name,
                     stream_type,
@@ -353,7 +349,7 @@ pub async fn search(
         };
 
         // Convert the original query to a histogram query
-        match crate::service::search::sql::histogram::convert_to_histogram_query(
+        match search_service::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
@@ -629,7 +625,7 @@ pub async fn around_v1(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -751,7 +747,7 @@ pub async fn around_v2(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -855,7 +851,7 @@ pub async fn values(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return (
                 StatusCode::TOO_MANY_REQUESTS,
                 Json(MetaHttpResponse::error(
@@ -1589,13 +1585,11 @@ pub async fn search_partition(
     #[cfg(feature = "enterprise")]
     {
         let stream_names = match resolve_stream_names(&req.sql) {
-            Ok(v) => v.clone(),
-            Err(e) => {
-                return map_error_to_http_response(&(e.into()), Some(trace_id));
-            }
+            Ok(stream_names) => stream_names,
+            Err(err) => return map_error_to_http_response(&err.into(), Some(trace_id)),
         };
         for stream in stream_names.iter() {
-            if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(stream)) {
+            if let Err(e) = search_service::check_search_allowed(&org_id, Some(stream)) {
                 return (
                     StatusCode::TOO_MANY_REQUESTS,
                     Json(MetaHttpResponse::error(
@@ -2042,9 +2036,7 @@ pub async fn result_schema(
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
     let sql =
-        match crate::service::search::sql::Sql::new(&query, &org_id, stream_type, req.search_type)
-            .await
-        {
+        match search_service::sql::Sql::new(&query, &org_id, stream_type, req.search_type).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!("Error parsing sql: {e}");

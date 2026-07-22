@@ -446,6 +446,7 @@ const openBulkDeleteConfirm = () => {
 
 const bulkDeleteMonitors = async () => {
   const org = orgIdentifier.value
+  bulkActionLoading.value = true
   const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.bulkDeleteToast'), timeout: 0 })
   try {
     await syntheticsService.bulkDelete(org, { ids: selectedMonitorIds.value }, searchAcrossFolders.value ? undefined : activeFolderId.value)
@@ -462,6 +463,7 @@ const bulkDeleteMonitors = async () => {
     console.error('[synthetics] bulk delete failed', err)
   } finally {
     showBulkDeleteConfirm.value = false
+    bulkActionLoading.value = false
   }
 }
 
