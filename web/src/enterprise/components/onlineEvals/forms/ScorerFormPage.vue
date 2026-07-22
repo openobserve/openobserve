@@ -605,7 +605,7 @@
         size="sm-action"
         :loading="isSubmitting"
       >
-        {{ mode === "create" ? t("onlineEvals.buttons.create") : t("onlineEvals.buttons.save") }}
+        {{ t("onlineEvals.buttons.save") }}
       </OButton>
     </footer>
 

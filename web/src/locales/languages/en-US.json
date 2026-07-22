@@ -8012,11 +8012,10 @@
     "buttons": {
       "cancel": "Cancel",
       "close": "Close",
-      "create": "Create",
       "remove": "Remove",
       "save": "Save",
       "saveAsDraft": "Save as Draft",
-      "createAndActivate": "Create & Activate"
+      "createAndActivate": "Save & Activate"
     },
     "scorerTypeDialog": {
       "title": "Create a New Scorer",
@@ -8109,8 +8108,6 @@
       "searchPlaceholder": "Search configs",
       "allTypes": "All types",
       "newButton": "New score config",
-      "saveButton": "Save changes",
-      "createButton": "Create",
       "columns": {
         "index": "#",
         "name": "Name",
