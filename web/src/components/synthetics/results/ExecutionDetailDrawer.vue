@@ -3,6 +3,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import type {
   RunLocationResult,
   RecordedStep,

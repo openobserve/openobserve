@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :style="{ position: 'relative', height: totalSize + 'px', width: '100%' }">
       <div
         v-for="virtualRow in virtualRows"
-        :key="virtualRow.key as string | number"
+        :key="getVirtualRowKey(virtualRow)"
         :style="{
           position: 'absolute',
           top: 0,
@@ -352,7 +352,7 @@ import { useI18n } from "vue-i18n";
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
 import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
-import { useVirtualizer } from "@tanstack/vue-virtual";
+import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -455,6 +455,8 @@ export default defineComponent({
 
     const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
     const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
+
+    const getVirtualRowKey = (row: VirtualItem): string | number => row.key as string | number;
 
     const highlightedSpanId = computed(() => props.hoveredSpanId || props.selectedSpanId);
 
@@ -779,6 +781,7 @@ export default defineComponent({
       viewSpanLogs,
       t,
       searchResults,
+      getVirtualRowKey,
       currentIndex,
       updateSearch,
       nextMatch,

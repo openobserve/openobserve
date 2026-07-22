@@ -177,6 +177,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface TocItem {
   id: string;
@@ -188,7 +189,7 @@ interface TocItem {
 
 export default defineComponent({
   name: "IncidentTableOfContents",
-  components: { OButton, OIcon },
+  components: { OButton, OIcon, OTooltip },
   props: {
     tableOfContents: {
       type: Array as PropType<TocItem[]>,

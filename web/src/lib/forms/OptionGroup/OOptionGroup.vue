@@ -36,6 +36,11 @@ defineSlots<OptionGroupSlots>();
 
 const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 
+// Named computed (not an inline `as X | undefined` cast) so the template
+// expression has no bare `|`, which vue/no-deprecated-filter misparses as
+// a Vue 2 filter pipe.
+const radioValue = computed(() => props.modelValue as OptionPrimitive | undefined);
+
 const checkboxValue = computed<(string | number)[]>(() => {
   const v = props.modelValue;
   if (Array.isArray(v))
@@ -83,7 +88,7 @@ function handleCheckbox(val: (string | number)[]) {
 
     <ORadioGroup
       v-if="type === 'radio'"
-      :model-value="modelValue as OptionPrimitive | undefined"
+      :model-value="radioValue"
       :disabled="disabled"
       :orientation="orientation"
       :name="name"

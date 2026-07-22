@@ -595,6 +595,7 @@ export default defineComponent({
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OInput,
     ODialog,
     AddDashboard,

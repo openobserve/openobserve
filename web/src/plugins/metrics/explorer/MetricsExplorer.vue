@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                collide. -->
             <div
               v-for="row in virtualizer.getVirtualItems()"
-              :key="row.key as string | number"
+              :key="getVirtualRowKey(row)"
               class="absolute top-0 left-0 w-full pb-3"
               :class="isGrid ? 'grid gap-3' : 'flex flex-col gap-3'"
               :style="{
@@ -540,7 +540,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useVirtualizer } from "@tanstack/vue-virtual";
+import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
 import { isEqual, debounce } from "lodash-es";
 
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -811,6 +811,8 @@ export default defineComponent({
         overscan: 2,
       })),
     );
+
+    const getVirtualRowKey = (row: VirtualItem): string | number => row.key as string | number;
 
     let resizeObserver: ResizeObserver | null = null;
 
@@ -1665,6 +1667,7 @@ export default defineComponent({
       columns,
       rowsOfCards,
       virtualizer,
+      getVirtualRowKey,
       onDataScope,
       visibleCards,
       gridVisible,

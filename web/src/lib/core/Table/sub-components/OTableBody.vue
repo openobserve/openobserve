@@ -125,6 +125,13 @@ function getRowForIndex(index: number) {
   return props.rows[index];
 }
 
+// Named helper (not an inline `as string | number` cast) so the template
+// expression has no bare `|`, which vue/no-deprecated-filter misparses as
+// a Vue 2 filter pipe.
+function getVirtualRowKey(virtualRow: { key: number | string | bigint }): string | number {
+  return virtualRow.key as string | number;
+}
+
 /** Get the TanStack Row from a draggable model item (plain data). */
 function getRowForItem(item: any): Row<any> {
   return rowByOriginal.value.get(item) ?? props.rows[0];
@@ -250,7 +257,7 @@ function getRowForItem(item: any): Row<any> {
 
     <OTableBodyRow
       v-for="virtualRow in virtualRows"
-      :key="virtualRow.key as string | number"
+      :key="getVirtualRowKey(virtualRow)"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
       :table="table"
