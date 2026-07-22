@@ -102,7 +102,10 @@ watch(
         variant === 'config'
           ? [
               'group px-3 py-0 min-h-9 rounded-none',
-              'sticky top-11 z-10 bg-surface-panel',
+              // z-20 keeps the sticky header above section content while
+              // scrolling — OToggleGroup items are positioned at z-10, so a
+              // z-10 header would tie and let the toggle bleed over it.
+              'sticky top-11 z-20 bg-surface-panel',
               'border-l-2 border-l-transparent',
               'data-[state=open]:bg-collapsible-trigger-open-bg',
               'data-[state=open]:border-l-collapsible-open-accent',

@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-else class="pb-8">
     <!-- Search bar (sticky; h-11 matches the config section headers' sticky top) -->
     <div
-      class="sticky top-0 z-20 flex h-11 items-center gap-1 px-2 bg-card-glass-solid"
+      class="sticky top-0 z-30 flex h-11 items-center gap-1 px-2 bg-card-glass-solid"
       data-test="dashboard-config-search-wrapper"
     >
       <ConfigPanelSearch v-model="searchQuery" class="flex-1 min-w-0" />
@@ -275,27 +275,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         />
 
-        <OSelect
+        <OToggleGroup
           v-if="shouldShowLegendPosition(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-position')"
-          v-model="dashboardPanelDataModel.data.config.legends_position"
-          :options="legendsPositionOptions"
+          type="single"
+          label-position="top"
           :label="t('dashboard.legendsPositionLabel')"
-          :valueKey="'value'"
-          :labelKey="'label'"
+          v-model="legendsPositionModel"
           data-test="dashboard-config-legend-position"
-        />
+        >
+          <OToggleGroupItem
+            v-for="opt in legendsPositionOptions"
+            :key="String(opt.value)"
+            :value="toggleItemValue(opt.value)"
+            size="sm"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
 
-        <OSelect
+        <OToggleGroup
           v-if="shouldShowLegendType(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-type')"
-          v-model="dashboardPanelDataModel.data.config.legends_type"
-          :options="legendTypeOptions"
+          type="single"
+          label-position="top"
           :label="t('dashboard.legendsType')"
-          :valueKey="'value'"
-          :labelKey="'label'"
+          v-model="legendsTypeModel"
           data-test="dashboard-config-legends-scrollable"
-        />
+        >
+          <OToggleGroupItem
+            v-for="opt in legendTypeOptions"
+            :key="String(opt.value)"
+            :value="toggleItemValue(opt.value)"
+            size="sm"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
 
         <div class="flex gap-2 flex-wrap"
           v-show="isConfigOptionVisible('legend', 'legend-size')"
@@ -405,16 +419,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSelect
+        <OToggleGroup
           v-if="shouldApplyChartAlign(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'chart-align')"
-          v-model="dashboardPanelDataModel.data.config.chart_align"
-          :options="chartAlignOptions"
+          type="single"
+          label-position="top"
           :label="t('dashboard.chartAlign')"
-          :valueKey="'value'"
-          :labelKey="'label'"
+          v-model="chartAlignModel"
           data-test="dashboard-config-chart-align"
-        />
+        >
+          <OToggleGroupItem
+            v-for="opt in chartAlignOptions"
+            :key="String(opt.value)"
+            :value="toggleItemValue(opt.value)"
+            size="sm"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
 
         <div
           v-if="
@@ -1842,6 +1863,8 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -1915,6 +1938,8 @@ export default defineComponent({
     OInput,
     OTextarea,
     OSelect,
+    OToggleGroup,
+    OToggleGroupItem,
     OSwitch,
     ConfigPanelSearch,
     Drilldown,
@@ -1944,6 +1969,27 @@ export default defineComponent({
 
     // Alias for template v-model mutation sites; same reference, no behavior change.
     const dashboardPanelDataModel = computed(() => dashboardPanelData);
+
+    // Segmented toggle (OToggleGroup) proxies for few-option config selects.
+    // OToggleGroup drops null/empty values (its single-select deselect guard),
+    // so we bridge the stored `null` ("Auto"/"None") to a sentinel string and
+    // back. Options iterate the same arrays used by the old OSelect.
+    const TOGGLE_AUTO = "__auto__";
+    const toggleModel = (key: string) =>
+      computed({
+        get: () =>
+          (dashboardPanelData.data.config as Record<string, unknown>)[key] ??
+          TOGGLE_AUTO,
+        set: (v: unknown) => {
+          (dashboardPanelData.data.config as Record<string, unknown>)[key] =
+            v === TOGGLE_AUTO ? null : v;
+        },
+      });
+    const legendsPositionModel = toggleModel("legends_position");
+    const legendsTypeModel = toggleModel("legends_type");
+    const chartAlignModel = toggleModel("chart_align");
+    const toggleItemValue = (value: unknown) =>
+      value === null || value === undefined ? TOGGLE_AUTO : value;
 
     const { t } = useI18n();
     const store = useStore();
@@ -2692,6 +2738,10 @@ export default defineComponent({
     const decimalsTouched = ref(false);
 
     return {
+      legendsPositionModel,
+      legendsTypeModel,
+      chartAlignModel,
+      toggleItemValue,
       t,
       dashboardPanelData,
       dashboardPanelDataModel,
