@@ -1,6 +1,6 @@
 {
   "totals": {
-    "rawProjectRamp": 146,
+    "rawProjectRamp": 142,
     "rawVarInComponent": 585,
     "arbZ": 35,
     "darkMechanism": 20,
@@ -246,7 +246,6 @@
       "rawVarInComponent": 47
     },
     "enterprise/components/onlineEvals/forms/ScorerFormPage.vue": {
-      "rawProjectRamp": 4,
       "rawVarInComponent": 1
     },
     "enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue": {

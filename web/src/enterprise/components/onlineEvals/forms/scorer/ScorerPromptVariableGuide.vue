@@ -3,21 +3,60 @@
     class="flex flex-col gap-2.5"
     data-test="scorer-form-prompt-variable-guide"
   >
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-1.5">
+      <!-- No "View Component" badge: that is internal architecture vocabulary
+           and told the reader nothing about what the table is for. -->
       <div class="flex flex-wrap items-center gap-2">
         <strong class="text-xs font-semibold text-text-heading">
           {{ t("onlineEvals.scorer.promptVariableGuide.title") }}
         </strong>
-        <OTag variant="primary-soft" size="xs">
-          {{ t("onlineEvals.scorer.promptVariableGuide.viewComponentBadge") }}
-        </OTag>
+        <!-- Same affordance as the Eval Job form: a Learn more that opens the
+             reference in a side drawer, rather than expanding inline and
+             pushing the prompt field down. -->
+        <OButton
+          type="button"
+          variant="ghost-primary"
+          size="xs"
+          icon-left="help"
+          class="ml-auto gap-1 font-medium"
+          data-test="scorer-form-prompt-variable-learn-more"
+          @click="detailOpen = true"
+        >
+          <span>{{ t("alerts.alertSettings.helpLearnMore") }}</span>
+        </OButton>
       </div>
-      <span class="text-2xs leading-[1.45] text-text-secondary">
-        {{ t("onlineEvals.scorer.promptVariableGuide.description") }}
-      </span>
+
+      <!-- The question this answers 99% of the time is "what can I type?", so
+           the names lead. The per-scope matrix is reference material and stays
+           collapsed until asked for. -->
+      <div class="flex flex-wrap gap-1.5">
+        <code
+          v-for="variable in allVariables"
+          :key="variable"
+          class="rounded-default bg-surface-subtle px-1.5 py-0.5"
+          :data-test="`scorer-form-prompt-variable-chip-${variable}`"
+          >{{ formatTemplateVariable(variable) }}</code
+        >
+      </div>
     </div>
 
-    <div class="overflow-hidden rounded-default border border-border-default">
+    <ODrawer
+      v-model:open="detailOpen"
+      :title="t('onlineEvals.scorer.promptVariableGuide.title')"
+      size="lg"
+      bleed
+      data-test="scorer-form-prompt-variable-detail"
+    >
+      <!-- `bleed` drops ODrawer's body inset so the table runs edge to edge;
+           the prose keeps the inset via the same tokens the drawer would have
+           applied. Mirrors the Eval Job variables drawer. -->
+      <div class="flex flex-col gap-3 py-dialog-content-py">
+        <span
+          class="px-dialog-content-px text-xs leading-relaxed text-text-secondary"
+        >
+          {{ t("onlineEvals.scorer.promptVariableGuide.description") }}
+        </span>
+
       <OTable
         data-test="scorer-form-prompt-variable-table"
         :data="guideRows"
@@ -42,7 +81,7 @@
             <code
               v-for="variable in row.variables"
               :key="variable"
-              class="rounded-default bg-surface-subtle px-1.5 py-0.5 font-mono text-2xs font-semibold text-text-heading"
+              class="rounded-default bg-surface-subtle px-1.5 py-0.5"
               >{{ formatTemplateVariable(variable) }}</code
             >
           </div>
@@ -60,34 +99,39 @@
           <ScopeCell :row="row" scope="session" />
         </template>
       </OTable>
-    </div>
 
-    <OBanner
-      variant="info"
-      icon="info"
-      dense
-      data-test="scorer-form-prompt-variable-index-note"
-    >
-      <span class="text-2xs leading-[1.45]">
-        {{
-          t("onlineEvals.scorer.promptVariableGuide.indexDescription", {
-            spansVar: formatTemplateVariable("spans"),
-            stepsVar: formatTemplateVariable("steps"),
-            indexedVar: formatTemplateVariable("spans[0]"),
-          })
-        }}
-      </span>
-    </OBanner>
+      <div class="px-dialog-content-px">
+          <OBanner
+            variant="info"
+            icon="info"
+            dense
+            data-test="scorer-form-prompt-variable-index-note"
+          >
+            <span class="text-xs leading-relaxed">
+              {{
+                t("onlineEvals.scorer.promptVariableGuide.indexDescription", {
+                  spansVar: formatTemplateVariable("spans"),
+                  stepsVar: formatTemplateVariable("steps"),
+                  indexedVar: formatTemplateVariable("spans[0]"),
+                })
+              }}
+            </span>
+          </OBanner>
+        </div>
+      </div>
+    </ODrawer>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, type PropType } from "vue";
+import { computed, defineComponent, h, ref, type PropType } from "vue";
 import { useI18n } from "vue-i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { formatTemplateVariable } from "../../utils/evalFormat";
 
 type GuideScope = "span" | "trace" | "session";
@@ -104,6 +148,7 @@ interface GuideRow {
 }
 
 const { t } = useI18n();
+const detailOpen = ref(false);
 
 const guideRows: GuideRow[] = [
   {
@@ -143,6 +188,9 @@ const guideRows: GuideRow[] = [
     },
   },
 ];
+
+// Flattened for the chip row — the names are what the user types.
+const allVariables = computed(() => guideRows.flatMap((row) => row.variables));
 
 const columns = computed<OTableColumnDef<GuideRow>[]>(() => [
   {

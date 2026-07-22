@@ -8100,8 +8100,7 @@
         "createdLabel": "Created",
         "updatedLabel": "Updated"
       },
-      "createTitle": "Create Score Config",
-      "editTitlePrefix": "Edit",
+      "createTitle": "New Score Config",
       "subtitle": "Soft-schema dimensions that scorers produce.",
       "eyebrow": "Score Configs",
       "sectionTitle": "Score Configs",
@@ -8316,14 +8315,13 @@
       "backTo": "Back to Scorers",
       "badgeRemote": "Remote",
       "badgeLlm": "LLM Judge",
-      "createTitleRemote": "Create Remote Scorer",
-      "createTitleLlm": "Create LLM Judge Scorer",
-      "editTitleRemote": "Edit Remote Scorer",
-      "editTitleLlm": "Edit LLM Judge Scorer",
+      "createTitleRemote": "New Remote Scorer",
+      "createTitleLlm": "New LLM Judge Scorer",
+      "editTitleRemote": "Update Remote Scorer",
+      "editTitleLlm": "Update LLM Judge Scorer",
       "subtitleRemote": "Call an HTTP endpoint you host. We render the request, you return a score.",
       "subtitleLlm": "A language model judges each evaluation target using the prompt you provide.",
       "descriptionPlaceholder": "A short summary of what this scorer measures.",
-      "producesScoreHelp": "What dimension does this scorer measure?",
       "providerHelp": "Choose the LLM Provider this judge calls. Manage providers in {settingsLink}.",
       "providerHelpSettingsLink": "Settings",
       "refreshProviders": "Refresh Providers",
@@ -8337,11 +8335,9 @@
       "healthyLabel": "Healthy:",
       "typeLabel": "Type:",
       "promptVariablesLabel": "Variables in this prompt:",
-      "promptHelp": "Use {inputVar} and {outputVar} for input and output values. Their source is configured when this scorer is added to an Eval Job.",
       "promptVariableGuide": {
-        "title": "Evaluation View variables",
-        "description": "The design defines five bounded View Components. Scorers are scope-independent; the Eval Job scope determines how each value is supplied.",
-        "viewComponentBadge": "View Component",
+        "title": "Available Prompt Variables",
+        "description": "These variables can be used in the prompt above. How each one is filled in depends on what the Eval Job evaluates.",
         "columns": {
           "variable": "Prompt variable"
         },
@@ -8359,27 +8355,27 @@
         },
         "variables": {
           "inputOutput": {
-            "span": "Map these variables to the span fields that contain the desired input and output.",
-            "trace": "Bounded input and output from the trace's root span.",
-            "session": "The design does not define root input or output for a multi-trace session."
+            "span": "Map these to the span fields holding the input and output.",
+            "trace": "Input and output from the trace's root span.",
+            "session": "Not available \u2014 a session has no single input or output."
           },
           "statistics": {
             "span": "Map this name like any other scorer variable when evaluating a single span.",
-            "trace": "Bounded trace metrics including span count, duration, LLM and tool calls, errors, tokens, and cost.",
-            "session": "Bounded session metrics including trace and turn counts, duration, and errors."
+            "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
+            "session": "Session metrics: trace and turn counts, duration, and errors."
           },
           "spans": {
             "span": "Map this name like any other scorer variable when evaluating a single span.",
-            "trace": "A bounded, filtered subset of trace spans. Its filter and fields come from the Eval Job's Span Selector.",
-            "session": "The design does not define selected-span evidence at session scope."
+            "trace": "A filtered subset of the trace's spans, chosen by the Eval Job's Span Selector.",
+            "session": "Not available for sessions."
           },
           "steps": {
             "span": "Map this name like any other scorer variable when evaluating a single span.",
-            "trace": "A bounded, time-ordered span trajectory; the middle is folded when the trace exceeds the item limit.",
-            "session": "A bounded, time-ordered sequence of traces represented as conversation turns."
+            "trace": "Spans in time order; the middle is folded when the trace is very long.",
+            "session": "Traces in time order, represented as conversation turns."
           }
         },
-        "indexDescription": "{spansVar} and {stepsVar} are inserted as bounded JSON arrays. Reference the whole variable; indexed template access such as {indexedVar} is not part of the documented contract and is not supported."
+        "indexDescription": "{spansVar} and {stepsVar} arrive as JSON arrays. Reference the whole variable \u2014 indexed access like {indexedVar} is not supported."
       },
       "identitySection": "Identity",
       "judgeSection": "Judge configuration",
@@ -8398,10 +8394,9 @@
       "modelPlaceholder": "gpt-4o",
       "promptLabel": "Judge prompt",
       "includeReasoningLabel": "Include Reasoning",
-      "includeReasoningHint": "LLM explains its score. Stored in score.metadata.reasoning.",
-      "extraFieldsLabel": "Extra Metadata Fields",
-      "extraFieldsOptional": "Optional",
-      "extraFieldsHint": "Add fields the LLM should output alongside the score. Stored in score.metadata for later analysis.",
+      "includeReasoningHint": "The judge explains why it gave that score, saved with each result.",
+      "extraFieldsLabel": "Extra Metadata Fields (Optional)",
+      "extraFieldsHint": "Ask the judge to return extra values with each score \u2014 a category or a confidence, for example.",
       "extraFields": {
         "colName": "Field Name",
         "colType": "Type",

@@ -61,7 +61,7 @@
           >
             <template #cell-variable="{ row }">
               <code
-                class="w-fit max-w-full rounded-default bg-surface-subtle px-1.5 py-0.5 font-mono text-2xs font-semibold text-text-heading"
+                class="w-fit max-w-full rounded-default bg-surface-subtle px-1.5 py-0.5"
                 :data-test="`job-input-mapping-system-variable-${row.name}`"
                 >{{ formatTemplateVariable(row.name) }}</code
               >
@@ -169,7 +169,7 @@
             class="grid grid-cols-[minmax(8.125rem,0.35fr)_minmax(0,1fr)] items-start gap-2.5"
           >
             <code
-              class="mt-0.5 truncate overflow-hidden rounded-default bg-surface-subtle px-2 py-1.25 font-mono text-2xs font-semibold text-text-label"
+              class="mt-0.5 truncate overflow-hidden rounded-default bg-surface-subtle px-2 py-1.25"
               >{{ formatTemplateVariable(variable) }}</code
             >
             <div
