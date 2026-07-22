@@ -9364,8 +9364,12 @@
       "stepJourney": "Journey",
       "untitledCheck": "Untitled check",
       "variablesHint": "Supports {variables} like {baseUrl}.",
-      "setupStep2Title": "Enable incognito mode",
-      "setupIncognitoHint": "Open chrome://extensions, click {details}, then enable {setting}."
+      "setupStep2Title": "Activate the recorder",
+      "setupIncognitoHint": "Open chrome://extensions, click {details}, then enable {setting}.",
+      "setupStep2Description": "Click the extension icon 🔲 in your toolbar to connect the recorder to this page.",
+      "setupIconActivateHint": "Click {icon} in your toolbar to activate the recorder for this page.",
+      "setupStep3Title": "Enable incognito mode",
+      "setupStep3IncognitoHint": "Open chrome://extensions, click {details}, then enable {setting}."
     },
     "dialog": {
       "bulkDeleteBody": "Are you sure you want to delete {count} check(s)? This action cannot be undone.",

@@ -182,7 +182,7 @@ function onLoadRetry(actionId?: string) {
 
 onMounted(() => {
   // Warm detection so an already-installed extension lets Record skip setup.
-  probeExtension({ reloadIfFailed: false })
+  probeExtension()
     .then((installed) => { extensionReady.value = installed })
     .catch(() => { /* extension messaging unavailable — handled in setup screen */ })
 
@@ -577,7 +577,7 @@ function onClearResults() {
         </p>
 
         <div class="rounded-default border border-border-default divide-y divide-border-default mb-6">
-          <!-- Step 1 -->
+          <!-- Step 1: Install the OpenObserve Recorder -->
           <div class="flex items-start gap-4 p-4">
             <span
             class="flex-shrink-0 w-7 h-7 rounded-full bg-primary-500 text-text-inverse flex items-center justify-center text-sm font-semibold"
@@ -591,25 +591,6 @@ function onClearResults() {
                 <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupStep1Description') }}</p>
               </div>
               <div class="flex items-center gap-3 px-3">
-                <!-- <a
-                  href="https://openobserve.ai/docs/synthetics/recorder/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-sm text-text-link underline"
-                  data-test="synthetics-setup-install-link"
-                >
-                  <OButton
-                    v-if="!extensionInstalled"
-                    variant="outline"
-                    size="sm"
-                    :loading="checkingExtension"
-                    iconLeft="download"
-                    data-test="synthetics-setup-recheck-btn"
-                    @click="probeExtension({ reloadIfFailed: true })"
-                  >
-                    Add to Chrome
-                  </OButton>
-                </a> -->
                 <OButton
                   v-if="!extensionInstalled"
                   variant="outline"
@@ -617,7 +598,7 @@ function onClearResults() {
                   :loading="checkingExtension"
                   iconLeft="refresh"
                   data-test="synthetics-setup-recheck-btn"
-                  @click="probeExtension({ reloadIfFailed: true })"
+                  @click="probeExtension"
                 >
                   {{ t('synthetics.createBrowserTest.setupCheckAgain') }}
                 </OButton>
@@ -630,16 +611,28 @@ function onClearResults() {
             </div>
           </div>
 
-          <!-- Step 2 -->
+          <!-- Step 2: Click the extension icon to activate -->
+          <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
+            <span
+              class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
+              :class="extensionInstalled ? 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
+            >2</span>
+            <div class="flex-1 min-w-0">
+              <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
+              <p class="text-xs text-text-secondary m-0">{{ t('synthetics.createBrowserTest.setupStep2Description') }}</p>
+            </div>
+          </div>
+
+          <!-- Step 3: Enable incognito mode -->
           <div class="flex items-start gap-4 p-4" :class="{ 'opacity-60': !extensionInstalled }">
             <span
               class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold"
               :class="extensionInstalled ? incognitoAllowed ? 'bg-[var(--color-status-success-text)]! text-text-inverse' : 'bg-primary-500 text-text-inverse' : 'bg-surface-subtle text-text-muted'"
-            >2</span>
+            >3</span>
             <div class="flex-1 min-w-0 flex justify-between">
               <div class="flex flex-col items-start">
-                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep2Title') }}</h4>
-                <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupIncognitoHint', { details: CHROME_UI_LABELS.details, setting: CHROME_UI_LABELS.allowIncognito }) }}</p>
+                <h4 class="text-sm font-semibold text-text-heading m-0 mb-1">{{ t('synthetics.createBrowserTest.setupStep3Title') }}</h4>
+                <p class="text-xs text-text-secondary m-0 mb-3">{{ t('synthetics.createBrowserTest.setupStep3IncognitoHint', { details: CHROME_UI_LABELS.details, setting: CHROME_UI_LABELS.allowIncognito }) }}</p>
               </div>
               <OSwitch
                 v-model="incognitoAllowed"
