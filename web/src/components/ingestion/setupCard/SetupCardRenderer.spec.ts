@@ -106,7 +106,7 @@ describe("SetupCardRenderer — advanced section", () => {
   it("uses icons registered in OIcon, never the material-font fallback", () => {
     // An unregistered name silently degrades to a ligature span, which renders
     // the raw word next to the label. Guard every accordion icon we pass.
-    for (const name of ["settings", "layers", "help-outline"]) {
+    for (const name of ["settings", "layers", "help-outline", "delete-outline"]) {
       expect(name in iconRegistry).toBe(true);
     }
     wrapper = mountCard();
@@ -119,6 +119,67 @@ describe("SetupCardRenderer — advanced section", () => {
     wrapper = mountCard({ ...CONTENT, extras: { troubleshooting: [] } });
     expect(wrapper.find('[data-test="ai-advanced-accordion"]').exists()).toBe(
       false,
+    );
+  });
+});
+
+describe("SetupCardRenderer — uninstall section", () => {
+  let wrapper: VueWrapper<any>;
+
+  const withUninstall = (): RichCardContent => ({
+    ...CONTENT,
+    extras: {
+      ...CONTENT.extras,
+      uninstall: {
+        label: "Uninstall the Agent",
+        description: "Removes it.",
+        code: { lang: "bash", raw: "sudo ./uninstall.sh" },
+      },
+    },
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("renders the uninstall accordion collapsed, as its own panel", () => {
+    wrapper = mountCard(withUninstall());
+    const acc = wrapper.find('[data-test="ai-uninstall-accordion"]');
+    expect(acc.exists()).toBe(true);
+    expect(acc.text()).toContain("Uninstall the Agent");
+    expect(acc.classes()).toContain("acc-item");
+    // Collapsed → the destructive command is not sitting open on the page.
+    expect(wrapper.find('[data-test="ai-uninstall-code"]').exists()).toBe(false);
+  });
+
+  it("renders it after troubleshooting, so it is the last section", () => {
+    wrapper = mountCard(withUninstall());
+    const order = wrapper
+      .findAll(".acc-item")
+      .map((el) => el.attributes("data-test") ?? el.text().slice(0, 20));
+    expect(order.at(-1)).toBe("ai-uninstall-accordion");
+  });
+
+  it("omits the accordion when a card provides no uninstall path", () => {
+    wrapper = mountCard();
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("still renders the section wrapper when uninstall is the only extra", () => {
+    // The .c-more guard has to know about uninstall, or the accordion is dropped.
+    wrapper = mountCard({
+      ...CONTENT,
+      extras: {
+        uninstall: {
+          label: "Uninstall the Agent",
+          code: { lang: "bash", raw: "sudo ./uninstall.sh" },
+        },
+      },
+    });
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(
+      true,
     );
   });
 });
