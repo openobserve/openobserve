@@ -19,6 +19,7 @@ export
         this.saveButtonLight = page.locator('[data-test="settings_ent_logo_custom_light_save_btn"]');
         this.enterpriseFeature = page.locator('#enterpriseFeature');
         this.organizationSearchInput = page.locator('[data-test="organization-search-input-field"]');
+        this.organizationMenuList = page.locator('[data-test="organization-menu-list"]');
         this.organizationMenuItem = page.locator('[data-test="organization-menu-item-label-item-label"]');
         this.navbarOrganizationsSelect = page.locator('[data-test="navbar-organizations-select"]');
 
@@ -48,15 +49,34 @@ export
     async managementOrg(orgName) {
         await this.page.waitForTimeout(2000);
         await this.page.reload();
-        await this.navbarOrganizationsSelect.click();
-        await this.page.waitForTimeout(2000);
 
-        // Search for the organization
-        await this.organizationSearchInput.fill(orgName);
-        await this.page.waitForTimeout(2000);
+        // Open the org dropdown and confirm the popover actually rendered before
+        // typing. The menu is a virtualized reka-ui popper that animates in, so a
+        // blind waitForTimeout can race ahead of the open and leave the search
+        // input un-rendered (the CI failure mode). Retry the open until the menu
+        // list is visible instead.
+        await expect(async () => {
+            await this.navbarOrganizationsSelect.click();
+            await this.organizationMenuList.waitFor({ state: 'visible', timeout: 3000 });
+        }).toPass({ timeout: 15000 });
 
-        // Click the organization from search results
-        await this.organizationMenuItem.first().click();
+        // Search for the organization. The OInput wrapper's outer node is a
+        // <div>; fill the inner native input via the -field suffix.
+        await this.organizationSearchInput.waitFor({ state: 'attached', timeout: 10000 });
+        await this.organizationSearchInput.fill(orgName, { force: true });
+
+        // Click the matching row, tolerating the virtualized list re-positioning
+        // underneath — the translateY transforms defeat Playwright's stability
+        // check, so scroll into view and force the click past it.
+        const row = this.organizationMenuItem.first();
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(async () => {
+            await row.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+            await row.click({ force: true, timeout: 5000 });
+            // Selecting a row closes the menu; if the click missed mid-reflow the
+            // popover stays open, so gate on it hiding and let toPass retry.
+            await this.organizationMenuList.waitFor({ state: 'hidden', timeout: 3000 });
+        }).toPass({ timeout: 20000 });
     }
 
     async managementPageURLValidation() {

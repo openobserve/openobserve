@@ -208,8 +208,49 @@ export class HomePage {
     async clickOrgRow(row, { timeout = 20000 } = {}) {
         await row.waitFor({ state: 'visible', timeout: 10000 });
         await expect(async () => {
-            await row.click({ timeout: 5000 });
+            // Virtualized rows carry a `transform: translateY(...)` that keeps
+            // shifting while the popper animates in and the list settles. Under
+            // CI load those frames stretch out, so Playwright's actionability
+            // "element is stable" check can burn the whole 5s click budget and
+            // time out even though the row is present and visible. Nudge it into
+            // view and force the click past the stability/hit-test gates — the
+            // row is already confirmed visible, so this clicks a real target.
+            await row.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+            await row.click({ force: true, timeout: 5000 });
+            // select() closes the menu. If the click landed mid-reflow and
+            // missed, the popover stays open — gate on it hiding so toPass retries
+            // instead of leaving an un-selected menu for the next step.
+            await this.orgMenuList.waitFor({ state: 'hidden', timeout: 3000 });
         }).toPass({ timeout });
+    }
+
+    /**
+     * Switch to a specific org by identifier, verified by the URL.
+     *
+     * A force-click on a virtualized row that is still re-positioning can land
+     * on a neighbouring row (often "default") — the menu still closes, so a
+     * "menu hidden" check alone can't tell a right selection from a wrong one.
+     * The only authoritative success signal is the URL carrying the target
+     * identifier, so retry the whole open → search → click until it does,
+     * re-opening the menu when a prior miss closed it.
+     */
+    async selectOrgByIdentifier(orgName, orgIdentifier) {
+        const targetRow = this.getOrgMenuItemByIdentifier(orgIdentifier);
+        await expect(async () => {
+            if (!(await this.orgMenuList.isVisible())) {
+                await this.orgSelector.click();
+                await this.orgMenuList.waitFor({ state: 'visible', timeout: 5000 });
+            }
+            // Filter is name/identifier-matched; the name can be shared across
+            // several orgs, so we still target the unique identifier row.
+            await this.orgSearchInput.fill(orgName, { force: true });
+            await targetRow.waitFor({ state: 'visible', timeout: 5000 });
+            await targetRow.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+            await targetRow.click({ force: true, timeout: 5000 });
+            await this.page.waitForURL(new RegExp(`org_identifier=${orgIdentifier}`), {
+                timeout: 5000,
+            });
+        }).toPass({ timeout: 30000 });
     }
 
     async selectOrganization(orgName) {
@@ -251,26 +292,20 @@ export class HomePage {
     async homePageOrg(orgName, orgIdentifier) {
         await this.page.reload();
         await this.orgSelector.waitFor({ state: 'visible', timeout: 10000 });
-        await this.orgSelector.click();
-        await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Search for the organization
-        await this.orgSearchInput.fill(orgName);
-
-        // When a specific identifier is available, target that row directly so
-        // we don't race against the OInput debounce / OTable filter and end up
-        // clicking the previously-first row (often "default").
+        // When a specific identifier is available, use the URL-verified switch
+        // so we can't silently settle on the wrong row (the name may be shared
+        // across several orgs). It opens the menu itself.
         if (orgIdentifier) {
-            await this.clickOrgRow(this.getOrgMenuItemByIdentifier(orgIdentifier));
-            // Wait for the router push to land — the URL should now carry the
-            // new org identifier.
-            await this.page.waitForURL(new RegExp(`org_identifier=${orgIdentifier}`), {
-                timeout: 10000,
-            }).catch(() => {});
+            await this.selectOrgByIdentifier(orgName, orgIdentifier);
             return;
         }
 
-        // Click the organization from search results
+        await this.orgSelector.click();
+        await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
+
+        // Search for the organization, then click the first match.
+        await this.orgSearchInput.fill(orgName);
         await this.clickOrgRow(this.orgMenuItemLabel.first());
     }
 

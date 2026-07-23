@@ -282,8 +282,8 @@ onBeforeUnmount(() => {
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          // Layout + stacking (must be above the app header/drawer: 2000/3000)
-          'min-w-40 p-1 z-[6000]',
+          // Layout + stacking — z-menu is the shared overlay layer (tokens/base.css)
+          'min-w-40 p-1 z-menu',
           // Surface
           'bg-dropdown-bg border border-dropdown-border rounded-default shadow-md',
           // Typography
