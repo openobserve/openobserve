@@ -19,7 +19,7 @@ use std::collections::HashMap;
 
 use config::utils::json;
 
-use crate::service::traces::otel::{
+use crate::traces::otel::{
     attributes::{
         FrameworkAttributes, GenAiAttributes, LangfuseAttributes, OpenInferenceAttributes,
         VercelAiSdkAttributes,

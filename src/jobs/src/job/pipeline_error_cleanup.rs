@@ -14,9 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, get_config, spawn_pausable_job, utils::time::now_micros};
+use db;
 use infra::cluster::get_cached_online_ingester_nodes;
-
-use crate::service::db;
 
 /// Runs the periodic pipeline error cleanup job.
 ///

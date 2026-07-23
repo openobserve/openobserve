@@ -51,7 +51,7 @@ pub async fn notify_check_result(n: CheckNotification) {
     use config::meta::destinations::{DestinationType, Module};
 
     for dest_name in &n.destinations {
-        match crate::service::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
+        match crate::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
             Ok((dest, _tpl)) => {
                 let Module::Alert {
                     destination_type, ..
@@ -72,12 +72,9 @@ pub async fn notify_check_result(n: CheckNotification) {
                     n.monitor_name,
                     n.status.to_uppercase()
                 );
-                if let Err(e) = crate::service::alerts::alert::dispatch_notification(
-                    destination_type,
-                    &subject,
-                    msg,
-                )
-                .await
+                if let Err(e) =
+                    crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
+                        .await
                 {
                     log::error!(
                         "[synthetics] notify dest={dest_name} monitor={}: {e}",
@@ -342,7 +339,7 @@ async fn notify_location_down(
     );
 
     for dest_name in destinations {
-        match crate::service::alerts::destinations::get_with_template(org_id, dest_name).await {
+        match crate::alerts::destinations::get_with_template(org_id, dest_name).await {
             Ok((dest, _tpl)) => {
                 let Module::Alert {
                     destination_type, ..
@@ -366,12 +363,9 @@ async fn notify_location_down(
                     DestinationType::Sns(_) => text.clone(),
                     DestinationType::Http(_) => serde_json::json!({ "text": text }).to_string(),
                 };
-                if let Err(e) = crate::service::alerts::alert::dispatch_notification(
-                    destination_type,
-                    &subject,
-                    msg,
-                )
-                .await
+                if let Err(e) =
+                    crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
+                        .await
                 {
                     log::error!(
                         "[synthetics] location-down notify dest={dest_name} location={}: {e}",

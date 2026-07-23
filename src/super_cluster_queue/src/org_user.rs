@@ -15,13 +15,13 @@
 
 use bytes::Bytes;
 use config::utils::json;
+use db::org_users as db_org_users;
 use infra::{
     db::{delete_from_db_coordinator, put_into_db_coordinator},
     errors::{Error, Result},
     table::org_users::{self, OrgUserPut},
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-use openobserve_core::service::db::org_users as db_org_users;
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {

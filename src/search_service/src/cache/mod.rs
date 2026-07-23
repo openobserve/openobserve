@@ -1080,7 +1080,7 @@ pub fn apply_vrl_to_response(
             Ok(program) => {
                 let registry = program
                     .config
-                    .get_custom::<transform::vector_enrichment::TableRegistry>()
+                    .get_custom::<vector_enrichment::TableRegistry>()
                     .unwrap();
                 registry.finish_load();
                 Some(program)
@@ -1224,7 +1224,7 @@ pub async fn apply_regex_to_response(
 
     let ret = match pattern_manager.process_at_search(
         org_id,
-        StreamType::Logs,
+        stream_type,
         &mut res.hits,
         projections,
     ) {

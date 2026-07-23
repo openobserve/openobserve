@@ -15,6 +15,11 @@
 
 use axum::{extract::Path, response::Response};
 use config::meta::folder::Folder;
+use db::folders::{self, FolderError};
+#[cfg(feature = "enterprise")]
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::UserEmail;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -22,10 +27,7 @@ use crate::{
         CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
         ListFoldersResponseBody, UpdateFolderRequestBody,
     },
-    service::folders::{self, FolderError},
 };
-#[cfg(feature = "enterprise")]
-use crate::{common::utils::auth::UserEmail, extractors::Headers};
 
 fn folder_error_response(value: FolderError) -> Response {
     match value {

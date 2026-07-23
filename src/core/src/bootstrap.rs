@@ -17,10 +17,11 @@ use std::sync::Arc;
 
 use ::common::infra::wal;
 use config::{cache_instance_id, ider};
+use db::metas;
 
 #[cfg(feature = "enterprise")]
 use crate::self_reporting::CoreAuditPublisher;
-use crate::{self_reporting::persistence::CoreBatchPublisher, service::db::metas};
+use crate::self_reporting::persistence::CoreBatchPublisher;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher))

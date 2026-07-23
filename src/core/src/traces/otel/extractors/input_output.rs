@@ -22,7 +22,7 @@ use serde_json::Map;
 
 use crate::{
     common::meta::traces::Event,
-    service::traces::otel::attributes::{
+    traces::otel::attributes::{
         FrameworkAttributes, GenAiAttributes, GenAiEventNames, LangfuseAttributes,
         VercelAiSdkAttributes,
     },

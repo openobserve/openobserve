@@ -23,15 +23,14 @@
 use std::collections::BTreeMap;
 
 use chrono::Utc;
+use common::meta::authz::Authz;
 use config::{ider, meta::stream::StreamType};
+use db::authz::{remove_ownership, set_ownership};
 use infra::table;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::common::{
-    meta::authz::Authz,
-    utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
-};
+use crate::auth::is_ofga_object_visible;
 
 pub mod reconciler;
 pub use o2_enterprise::enterprise::llm_evaluations::eval_jobs::executor_runtime;

@@ -29,16 +29,16 @@ pub use o2_enterprise::enterprise::llm_evaluations::agents::{
     AgentListQuery, ClearAgentRegistryQuery, ClearAgentRegistryResponse, GenAiAgentListItem,
     GenAiAgentListResponse,
 };
+use openobserve_core::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_permissions;
 #[cfg(not(feature = "enterprise"))]
 use serde::{Deserialize, Serialize};
 #[cfg(not(feature = "enterprise"))]
 use utoipa::{IntoParams, ToSchema};
 
-#[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
 };
 
 #[cfg(not(feature = "enterprise"))]
@@ -132,8 +132,7 @@ pub async fn get_agent_mapping(
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
 
-        let config =
-            crate::service::db::system_settings::get_gen_ai_agent_mapping_config(&org_id).await;
+        let config = db::system_settings::get_gen_ai_agent_mapping_config(&org_id).await;
         MetaHttpResponse::json(config)
     }
 
@@ -187,7 +186,7 @@ pub async fn save_agent_mapping(
             Err(e) => return MetaHttpResponse::bad_request(e),
         };
 
-        match crate::service::db::system_settings::set_gen_ai_agent_mapping_config(
+        match db::system_settings::set_gen_ai_agent_mapping_config(
             &org_id,
             &user_email.user_id,
             config.clone(),

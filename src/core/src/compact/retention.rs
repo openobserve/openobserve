@@ -35,7 +35,7 @@ use infra::{
 };
 use itertools::Itertools;
 
-use crate::service::{db, file_list, file_list_dump::generate_dump_stream_name};
+use crate::{db, file_list, file_list_dump::generate_dump_stream_name};
 
 pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();

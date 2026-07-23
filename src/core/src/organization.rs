@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    ider,
+    DEFAULT_ORG, ider,
     meta::{
         alerts::alert::ListAlertsParams,
         dashboards::ListDashboardsParams,
@@ -25,15 +25,16 @@ use config::{
     },
     utils::{json, rand::generate_random_string, time},
 };
+use db::{self, org_users, user::is_root_user};
 use infra::table::{self, org_users::UserOrgExpandedRecord};
 #[cfg(feature = "enterprise")]
 use o2_openfga::config::get_config as get_openfga_config;
 #[cfg(feature = "cloud")]
 use {
-    crate::common::meta::organization::{
+    chrono::{Duration, Utc},
+    common::meta::organization::{
         OrganizationInviteResponse, OrganizationInviteUserRecord, OrganizationInvites,
     },
-    chrono::{Duration, Utc},
     config::{SMTP_CLIENT, get_config},
     lettre::{AsyncTransport, Message, message::SinglePart},
     o2_enterprise::enterprise::cloud::{
@@ -45,21 +46,18 @@ use {
 #[cfg(feature = "cloud")]
 use super::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event};
 use crate::{
+    auth::{delete_org_tuples, save_org_tuples},
     common::{
         infra::config::ORG_USERS,
         meta::organization::{
-            AlertSummary, CUSTOM, DEFAULT_ORG, IngestionPasscode, IngestionTokensContainer,
-            OrgSummary, Organization, PipelineSummary, RumIngestionToken, StreamSummary,
-            TriggerStatus, TriggerStatusSearchResult,
+            AlertSummary, CUSTOM, IngestionPasscode, IngestionTokensContainer, OrgSummary,
+            Organization, PipelineSummary, RumIngestionToken, StreamSummary, TriggerStatus,
+            TriggerStatusSearchResult,
         },
-        utils::auth::{delete_org_tuples, is_root_user, save_org_tuples},
     },
-    service::{
-        db::{self, org_users},
-        ingestion_tokens, self_reporting,
-        stream::get_streams,
-        users::add_admin_to_org,
-    },
+    ingestion_tokens, self_reporting,
+    stream::get_streams,
+    users::add_admin_to_org,
 };
 
 const MASKED_TOKEN: &str = "NOT_AVAILABLE";
@@ -430,7 +428,7 @@ pub async fn create_org(
 ) -> Result<
     (
         Organization,
-        Option<crate::common::meta::organization::ServiceAccountTokenInfo>,
+        Option<common::meta::organization::ServiceAccountTokenInfo>,
     ),
     anyhow::Error,
 > {
@@ -592,7 +590,7 @@ pub async fn create_org(
                 );
 
                 // Create user record if it doesn't exist as ServiceAccount
-                use crate::service::users::create_service_account_if_not_exists;
+                use crate::users::create_service_account_if_not_exists;
                 create_service_account_if_not_exists(service_account_email).await?;
 
                 // Add service account to the org with ServiceAccount role
@@ -694,14 +692,13 @@ pub async fn create_org(
             // send the info in response, else ignore
             let service_account_info = if let Some(sa) = org.service_account.as_ref() {
                 // Check if they're a service account in _meta org
-                if let Some(meta_user) =
-                    crate::service::users::get_user(Some(config::META_ORG_ID), sa).await
+                if let Some(meta_user) = crate::users::get_user(Some(config::META_ORG_ID), sa).await
                 {
                     if meta_user.role == UserRole::ServiceAccount {
                         // Return service account info with instructions to use
                         // assume_service_account API Tokens are no longer
                         // returned directly for security reasons
-                        Some(crate::common::meta::organization::ServiceAccountTokenInfo {
+                        Some(common::meta::organization::ServiceAccountTokenInfo {
                             email: sa.clone(),
                             token: String::new(), // Not returned for security
                             role: UserRole::ServiceAccount.to_string(),
@@ -925,7 +922,7 @@ pub async fn remove_org(org_id: &str) -> Result<(), anyhow::Error> {
 pub async fn get_invitations_for_org(
     org_id: &str,
 ) -> Result<Vec<OrganizationInviteUserRecord>, anyhow::Error> {
-    use crate::common::meta::user::InviteStatus;
+    use common::meta::user::InviteStatus;
 
     let invites = org_invites::get_invite_list_for_org(org_id).await?;
     Ok(invites
@@ -1066,7 +1063,7 @@ pub async fn generate_invitation(
 pub async fn accept_invitation(user_email: &str, invite_token: &str) -> Result<(), anyhow::Error> {
     use std::str::FromStr;
 
-    use crate::service::db::org_users::get_cached_user_org;
+    use crate::db::org_users::get_cached_user_org;
 
     let invite = org_invites::get_by_token_user(invite_token, &user_email.to_lowercase())
         .await
@@ -1257,7 +1254,7 @@ pub async fn ensure_sys_rca_agent(org_id: &str) -> Result<(), anyhow::Error> {
     use config::{meta::user::UserRole, utils::rand::generate_random_string};
     use o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, update_tuples};
 
-    use crate::service::users::create_service_account_if_not_exists;
+    use crate::users::create_service_account_if_not_exists;
 
     let email = sre_agent_email(org_id);
 
@@ -1350,7 +1347,7 @@ mod tests {
     use infra::{db as infra_db, table as infra_table};
 
     use super::*;
-    use crate::{common::meta::user::UserRequest, service::users};
+    use crate::{common::meta::user::UserRequest, users};
 
     // TODO: move these tests to integration tests,
     // the below test case will fail as is_root_user()
@@ -1371,7 +1368,7 @@ mod tests {
             UserRequest {
                 email: init_user.to_string(),
                 password: pwd.to_string(),
-                role: crate::common::meta::user::UserOrgRole {
+                role: common::meta::user::UserOrgRole {
                     base_role: config::meta::user::UserRole::Root,
                     custom_role: None,
                 },
@@ -1389,7 +1386,7 @@ mod tests {
             UserRequest {
                 email: user_id.to_string(),
                 password: "pass".to_string(),
-                role: crate::common::meta::user::UserOrgRole {
+                role: common::meta::user::UserOrgRole {
                     base_role: config::meta::user::UserRole::Admin,
                     custom_role: None,
                 },

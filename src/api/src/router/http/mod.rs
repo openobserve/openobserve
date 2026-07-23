@@ -21,6 +21,7 @@ use axum::{
     http::{HeaderMap, Method, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use common::utils::http::get_search_type_from_request;
 use config::{
     RouteDispatchStrategy, get_config,
     meta::{
@@ -41,8 +42,6 @@ use hashbrown::HashMap;
 use http_body_util::BodyExt;
 use infra::cluster;
 
-use crate::common::utils::http::get_search_type_from_request;
-
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -50,7 +49,7 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 /// Returns a reference to the global HTTP client, initializing it if necessary.
 fn get_http_client() -> &'static reqwest::Client {
     HTTP_CLIENT.get_or_init(|| {
-        crate::service::tls::reqwest_client_tls_config()
+        openobserve_core::tls::reqwest_client_tls_config()
             .expect("Failed to create HTTP client with TLS config")
     })
 }

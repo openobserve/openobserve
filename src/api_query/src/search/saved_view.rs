@@ -14,19 +14,17 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, response::Response};
+use db::{
+    authz::{remove_ownership, set_ownership},
+    saved_view,
+};
 
-use crate::{
-    common::{
-        meta::{
-            authz::Authz,
-            http::HttpResponse as MetaHttpResponse,
-            saved_view::{
-                CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest, View,
-            },
-        },
-        utils::auth::{remove_ownership, set_ownership},
+use crate::common::meta::{
+    authz::Authz,
+    http::HttpResponse as MetaHttpResponse,
+    saved_view::{
+        CreateViewRequest, CreateViewResponse, DeleteViewResponse, UpdateViewRequest, View,
     },
-    service::db::saved_view,
 };
 
 /// GetSavedView - Retrieve a single saved view associated with this org.
