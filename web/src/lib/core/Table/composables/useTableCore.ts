@@ -8,6 +8,8 @@ import {
   useVueTable,
   type AggregationFn,
   type ColumnDef,
+  type ColumnFiltersState,
+  type FilterFn,
   type Row,
 } from "@tanstack/vue-table";
 import { computed, ref, watch, type Ref } from "vue";
@@ -202,6 +204,17 @@ export function useTableCore<TData>(
   });
   const columnPinning = ref<{ left?: string[]; right?: string[] }>({});
 
+  // ── Per-column value filtering (Excel-style multi-select) ────────
+  // Each active filter is `{ id, value: rawValue[] }`: a row passes a column's
+  // filter when its cell value is one of the selected values. Empty/no filter =
+  // no restriction, so tables that never opt in (no `filterable` columns) behave
+  // exactly as before. Ported from the legacy TenstackTable column filter.
+  const columnFilters = ref<ColumnFiltersState>([]);
+  const valueInSet: FilterFn<TData> = (row, columnId, filterValue) => {
+    if (!Array.isArray(filterValue) || filterValue.length === 0) return true;
+    return filterValue.includes(row.getValue(columnId));
+  };
+
   // Keep auto-pinned columns in sync
   watch(
     [rightPinnedIds, leftPinnedIds],
@@ -249,6 +262,8 @@ export function useTableCore<TData>(
         maxSize: rigid ? size : (col.maxSize ?? 800),
         enableSorting: (props.sorting === "client" && col.sortable) ?? false,
         enableColumnFilter: col.filterable ?? false,
+        // Multi-select "value in set" matcher for the per-column filter dropdown.
+        filterFn: col.filterable ? valueInSet : undefined,
         // Rigid (actions / #), permanent-elastic (autoWidth), and the invisible
         // spacer are never resizable. `flex` columns ARE resizable — dragging one
         // freezes it (OTable) then resizes it like any other column.
@@ -322,6 +337,11 @@ export function useTableCore<TData>(
     getPaginationRowModel: isClientPagination.value
       ? getPaginationRowModel()
       : undefined,
+    onColumnFiltersChange: (updater) => {
+      const old = columnFilters.value;
+      columnFilters.value =
+        typeof updater === "function" ? updater(old) : updater;
+    },
     aggregationFns,
     getSubRows: props.getSubRows as any,
     enableSorting: props.sorting !== "none",
@@ -369,6 +389,9 @@ export function useTableCore<TData>(
       get columnPinning() {
         return columnPinning.value;
       },
+      get columnFilters() {
+        return columnFilters.value;
+      },
     },
   });
 
@@ -415,6 +438,7 @@ export function useTableCore<TData>(
     isClientSort,
     isClientPagination,
     isClientFilter,
+    columnFilters,
     tanstackColumns,
     columnResizeMode,
     columnSizeVars,
