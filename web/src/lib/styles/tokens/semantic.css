@@ -109,12 +109,12 @@
   --color-surface-chrome:        var(--color-surface-chrome);
   --color-surface-chrome-deeper: var(--color-surface-chrome-deeper);
 
-  /* Borders — `default` and `strong` are registered as app-facing utilities.
-     `subtle` stays library-internal: defined in :root above and consumed by
-     component tokens (checkbox, table row-divider, tooltip, …) via var(), but NOT
-     registered here, so no `border-border-subtle` utility exists. */
+  /* Borders — only `default` is registered as an app-facing utility.
+     `strong` and `subtle` stay library-internal: defined in :root above and
+     consumed by component tokens (checkbox, file, datepicker, …) and via
+     `var(--color-border-strong)` in scoped CSS, but NOT registered here, so no
+     `border-border-strong` / `border-border-subtle` utility exists. */
   --color-border-default: var(--color-border-default);
-  --color-border-strong: var(--color-border-strong);
 
   /* Overlay scrim */
   --color-overlay-scrim: var(--color-overlay-scrim);

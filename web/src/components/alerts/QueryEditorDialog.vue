@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="text-lg font-semibold text-dialog-header-text truncate block">{{ t('alerts.addConditions') }}</span>
 
           <!-- Separator -->
-          <div class="w-px h-4 opacity-30 bg-border-strong" />
+          <div class="w-px h-4 opacity-30 bg-separator" />
 
           <!-- Stream Type + Stream Name -->
           <div class="flex items-center gap-2">

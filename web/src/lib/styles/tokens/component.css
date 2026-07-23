@@ -14,7 +14,6 @@
   /* Separator */
   --spacing-separator: var(--spacing-px);
   --color-separator: var(--color-border-default);
-  --color-separator-strong: var(--color-border-strong);
 
   /* Form field label (dark overrides in dark.css) */
   --color-input-label-text: var(--color-grey-800);
@@ -801,7 +800,6 @@
   /* Separator */
   --spacing-separator: var(--spacing-separator);
   --color-separator: var(--color-separator);
-  --color-separator-strong: var(--color-separator-strong);
 
   /* Button — primary */
   --color-button-primary: var(--color-button-primary);

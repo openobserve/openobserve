@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <button
           type="button"
-          class="wf-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
+          class="wf-plus-btn border-2 border-dashed border-border-default bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
           :data-test="`workflow-node-${data?.node_type}-add-${p.handle}`"
           @click.stop="openStepPicker(id, p.handle)"
         >

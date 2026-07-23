@@ -501,7 +501,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         >
           <button
             type="button"
-            class="pl-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
+            class="pl-plus-btn border-2 border-dashed border-border-default bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
             :data-test="`pipeline-node-${io_type}-add-btn`"
             @click.stop="openStepPicker(id)"
           >
