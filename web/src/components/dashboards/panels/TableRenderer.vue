@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :get-cell-style="cellStyleFn"
       :wrap="wrapCells"
       :pagination="showPagination ? 'client' : 'none'"
-      :page-size="rowsPerPage"
+      :page-size="effectivePageSize"
       :row-height="22"
       :default-columns="false"
       :show-global-filter="false"
@@ -123,6 +123,17 @@ export default defineComponent({
   setup(props) {
     const store = useStore();
     const tableRef = ref<any>(null);
+
+    // The "Records per page" config field is `v-model.number`, so clearing it
+    // ("Auto") yields "" — a non-number that must not reach OTable's page-size
+    // (it silently disables the page-size watch). Coerce to a positive integer,
+    // falling back to the default (QA #2239.3: rows-per-page not applying).
+    const effectivePageSize = computed(() => {
+      const n = Number(props.rowsPerPage);
+      return Number.isFinite(n) && n > 0
+        ? n
+        : TABLE_ROWS_PER_PAGE_DEFAULT_VALUE;
+    });
 
     const tableColumns = computed(
       () => (props.data?.columns as any[]) || [],
@@ -370,6 +381,7 @@ export default defineComponent({
       otableColumns,
       pivotRowColumns,
       cellStyleFn,
+      effectivePageSize,
       sortedRows,
       localSortBy,
       localSortOrder,

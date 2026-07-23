@@ -29,9 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OSelect
         :model-value="pagination.rowsPerPage"
-        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', val)"
+        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', Number(val))"
         :options="formattedPaginationOptions"
         size="sm"
+        :searchable="false"
         class="w-fit!"
         data-test="dashboard-table-rows-per-page-select"
       />

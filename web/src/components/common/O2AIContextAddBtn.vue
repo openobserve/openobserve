@@ -3,7 +3,7 @@
     <OButton
         v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
         variant="ghost"
-        size="icon-toolbar"
+        :size="size"
         @click.stop="sendToAiChat"
         data-test="o2-ai-context-add-btn"
         class="group [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease] dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] hover:[background:var(--color-gradient-ai)]! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]!"
@@ -64,11 +64,13 @@ const props = defineProps({
         default: '',
         required: false
     },
-    //the size of the button can be in xs , sm , md , lg , xl
-    //can be in pixels as well
+    // OButton size token (e.g. "icon-toolbar", "icon-xs-circle"). Defaults to
+    // the toolbar size the button previously hard-coded, so existing callers are
+    // unchanged; table cell overlays pass a smaller token to match sibling
+    // actions (QA #2239: AI button oversized vs other action buttons).
     size: {
         type: String,
-        default: 'xs',
+        default: 'icon-toolbar',
         required: false
     },
     // String or object: Vue compiles static style="" attributes into objects.
