@@ -16,15 +16,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Shared node palette for the flow editors (Pipelines + Workflows). Docked as a
-  fixed left column with a "Nodes" header and Source/Transform/Destination
-  sections. Data + interaction come from props so each editor drives it with its
-  own registry — ONE component, so the two palettes can never drift apart.
+  fixed left rail of Source/Transform/Destination sections. Data + interaction
+  come from props so each editor drives it with its own registry — ONE component,
+  so the two palettes can never drift apart.
+
+  The rail is HEADERLESS by design: the editors label it from the outside (the
+  collapse toggle that opens it), so an in-rail title only repeated what the
+  surrounding chrome already says. The former `title` prop went with it.
+
+  Width is `w-44`, NOT the shared `w-rail` (--spacing-rail) the folder rails use.
+  That token is sized for long user-supplied folder names; these labels are one
+  word ("Stream", "Query"), so w-rail left the cards far wider than they have
+  anything to fill. Cards are w-full, so this class is the ONE width knob for
+  the rail and its cards — adjust here, not on the card.
 
     items       — node list: { label, icon, io_type, subtype, tooltip?, isSectionHeader }
                   icon: an OIcon name, or an "img:<url>" string for an image glyph.
     onDragStart — (event, item) => void   drag-to-add (both editors)
     onItemClick — (item) => void          click-to-add (workflows); omit for drag-only
-    title       — header label (defaults to "Nodes")
     testPrefix  — data-test prefix, so each editor keeps its existing selectors
 -->
 <script lang="ts">
@@ -32,7 +41,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // top of node-palette.css for why it cannot be scoped). Imported here rather
 // than through an SFC style block, so this component carries none at all.
 import "@/components/flow/node-palette.css";
-import { useI18n } from "vue-i18n";
 import type { PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -52,30 +60,20 @@ interface NodePaletteItem {
 export default {
   props: {
     items: { type: Array as PropType<NodePaletteItem[]>, default: () => [] },
-    title: { type: String, default: "" },
     testPrefix: { type: String, default: "flow-node-palette" },
     onDragStart: { type: Function, default: undefined },
     onItemClick: { type: Function, default: undefined },
   },
   components: { OButton, OTooltip, OIcon, OSeparator },
-  setup() {
-    const { t } = useI18n();
-    return { t };
-  },
 };
 </script>
 
 <template>
-  <div class="np-sidebar shrink-0 w-50 pr-3" :data-test="testPrefix">
-    <div
-      class="np-header mb-2 mx-2 text-base font-semibold px-1 pb-2 text-center tracking-wide"
-      :data-test="`${testPrefix}-title`"
-    >
-      {{ title || t("pipeline.nodes") }}
-    </div>
-
-    <div class="flex mt-2">
-      <div class="np-body np-panel">
+  <div
+    class="np-sidebar w-44 shrink-0 h-full flex flex-col bg-surface-panel border-r border-border-default"
+    :data-test="testPrefix"
+  >
+    <div class="np-body flex-1 min-h-0 overflow-y-auto px-1.5 py-2">
         <template v-for="(node, idx) in items" :key="`${node.subtype}-${node.io_type}-${idx}`">
         <!-- section label (Source / Transform / Destination). Same mb-3 outer
              gap as the node cards (matching the original NodeSidebar). -->
@@ -89,7 +87,7 @@ export default {
             variant="ghost"
             size="md"
             :class="[`o2vf_node_${node.io_type}`, onItemClick ? 'cursor-pointer' : '']"
-            class="p-0 btn-fixed-width relative flex items-center w-[10.625rem] justify-start hover:translate-x-[0.1875rem] hover:bg-white/10 hover:backdrop-blur-[0.5rem] dark:hover:bg-white/8! dark:hover:backdrop-blur-[0.75rem]!"
+            class="p-0 btn-fixed-width relative flex items-center w-full justify-start hover:translate-x-[0.1875rem] hover:bg-white/10 hover:backdrop-blur-[0.5rem] dark:hover:bg-white/8! dark:hover:backdrop-blur-[0.75rem]!"
             :data-test="`${testPrefix}-${node.subtype}-${node.io_type}-btn`"
             :draggable="!!onDragStart"
             @dragstart="onDragStart && onDragStart($event, node)"
@@ -114,7 +112,7 @@ export default {
                 <OIcon v-else size="md" :name="node.icon" />
                 <OSeparator vertical class="node-separator h-4" />
               </div>
-              <div class="node-label w-[4.375rem] text-left overflow-hidden text-ellipsis whitespace-nowrap font-medium text-xs">{{ node.label }}</div>
+              <div class="node-label min-w-0 text-left overflow-hidden text-ellipsis whitespace-nowrap font-medium text-xs">{{ node.label }}</div>
               <div class="drag-dots grid grid-cols-2 gap-0.5 w-2 h-2">
                 <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
                 <span class="dot w-0.5 h-0.5 rounded-full transition-all"></span>
@@ -125,7 +123,6 @@ export default {
           </OButton>
         </div>
       </template>
-      </div>
     </div>
   </div>
 </template>

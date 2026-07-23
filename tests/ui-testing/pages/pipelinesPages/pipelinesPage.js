@@ -409,33 +409,51 @@ export class PipelinesPage {
         // Wait for the add pipeline button to be visible.
         await this.addPipelineButton.waitFor({ state: 'visible', timeout: 15000 });
         await this.addPipelineButton.click();
-        // Confirm the editor actually mounted: the NodeSidebar's stream-input button is the
-        // first thing every pipeline flow needs (selectStream/dragStreamToTarget). Under
-        // concurrent cloud load the route change + VueFlow/NodeSidebar mount can lag, or the
-        // add click can be dropped before navigation starts. If the button hasn't rendered
-        // and we're still on the list page (add button still visible), re-click to re-trigger
-        // navigation. This is NON-DESTRUCTIVE — no page.reload(): a reload here trips the
-        // editor's onBeforeRouteLeave unsaved-changes guard, bounces off the editor route,
-        // and stalls every downstream test (regressed the shard to 18 failed).
+        // Confirm the editor actually mounted. The mount signal is the node-rail
+        // COLLAPSE TOGGLE, which lives in VueFlow's control stack and is present
+        // the moment the canvas mounts — rail open or closed. The rail's own
+        // buttons (streamButton etc.) can NO LONGER be the signal: the rail now
+        // starts collapsed, so those buttons are absent from the DOM until we
+        // open it below. Under concurrent cloud load the route change + VueFlow
+        // mount can lag, or the add click can be dropped before navigation
+        // starts; if so and we're still on the list page, re-click. NON-
+        // DESTRUCTIVE — no page.reload() (a reload trips the editor's
+        // onBeforeRouteLeave unsaved-changes guard and stalls downstream tests).
+        const railToggle = this.page.locator('[data-test="pipeline-node-sidebar-collapse-btn"]');
         for (let attempt = 1; attempt <= 3; attempt++) {
-            if (await this.streamButton.isVisible({ timeout: 15000 }).catch(() => false)) {
-                return;
-            }
+            if (await railToggle.isVisible({ timeout: 15000 }).catch(() => false)) break;
             if (await this.addPipelineButton.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await this.addPipelineButton.click().catch(() => {});
             }
         }
-        await this.streamButton.waitFor({ state: 'visible', timeout: 15000 });
+        await railToggle.waitFor({ state: 'visible', timeout: 15000 });
+        // Open the palette so its Source/Transform/Destination buttons render.
+        await this.ensureNodePaletteOpen();
     }
 
     async selectStream() {
-        // addPipeline() already confirms the editor + NodeSidebar mounted; just synchronise
-        // on the button being actionable before clicking (no reload — see addPipeline note).
+        // addPipeline() opens the rail, but guard here too (idempotent) so this is
+        // safe to call on its own. Then synchronise on the button being actionable
+        // before clicking (no reload — see addPipeline note).
+        await this.ensureNodePaletteOpen();
         await this.streamButton.waitFor({ state: 'visible', timeout: 30000 });
         await this.streamButton.click();
     }
 
+    /**
+     * The node rail now starts COLLAPSED (toggled from the canvas control
+     * stack), so its buttons are not in the DOM until it is opened. Every
+     * palette interaction has to go through here first.
+     */
+    async ensureNodePaletteOpen() {
+        const rail = this.page.locator('[data-test="pipeline-node-sidebar"]');
+        if (await rail.isVisible().catch(() => false)) return;
+        await this.page.locator('[data-test="pipeline-node-sidebar-collapse-btn"]').click();
+        await rail.waitFor({ state: 'visible' });
+    }
+
     async dragStreamToTarget(streamElement, offset = { x: 0, y: 0 }) {
+        await this.ensureNodePaletteOpen();
         // The pipeline NodeSidebar uses HTML5 `@dragstart` (draggable="true"),
         // and the canvas's `@drop` reads `pipelineObj.draggedNode` set in
         // `onDragStart`. Playwright's `mouse.move/down/up` does NOT dispatch
@@ -951,6 +969,8 @@ export class PipelinesPage {
     }
 
     async selectFunction() {
+        // Palette buttons live in the rail, which starts collapsed — open it first.
+        await this.ensureNodePaletteOpen();
         await this.functionButton.click();
     }
 

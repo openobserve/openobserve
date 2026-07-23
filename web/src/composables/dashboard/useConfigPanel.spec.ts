@@ -205,8 +205,10 @@ describe("DEFAULT_EXPANDED_SECTIONS", () => {
     }
   });
 
-  it("defaults all sections to true", () => {
-    expect(Object.values(DEFAULT_EXPANDED_SECTIONS).every((v) => v)).toBe(true);
+  it("defaults all sections to false (collapsed)", () => {
+    expect(Object.values(DEFAULT_EXPANDED_SECTIONS).every((v) => v === false)).toBe(
+      true,
+    );
   });
 });
 
@@ -249,6 +251,7 @@ describe("useConfigPanel – search state", () => {
 
   it("does not re-save state on subsequent query changes (non-empty → non-empty)", async () => {
     c.expandedSections.value["general"] = false;
+    c.expandedSections.value["legend"] = true;
     c.searchQuery.value = "ax";
     await nextTick();
     // Change section state after first search (should not affect saved snapshot)
@@ -289,17 +292,18 @@ describe("useConfigPanel – expand/collapse", () => {
     c = makeComposable();
   });
 
-  it("isExpanded returns true by default for all known sections", () => {
+  it("isExpanded returns false by default for all known sections", () => {
     for (const id of ORDERED_SECTION_IDS) {
-      expect(c.isExpanded(id)).toBe(true);
+      expect(c.isExpanded(id)).toBe(false);
     }
   });
 
-  it("isExpanded returns true for unknown section keys (fallback)", () => {
-    expect(c.isExpanded("unknownSection")).toBe(true);
+  it("isExpanded returns false for unknown section keys (fallback)", () => {
+    expect(c.isExpanded("unknownSection")).toBe(false);
   });
 
   it("toggleSection collapses an expanded section", () => {
+    c.expandedSections.value["general"] = true;
     c.toggleSection("general");
     expect(c.isExpanded("general")).toBe(false);
   });
@@ -312,10 +316,13 @@ describe("useConfigPanel – expand/collapse", () => {
 
   it("toggleSection does not affect other sections", () => {
     c.toggleSection("general");
-    expect(c.isExpanded("legend")).toBe(true);
+    expect(c.isExpanded("legend")).toBe(false);
   });
 
   it("allSectionsExpanded is true when all are open", () => {
+    Object.keys(c.expandedSections.value).forEach((k) => {
+      c.expandedSections.value[k] = true;
+    });
     expect(c.allSectionsExpanded.value).toBe(true);
   });
 
@@ -325,6 +332,9 @@ describe("useConfigPanel – expand/collapse", () => {
   });
 
   it("toggleAllSections collapses everything when all are expanded", () => {
+    Object.keys(c.expandedSections.value).forEach((k) => {
+      c.expandedSections.value[k] = true;
+    });
     c.toggleAllSections();
     expect(c.allSectionsExpanded.value).toBe(false);
     expect(Object.values(c.expandedSections.value).every((v) => !v)).toBe(true);

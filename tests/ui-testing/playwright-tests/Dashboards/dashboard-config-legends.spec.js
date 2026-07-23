@@ -79,7 +79,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Right persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legend-position-trigger"]')).toHaveAttribute('data-test-selected-value', 'right');
+    await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toHaveAttribute('data-test-selected-value', 'right');
     await expect(page.locator('[data-test="dashboard-config-legend-width"]').locator('[data-test$="-field"]')).toHaveValue("30");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -118,7 +118,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Bottom persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legend-position-trigger"]')).toHaveAttribute('data-test-selected-value', 'bottom');
+    await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toHaveAttribute('data-test-selected-value', 'bottom');
     await expect(page.locator('[data-test="dashboard-config-legend-height"]').locator('[data-test$="-field"]')).toHaveValue("100");
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
@@ -140,7 +140,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend position Auto persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legend-position-trigger"]')).toHaveAttribute('data-test-selected-value', 'null');
+    await expect(page.locator('[data-test="dashboard-config-legend-position"]')).toHaveAttribute('data-test-selected-value', 'null');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
@@ -171,7 +171,7 @@ test.describe("ConfigPanel — Legends", () => {
     await pm.dashboardPanelActions.savePanel();
     testLogger.info("Verifying legend type Plain persists after save");
     await reopenPanelConfig(page, pm);
-    await expect(page.locator('[data-test="dashboard-config-legends-scrollable-trigger"]')).toHaveAttribute('data-test-selected-value', 'plain');
+    await expect(page.locator('[data-test="dashboard-config-legends-scrollable"]')).toHaveAttribute('data-test-selected-value', 'plain');
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
