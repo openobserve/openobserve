@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :fill-height="false"
           :scroll-el="scrollEl"
           :scroll-margin="0"
+          :horizontal-scroll="true"
           :enable-column-reorder="true"
           :default-columns="false"
           :show-global-filter="false"

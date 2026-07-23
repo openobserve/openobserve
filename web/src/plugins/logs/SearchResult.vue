@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             virtual-scroll
             :fill-height="false"
             :scroll-el="scrollContainerRef"
-            :horizontal-scroll="!searchObj.meta.toggleSourceWrap"
+            :horizontal-scroll="true"
             :scroll-margin="0"
             :default-columns="false"
             :show-global-filter="false"
@@ -557,6 +557,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-hover-actions="{ row, column, active }">
               <O2AIContextAddBtn
                 v-if="active && column.id === logsTimestampCol"
+                size="icon-xs-circle"
+                image-height="14px"
+                image-width="14px"
                 data-test="logs-search-result-ai-btn"
                 @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
               />

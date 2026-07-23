@@ -228,7 +228,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :key="'pivot-rh-' + (col.name ?? col.id)"
         :rowspan="pivotHeaderLevels.length"
         :data-test="`o2-table-pivot-th-${col.name ?? col.id}`"
-        class="px-2 text-left cursor-pointer font-medium text-secondary text-xs"
+        class="px-2 text-left cursor-pointer font-medium text-secondary text-xs bg-table-header-bg"
         :style="getPivotRowColStyle(col.name ?? col.id)"
         @click="handleSort(col.name ?? col.id)"
       >
@@ -267,7 +267,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         :colspan="cell.colspan"
         :rowspan="cell.rowspan || 1"
         :data-test="`o2-table-pivot-th-${levelIdx}-${cellIdx}`"
-        class="px-2"
+        class="px-2 bg-table-header-bg"
         :class="[
           level.isLeaf
             ? 'pivot-value-header text-secondary text-xs font-medium'

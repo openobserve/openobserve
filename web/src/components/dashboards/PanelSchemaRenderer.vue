@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
+          panelSchema.type != 'table' &&
           !loading
         "
         size="inline"
