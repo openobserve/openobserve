@@ -14,13 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::otlp::OtlpRequestType, metrics};
+use openobserve_core::ingestion_types::IngestUser;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     metrics_service_server::MetricsService,
 };
 use tonic::{Response, Status};
-
-use crate::common::meta::ingestion::IngestUser;
 
 #[derive(Default)]
 pub struct MetricsIngester;
@@ -59,7 +58,7 @@ impl MetricsService for MetricsIngester {
 
         let user = IngestUser::from_user_email(user_email);
 
-        let resp = crate::service::metrics::otlp::handle_otlp_request(
+        let resp = openobserve_core::metrics::otlp::handle_otlp_request(
             org_id.unwrap().to_str().unwrap(),
             in_req,
             OtlpRequestType::Grpc,

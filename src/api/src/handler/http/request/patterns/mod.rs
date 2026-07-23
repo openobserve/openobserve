@@ -17,19 +17,19 @@ use axum::{
     extract::{FromRequestParts, Path},
     response::{IntoResponse, Response},
 };
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
 use {
-    crate::handler::http::request::search::utils::{
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+    openobserve_api_query::search::utils::{
         StreamPermissionResourceType, check_stream_permissions,
     },
-    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     search_service::streaming,
     tokio::sync::mpsc,
 };
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
 };
 
 /// Extract patterns from search results
@@ -113,7 +113,7 @@ pub async fn extract_patterns(
         };
 
         // Create audit context
-        let audit_ctx = Some(crate::common::meta::search::AuditContext {
+        let audit_ctx = Some(search::AuditContext {
             method: parts.method.to_string(),
             path: parts.uri.path().to_string(),
             query_params: parts.uri.query().unwrap_or("").to_string(),

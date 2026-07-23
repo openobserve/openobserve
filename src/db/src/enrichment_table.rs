@@ -28,21 +28,20 @@ use infra::{cache::stats, db as infra_db, table::enrichment_table_urls};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::super_cluster::queue::ENRICHMENT_TABLE_URL_JOB_KEY;
 use rayon::prelude::*;
-use transform::vrl::prelude::NotNan;
+use vrl::prelude::NotNan;
 
 use crate as db_service;
 
 /// Will no longer be used as we are using the meta stream stats to store start, end time and size
 pub const ENRICHMENT_TABLE_SIZE_KEY: &str = "/enrichment_table_size";
-pub use infra::table::enrichment_tables::ENRICHMENT_TABLE_META_STREAM_STATS_KEY;
-pub use transform::{convert_from_vrl, convert_to_vrl};
+use infra::table::enrichment_tables::ENRICHMENT_TABLE_META_STREAM_STATS_KEY;
 
 /// Convert RecordBatch directly to VRL values without intermediate JSON
 /// Only handles data types supported by convert_json_to_record_batch:
 /// Utf8, Utf8View, LargeUtf8, Int64, UInt64, Float64, Boolean, Binary, Null
 pub fn convert_recordbatch_to_vrl(
     batches: &[RecordBatch],
-) -> Result<Vec<transform::vrl::value::Value>, anyhow::Error> {
+) -> Result<Vec<vrl::value::Value>, anyhow::Error> {
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(config::get_config().limit.cpu_num)
         .build()?;
@@ -59,14 +58,14 @@ pub fn convert_recordbatch_to_vrl(
                 (0..num_rows)
                     .into_par_iter()
                     .map(|row_idx| {
-                        let mut record_map = transform::vrl::value::ObjectMap::new();
+                        let mut record_map = vrl::value::ObjectMap::new();
 
                         for (col_idx, field) in schema.fields().iter().enumerate() {
                             let column = batch.column(col_idx);
                             let field_name = field.name();
 
                             if column.is_null(row_idx) {
-                                record_map.insert(field_name.clone().into(), transform::vrl::value::Value::Null);
+                                record_map.insert(field_name.clone().into(), vrl::value::Value::Null);
                                 continue;
                             }
 
@@ -74,22 +73,22 @@ pub fn convert_recordbatch_to_vrl(
                                 DataType::Boolean => {
                                     let array =
                                         column.as_any().downcast_ref::<BooleanArray>().unwrap();
-                                    transform::vrl::value::Value::Boolean(array.value(row_idx))
+                                    vrl::value::Value::Boolean(array.value(row_idx))
                                 }
                                 DataType::Int64 => {
                                     let array =
                                         column.as_any().downcast_ref::<Int64Array>().unwrap();
-                                    transform::vrl::value::Value::Integer(array.value(row_idx))
+                                    vrl::value::Value::Integer(array.value(row_idx))
                                 }
                                 DataType::UInt64 => {
                                     let array =
                                         column.as_any().downcast_ref::<UInt64Array>().unwrap();
-                                    transform::vrl::value::Value::Integer(array.value(row_idx) as i64)
+                                    vrl::value::Value::Integer(array.value(row_idx) as i64)
                                 }
                                 DataType::Float64 => {
                                     let array =
                                         column.as_any().downcast_ref::<Float64Array>().unwrap();
-                                    transform::vrl::value::Value::Float(
+                                    vrl::value::Value::Float(
                                         NotNan::new(array.value(row_idx))
                                             .unwrap_or(NotNan::new(0.0).unwrap()),
                                     )
@@ -97,26 +96,26 @@ pub fn convert_recordbatch_to_vrl(
                                 DataType::Utf8 => {
                                     let array =
                                         column.as_any().downcast_ref::<StringArray>().unwrap();
-                                    transform::vrl::value::Value::from(array.value(row_idx))
+                                    vrl::value::Value::from(array.value(row_idx))
                                 }
                                 DataType::Utf8View => {
                                     let array =
                                         column.as_any().downcast_ref::<StringViewArray>().unwrap();
-                                    transform::vrl::value::Value::from(array.value(row_idx))
+                                    vrl::value::Value::from(array.value(row_idx))
                                 }
                                 DataType::LargeUtf8 => {
                                     let array = column
                                         .as_any()
                                         .downcast_ref::<LargeStringArray>()
                                         .unwrap();
-                                    transform::vrl::value::Value::from(array.value(row_idx))
+                                    vrl::value::Value::from(array.value(row_idx))
                                 }
                                 DataType::Binary => {
                                     let array =
                                         column.as_any().downcast_ref::<BinaryArray>().unwrap();
-                                    transform::vrl::value::Value::Bytes(array.value(row_idx).to_vec().into())
+                                    vrl::value::Value::Bytes(array.value(row_idx).to_vec().into())
                                 }
-                                DataType::Null => transform::vrl::value::Value::Null,
+                                DataType::Null => vrl::value::Value::Null,
                                 _ => {
                                     return Err(anyhow::anyhow!(
                                         "Unsupported data type for RecordBatch to VRL conversion: {:?}",
@@ -128,7 +127,7 @@ pub fn convert_recordbatch_to_vrl(
                             record_map.insert(field_name.clone().into(), vrl_value);
                         }
 
-                        Ok(transform::vrl::value::Value::Object(record_map))
+                        Ok(vrl::value::Value::Object(record_map))
                     })
                     .collect::<Result<Vec<_>, _>>()
             })
@@ -596,41 +595,40 @@ pub async fn claim_stale_url_jobs(
 #[cfg(test)]
 mod tests {
 
+    use transform::{convert_from_vrl, convert_to_vrl};
+
     use super::*;
 
     #[test]
     fn test_convert_to_vrl_string() {
         let value = json::Value::String("123".to_string());
         let vrl_value = convert_to_vrl(&value);
-        assert_eq!(
-            vrl_value,
-            transform::vrl::value::Value::Bytes(b"123".to_vec().into())
-        );
+        assert_eq!(vrl_value, vrl::value::Value::Bytes(b"123".to_vec().into()));
     }
 
     #[test]
     fn test_convert_to_vrl_null() {
         let value = json::Value::Null;
         let vrl_value = convert_to_vrl(&value);
-        assert_eq!(vrl_value, transform::vrl::value::Value::Null);
+        assert_eq!(vrl_value, vrl::value::Value::Null);
     }
 
     #[test]
     fn test_convert_to_vrl_boolean() {
         let value = json::Value::Bool(true);
         let vrl_value = convert_to_vrl(&value);
-        assert_eq!(vrl_value, transform::vrl::value::Value::Boolean(true));
+        assert_eq!(vrl_value, vrl::value::Value::Boolean(true));
 
         let value = json::Value::Bool(false);
         let vrl_value = convert_to_vrl(&value);
-        assert_eq!(vrl_value, transform::vrl::value::Value::Boolean(false));
+        assert_eq!(vrl_value, vrl::value::Value::Boolean(false));
     }
 
     #[test]
     fn test_convert_to_vrl_integer() {
         let value = json::Value::Number(serde_json::Number::from(42));
         let vrl_value = convert_to_vrl(&value);
-        assert_eq!(vrl_value, transform::vrl::value::Value::Integer(42));
+        assert_eq!(vrl_value, vrl::value::Value::Integer(42));
     }
 
     #[test]
@@ -639,7 +637,7 @@ mod tests {
             json::Value::Number(serde_json::Number::from_f64(std::f64::consts::PI).unwrap());
         let vrl_value = convert_to_vrl(&value);
         match vrl_value {
-            transform::vrl::value::Value::Float(f) => {
+            vrl::value::Value::Float(f) => {
                 assert_eq!(f.into_inner(), std::f64::consts::PI)
             }
             _ => panic!("Expected float value"),
@@ -656,13 +654,10 @@ mod tests {
         let vrl_value = convert_to_vrl(&value);
 
         match vrl_value {
-            transform::vrl::value::Value::Array(arr) => {
+            vrl::value::Value::Array(arr) => {
                 assert_eq!(arr.len(), 2);
-                assert_eq!(
-                    arr[0],
-                    transform::vrl::value::Value::Bytes(b"item1".to_vec().into())
-                );
-                assert_eq!(arr[1], transform::vrl::value::Value::Integer(2));
+                assert_eq!(arr[0], vrl::value::Value::Bytes(b"item1".to_vec().into()));
+                assert_eq!(arr[1], vrl::value::Value::Integer(2));
             }
             _ => panic!("Expected array value"),
         }
@@ -683,18 +678,13 @@ mod tests {
 
         let vrl_value = convert_to_vrl(&value);
         match vrl_value {
-            transform::vrl::value::Value::Object(vrl_obj) => {
+            vrl::value::Value::Object(vrl_obj) => {
                 assert_eq!(vrl_obj.len(), 2);
                 assert_eq!(
                     vrl_obj.get("key1"),
-                    Some(&transform::vrl::value::Value::Bytes(
-                        b"value1".to_vec().into()
-                    ))
+                    Some(&vrl::value::Value::Bytes(b"value1".to_vec().into()))
                 );
-                assert_eq!(
-                    vrl_obj.get("key2"),
-                    Some(&transform::vrl::value::Value::Integer(42))
-                );
+                assert_eq!(vrl_obj.get("key2"), Some(&vrl::value::Value::Integer(42)));
             }
             _ => panic!("Expected object value"),
         }
@@ -840,57 +830,57 @@ mod tests {
     #[test]
     fn test_vrl_to_json_round_trip() {
         use chrono::{DateTime, Utc};
-        use transform::vrl::prelude::NotNan;
+        use vrl::prelude::NotNan;
 
         // Test null
-        let null_vrl = transform::vrl::value::Value::Null;
+        let null_vrl = vrl::value::Value::Null;
         let json_value = convert_from_vrl(&null_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         assert_eq!(null_vrl, back_to_vrl);
 
         // Test boolean
-        let bool_vrl = transform::vrl::value::Value::Boolean(true);
+        let bool_vrl = vrl::value::Value::Boolean(true);
         let json_value = convert_from_vrl(&bool_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         assert_eq!(bool_vrl, back_to_vrl);
 
         // Test integer
-        let int_vrl = transform::vrl::value::Value::Integer(42);
+        let int_vrl = vrl::value::Value::Integer(42);
         let json_value = convert_from_vrl(&int_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         assert_eq!(int_vrl, back_to_vrl);
 
         // Test float
-        let float_vrl = transform::vrl::value::Value::Float(NotNan::new(1.23).unwrap());
+        let float_vrl = vrl::value::Value::Float(NotNan::new(1.23).unwrap());
         let json_value = convert_from_vrl(&float_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         assert_eq!(float_vrl, back_to_vrl);
 
         // Test bytes (converted to string)
-        let bytes_vrl = transform::vrl::value::Value::Bytes("Hello, World!".as_bytes().into());
+        let bytes_vrl = vrl::value::Value::Bytes("Hello, World!".as_bytes().into());
         let json_value = convert_from_vrl(&bytes_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         // Note: bytes -> string conversion means we expect a string VRL value back
-        let expected_vrl = transform::vrl::value::Value::from("Hello, World!");
+        let expected_vrl = vrl::value::Value::from("Hello, World!");
         assert_eq!(expected_vrl, back_to_vrl);
 
         // Test array
-        let array_vrl = transform::vrl::value::Value::Array(vec![
-            transform::vrl::value::Value::Integer(1),
-            transform::vrl::value::Value::from("test"),
-            transform::vrl::value::Value::Boolean(true),
-            transform::vrl::value::Value::Null,
+        let array_vrl = vrl::value::Value::Array(vec![
+            vrl::value::Value::Integer(1),
+            vrl::value::Value::from("test"),
+            vrl::value::Value::Boolean(true),
+            vrl::value::Value::Null,
         ]);
         let json_value = convert_from_vrl(&array_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         assert_eq!(array_vrl, back_to_vrl);
 
         // Test object
-        let mut object = transform::vrl::value::ObjectMap::new();
-        object.insert("name".into(), transform::vrl::value::Value::from("John"));
-        object.insert("age".into(), transform::vrl::value::Value::Integer(30));
-        object.insert("active".into(), transform::vrl::value::Value::Boolean(true));
-        let object_vrl = transform::vrl::value::Value::Object(object);
+        let mut object = vrl::value::ObjectMap::new();
+        object.insert("name".into(), vrl::value::Value::from("John"));
+        object.insert("age".into(), vrl::value::Value::Integer(30));
+        object.insert("active".into(), vrl::value::Value::Boolean(true));
+        let object_vrl = vrl::value::Value::Object(object);
         let json_value = convert_from_vrl(&object_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         assert_eq!(object_vrl, back_to_vrl);
@@ -899,12 +889,12 @@ mod tests {
         let timestamp = DateTime::parse_from_rfc3339("2023-01-01T12:00:00Z")
             .unwrap()
             .with_timezone(&Utc);
-        let timestamp_vrl = transform::vrl::value::Value::Timestamp(timestamp);
+        let timestamp_vrl = vrl::value::Value::Timestamp(timestamp);
         let json_value = convert_from_vrl(&timestamp_vrl);
         let back_to_vrl = convert_to_vrl(&json_value);
         // Note: timestamp -> number conversion means we expect an integer VRL value back
         let expected_microseconds = timestamp.timestamp_nanos_opt().unwrap_or(0) / 1000;
-        let expected_vrl = transform::vrl::value::Value::Integer(expected_microseconds);
+        let expected_vrl = vrl::value::Value::Integer(expected_microseconds);
         assert_eq!(expected_vrl, back_to_vrl);
     }
 
@@ -945,22 +935,13 @@ mod tests {
 
         // Verify first record
         match &vrl_data[0] {
-            transform::vrl::value::Value::Object(obj) => {
-                assert_eq!(
-                    obj.get("name"),
-                    Some(&transform::vrl::value::Value::from("Alice"))
-                );
-                assert_eq!(
-                    obj.get("age"),
-                    Some(&transform::vrl::value::Value::Integer(30))
-                );
-                assert_eq!(
-                    obj.get("active"),
-                    Some(&transform::vrl::value::Value::Boolean(true))
-                );
+            vrl::value::Value::Object(obj) => {
+                assert_eq!(obj.get("name"), Some(&vrl::value::Value::from("Alice")));
+                assert_eq!(obj.get("age"), Some(&vrl::value::Value::Integer(30)));
+                assert_eq!(obj.get("active"), Some(&vrl::value::Value::Boolean(true)));
                 // Check score is a float
                 match obj.get("score") {
-                    Some(transform::vrl::value::Value::Float(f)) => {
+                    Some(vrl::value::Value::Float(f)) => {
                         assert!((f.into_inner() - 95.5).abs() < 0.001);
                     }
                     _ => panic!("Expected float value for score"),
@@ -971,19 +952,10 @@ mod tests {
 
         // Verify second record
         match &vrl_data[1] {
-            transform::vrl::value::Value::Object(obj) => {
-                assert_eq!(
-                    obj.get("name"),
-                    Some(&transform::vrl::value::Value::from("Bob"))
-                );
-                assert_eq!(
-                    obj.get("age"),
-                    Some(&transform::vrl::value::Value::Integer(25))
-                );
-                assert_eq!(
-                    obj.get("active"),
-                    Some(&transform::vrl::value::Value::Boolean(false))
-                );
+            vrl::value::Value::Object(obj) => {
+                assert_eq!(obj.get("name"), Some(&vrl::value::Value::from("Bob")));
+                assert_eq!(obj.get("age"), Some(&vrl::value::Value::Integer(25)));
+                assert_eq!(obj.get("active"), Some(&vrl::value::Value::Boolean(false)));
             }
             _ => panic!("Expected object value"),
         }

@@ -18,9 +18,6 @@ use infra::table::online_eval_jobs::{
     JobInputMapping, SamplingMode, SessionEvalConfig, SpanSelector, SpanSelectorBindings,
     TargetScope, TraceEvalConfig,
 };
-pub use openobserve_core::service::llm_evaluations::eval_jobs::{
-    ManualEvalJobRequestBody, ManualEvalJobResponseBody,
-};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -217,6 +214,9 @@ impl From<infra::table::online_eval_jobs::OnlineEvalJob> for EvalJobStatusAction
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use openobserve_core::llm_evaluations::eval_jobs::ManualEvalJobRequestBody;
+
     use super::*;
 
     fn sample_job() -> infra::table::online_eval_jobs::OnlineEvalJob {

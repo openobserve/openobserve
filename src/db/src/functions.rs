@@ -15,8 +15,8 @@
 
 use std::sync::Arc;
 
-use common::infra::config::QUERY_FUNCTIONS;
 use config::{meta::function::Transform, utils::json};
+use transform::QUERY_FUNCTIONS;
 
 use crate as db;
 

@@ -51,7 +51,7 @@ pub async fn notify_check_result(n: CheckNotification) {
     use config::meta::destinations::{DestinationType, Module};
 
     for dest_name in &n.destinations {
-        match crate::service::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
+        match crate::alerts::destinations::get_with_template(&n.org_id, dest_name).await {
             Ok((dest, _tpl)) => {
                 let Module::Alert {
                     destination_type, ..
@@ -72,12 +72,9 @@ pub async fn notify_check_result(n: CheckNotification) {
                     n.monitor_name,
                     n.status.to_uppercase()
                 );
-                if let Err(e) = crate::service::alerts::alert::dispatch_notification(
-                    destination_type,
-                    &subject,
-                    msg,
-                )
-                .await
+                if let Err(e) =
+                    crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
+                        .await
                 {
                     log::error!(
                         "[synthetics] notify dest={dest_name} monitor={}: {e}",
@@ -176,6 +173,7 @@ fn build_plain_text(n: &CheckNotification) -> String {
 /// HTML card for email destinations (lettre sends it as the HTML alternative).
 #[cfg(feature = "enterprise")]
 fn build_email_html(n: &CheckNotification) -> String {
+    // TODO: update with a better template for all the checks
     let color = match n.status.as_str() {
         "warning" => "#b58105",
         "error" => "#b45309",
@@ -224,4 +222,160 @@ fn html_escape(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+// ── Private-location staleness watcher ────────────────────────────────────────
+
+/// Ticks every 60s on alert_manager nodes. A private location whose registered
+/// agents have ALL gone stale (`O2_SYNTHETICS_AGENT_STALE_SECS`) while
+/// synthetics are assigned to it gets one "location down" notification, sent to
+/// the union of those synthetics' alert destinations. One-shot per down
+/// transition — cleared when any agent comes back (or the location empties).
+/// Never-registered locations count as pending, not down.
+#[cfg(feature = "enterprise")]
+pub async fn location_staleness_watcher() {
+    use std::collections::HashSet;
+
+    let mut notified_down: HashSet<String> = HashSet::new();
+    loop {
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+        let rows = match infra::table::synthetics_locations::list_private().await {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("[synthetics] staleness watcher: list_private: {e}");
+                continue;
+            }
+        };
+        let window_us = o2_enterprise::enterprise::common::config::get_config()
+            .synthetics
+            .agent_stale_secs
+            .max(1)
+            * 1_000_000;
+        let now = config::utils::time::now_micros();
+
+        for loc in rows {
+            let Some(org_id) = loc.org_id.clone() else {
+                continue;
+            };
+            let agents = infra::table::synthetics_agents::list_by_location(&loc.id)
+                .await
+                .unwrap_or_default();
+            if !loc.enabled || agents.is_empty() {
+                notified_down.remove(&loc.id);
+                continue;
+            }
+            let any_live = agents.iter().any(|a| now - a.last_seen_at <= window_us);
+            if any_live {
+                notified_down.remove(&loc.id);
+                continue;
+            }
+            if notified_down.contains(&loc.id) {
+                continue;
+            }
+
+            let conn = infra::db::ORM_CLIENT
+                .get_or_init(infra::db::connect_to_orm)
+                .await;
+            let checks = infra::table::synthetics_monitors::list_referencing_location(
+                conn, &org_id, &loc.id,
+            )
+            .await
+            .unwrap_or_default();
+            if checks.is_empty() {
+                // Nothing runs here — stay quiet, re-evaluate next tick.
+                continue;
+            }
+            // Mark before dispatch so a location without destinations is still
+            // one-shot (no per-tick log spam / retry storm).
+            notified_down.insert(loc.id.clone());
+
+            let mut destinations: Vec<String> =
+                checks.iter().flat_map(|c| c.destinations.clone()).collect();
+            destinations.sort();
+            destinations.dedup();
+            log::warn!(
+                "[synthetics] private location down: {} ({}) org={} affected_checks={} destinations={}",
+                loc.label,
+                loc.id,
+                org_id,
+                checks.len(),
+                destinations.len()
+            );
+            if destinations.is_empty() {
+                continue;
+            }
+            notify_location_down(
+                &org_id,
+                &loc,
+                checks.len(),
+                window_us / 1_000_000,
+                &destinations,
+            )
+            .await;
+        }
+    }
+}
+
+/// Sends the "location down" notification to each destination, matching the
+/// per-type message formats of `notify_check_result`.
+#[cfg(feature = "enterprise")]
+async fn notify_location_down(
+    org_id: &str,
+    loc: &infra::table::synthetics_locations::SyntheticsLocationRecord,
+    affected: usize,
+    stale_secs: i64,
+    destinations: &[String],
+) {
+    use config::meta::destinations::{DestinationType, Module};
+
+    let subject = format!(
+        "[OpenObserve Synthetics] 🔴 Private location {} is DOWN",
+        loc.label
+    );
+    let text = format!(
+        "Private location {} ({}) is down — no live agent for over {}s.\nAffected checks: {}\nRestart the agent container or check its network path to OpenObserve.",
+        loc.label, loc.region, stale_secs, affected
+    );
+
+    for dest_name in destinations {
+        match crate::alerts::destinations::get_with_template(org_id, dest_name).await {
+            Ok((dest, _tpl)) => {
+                let Module::Alert {
+                    destination_type, ..
+                } = &dest.module
+                else {
+                    continue;
+                };
+                let msg = match destination_type {
+                    DestinationType::Email(_) => format!(
+                        r#"<div style="font-family:sans-serif;max-width:560px;">
+  <h2 style="color:#c62828;margin-bottom:4px;">🔴 Private location {} is down</h2>
+  <p>No live agent for over {}s ({}).</p>
+  <p>Affected checks: <b>{}</b></p>
+  <p>Restart the agent container or check its network path to OpenObserve.</p>
+</div>"#,
+                        html_escape(&loc.label),
+                        stale_secs,
+                        html_escape(&loc.region),
+                        affected
+                    ),
+                    DestinationType::Sns(_) => text.clone(),
+                    DestinationType::Http(_) => serde_json::json!({ "text": text }).to_string(),
+                };
+                if let Err(e) =
+                    crate::alerts::alert::dispatch_notification(destination_type, &subject, msg)
+                        .await
+                {
+                    log::error!(
+                        "[synthetics] location-down notify dest={dest_name} location={}: {e}",
+                        loc.id
+                    );
+                }
+            }
+            Err(e) => {
+                log::error!("[synthetics] load dest={dest_name} org={org_id}: {e}");
+            }
+        }
+    }
 }

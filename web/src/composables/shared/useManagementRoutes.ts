@@ -224,6 +224,18 @@ const useManagementRoutes = () => {
 
         },
         {
+          path: "synthetics_locations",
+          name: "syntheticsLocations",
+          component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
+          meta: {
+            keepAlive: true,
+            title: "Synthetics Locations",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "correlation/:tab?",
           name: "correlationSettings",
           component: () => import("@/components/settings/CorrelationSettings.vue"),

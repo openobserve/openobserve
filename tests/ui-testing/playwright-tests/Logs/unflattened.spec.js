@@ -1,5 +1,4 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const logData = require("../../fixtures/log.json");
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { getOrgIdentifier, isCloudEnvironment } = require('../utils/cloud-auth.js');
@@ -10,21 +9,53 @@ const { ingestTestData: ingestion } = require('../utils/data-ingestion.js');
 
 test.describe("Unflattened testcases", () => {
   let pageManager;
-  // let logData;
   function removeUTFCharacters(text) {
     // Remove UTF characters using regular expression
     return text.replace(/[^\x00-\x7F]/g, " ");
   }
+  // ── Time budget ───────────────────────────────────────────────────────────
+  // beforeEach + body + afterEach all share ONE Playwright timeout. The waits
+  // below used to be sized in isolation and optimistically — a 90s + 120s
+  // readiness gate, then up to 3 scan attempts each fronted by a fresh
+  // navigation and a 60s + 120s query wait — so their sum could exceed the
+  // whole budget several times over. When it did, Playwright killed the test in
+  // the middle of whatever it was doing and reported
+  // "page.goto: Target page, context or browser has been closed" — the symptom
+  // of the kill, not the cause. Every long wait is now clamped to the time
+  // actually left, so a slow backend produces a diagnostic failure while the
+  // browser is still alive, and the honest path has room to finish.
+  let testStartedAt = 0;
+
+  // Held back so each test's "toggle Store Original Data back OFF" cleanup can
+  // always run; leaving the stream with the flag ON leaks into the next test in
+  // this serial file.
+  const CLEANUP_RESERVE_MS = 45000;
+
+  // A scan attempt costs a row sweep plus, on a miss, a fresh navigation and a
+  // full re-query. Only start another round when at least this much is left.
+  const SCAN_ATTEMPT_COST_MS = 90000;
+
+  function msLeft(reserve = CLEANUP_RESERVE_MS) {
+    const budget = test.info().timeout;
+    if (!budget) return Number.MAX_SAFE_INTEGER; // timeout disabled
+    return budget - (Date.now() - testStartedAt) - reserve;
+  }
+
+  function clampToBudget(preferred, { min = 10000, reserve = CLEANUP_RESERVE_MS } = {}) {
+    return Math.max(min, Math.min(preferred, msLeft(reserve)));
+  }
+
   async function applyQueryButton(page) {
     // runQueryAndWaitForResults already handles an in-flight auto-search internally:
     // it waits for the button to exit the "Cancel" state before clicking, and if the
     // state never clears it cancels and re-clicks Run itself. The old double-click
     // wrapper (3s sleep + run + 1s sleep + run) duplicated that logic and added ~5s
     // of fixed sleep to every call.
-    await pageManager.logsPage.runQueryAndWaitForResults();
+    await pageManager.logsPage.runQueryAndWaitForResults(clampToBudget(60000, { min: 20000 }));
 
-    // 2-minute timeout: cloud re-indexing after Store Original Data changes takes longer than the default 30s
-    await pageManager.logsPage.waitForSearchResults(120000);
+    // Up to 2 minutes: cloud re-indexing after Store Original Data changes takes
+    // longer than the default 30s — but never longer than the budget left.
+    await pageManager.logsPage.waitForSearchResults(clampToBudget(120000, { min: 20000 }));
   }
 
   // Re-run the log search from a FRESH page load so the row scan below sees a
@@ -38,9 +69,9 @@ test.describe("Unflattened testcases", () => {
   // otherwise fall back to the quick-mode interesting-fields-only query).
   async function runFreshLogSearch(page, { sqlSelectAll = false } = {}) {
     await page.goto(
-      `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`
+      `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`,
+      { waitUntil: 'domcontentloaded', timeout: clampToBudget(45000, { min: 15000 }) }
     );
-    await page.waitForLoadState('domcontentloaded');
     if (sqlSelectAll) {
       await pageManager.logsPage.typeQuery('SELECT * FROM "e2e_automate" ORDER BY _timestamp DESC');
       await pageManager.logsPage.waitForQueryEditorValue('ORDER BY _timestamp DESC');
@@ -48,7 +79,77 @@ test.describe("Unflattened testcases", () => {
     await applyQueryButton(page);
   }
 
+  // Backend readiness gate for _o2_id. A single budget-bounded wait: the old
+  // 90s-then-120s pair could consume 210s of a 300s test on its own, leaving
+  // nothing for the UI work it was supposed to be preparing.
+  async function waitForO2IdReady() {
+    const ready = await pageManager.unflattenedPage.waitForO2IdQueryable({
+      timeout: clampToBudget(90000, { min: 20000 }),
+    });
+    if (ready) {
+      testLogger.info('_o2_id confirmed queryable via search API');
+    } else {
+      testLogger.warn('_o2_id readiness gate timed out — the UI scan below is unlikely to find it');
+    }
+    return ready;
+  }
+
+  // Scan the rendered log rows for _o2_id, leaving the detail drawer open on the
+  // matching row. A miss means UI/streaming lag, which only a fresh navigation +
+  // re-query recovers (re-clicking Run in place does not recover a stale/partial
+  // streaming result set), so each retry costs a full search — hence the budget
+  // check before starting another one.
+  async function scanForO2IdOrFail(page, { sqlSelectAll = false, backendReady = true, reserve = CLEANUP_RESERVE_MS } = {}) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15, {
+        deadlineAt: Date.now() + clampToBudget(45000, { min: 15000, reserve }),
+      });
+      if (matchedRow !== -1) {
+        testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
+        await pageManager.unflattenedPage.o2IdText.click();
+        return;
+      }
+
+      testLogger.warn(`_o2_id not found in the scanned rows on attempt ${attempt}`);
+      await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
+
+      // A fresh search only fixes UI-side staleness. If the backend never
+      // surfaced _o2_id, retrying the UI cannot help — it just burns the budget
+      // until Playwright kills the test mid-action.
+      if (!backendReady) break;
+      if (attempt === 3) break;
+      if (msLeft(reserve) < SCAN_ATTEMPT_COST_MS) {
+        testLogger.warn('Not enough test budget left for another scan attempt');
+        break;
+      }
+      testLogger.info('Re-running the query from a fresh page before the next scan');
+      await runFreshLogSearch(page, { sqlSelectAll });
+    }
+
+    // Diagnostic: dump what the first row actually does contain. Skipped when
+    // the budget is nearly gone — being killed here would replace the useful
+    // error below with an opaque "browser has been closed".
+    if (msLeft(0) > 30000) {
+      try {
+        await pageManager.unflattenedPage.openLogRowDetail(0);
+        const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
+        testLogger.error('Available fields in log detail', { fields: allKeys });
+      } catch (e) {
+        testLogger.error('Could not retrieve available fields');
+      }
+    }
+
+    throw new Error(
+      'Failed to find _o2_id field in log details' +
+      (backendReady
+        ? ''
+        : ' — the search API never returned a record containing _o2_id, so "Store Original Data" had not taken effect on the backend') +
+      ` (${Math.round(Math.max(0, msLeft(0)) / 1000)}s of test budget left)`
+    );
+  }
+
   test.beforeEach(async ({ page }) => {
+    testStartedAt = Date.now();
     pageManager = new PageManager(page);
     if (isCloudEnvironment()) {
       await navigateToBase(page);
@@ -102,11 +203,14 @@ test.describe("Unflattened testcases", () => {
     await pageManager.unflattenedPage.closeButton.click();
     await page.waitForTimeout(500);
 
-    await page.goto(
-      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
-    );
-    await pageManager.logsPage.selectStream("e2e_automate");
-    await applyQueryButton(page);
+    // Leave the browser on the logs page with e2e_automate selected. Two costs
+    // were removed here because nothing in either test consumes their result:
+    //  - the trailing search (up to 180s of query waiting) — both tests navigate
+    //    straight back to Streams from here;
+    //  - the explicit goto, since selectStream navigates to the logs page itself.
+    // apiWaitMs=0 also skips selectStream's own stream-availability poll (up to
+    // 120s on cloud) — waitForStreamAvailable above already established that.
+    await pageManager.logsPage.selectStream("e2e_automate", 5, 0);
   });
 
   test.afterEach(async ({ page }) => {
@@ -153,54 +257,22 @@ test.describe("Unflattened testcases", () => {
 
     // Deterministic readiness gate: poll the search API until _o2_id is queryable
     // instead of sleeping a fixed interval and hoping indexing has caught up.
-    // This is what makes the single UI scan below succeed on the first attempt.
+    // This is what makes the UI scan below succeed on the first attempt.
     testLogger.info('Waiting for _o2_id to become queryable via search API');
-    // Respect the gate's result. On heavily contended CI runners indexing can
-    // lag past the gate window; the gate returning false (ignored previously)
-    // is exactly when the subsequent UI scan was doomed. Give the backend one
-    // more long wait before falling through to the UI scan, so the UI step
-    // isn't asked to find a field the backend hasn't surfaced yet.
-    const o2idReady = await pageManager.unflattenedPage.waitForO2IdQueryable();
-    if (o2idReady) {
-      testLogger.info('_o2_id confirmed queryable via search API');
-    } else {
-      testLogger.warn('_o2_id readiness gate timed out; waiting once more before UI scan');
-      const o2idReadyRetry = await pageManager.unflattenedPage.waitForO2IdQueryable({ timeout: 120000 });
-      testLogger.info('_o2_id readiness gate second wait result', { ready: o2idReadyRetry });
-    }
+    const o2idReady = await waitForO2IdReady();
 
     // Navigate directly with stream in URL — selectStream would deselect it because
     // the Pinia store already has e2e_automate selected from beforeEach
     testLogger.info('Navigating to logs with e2e_automate stream');
-    await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
+    await page.goto(
+      `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`,
+      { waitUntil: 'domcontentloaded', timeout: clampToBudget(45000, { min: 15000 }) }
+    );
     await applyQueryButton(page);
     testLogger.info('Search query applied, logs should now contain _o2_id field');
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 15 rows per attempt)');
-    let o2idFound = false;
-    // The backend readiness gate above already guarantees _o2_id is queryable, so
-    // a miss here is UI/streaming lag — recover with a FRESH log search (reload +
-    // re-run) rather than re-ingesting. Re-clicking Run in place does not recover a
-    // stale/partial streaming result set; a fresh navigation does (see runFreshLogSearch).
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
-      if (matchedRow !== -1) {
-        testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
-        await pageManager.unflattenedPage.o2IdText.click();
-        o2idFound = true;
-        break;
-      }
-      testLogger.warn(`_o2_id not found in first 15 rows on attempt ${attempt}, re-running query from a fresh page`);
-      await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
-      if (attempt < 3) {
-        await runFreshLogSearch(page);
-      }
-    }
-    if (!o2idFound) {
-      throw new Error('Failed to find _o2_id field in log details after 3 attempts');
-    }
+    testLogger.info('Searching log rows for _o2_id field');
+    await scanForO2IdOrFail(page, { backendReady: o2idReady });
 
     testLogger.info('Switching to unflattened tab');
     await pageManager.unflattenedPage.unflattenedTab.waitFor();
@@ -286,26 +358,15 @@ test.describe("Unflattened testcases", () => {
     // instead of a fixed 15s sleep + UI re-ingestion retry loop. This was the
     // dominant source of the timeout flake on contended CI runners.
     testLogger.info('Waiting for _o2_id to become queryable via search API');
-    // Respect the gate's result. On heavily contended CI runners indexing can
-    // lag past the gate window; the gate returning false (ignored previously)
-    // is exactly when the subsequent UI scan was doomed. Give the backend one
-    // more long wait before falling through to the UI scan, so the UI step
-    // isn't asked to find a field the backend hasn't surfaced yet.
-    const o2idReady = await pageManager.unflattenedPage.waitForO2IdQueryable();
-    if (o2idReady) {
-      testLogger.info('_o2_id confirmed queryable via search API');
-    } else {
-      testLogger.warn('_o2_id readiness gate timed out; waiting once more before UI scan');
-      const o2idReadyRetry = await pageManager.unflattenedPage.waitForO2IdQueryable({ timeout: 120000 });
-      testLogger.info('_o2_id readiness gate second wait result', { ready: o2idReadyRetry });
-    }
+    const o2idReady = await waitForO2IdReady();
 
     // Navigate directly with stream in URL — selectStream would deselect it because
     // the Pinia store already has e2e_automate selected from beforeEach
     testLogger.info('Navigating to logs with e2e_automate stream');
-    await page.goto(`${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`);
-    await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
+    await page.goto(
+      `${process.env.ZO_BASE_URL}/web/logs?org_identifier=${getOrgIdentifier()}&stream_type=logs&stream=e2e_automate`,
+      { waitUntil: 'domcontentloaded', timeout: clampToBudget(45000, { min: 15000 }) }
+    );
 
     testLogger.info('Ensuring Quick Mode is on');
     await pageManager.logsPage.ensureQuickModeState(true);
@@ -348,38 +409,12 @@ test.describe("Unflattened testcases", () => {
     testLogger.info('Executing SELECT * query to fetch fresh data with _o2_id');
     await applyQueryButton(page);
 
-    testLogger.info('Searching log rows for _o2_id field (iterates first 15 rows per attempt)');
+    testLogger.info('Searching log rows for _o2_id field');
     // With ORDER BY _timestamp DESC the newest rows come first (the fixture carries
-    // no _timestamp, so the Store-Original-Data re-ingest is genuinely newest). The
-    // backend readiness gate above guarantees _o2_id is queryable, so a miss here is
-    // UI/streaming lag — recover with a FRESH SELECT * search (reload + re-type +
-    // re-run) rather than re-ingesting. Re-clicking Run in place does not recover a
-    // stale/partial streaming result set; a fresh navigation does.
-    let o2idFound = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const matchedRow = await pageManager.unflattenedPage.findRowWithO2Id(15);
-      if (matchedRow !== -1) {
-        testLogger.info(`Found _o2_id in row ${matchedRow} (attempt ${attempt})`);
-        await pageManager.unflattenedPage.o2IdText.click();
-        o2idFound = true;
-        break;
-      }
-      testLogger.warn(`_o2_id not found in first 15 rows on attempt ${attempt}, re-running query from a fresh page`);
-      if (attempt === 3) {
-        try {
-          const allKeys = await pageManager.unflattenedPage.allLogDetailKeys.allTextContents();
-          testLogger.error('Available fields in log detail', { fields: allKeys });
-        } catch (e) {
-          testLogger.error('Could not retrieve available fields');
-        }
-        break;
-      }
-      await pageManager.unflattenedPage.closeLogDetailDrawerIfOpen();
-      await runFreshLogSearch(page, { sqlSelectAll: true });
-    }
-    if (!o2idFound) {
-      throw new Error('Failed to find _o2_id field in log details after 3 attempts');
-    }
+    // no _timestamp, so the Store-Original-Data re-ingest is genuinely newest).
+    // Larger reserve than the default: this test's tail does a third ingestion and
+    // a full explorer walk after the cleanup toggle, so it needs more budget kept back.
+    await scanForO2IdOrFail(page, { sqlSelectAll: true, backendReady: o2idReady, reserve: 90000 });
 
     await page.waitForTimeout(500);
     testLogger.info('Switching to unflattened tab');
@@ -447,7 +482,9 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(1500);
 
     testLogger.info('Waiting for log detail panel to load');
-    await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ state: "visible", timeout: 10000 });
+    // The drawer opens on the Table tab, so select JSON before waiting on the
+    // JSON panel and its per-key rows (see openJsonDetailTab).
+    await pageManager.unflattenedPage.openJsonDetailTab();
     await page.waitForTimeout(1000);
 
     testLogger.info('Looking for timestamp dropdown in log details');

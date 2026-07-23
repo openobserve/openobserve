@@ -70,11 +70,11 @@
      so thin small marks stay readable — that dark flip is why it can't be raw primary-600. */
   --color-accent: var(--color-primary-600);
 
-  /* Favorite (filled heart) — a rose/pink-leaning red, deliberately warmer
-     than the destructive error red so "loved" and "danger" never read as the
-     same hue on a row that carries both. Only the FILLED heart uses this;
-     unfavorited outlines stay neutral. */
-  --color-favorite: #F43F5E;
+  /* Favorite (filled star) — a warm yellow, deliberately distinct from the
+     destructive error red so "starred" and "danger" never read as the same hue
+     on a row that carries both. Only the FILLED star uses this; unfavorited
+     outlines stay neutral. */
+  --color-favorite: #EAB308;
 }
 
 /* ── Register ALL semantic tokens for Tailwind utilities ── */

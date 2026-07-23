@@ -1114,9 +1114,8 @@ impl Synthetic {
                         cfg.auth.auth_type
                     ));
                 }
-                if cfg.auth.secret.trim().is_empty() {
-                    return Err("config.auth.secret: must not be empty".to_string());
-                }
+                // Empty secret is allowed: the probe runs a credential-less
+                // banner check (a rejected auth still proves SSH is up).
                 Ok(())
             }
         }
@@ -1621,11 +1620,11 @@ mod tests {
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("unknown auth type 'kerberos'"), "{err}");
 
+        // Empty secret = credential-less banner check — allowed.
         s.config = serde_json::json!({
             "username": "demo", "auth": {"type": "password", "secret": ""}
         });
-        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("config.auth.secret"), "{err}");
+        assert!(s.validate(&locs, &brs, &devs, true).is_ok());
 
         s.config = serde_json::json!({
             "username": "demo", "auth": {"type": "password", "secret": "password"}

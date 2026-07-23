@@ -16,33 +16,28 @@
 use std::time::Duration;
 
 #[cfg(feature = "enterprise")]
-pub use audit::{audit, auditor, flush as flush_audit, run_publish_job as run_audit_publish};
+use audit::flush as flush_audit;
 use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::self_reporting::{EnqueueError, ReportingData, error::ErrorData, usage::TriggerData},
     metrics,
 };
-pub use usage_reporting::{http_report_metrics, report_request_usage_stats, report_usage};
 
 #[cfg(feature = "cloud")]
 pub mod cloud_events;
 #[cfg(feature = "enterprise")]
-mod evaluator_schema;
+pub mod evaluator_schema;
 mod ingestion;
 #[cfg(feature = "enterprise")]
-mod llm_scores_schema;
+pub mod llm_scores_schema;
 pub(crate) mod persistence;
 pub mod search;
 mod triggers_schema;
 mod usage_schema;
 
-#[cfg(feature = "enterprise")]
-pub use evaluator_schema::ensure_evaluator_stream_initialized;
 #[cfg(feature = "cloud")]
 pub use ingestion::ingest_data_retention_usages;
-#[cfg(feature = "enterprise")]
-pub use llm_scores_schema::ensure_llm_scores_stream_initialized;
 
 pub async fn run() {
     #[cfg(not(feature = "enterprise"))]
@@ -226,7 +221,7 @@ impl audit::AuditPublisher for CoreAuditPublisher {
         &self,
         request: proto::cluster_rpc::IngestionRequest,
     ) -> Result<proto::cluster_rpc::IngestionResponse, anyhow::Error> {
-        crate::service::ingestion::ingestion_service::ingest(request)
+        crate::ingestion::ingestion_service::ingest(request)
             .await
             .map_err(|error| anyhow::anyhow!(error.to_string()))
     }

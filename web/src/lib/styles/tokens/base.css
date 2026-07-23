@@ -694,6 +694,11 @@
   /* Drawers, side panels */
   --z-index-5000: 5000;
   --z-index-5100: 5100;
+  /* 6000 = drawer/dialog content AND page menu overlays (dropdown, context menu).
+     App stack for context: header 2000, drawer/dialog scrim 5999, content 6000
+     (+1000 per nesting level, computed in ODialog/ODrawer). A page-opened menu
+     must clear the header; a dialog-opened one is portaled after that dialog's
+     content, so equal z + later DOM order puts it on top. */
   --z-index-6000: 6000;
   /* Modal / dialog overlays */
   --z-index-9998: 9998;

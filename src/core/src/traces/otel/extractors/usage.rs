@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use config::utils::json;
 
 use super::utils::{extract_f64, extract_i64};
-use crate::service::traces::otel::{
+use crate::traces::otel::{
     attributes::{
         GenAiAttributes, LLMAttributes, LangfuseAttributes, OpenInferenceAttributes,
         VercelAiSdkAttributes,

@@ -26,6 +26,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "enterprise")]
+use openobserve_api_query::search::search_stream::report_to_audit;
 use serde::Deserialize;
 #[cfg(feature = "enterprise")]
 use {
@@ -46,7 +48,6 @@ use crate::{
     handler::http::{
         extractors::Headers,
         models::ai::{PromptRequest, PromptResponse},
-        request::search::search_stream::report_to_audit,
         router::X_O2_ASSISTANT_SESSION_ID,
     },
 };
@@ -189,13 +190,13 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         // Stripe billing; unpaid orgs get a hard 402.
         #[cfg(feature = "cloud")]
         {
-            let deduction = crate::service::trial_quota::try_deduct(
+            let deduction = openobserve_core::trial_quota::try_deduct(
                 org_id_str,
-                crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
             )
             .await;
 
-            let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
                 user_email: user_id.to_string(),
                 trace_id: Some(trace_id.clone()),
                 session_id: None,
@@ -203,10 +204,10 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
             };
             match &deduction {
                 Ok(_) => {
-                    crate::service::trial_quota::record_free_ai_usage(
+                    openobserve_core::trial_quota::record_free_ai_usage(
                         org_id_str,
                         &usage_ctx,
-                        crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                     );
                 }
                 Err(e) => {
@@ -215,10 +216,10 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
                     )
                     .await;
                     if policy.allows_metered_overage() {
-                        crate::service::trial_quota::record_billable_ai_usage(
+                        openobserve_core::trial_quota::record_billable_ai_usage(
                             org_id_str,
                             &usage_ctx,
-                            crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                         );
                     } else {
                         return MetaHttpResponse::payment_required(
@@ -230,8 +231,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         }
 
         // Extract user auth from headers to pass to the agent
-        let auth_str =
-            crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
         // Auth header is passed directly to agent - no need to extract user_token
 
         // Get global agent client singleton
@@ -478,7 +478,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
             // Extract parent context from incoming traceparent header
             let parent_cx = opentelemetry::global::get_text_map_propagator(|propagator| {
-                propagator.extract(&crate::common::utils::http::RequestHeaderExtractor::new(
+                propagator.extract(&common::utils::http::RequestHeaderExtractor::new(
                     &parts.headers,
                 ))
             });
@@ -625,13 +625,13 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
         // Stripe billing; unpaid orgs get a hard 402.
         #[cfg(feature = "cloud")]
         {
-            let deduction = crate::service::trial_quota::try_deduct(
+            let deduction = openobserve_core::trial_quota::try_deduct(
                 &org_id_str,
-                crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
             )
             .await;
 
-            let usage_ctx = crate::service::trial_quota::AiUsageContext {
+            let usage_ctx = openobserve_core::trial_quota::AiUsageContext {
                 user_email: user_id.clone(),
                 trace_id: Some(trace_id.clone()),
                 session_id: forward_headers
@@ -641,10 +641,10 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
             };
             match &deduction {
                 Ok(_) => {
-                    crate::service::trial_quota::record_free_ai_usage(
+                    openobserve_core::trial_quota::record_free_ai_usage(
                         &org_id_str,
                         &usage_ctx,
-                        crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                        openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                     );
                 }
                 Err(e) => {
@@ -653,10 +653,10 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
                     )
                     .await;
                     if policy.allows_metered_overage() {
-                        crate::service::trial_quota::record_billable_ai_usage(
+                        openobserve_core::trial_quota::record_billable_ai_usage(
                             &org_id_str,
                             &usage_ctx,
-                            crate::service::trial_quota::TrialQuotaFeature::AiChat,
+                            openobserve_core::trial_quota::TrialQuotaFeature::AiChat,
                         );
                     } else {
                         return MetaHttpResponse::payment_required(
@@ -691,8 +691,7 @@ pub async fn chat_stream(Path(org_id): Path<String>, in_req: axum::extract::Requ
 
         // Extract user token from cookie/header for per-user MCP auth
         // Unwrap Session:: wrapper if present, otherwise use token as-is
-        let auth_str =
-            crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
         // Auth header is passed directly to agent - no need to extract user_token
 
         // Transform PromptRequest -> QueryRequest
@@ -944,8 +943,7 @@ pub async fn feedback(Path(org_id): Path<String>, in_req: axum::extract::Request
         };
 
         // Extract user auth from headers to pass to the agent
-        let auth_str =
-            crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
 
         let headers_to_forward = if forward_headers.is_empty() {
             None
@@ -1040,8 +1038,7 @@ pub async fn confirm_action(
         };
 
         // Extract user auth from headers to pass to the agent
-        let auth_str =
-            crate::common::utils::auth::extract_auth_str_from_headers(&parts.headers).await;
+        let auth_str = openobserve_core::auth::extract_auth_str_from_headers(&parts.headers).await;
 
         // Agent uses Authorization header directly - no need to inject user_token into body
         let forward_bytes = body_bytes;

@@ -11,7 +11,7 @@ use std::sync::{Arc, OnceLock};
 
 use async_trait::async_trait;
 use config::{META_ORG_ID, spawn_pausable_job};
-pub use o2_enterprise::enterprise::common::auditor;
+use o2_enterprise::enterprise::common::auditor;
 use proto::cluster_rpc;
 
 #[async_trait]

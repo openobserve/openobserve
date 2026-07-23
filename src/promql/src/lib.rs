@@ -34,8 +34,8 @@ use tokio::sync::oneshot;
 mod aggregations;
 mod binaries;
 pub mod common;
-mod engine;
-mod exec;
+pub mod engine;
+pub mod exec;
 mod functions;
 mod label_usage;
 pub mod name_visitor;
@@ -43,11 +43,7 @@ mod rewrite;
 mod selector_loader;
 pub mod selector_visitor;
 mod series_labels;
-mod utils;
-
-pub use engine::Engine;
-pub use exec::PromqlContext;
-pub use utils::{apply_label_selector, apply_matchers};
+pub mod utils;
 
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s

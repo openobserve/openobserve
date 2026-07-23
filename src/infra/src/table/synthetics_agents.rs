@@ -127,6 +127,27 @@ pub async fn list_by_location(
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
+/// Find an agent by its deploy identity. Agents hold no persistent state, so
+/// a restarted container re-registers with the same (org, location, name) but
+/// without its previous server-issued id — this lookup lets register reuse the
+/// existing row instead of minting a ghost.
+pub async fn find_by_identity(
+    org_id: &str,
+    location_id: &str,
+    name: &str,
+) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let row = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::LocationId.eq(location_id))
+        .filter(Column::Name.eq(name))
+        .order_by_desc(Column::LastSeenAt)
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(row.map(Into::into))
+}
+
 /// Find one agent by id.
 pub async fn get(agent_id: &str) -> Result<Option<SyntheticsAgentRecord>, errors::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;

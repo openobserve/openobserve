@@ -20,7 +20,7 @@ use infra::{db::Event, table::org_storage_providers::OrgStorageProvider};
 use parquet::data_type::AsBytes;
 
 pub async fn watch() -> Result<(), anyhow::Error> {
-    let cluster_coordinator = ::db::get_coordinator().await;
+    let cluster_coordinator = ::infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(OSP_PREFIX).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("Start watching org_storage_providers");

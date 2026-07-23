@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::errors::{Error, Result};
-use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-use openobserve_core::service::db::enrichment_table::{
-    ENRICHMENT_TABLE_META_STREAM_STATS_KEY, notify_update,
+use db::enrichment_table::notify_update;
+use infra::{
+    errors::{Error, Result},
+    table::enrichment_tables::ENRICHMENT_TABLE_META_STREAM_STATS_KEY,
 };
+use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     let db = infra::db::get_db().await;
@@ -64,8 +65,7 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                 let org_id = key_parts[2];
                 let name = key_parts[3];
                 if let Err(e) =
-                    openobserve_core::service::enrichment::storage::database::delete(org_id, name)
-                        .await
+                    openobserve_core::enrichment::storage::database::delete(org_id, name).await
                 {
                     log::error!("delete enrichment table db data error: {e:?}");
                 }

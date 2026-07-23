@@ -27,7 +27,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         return Err(e);
     }
 
-    let providers = match crate::service::org_storage_providers::get_provider_list().await {
+    let providers = match openobserve_core::org_storage_providers::get_provider_list().await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Error in setting up org level storage providers : {e}");
@@ -72,7 +72,7 @@ async fn test_storage_validity() {
                 provider.org_id
             );
             if let Err(e) =
-                crate::service::org_storage_providers::validate_provider(&provider).await
+                openobserve_core::org_storage_providers::validate_provider(&provider).await
             {
                 // todo: bring error up to ui somehow
                 log::error!(
@@ -84,7 +84,7 @@ async fn test_storage_validity() {
                     "org {} has been removed from org storage cache, and will use default storage",
                     provider.org_id
                 );
-                crate::service::self_reporting::publish_error(ErrorData {
+                openobserve_core::self_reporting::publish_error(ErrorData {
                     _timestamp: chrono::Utc::now().timestamp_micros(),
                     stream_params: Default::default(),
                     error_source: ErrorSource::OrgStorage(OrgStorageError {

@@ -136,7 +136,7 @@ impl Metrics for MetricsQuerier {
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
-            if let Err(e) = crate::service::promql::search::grpc::data(&req, tx).await {
+            if let Err(e) = openobserve_core::promql::search::grpc::data(&req, tx).await {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
             #[cfg(feature = "enterprise")]

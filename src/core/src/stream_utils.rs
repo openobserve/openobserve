@@ -107,18 +107,17 @@ pub async fn populate_file_meta(
     Ok(())
 }
 
-pub use config::utils::query_range::get_default_max_query_range;
-pub use search_service::query_range::{
-    get_max_query_range, get_max_query_range_by_user_role, get_settings_max_query_range,
-};
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
+    use config::utils::query_range::get_default_max_query_range;
     use datafusion::arrow::{
         array::StringArray,
         datatypes::{DataType, Field, Schema},
+    };
+    use search_service::query_range::{
+        get_max_query_range, get_max_query_range_by_user_role, get_settings_max_query_range,
     };
 
     use super::*;

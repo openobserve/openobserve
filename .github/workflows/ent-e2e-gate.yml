@@ -11,8 +11,14 @@ name: ENT e2e gate
 #   - PR does NOT touch web/** or tests/ui-testing/**            → pass instantly (never blocks).
 #   - Touches them + `skip-ent-e2e` label                       → pass (explicit, auditable opt-out).
 #   - Touches them + NO `e2e` label                             → FAIL "add the e2e label" (blocks; no silent miss).
-#   - Touches them + `e2e` label                                → dispatch the ENT engine, POLL it,
-#                                                                  mirror pass/fail; comment on failure.
+#   - Touches them + `e2e` label:
+#       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
+#       · sister ENT branch only (no PR)          → build the enterprise binary against that branch
+#       · no ENT counterpart                      → build against ENT main
+#     then POLL and mirror pass/fail.
+#
+# A single STICKY comment per PR (found by a hidden marker) reports running → passed / failed, lists the
+# failing specs (or an enterprise build failure), and links the sister ENT PR/branch + the ENT run.
 #
 # Pure CI — no AI/LLM. Deterministic dispatch + poll of o2-enterprise/oss-pr-ent-gate.yml.
 #
@@ -110,36 +116,88 @@ jobs:
         run: |
           set -euo pipefail
           REPO="openobserve/o2-enterprise"; WF="oss-pr-ent-gate.yml"
+          MARKER="<!-- ent-e2e-gate -->"
 
-          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF) for OSS PR #$PR ($HEAD_REF)…"
+          # Upsert ONE sticky gate comment per PR (located by the hidden marker) so status updates in
+          # place — pass AND fail — instead of spamming a fresh comment each run.
+          sticky() {
+            local body="$1" cid
+            cid=$(gh api "repos/openobserve/openobserve/issues/$PR/comments" --paginate \
+              -q "[.[] | select(.body|contains(\"$MARKER\")) | .id][0]" 2>/dev/null || echo "")
+            if [ -n "$cid" ] && [ "$cid" != "null" ]; then
+              gh api -X PATCH "repos/openobserve/openobserve/issues/comments/$cid" -f body="$body" >/dev/null 2>&1 || true
+            else
+              gh api -X POST "repos/openobserve/openobserve/issues/$PR/comments" -f body="$body" >/dev/null 2>&1 || true
+            fi
+          }
+
+          # Sister ENT resolution. An OPEN same-named ENT PR is the live counterpart — let ITS checks
+          # own enterprise validation; we DEFER (don't build here), just link. Only a branch (no PR) →
+          # build against that branch. Neither → build against main.
+          SISTER_PR=$(gh pr list --repo "$REPO" --head "$HEAD_REF" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
+          if [ -n "$SISTER_PR" ] && [ "$SISTER_PR" != "null" ]; then
+          sticky "### ⏭️ ENT e2e gate — handled by the sister ENT PR
+
+          $MARKER
+          This OSS PR has a matching enterprise PR on branch \`$HEAD_REF\`: **openobserve/o2-enterprise#$SISTER_PR**. The enterprise-only e2e specs run there, so this gate defers to that PR's checks and does not build here."
+            echo "::notice::Sister ENT PR #$SISTER_PR is open — deferring, not dispatching."
+            exit 0
+          fi
+
+          if gh api "repos/$REPO/branches/$HEAD_REF" >/dev/null 2>&1; then
+            ENT_CODE_REF="$HEAD_REF"
+            SISTER_NOTE="Built against the matching ENT branch \`$HEAD_REF\` (no ENT PR yet)."
+            echo "::notice::ENT branch '$HEAD_REF' exists (no PR) — building against it."
+          else
+            ENT_CODE_REF=main
+            SISTER_NOTE="No ENT counterpart — built against ENT \`main\`."
+            echo "::notice::No ENT counterpart for '$HEAD_REF' — building against main."
+          fi
+
+          # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
+          DISPATCH_TS=$(date -u +%s)
+          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF) for OSS PR #$PR ($HEAD_REF)…"
           gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
             -f oss_branch="$HEAD_REF" \
             -f oss_pr="$PR" \
             -f oss_sha="$HEAD_SHA" \
-            -f enterprise_ref="$ENT_REF"
+            -f enterprise_ref="$ENT_CODE_REF"
 
-          # Correlate our run by its PR-scoped run-name: "ENT e2e gate — OSS PR #<PR> (<branch>)".
-          # `#<PR> (` boundary avoids #12 matching #123. gh returns newest-first, so [0] is our latest.
+          # Correlate by PR-scoped run-name ("ENT e2e gate — OSS PR #<PR> ("; the "(" boundary keeps
+          # #12 from matching #123) AND createdAt >= dispatch time (minus 60s clock-skew), so a stale
+          # prior run for this PR is never picked. Take the NEWEST qualifying run.
           MATCH="OSS PR #$PR ("
+          MIN_TS=$((DISPATCH_TS - 60))
           RUN_ID=""
+          sleep 8   # let the dispatched run register before the first lookup
           for i in $(seq 1 30); do            # ~5 min to appear
             RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 \
-              --json databaseId,displayTitle \
-              -q "[.[] | select(.displayTitle | contains(\"$MATCH\"))][0].databaseId" 2>/dev/null || echo "")
+              --json databaseId,displayTitle,createdAt \
+              -q "[.[] | select(.displayTitle | contains(\"$MATCH\")) | select((.createdAt|fromdateiso8601) >= $MIN_TS)] | sort_by(.createdAt) | last | .databaseId" 2>/dev/null || echo "")
             if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
             sleep 10
           done
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-            echo "::error::Could not locate the dispatched ENT run within 5 min — failing the gate (unverified)."
-            gh pr comment "$PR" --repo openobserve/openobserve --body \
-              "### 🚫 ENT e2e gate — could not start
+          sticky "### 🚫 ENT e2e gate — could not start
 
-            Dispatching the enterprise e2e engine failed or the run never appeared (check \`ORG_ADMIN_TOKEN\` / \`ENT_GATE_REF=$ENT_REF\`). The gate stays red until it runs. Re-push or re-label to retry." || true
+          $MARKER
+          Dispatching the enterprise e2e engine failed or the run never appeared (check \`ORG_ADMIN_TOKEN\` / \`ENT_GATE_REF=$ENT_REF\`). The gate stays red until it runs — re-push or re-label to retry.
+
+          $SISTER_NOTE"
+            echo "::error::Could not locate the dispatched ENT run within 5 min — failing the gate (unverified)."
             exit 1
           fi
 
           RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
           echo "::notice::Tracking ENT run: $RUN_URL"
+
+          sticky "### 🔄 ENT e2e gate — running
+
+          $MARKER
+          Building the enterprise binary and running the enterprise-only e2e specs against this PR.
+          $SISTER_NOTE
+
+          [ENT run]($RUN_URL)"
 
           # Poll to completion (~75 min budget — covers a cold-cache ENT build+run worst case).
           STATUS=""; CONCL=""
@@ -151,24 +209,68 @@ jobs:
           done
 
           if [ "$STATUS" != "completed" ]; then
-            echo "::error::ENT run did not finish within the poll window."
-            gh pr comment "$PR" --repo openobserve/openobserve --body \
-              "### ⏳ ENT e2e gate — timed out
+          sticky "### ⏳ ENT e2e gate — timed out
 
-            The enterprise e2e run [did not finish in time]($RUN_URL). The gate stays red. Re-push to retry." || true
+          $MARKER
+          The [enterprise e2e run]($RUN_URL) didn't finish within the poll window. The gate stays red — re-push to retry.
+          $SISTER_NOTE"
+            echo "::error::ENT run did not finish within the poll window."
             exit 1
           fi
 
           if [ "$CONCL" = "success" ]; then
+          sticky "### ✅ ENT e2e gate — passed
+
+          $MARKER
+          The enterprise-only e2e specs passed against this PR. $SISTER_NOTE
+
+          [ENT run]($RUN_URL)"
             echo "::notice::✅ Enterprise e2e specs passed against this PR."
             exit 0
           fi
 
-          echo "::error::Enterprise e2e specs failed (conclusion: $CONCL)."
-          gh pr comment "$PR" --repo openobserve/openobserve --body \
-            "### 🚫 ENT e2e gate — Needs Review
+          # cancelled/skipped/empty ≈ a newer push superseded this run (engine cancel-in-progress).
+          # NOT a failure — the newer run is authoritative and updates the sticky itself. Defer.
+          if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
+            echo "::notice::ENT run concluded '$CONCL' (likely superseded by a newer push) — deferring, not failing."
+            exit 0
+          fi
 
-          This PR changes \`web/**\`/\`tests/ui-testing/**\`, and the **enterprise-only** e2e specs failed against it: [ENT run]($RUN_URL) (conclusion: \`$CONCL\`).
+          # Genuine failure — distinguish an enterprise BUILD failure (compile) from SPEC failures,
+          # and for specs list the failing files from the engine's failed-specs artifact.
+          BUILD_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="build_binary")|.conclusion' 2>/dev/null || echo "")
+          TEST_CONCL=$(gh run view "$RUN_ID" --repo "$REPO" --json jobs -q '.jobs[]|select(.name=="ent_gate_tests")|.conclusion' 2>/dev/null || echo "")
 
-          These specs run only against the enterprise binary, so this breakage wouldn't show up in OSS CI. Open the run for the failing specs. Fix and re-push, or add \`skip-ent-e2e\` if this is a known-safe change." || true
+          if [ "$TEST_CONCL" = "failure" ]; then
+            rm -rf /tmp/fs; SPEC_LIST=""
+            if gh run download "$RUN_ID" --repo "$REPO" -n failed-specs -D /tmp/fs >/dev/null 2>&1 && [ -f /tmp/fs/failed-specs.txt ]; then
+              SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
+            fi
+            [ -n "$SPEC_LIST" ] || SPEC_LIST="_(couldn't read the failed-spec list — open the run for details)_"
+          sticky "### 🚫 ENT e2e gate — Needs Review
+
+          $MARKER
+          The **enterprise-only** e2e spec(s) below failed against this PR. They run only against the enterprise binary, so this breakage wouldn't show up in OSS CI:
+
+          $SPEC_LIST
+
+          $SISTER_NOTE · [ENT run]($RUN_URL)
+
+          Fix and re-push, or add \`skip-ent-e2e\` if this is a known-safe change."
+          elif [ "$BUILD_CONCL" = "failure" ]; then
+          sticky "### 🚫 ENT e2e gate — enterprise build failed
+
+          $MARKER
+          The enterprise binary didn't compile against this PR, so the specs never ran. This usually means the OSS code references enterprise code not present on the ref it was built against.
+
+          $SISTER_NOTE · [ENT run]($RUN_URL)"
+          else
+          sticky "### 🚫 ENT e2e gate — failed
+
+          $MARKER
+          The [enterprise e2e run]($RUN_URL) failed (conclusion: \`$CONCL\`).
+
+          $SISTER_NOTE"
+          fi
+          echo "::error::Enterprise gate failed (conclusion=$CONCL build=$BUILD_CONCL test=$TEST_CONCL)."
           exit 1

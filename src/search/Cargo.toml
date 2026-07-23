@@ -42,6 +42,8 @@ md5.workspace = true
 memchr.workspace = true
 object_store.workspace = true
 transform.workspace = true
+vector-enrichment.workspace = true
+vrl.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 opentelemetry.workspace = true
 parking_lot.workspace = true
