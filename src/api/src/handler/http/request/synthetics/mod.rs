@@ -1391,6 +1391,164 @@ pub async fn agent_setup(Path(org_id): Path<String>) -> Response {
     }
 }
 
+// ── Agent token management (list / rotate / revoke) ─────────────────────────
+
+#[derive(Debug, Default, Deserialize)]
+pub struct RotateAgentTokenRequest {
+    /// Optional operator-chosen name (e.g. per region/agent). Omitted → a
+    /// timestamped name.
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetAgentTokenEnabledRequest {
+    pub enabled: bool,
+}
+
+// RBAC for these routes is enforced by the OpenFGA route-permission middleware
+// (`o2_openfga/.../route_permissions.rs`): all three gate on `synthetic_folder`
+// WRITE (PUT), the same resource as `agent-setup`. No inline role check here —
+// that keeps the whole synthetics management surface consistent (a view-only
+// user is rejected before the handler runs).
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/synthetics/agent-tokens",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "ListSyntheticsAgentTokens",
+    summary = "List the org's private-agent (o2syn_) tokens (values masked)",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Admin or Root role required"),
+    ),
+)]
+pub async fn list_agent_tokens(Path(org_id): Path<String>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::list_agent_tokens(&org_id).await {
+            Ok(tokens) => MetaHttpResponse::json(serde_json::json!({ "tokens": tokens })),
+            Err(e) => {
+                tracing::error!("[synthetics] list_agent_tokens: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = org_id;
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/agent-tokens/rotate",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "RotateSyntheticsAgentToken",
+    summary = "Mint a new default agent token; the old one stays valid until disabled",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    request_body(content = Object, description = r#"{"name": "dc-east"}  (name optional)"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "New token (shown once)", content_type = "application/json", body = Object),
+        (status = 400, description = "Token name already exists"),
+        (status = 403, description = "Admin or Root role required"),
+    ),
+)]
+pub async fn rotate_agent_token(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<RotateAgentTokenRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::rotate_agent_token(
+            &org_id,
+            body.name,
+            &user_email.user_id,
+        )
+        .await
+        {
+            Ok(secret) => MetaHttpResponse::json(secret),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("already exists") {
+                    return MetaHttpResponse::bad_request(msg);
+                }
+                tracing::error!("[synthetics] rotate_agent_token: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg)
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    patch,
+    path = "/{org_id}/synthetics/agent-tokens/{name}",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "SetSyntheticsAgentTokenEnabled",
+    summary = "Enable or disable (revoke) a named agent token",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("name" = String, Path, description = "Token name"),
+    ),
+    request_body(content = Object, description = r#"{"enabled": false}"#, content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 400, description = "Cannot disable the default token — rotate first"),
+        (status = 403, description = "Admin or Root role required"),
+        (status = 404, description = "Token not found"),
+    ),
+)]
+pub async fn set_agent_token_enabled(
+    Path((org_id, name)): Path<(String, String)>,
+    Json(body): Json<SetAgentTokenEnabledRequest>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::synthetics::service::set_agent_token_enabled(
+            &org_id,
+            &name,
+            body.enabled,
+        )
+        .await
+        {
+            Ok(()) => {
+                let state = if body.enabled { "enabled" } else { "disabled" };
+                MetaHttpResponse::json(serde_json::json!({
+                    "message": format!("Token {state} successfully")
+                }))
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("not found") {
+                    MetaHttpResponse::not_found(msg)
+                } else {
+                    MetaHttpResponse::bad_request(msg)
+                }
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, name, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/synthetics/locations/{id}",
