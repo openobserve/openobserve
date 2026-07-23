@@ -24,6 +24,7 @@ beforeAll(() => {
 
 import { nextTick } from "vue";
 import OTable from "./OTable.vue";
+import OTableHeader from "./sub-components/OTableHeader.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { OTableColumnDef } from "./OTable.types";
 
@@ -1399,6 +1400,31 @@ describe("OTable", () => {
       expect(
         wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists(),
       ).toBe(false);
+    });
+  });
+
+  // ── Column reorder (#2239.11) ────────────────────────────────
+  describe("column reorder", () => {
+    it("re-emits column-order-change when the header updates the order", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(4),
+          columns: makeColumns(),
+          enableColumnReorder: true,
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      const header = wrapper.findComponent(OTableHeader);
+      const newOrder = ["status", "id", "name", "email"];
+      header.vm.$emit("update:column-order", newOrder);
+      await nextTick();
+      // Previously OTable swallowed this (only updated its internal order), so
+      // consumers like the logs grid never persisted the reorder — #2239.11.
+      const emitted = wrapper.emitted("column-order-change");
+      expect(emitted).toBeTruthy();
+      expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);
     });
   });
 });

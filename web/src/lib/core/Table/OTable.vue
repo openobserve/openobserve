@@ -1085,7 +1085,7 @@ defineExpose({
           :sticky-col-totals="props.stickyColTotals"
           @toggle-all-rows="selection.toggleAllRows"
           @sort="sorting.handleSort"
-          @update:column-order="(order: string[]) => { columnOrder = order; }"
+          @update:column-order="(order: string[]) => { columnOrder = order; emit('column-order-change', order); }"
           @drag-start="columnMgmt.onDragStart"
           @drag-end="columnMgmt.onDragEnd"
           @resize-start="freezeFlexColumns"
