@@ -18,8 +18,10 @@ const agentWithId: GenAiAgentListItem = {
 
 describe("llmAgentFilter", () => {
   it("keys agent options by stream + id (not display name)", () => {
-    expect(agentOptionKey(agentWithId)).toBe("traces/prod_traces/agent-123");
-    expect(agentOptionKey({ ...agentWithId, id: null })).toBe("traces/prod_traces/support-agent");
+    expect(agentOptionKey(agentWithId)).toBe("traces/prod_traces/agent-123//");
+    expect(agentOptionKey({ ...agentWithId, id: null })).toBe(
+      "traces/prod_traces/support-agent//",
+    );
   });
 
   it("returns an empty predicate for no agent / All Agents", () => {
@@ -32,7 +34,9 @@ describe("llmAgentFilter", () => {
   });
 
   it("filters directly by gen_ai_agent_id when present", () => {
-    expect(buildAgentTraceFilter(agentWithId, "default")).toBe(`gen_ai_agent_id = 'agent-123'`);
+    expect(buildAgentTraceFilter(agentWithId, "default")).toBe(
+      `gen_ai_agent_id = 'agent-123'`,
+    );
   });
 
   it("falls back to gen_ai_agent_name when the agent has no id (§6.3)", () => {
@@ -43,8 +47,30 @@ describe("llmAgentFilter", () => {
 
   it("escapes single quotes in the agent value", () => {
     expect(
-      buildAgentTraceFilter({ ...agentWithId, id: null, name: "o'brien" }, "default"),
+      buildAgentTraceFilter(
+        { ...agentWithId, id: null, name: "o'brien" },
+        "default",
+      ),
     ).toContain(`gen_ai_agent_name = 'o''brien'`);
+  });
+
+  it("adds a version predicate when the agent has a version", () => {
+    const where = buildAgentTraceFilter(
+      { ...agentWithId, version: "1.3.0" },
+      "default",
+    );
+    expect(where).toContain("gen_ai_agent_id = 'agent-123'");
+    expect(where).toContain("gen_ai_agent_version = '1.3.0'");
+  });
+
+  it("adds an env predicate when the agent has an env", () => {
+    const where = buildAgentTraceFilter(
+      { ...agentWithId, env: "production" },
+      "default",
+    );
+    expect(where).toContain(
+      "service_deployment_environment_name = 'production'",
+    );
   });
 
   it("builds a session-membership filter that keeps full matching sessions", () => {

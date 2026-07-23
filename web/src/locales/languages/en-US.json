@@ -5858,6 +5858,12 @@
       "agentIdFields": "Agent ID fallback fields",
       "agentIdHelp": "Incoming attributes to use as fallbacks for gen_ai.agent.id.",
       "agentIdInfo": "Checked only when the standard gen_ai.agent.id attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "envFields": "Environment fallback fields",
+      "envHelp": "Incoming attributes to use as the agent's environment.",
+      "envInfo": "Checked only when the standard deployment.environment.name attribute is missing or empty. Add one incoming telemetry attribute per line.",
+      "versionFields": "Version fallback fields",
+      "versionHelp": "Incoming attributes to use as the agent's version.",
+      "versionInfo": "Checked only when the standard gen_ai.agent.version attribute is missing or empty. Add one incoming telemetry attribute per line.",
       "fieldsPlaceholder": "agent.name\nllm.agent.name",
       "applyDefaults": "Apply defaults",
       "resetToEmpty": "Reset to empty",
@@ -6424,6 +6430,7 @@
   },
   "traces": {
     "agentDefaultVariant": "default",
+    "allAgents": "All Agents",
     "serviceGraph": {
       "searchPlaceholder": "Search Services",
       "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",

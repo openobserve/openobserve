@@ -1,4 +1,5 @@
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { formatAgentOption } from "@/plugins/traces/agentOptionFormat";
 
 export const ALL_AGENTS_VALUE = "__all__";
 
@@ -14,9 +15,10 @@ export function agentFilterKey(agent: AgentFilterSelection): string {
 }
 
 export function agentFilterLabel(agent: AgentFilterSelection): string {
-  // Display the agent identity only — the source stream is part of the filter
-  // KEY (see agentFilterKey) for uniqueness, but it's noise in the dropdown.
-  return agent.id ? `${agent.name} (${agent.id})` : agent.name;
+  // Display the agent identity plus env/version — the source stream is part of
+  // the filter KEY (see agentFilterKey) for uniqueness, but it's noise in the
+  // dropdown. Delegates to the shared formatter so all agent dropdowns match.
+  return formatAgentOption(agent);
 }
 
 // `_llm_scores` and `_evaluator` carry the agent identity denormalized onto
