@@ -2222,6 +2222,7 @@
       "linkPartial": "Lié à {ok} alerte(s), {failed} échoué(es)",
       "linkError": "Impossible de lier les alertes."
     },
+    "chooseTrigger": "Choisir un déclencheur",
     "node": {
       "kindTrigger": "Déclencheur",
       "kindLogic": "Logique",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Supprimer le nœud",
     "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?",
     "cancel": "Annuler",
+    "collapseNodes": "Réduire les nœuds",
+    "openNodes": "Ouvrir les nœuds",
+    "chooseSource": "Choisir une source",
+    "sourceStreamDesc": "Traiter les données en temps réel lors de leur ingestion dans un flux",
+    "sourceQueryDesc": "Exécuter une requête selon un planning et traiter ses résultats",
     "promqlOnlyForMetrics": "ProMQL n'est disponible que pour le type de flux de métriques",
     "invalidCronExpression": "Expression cron non valide",
     "cronRequired": "L'expression cron est obligatoire",
@@ -3326,6 +3332,8 @@
     "seriesName": "Nom de la série",
     "seriesValue": "Valeur de la série",
     "axisValue": "Valeur de l'axe",
+    "expandAllSections": "Développer toutes les sections",
+    "collapseAllSections": "Réduire toutes les sections",
     "configSectionGeneral": "Général",
     "configSectionPromqlTable": "Mode Tableau ProMQL",
     "configSectionGeographic": "Configuration géographique",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Tous les agents",
       "stream": "Flux",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "Aucun agent trouvé",
+      "noAgentsDescription": "Aucun agent n'a été découvert dans cette plage horaire. Essayez d'élargir la plage horaire, ou vérifiez que vos traces incluent les attributs d'agent gen_ai.",
+      "agentCountSingular": "agent",
+      "agentCountPlural": "agents"
     },
     "kpi": {
       "totalCost": "Coût total",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Confirmez-vous la suppression de {count} vérification(s) ? Cette action est irréversible.",
       "bulkDeleteTitle": "Supprimer les vérifications",
+      "deleteSingleBody": "Êtes-vous sûr de vouloir supprimer \"{name}\" ? Cette action est irréversible.",
+      "deleteSingleTitle": "Supprimer le check",
       "duplicateTitle": "Dupliquer la vérification"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Vérifiez les points de terminaison, les codes d'état et les corps de réponse",
       "leave": "Quitter",
       "loadEditFailed": "Impossible de charger la vérification pour modification — le formulaire affiche les valeurs par défaut, ne pas enregistrer",
+      "notFoundInOrg": "Ce check n'existe pas dans l'organisation actuelle.",
       "modalSubtitle": "Choisissez ce que vous voulez surveiller",
       "modalTitle": "Créer une vérification",
       "pageTitle": "Nouvelle vérification {label}",
@@ -9693,6 +9708,7 @@
       "failed": "Échoué",
       "failedRuns": "Exécution échouée",
       "jumpToLastRun": "Aller à la dernière exécution",
+      "jumpToLatestData": "Aller aux dernières données",
       "lastRun": "Dernière course",
       "location": "Lieu",
       "monitors": "Moniteurs",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Le nom est requis",
       "selectorRequired": "Le sélecteur est requis pour \"{step}\"",
       "urlInvalid": "Saisissez une URL valide commençant par http:// ou https://",
-      "urlRequired": "L'URL de départ est requise"
+      "urlRequired": "L'URL de départ est requise",
+      "fixHighlightedFields": "Corrigez les champs en surbrillance avant d'enregistrer"
     },
     "privateLocations": {
       "searchPlaceholder": "Rechercher des emplacements...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Ouvrez l'inspecteur de requêtes",
       "metricsRunQuery": "Exécuter une requête ProMQL",
       "metricsRefresh": "Actualiser",
+      "metricsAddToDashboard": "Ajouter au tableau de bord",
+      "metricsCopyUrl": "Copier le lien de partage",
       "tracesSearch": "Rechercher des traces",
       "tracesRefresh": "Actualiser",
       "alertsCreate": "Créer une nouvelle alerte",

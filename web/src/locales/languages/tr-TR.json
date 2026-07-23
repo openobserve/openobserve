@@ -2071,7 +2071,7 @@
   "workflow": {
     "header": "İş Akışları",
     "subtitle": "Tetikleyiciler, Mantık ve Hedeflerle Eylemleri Otomatikleştirin",
-    "create": "Yeni İş Akışı",
+    "create": "Yeni iş akışı",
     "createTitle": "İş Akışı Oluştur",
     "createConfirm": "Oluştur",
     "createSuccess": "İş Akışı Başarıyla Oluşturuldu",
@@ -2222,6 +2222,7 @@
       "linkPartial": "{ok} Uyarıya Bağlandı, {failed} Başarısız",
       "linkError": "Uyarılar Bağlanamıyor."
     },
+    "chooseTrigger": "Tetikleyici Seç",
     "node": {
       "kindTrigger": "Tetikleyici",
       "kindLogic": "Mantık",
@@ -2378,6 +2379,11 @@
     "deleteNodeTitle": "Düğümü Sil",
     "deleteNodeLlmEvalConfirm": "Bu LLM değerlendirme düğümünü silmek istediğinizden emin misiniz?",
     "cancel": "İptal",
+    "collapseNodes": "Düğümleri Daralt",
+    "openNodes": "Düğümleri Aç",
+    "chooseSource": "Kaynak Seç",
+    "sourceStreamDesc": "Bir akışa alınırken verileri gerçek zamanlı olarak işle",
+    "sourceQueryDesc": "Bir sorguyu zamanlamaya göre çalıştır ve sonuçlarını işle",
     "promqlOnlyForMetrics": "PromQL yalnızca metrik akış türü için kullanılabilir",
     "invalidCronExpression": "Geçersiz cron ifadesi",
     "cronRequired": "Cron ifadesi gereklidir",
@@ -3326,6 +3332,8 @@
     "seriesName": "Seri Adı",
     "seriesValue": "Seri Değeri",
     "axisValue": "Eksen Değeri",
+    "expandAllSections": "Tüm bölümleri genişlet",
+    "collapseAllSections": "Tüm bölümleri daralt",
     "configSectionGeneral": "General",
     "configSectionPromqlTable": "PromQL Tablo Modu",
     "configSectionGeographic": "Coğrafi Yapılandırma",
@@ -7730,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "Tüm ajanlar",
       "stream": "Akış",
-      "agent": "Ajan"
+      "agent": "Ajan",
+      "noAgentsTitle": "Hiçbir ajan bulunamadı",
+      "noAgentsDescription": "Bu zaman aralığında hiçbir ajan bulunamadı. Zaman aralığını genişletmeyi deneyin veya izlemelerinizin gen_ai ajan niteliklerini içerdiğini kontrol edin.",
+      "agentCountSingular": "ajan",
+      "agentCountPlural": "ajanlar"
     },
     "kpi": {
       "totalCost": "Toplam Maliyet",
@@ -9381,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "{count} kontrol(ü) silmek istediğinize emin misiniz? Bu işlem geri alınamaz.",
       "bulkDeleteTitle": "Kontrolleri Sil",
+      "deleteSingleBody": "\"{name}\" silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+      "deleteSingleTitle": "Kontrolü Sil",
       "duplicateTitle": "Kontrolü Çoğalt"
     },
     "empty": {
@@ -9574,6 +9588,7 @@
       "httpDesc": "Uç noktaları, durum kodlarını ve yanıt gövdelerini kontrol edin",
       "leave": "Ayrıl",
       "loadEditFailed": "Kontrol düzenleme için yüklenemedi — form varsayılanları gösteriyor, kaydetmeyin",
+      "notFoundInOrg": "Bu kontrol mevcut kuruluşta bulunmuyor.",
       "modalSubtitle": "İzlemek istediğiniz şeyi seçin",
       "modalTitle": "Bir Kontrol Oluşturun",
       "pageTitle": "Yeni {label} Kontrol",
@@ -9693,6 +9708,7 @@
       "failed": "Başarısız",
       "failedRuns": "Başarısız Çalışmalar",
       "jumpToLastRun": "Son çalıştırmaya git",
+      "jumpToLatestData": "En son verilere git",
       "lastRun": "Son Koşu",
       "location": "Yer",
       "monitors": "Monitörler",
@@ -10022,7 +10038,8 @@
       "nameRequired": "Ad gereklidir",
       "selectorRequired": "\"{step}\" için seçici gereklidir",
       "urlInvalid": "http:// veya https:// ile başlayan geçerli bir URL girin",
-      "urlRequired": "Başlangıç URL'si gereklidir"
+      "urlRequired": "Başlangıç URL'si gereklidir",
+      "fixHighlightedFields": "Kaydetmeden önce vurgulanan alanları düzeltin"
     },
     "privateLocations": {
       "searchPlaceholder": "Konum ara...",
@@ -10209,6 +10226,8 @@
       "panelEditorQueryInspector": "Sorgu denetçisini aç",
       "metricsRunQuery": "PromQL sorgusunu çalıştırın",
       "metricsRefresh": "Yenile",
+      "metricsAddToDashboard": "Panoya ekle",
+      "metricsCopyUrl": "Paylaşım bağlantısını kopyala",
       "tracesSearch": "İzleri ara",
       "tracesRefresh": "Yenile",
       "alertsCreate": "Yeni uyarı oluştur",
