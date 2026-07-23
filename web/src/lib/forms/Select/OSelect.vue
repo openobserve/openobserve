@@ -1343,7 +1343,7 @@ const fieldWidthClass = computed(() => {
                   <span
                     :class="[
                       'flex items-center justify-center shrink-0',
-                      'size-3.5 rounded-default border transition-colors',
+                      'size-3.5 rounded-checkbox border transition-colors',
                       allSelected
                         ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
                         : 'bg-checkbox-bg border-checkbox-border',
@@ -1483,7 +1483,7 @@ const fieldWidthClass = computed(() => {
                           <span
                             :class="[
                               'flex items-center justify-center shrink-0',
-                              'size-3.5 rounded-default border transition-colors',
+                              'size-3.5 rounded-checkbox border transition-colors',
                               selectedValues.includes(
                                 filteredOptions[vRow.index].value,
                               )
@@ -1614,7 +1614,7 @@ const fieldWidthClass = computed(() => {
                 <!-- Checkbox zone hint -->
                 <span class="flex items-center gap-1.5 text-2xs text-select-placeholder shrink-0">
                   <span
-                    class="inline-flex items-center justify-center size-3.5 rounded-default border border-select-placeholder shrink-0"
+                    class="inline-flex items-center justify-center size-3.5 rounded-checkbox border border-select-placeholder shrink-0"
                     aria-hidden="true"
                   >
                     <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-2.5 p-px">
