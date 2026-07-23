@@ -171,9 +171,13 @@ class WorkflowsPage {
   }
 
   /**
-   * K9: attempt a PLAIN Playwright click on Save (no JS bypass). Returns true if it was
-   * intercepted (Save is covered by the tooltip overlay so the click never lands). Documents the
-   * K9 bug and acts as a regression marker — if K9 is fixed this returns false and the test fails.
+   * K9 canary probe — attempts a PLAIN Playwright click on Save (no JS bypass) and returns
+   * true if it was intercepted (the click never landed). This is NON-deterministic in headless
+   * CI: Save has no tooltip of its own (WorkflowEditor.vue), so the overlay that intercepts it
+   * is a transient/adjacent tooltip that often never appears on a programmatic hover.
+   * Callers MUST treat the result as informational only, not a hard assertion — see the CT-19
+   * K9 spec. A consistent `false` would be the signal that K9 is fixed and the clickSave()
+   * JS-bypass workaround can be dropped.
    */
   async normalSaveClickIsIntercepted(timeoutMs = 4000) {
     await this.page.locator(this.saveBtn).hover().catch(() => {});
