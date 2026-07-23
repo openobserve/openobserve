@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Ajouter une étape",
       "search": "Rechercher des étapes…",
       "noMatch": "Aucune étape correspondante"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Lié à {ok} alerte(s), {failed} échoué(es)",
       "linkError": "Impossible de lier les alertes."
     },
-    "canvasEmpty": "Ajoutez un déclencheur pour commencer à construire votre workflow",
     "node": {
       "kindTrigger": "Déclencheur",
       "kindLogic": "Logique",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Pas encore configuré",
       "configComingSoon": "La configuration de {node} sera disponible dans une étape ultérieure",
       "addNext": "Ajouter l'étape suivante",
-      "stepDialogTitle": "Ajouter une étape",
-      "paletteTitle": "Nœuds",
       "sectionTransform": "Transformer",
       "sectionDestination": "Destination",
       "paletteCollapse": "Réduire",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Supprimer le nœud",
     "deleteNodeLlmEvalConfirm": "Êtes-vous sûr de vouloir supprimer ce nœud d'évaluation LLM ?",
     "cancel": "Annuler",
-    "dragDropNodesHere": "Faites glisser et déposez les nœuds ici",
     "promqlOnlyForMetrics": "ProMQL n'est disponible que pour le type de flux de métriques",
     "invalidCronExpression": "Expression cron non valide",
     "cronRequired": "L'expression cron est obligatoire",

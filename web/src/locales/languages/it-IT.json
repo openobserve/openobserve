@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Aggiungi un passaggio",
       "search": "Cerca passaggi…",
       "noMatch": "Nessun passaggio corrispondente"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Collegato a {ok} avviso(i), {failed} falliti",
       "linkError": "Impossibile collegare gli avvisi."
     },
-    "canvasEmpty": "Aggiungi un trigger per iniziare a costruire il tuo workflow",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Non ancora configurato",
       "configComingSoon": "La configurazione di {node} arriverà in un passaggio successivo",
       "addNext": "Aggiungi passaggio successivo",
-      "stepDialogTitle": "Aggiungi un passaggio",
-      "paletteTitle": "Nodi",
       "sectionTransform": "Trasforma",
       "sectionDestination": "Destinazione",
       "paletteCollapse": "Comprimi",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Elimina nodo",
     "deleteNodeLlmEvalConfirm": "Sei sicuro di voler eliminare questo nodo di valutazione LLM?",
     "cancel": "Annulla",
-    "dragDropNodesHere": "Trascina e rilascia i nodi qui",
     "promqlOnlyForMetrics": "ProMQL è disponibile solo per il tipo di flusso di metriche",
     "invalidCronExpression": "Espressione cron non valida",
     "cronRequired": "L'espressione cron è obbligatoria",

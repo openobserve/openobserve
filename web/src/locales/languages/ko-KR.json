@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "단계 추가",
       "search": "단계 검색...",
       "noMatch": "일치하는 단계 없음"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "{ok}개 알림에 연결됨, {failed}개 실패",
       "linkError": "알림을 연결할 수 없습니다."
     },
-    "canvasEmpty": "워크플로우 구축을 시작하려면 트리거를 추가하세요.",
     "node": {
       "kindTrigger": "트리거",
       "kindLogic": "로직",
@@ -2229,8 +2227,6 @@
       "notConfigured": "아직 구성되지 않음",
       "configComingSoon": "{node} 구성은 이후 단계에서 제공됩니다.",
       "addNext": "다음 단계 추가",
-      "stepDialogTitle": "단계 추가",
-      "paletteTitle": "노드",
       "sectionTransform": "변환",
       "sectionDestination": "대상",
       "paletteCollapse": "축소",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "노드 삭제",
     "deleteNodeLlmEvalConfirm": "이 LLM 평가 노드를 정말로 삭제하시겠습니까?",
     "cancel": "취소",
-    "dragDropNodesHere": "노드를 여기로 드래그 앤 드롭하세요",
     "promqlOnlyForMetrics": "PromQL은 메트릭 스트림 유형에만 사용할 수 있습니다.",
     "invalidCronExpression": "잘못된 크론 표현식",
     "cronRequired": "Cron 표현식은 필수입니다",

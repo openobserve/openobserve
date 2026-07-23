@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "添加步骤",
       "search": "搜索步骤…",
       "noMatch": "没有匹配的步骤"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "已链接到 {ok} 个告警，{failed} 个失败",
       "linkError": "无法链接告警。"
     },
-    "canvasEmpty": "添加触发器以开始构建您的工作流",
     "node": {
       "kindTrigger": "触发器",
       "kindLogic": "逻辑",
@@ -2229,8 +2227,6 @@
       "notConfigured": "尚未配置",
       "configComingSoon": "{node} 配置将在后续步骤中完成",
       "addNext": "添加下一步",
-      "stepDialogTitle": "添加步骤",
-      "paletteTitle": "节点",
       "sectionTransform": "转换",
       "sectionDestination": "目标",
       "paletteCollapse": "折叠",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "删除节点",
     "deleteNodeLlmEvalConfirm": "您确定要删除此 LLM 评估节点吗？",
     "cancel": "取消",
-    "dragDropNodesHere": "将节点拖放到此处",
     "promqlOnlyForMetrics": "PromQL 仅适用于指标流类型",
     "invalidCronExpression": "无效的 cron 表达式",
     "cronRequired": "Cron 表达式为必填项",
