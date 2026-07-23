@@ -243,6 +243,7 @@ class UnflattenedPage {
         await this.page
             .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
             .waitFor({ state: 'visible', timeout: 10000 });
+        await this.openJsonDetailTab();
         // JSON content renders asynchronously after the drawer opens. Wait for the
         // first detail key to actually render instead of a fixed 3s sleep — the keys
         // appearing IS the signal callers need before probing for _o2_id, and the
@@ -252,6 +253,33 @@ class UnflattenedPage {
             .first()
             .waitFor({ state: 'visible', timeout: 10000 })
             .catch(() => {});
+    }
+
+    /**
+     * Select the JSON tab in the log detail drawer.
+     *
+     * The drawer now opens on the Table tab — see 4194865a63 "logs sidebar table
+     * will be default view and draggable tabs", which flipped
+     * SearchResult.vue's `detailTableInitialTab` and DetailTable's `initialTab`
+     * default from "json" to "table". Everything this page object reads
+     * (`_o2_id`, the per-key `log-expand-detail-key-*` rows, the unflattened
+     * sub-tab) lives in the JSON panel, and `OTabPanels` is used with
+     * `keep-alive`, so the inactive JSON panel stays mounted but `v-show`-hidden.
+     * It is therefore present in the DOM yet never *visible*, which is what made
+     * every `_o2_id` probe time out.
+     *
+     * The tab bar is user-reorderable (order persisted in localStorage), so
+     * select by data-test rather than position.
+     */
+    async openJsonDetailTab() {
+        const jsonTab = this.page
+            .locator('[data-test="logs-search-result-detail-dialog"] [data-test="log-detail-json-tab"]')
+            .first();
+        await jsonTab.waitFor({ state: 'visible', timeout: 10000 });
+        if ((await jsonTab.getAttribute('data-state')) !== 'active') {
+            await jsonTab.click();
+        }
+        await this.logDetailJsonContent.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**

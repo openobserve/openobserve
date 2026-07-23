@@ -482,7 +482,9 @@ test.describe("Unflattened testcases", () => {
     await page.waitForTimeout(1500);
 
     testLogger.info('Waiting for log detail panel to load');
-    await pageManager.unflattenedPage.logDetailJsonContent.waitFor({ state: "visible", timeout: 10000 });
+    // The drawer opens on the Table tab, so select JSON before waiting on the
+    // JSON panel and its per-key rows (see openJsonDetailTab).
+    await pageManager.unflattenedPage.openJsonDetailTab();
     await page.waitForTimeout(1000);
 
     testLogger.info('Looking for timestamp dropdown in log details');
