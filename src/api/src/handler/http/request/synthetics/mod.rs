@@ -685,10 +685,33 @@ pub async fn delete_synthetics_bulk(
 pub async fn move_synthetics(
     Path(org_id): Path<String>,
     Query(_folder_query): Query<FolderQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<MoveSyntheticsRequestBody>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // RBAC: moving a check is a write — require PUT on each check being
+        // moved (same shape get_synthetic/update use). Mirrors alerts'
+        // move_to_folder check; without it a List+Delete-only role could move
+        // checks between folders. The move route is bypass:true, so this
+        // in-handler check is the only gate.
+        for id in &body.synthetic_ids {
+            if !check_permissions(
+                id,
+                &org_id,
+                &user_email.user_id,
+                "synthetics",
+                "PUT",
+                None,
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Forbidden");
+            }
+        }
         match o2_enterprise::enterprise::synthetics::service::move_synthetics(
             &org_id,
             &body.synthetic_ids,
