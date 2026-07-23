@@ -846,6 +846,7 @@ mod tests {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["custom.agent_name".to_string()],
             agent_id_fields: vec!["custom.agent_id".to_string()],
+            ..Default::default()
         };
 
         processor.process_span_with_pricing_and_agent_mapping(

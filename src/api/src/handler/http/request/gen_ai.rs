@@ -65,6 +65,8 @@ pub struct GenAiAgentListItem {
     pub id: Option<String>,
     pub source_stream: String,
     pub source_stream_type: String,
+    pub env: Option<String>,
+    pub version: Option<String>,
 }
 
 #[cfg(not(feature = "enterprise"))]
@@ -422,5 +424,7 @@ fn agent_item_from_registry_row(
         id: row.agent_id,
         source_stream: row.stream_name,
         source_stream_type: row.stream_type,
+        env: row.env,
+        version: row.agent_version,
     })
 }
