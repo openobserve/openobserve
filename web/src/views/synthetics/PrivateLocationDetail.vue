@@ -210,11 +210,16 @@ const showSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
 const setupAgentName = ref<string | null>(null);
 
-/** Opens the setup drawer. With an agentName (from a specific Agents-table
- *  row's "Recover" action), the drawer pre-fills --agent-name so recovering
- *  a known — possibly offline — agent is a straight copy-paste. */
+/** Opens the setup drawer. With an explicit agentName (from a specific
+ *  Agents-table row's "Recover" action), the drawer pre-fills --agent-name
+ *  so recovering a known — possibly offline — agent is a straight
+ *  copy-paste. Without one (the page-level button), default to this
+ *  location's sole agent when there's exactly one — the common case, and
+ *  restarting it should keep the same identity. Ambiguous with 0 or 2+
+ *  agents, so leave it blank (auto-generate) there. */
 async function openSetup(agentName?: string) {
-  setupAgentName.value = agentName ?? null;
+  const agents = detail.value?.agents ?? [];
+  setupAgentName.value = agentName ?? (agents.length === 1 ? agents[0].name : null);
   showSetup.value = true;
   if (agentSetup.value) return;
   try {
