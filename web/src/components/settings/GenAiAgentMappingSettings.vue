@@ -76,6 +76,34 @@
               <OTooltip :content="t('settings.genAiAgentMapping.agentIdInfo')" />
             </template>
           </OTextarea>
+          <OTextarea
+            v-model="envFieldsText"
+            :label="t('settings.genAiAgentMapping.envFields')"
+            :help-text="t('settings.genAiAgentMapping.envHelp')"
+            :placeholder="t('settings.genAiAgentMapping.fieldsPlaceholder')"
+            :rows="10"
+            spellcheck="false"
+            data-test="gen-ai-env-fields-input"
+          >
+            <template #tooltip>
+              <OTooltip :content="t('settings.genAiAgentMapping.envInfo')" />
+            </template>
+          </OTextarea>
+          <OTextarea
+            v-model="versionFieldsText"
+            :label="t('settings.genAiAgentMapping.versionFields')"
+            :help-text="t('settings.genAiAgentMapping.versionHelp')"
+            :placeholder="t('settings.genAiAgentMapping.fieldsPlaceholder')"
+            :rows="10"
+            spellcheck="false"
+            data-test="gen-ai-version-fields-input"
+          >
+            <template #tooltip>
+              <OTooltip
+                :content="t('settings.genAiAgentMapping.versionInfo')"
+              />
+            </template>
+          </OTextarea>
         </div>
       </div>
 
@@ -141,6 +169,8 @@ const clearingRegistry = ref(false);
 const clearRegistryDialogOpen = ref(false);
 const agentNameText = ref("");
 const agentIdText = ref("");
+const envFieldsText = ref("");
+const versionFieldsText = ref("");
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
@@ -154,11 +184,15 @@ const textToFields = (text: string) =>
 const setDraft = (config: GenAiAgentMappingConfig) => {
   agentNameText.value = fieldsToText(config.agent_name_fields);
   agentIdText.value = fieldsToText(config.agent_id_fields);
+  envFieldsText.value = fieldsToText(config.env_fields);
+  versionFieldsText.value = fieldsToText(config.version_fields);
 };
 
 const draftConfig = (): GenAiAgentMappingConfig => ({
   agent_name_fields: textToFields(agentNameText.value),
   agent_id_fields: textToFields(agentIdText.value),
+  env_fields: textToFields(envFieldsText.value),
+  version_fields: textToFields(versionFieldsText.value),
 });
 
 const loadConfig = async () => {
