@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            card is positioned by us, so it needs neither. -->
       <div
         data-test="pipeline-flow-start-node"
-        class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom)] cursor-pointer!"
+        class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom,1)] cursor-pointer!"
         :style="{ '--ghost-zoom': viewport.zoom }"
         @click="openSourcePicker($event)"
       >

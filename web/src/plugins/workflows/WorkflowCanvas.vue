@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          `transform-origin:0 0` (which scaled it toward the top-left). -->
     <div
       data-test="workflow-flow-start-node"
-      class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom)] cursor-pointer!"
+      class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom,1)] cursor-pointer!"
       :style="{ '--ghost-zoom': viewport.zoom }"
       @click="openTriggerPicker($event)"
     >
