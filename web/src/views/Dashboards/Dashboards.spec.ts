@@ -677,10 +677,11 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showFavoritesOnly).toBe(false);
     });
 
-    it("an app-stamped ?folder=default does NOT beat the favorites landing", async () => {
-      // The folder watcher writes ?folder=default into the URL on every
-      // ordinary visit, so a reload always carries it — it is not an explicit
-      // deep link and must not suppress favorites-first.
+    it("?folder=default in the URL wins over the favorites-first landing", async () => {
+      // getFoldersList always guarantees a "default" folder entry, so it is
+      // trusted the same way any other real folder id in the URL already is
+      // — e.g. after the dashboard-view back button pushes ?folder=default,
+      // or after a reload of that same URL.
       useFavoriteDashboards().favorites.value = [
         { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
       ];
@@ -690,7 +691,7 @@ describe("Dashboards.vue", () => {
       });
       await settle();
 
-      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+      expect(wrapper.vm.activeFolderId).toBe("default");
     });
 
     it("ignores folder emissions that arrive before the landing decision", async () => {

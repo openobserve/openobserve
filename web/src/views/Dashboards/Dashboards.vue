@@ -857,20 +857,15 @@ export default defineComponent({
       const userId = store.state.userInfo?.email;
       if (org && userId) await loadFavorites(org, userId);
 
-      // Landing rules: an explicit deep link (?folder=...) wins — including
-      // the Favorites pseudo-folder. `folder=default` is NOT treated as
-      // explicit: the folder watcher stamps it into the URL on every ordinary
-      // visit, so honoring it would defeat the favorites-first landing on
-      // every reload. With no (effective) deep link, land on Favorites when
-      // the user has any, else on the default folder.
+      // Landing rules: the folder is synced in the URL, so whenever it's
+      // present — a deep link, the folder-watcher stamp, or the
+      // dashboard-view back button — it wins outright and we redirect to
+      // that folder (Favorites pseudo-folder included). Only with no folder
+      // in the URL at all do we fall back to the favorites-first landing.
       activeFolderId.value = null;
       if (route.query.folder === FAVORITES_FOLDER_ID) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
-      } else if (
-        typeof route.query.folder === "string" &&
-        route.query.folder !== "default" &&
-        store.state.organizationData.folders.find((it: any) => it.folderId === route.query.folder)
-      ) {
+      } else if (typeof route.query.folder === "string" && route.query.folder) {
         activeFolderId.value = route.query.folder;
       } else if (favorites.value.length > 0) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
