@@ -168,7 +168,8 @@ def test_rum_search_for_nonexistent_service_returns_empty(client: OpenObserveCli
         headers={"X-Forwarded-For": "182.70.14.246"},
         timeout=10,
     )
-    assert resp_ingest.status_code == 200, \
+    # 202 Accepted: the RUM SDKs drop the batch on any non-202 intake response.
+    assert resp_ingest.status_code == 202, \
         f"rum data ingest failed: {resp_ingest.status_code} {resp_ingest.text}"
 
     # Step 3: wait until the _rumdata stream schema is registered and queryable
@@ -219,7 +220,8 @@ def test_rum_log_ingest_then_search_finds_record(client: OpenObserveClient):
         headers={"X-Forwarded-For": "182.70.14.246"},
         timeout=10,
     )
-    assert resp_ingest.status_code == 200, \
+    # 202 Accepted: the RUM SDKs drop the batch on any non-202 intake response.
+    assert resp_ingest.status_code == 202, \
         f"ingest failed: {resp_ingest.status_code} {resp_ingest.text}"
 
     # Step 3: poll search until the unique message appears in _rumlog

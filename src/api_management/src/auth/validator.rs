@@ -1004,11 +1004,10 @@ pub async fn validator_gcp(req_data: &RequestData) -> Result<AuthValidationResul
     }
 }
 
-/// Validates RUM requests
 /// Extracts the RUM intake token, preferring the query param (browser RUM) over the
 /// request header (mobile RUM). The header path exists because the mobile SDK's native
-/// request factory appends its own `?ddsource=...` to the intake URL and therefore
-/// cannot also carry `?oo-api-key=...` without producing a malformed double-`?` URL.
+/// request factory appends its own query string to the intake URL and therefore cannot
+/// also carry `?oo-api-key=...` without producing a malformed double-`?` URL.
 /// Both the `oo-api-key` header/param and the legacy `o2-api-key` alias are accepted,
 /// query first. Returns `None` when neither source carries a token.
 fn extract_rum_token(
@@ -1021,15 +1020,11 @@ fn extract_rum_token(
     headers
         .get("oo-api-key")
         .or_else(|| headers.get("o2-api-key"))
-        // DEV-ONLY: also accept the upstream Datadog mobile SDK's `DD-API-KEY` header
-        // so an un-rebranded native binary can authenticate during local mobile RUM
-        // testing. REMOVE before shipping — the OpenObserve native fork rebrands this
-        // header to `oo-api-key`, at which point this line is unnecessary.
-        .or_else(|| headers.get("dd-api-key"))
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_owned())
 }
 
+/// Validates RUM requests
 pub async fn validator_rum(req_data: &RequestData) -> Result<AuthValidationResult, AuthError> {
     // By the time this middleware runs, axum's nested router has already stripped
     // both the base_uri prefix (outer nest) and the "/rum" prefix (inner nest),
@@ -1334,6 +1329,21 @@ mod tests {
         assert_eq!(
             extract_rum_token(&std::collections::HashMap::new(), &headers).as_deref(),
             Some("header-token")
+        );
+    }
+
+    #[test]
+    fn extract_rum_token_rejects_unrecognized_vendor_api_key_headers() {
+        // Only `oo-api-key` and the `o2-api-key` alias authenticate. Accepting any other
+        // vendor's API-key header would widen the auth surface to third-party clients, so
+        // upstream header names must never be honoured here.
+        let mut headers = HeaderMap::new();
+        headers.insert("x-vendor-api-key", "third-party-token".parse().unwrap());
+        headers.insert("api-key", "third-party-token".parse().unwrap());
+
+        assert_eq!(
+            extract_rum_token(&std::collections::HashMap::new(), &headers),
+            None
         );
     }
 

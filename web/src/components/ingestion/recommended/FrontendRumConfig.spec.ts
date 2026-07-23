@@ -60,7 +60,10 @@ vi.mock(
     default: {
       name: "SetupCardRenderer",
       props: ["content", "subs"],
-      template: '<div data-test="rum-web-setup-card" />',
+      // Renders the hero-actions slot like the real component does — the
+      // platform switch lives there, so the tests below need it in the DOM.
+      template:
+        '<div data-test="rum-web-setup-card"><slot name="hero-actions" /></div>',
     },
   }),
 );
@@ -113,6 +116,9 @@ const i18n = createI18n({
       ingestion: {
         generateRUMTokenMessage:
           "Generate RUM Token to enable RUM for your organization.",
+        rumPlatform: "Platform",
+        rumPlatformBrowser: "Browser",
+        rumPlatformReactNative: "React Native",
       },
     },
   },
@@ -551,6 +557,101 @@ describe("FrontendRumConfig", () => {
       expect(npmVariant.code.raw).toBe(
         "npm i @openobserve/browser-rum @openobserve/browser-logs",
       );
+    });
+  });
+
+  // ── platform switcher ───────────────────────────────────────────────────
+
+  describe("platform switcher", () => {
+    beforeEach(() => {
+      vi.mocked(getIngestionURL).mockReturnValue(HTTPS_ENDPOINT);
+      ({ wrapper } = mountComponent());
+    });
+
+    it("renders both platform options with their labels when rumToken is present", () => {
+      const browserTab = wrapper.find(
+        '[data-test="rum-setup-platform-browser"]',
+      );
+      const reactNativeTab = wrapper.find(
+        '[data-test="rum-setup-platform-react-native"]',
+      );
+
+      expect(browserTab.exists()).toBe(true);
+      expect(browserTab.text()).toBe("Browser");
+      expect(reactNativeTab.exists()).toBe(true);
+      expect(reactNativeTab.text()).toBe("React Native");
+    });
+
+    it("does NOT render the platform switcher when rumToken is empty", () => {
+      wrapper.unmount();
+      ({ wrapper } = mountComponent({ rumToken: "" }));
+
+      expect(
+        wrapper.find('[data-test="rum-setup-platform-group"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-test="rum-web-no-token-message"]').exists(),
+      ).toBe(true);
+    });
+
+    it("defaults to the browser card with 3 steps and the browser provider name", () => {
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.steps).toHaveLength(3);
+    });
+
+    it("swaps to the React Native card when React Native is selected", async () => {
+      const reactNativeTab = wrapper.find(
+        '[data-test="rum-setup-platform-react-native"]',
+      );
+
+      await reactNativeTab.trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      // Title deliberately stays "Real User Monitoring" on both platforms.
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.steps.map((s: any) => s.id)).toEqual([
+        "install",
+        "init",
+        "session-replay",
+        "navigation",
+        "verify",
+      ]);
+    });
+
+    it("sets the React Native card's detect filter to source = 'react-native'", async () => {
+      const reactNativeTab = wrapper.find(
+        '[data-test="rum-setup-platform-react-native"]',
+      );
+
+      await reactNativeTab.trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      expect(card.props("content").detect.filter).toBe(
+        "source = 'react-native'",
+      );
+    });
+
+    it("restores the browser card when switching back to Browser", async () => {
+      await wrapper
+        .find('[data-test="rum-setup-platform-react-native"]')
+        .trigger("click");
+
+      await wrapper
+        .find('[data-test="rum-setup-platform-browser"]')
+        .trigger("click");
+
+      const card = wrapper.findComponent({ name: "SetupCardRenderer" });
+      const content = card.props("content");
+      expect(content.provider.name).toBe("Real User Monitoring");
+      expect(content.steps.map((s: any) => s.id)).toEqual([
+        "install",
+        "init",
+        "verify",
+      ]);
     });
   });
 });
