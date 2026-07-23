@@ -64,6 +64,7 @@ vi.mock("@/services/settings", () => ({
 
 import settingsService from "@/services/settings";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
+import { markExplicitDashboardFolderNav } from "@/utils/dashboard/explicitFolderNav";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, 'removeAttribute', {
@@ -611,6 +612,24 @@ describe("Dashboards.vue", () => {
       await settle();
 
       expect(wrapper.vm.activeFolderId).toBe("__favorites__");
+    });
+
+    it("an explicit back-navigation to folder=default lands on the default folder, not Favorites", async () => {
+      // Regression: the dashboard-view back button marks its target folder
+      // right before pushing ?folder=default. That marker must beat the
+      // favorites-first landing even though the URL alone looks identical to
+      // a plain reload of the stamped URL.
+      useFavoriteDashboards().favorites.value = [
+        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
+      ];
+      markExplicitDashboardFolderNav("default");
+      await router.push({ path: "/dashboards", query: { folder: "default" } });
+      wrapper = shallowMount(Dashboards, {
+        global: buildGlobalConfig(storeWithTwo(), router, i18n),
+      });
+      await settle();
+
+      expect(wrapper.vm.activeFolderId).toBe("default");
     });
 
     it("ignores folder emissions that arrive before the landing decision", async () => {

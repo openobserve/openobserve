@@ -355,6 +355,7 @@ import {
 } from "@/composables/contextProviders";
 import { hasPanelTime } from "@/utils/dashboard/panelTimeUtils";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
+import { markExplicitDashboardFolderNav } from "@/utils/dashboard/explicitFolderNav";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
@@ -1253,10 +1254,12 @@ export default defineComponent({
 
     // back button → dashboards list scoped to the current folder.
     const goBackToDashboardList = () => {
+      const folder = (route.query.folder as string) ?? "default";
+      markExplicitDashboardFolderNav(folder);
       return router.push({
         path: "/dashboards",
         query: {
-          folder: route.query.folder ?? "default",
+          folder,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });

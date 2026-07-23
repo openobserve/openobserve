@@ -585,6 +585,7 @@ import {
   useFavoriteDashboards,
   FAVORITES_FOLDER_ID,
 } from "@/composables/useFavoriteDashboards";
+import { consumeExplicitDashboardFolderNav } from "@/utils/dashboard/explicitFolderNav";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -912,10 +913,15 @@ export default defineComponent({
 
       // Landing rules: an explicit deep link (?folder=...) wins — including
       // the Favorites pseudo-folder. `folder=default` is NOT treated as
-      // explicit: the folder watcher stamps it into the URL on every ordinary
-      // visit, so honoring it would defeat the favorites-first landing on
-      // every reload. With no (effective) deep link, land on Favorites when
-      // the user has any, else on the default folder.
+      // explicit on its own: the folder watcher stamps it into the URL on
+      // every ordinary visit, so honoring it would defeat the
+      // favorites-first landing on every reload. The one exception is an
+      // in-app navigation that marked "default" as its explicit target right
+      // before pushing the route (e.g. the dashboard-view back button) —
+      // that marker doesn't survive a real reload, so it can't be confused
+      // with the stamped-URL case. With no (effective) deep link, land on
+      // Favorites when the user has any, else on the default folder.
+      const explicitFolder = consumeExplicitDashboardFolderNav();
       activeFolderId.value = null;
       if (route.query.folder === FAVORITES_FOLDER_ID) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
@@ -927,6 +933,11 @@ export default defineComponent({
         )
       ) {
         activeFolderId.value = route.query.folder;
+      } else if (
+        route.query.folder === "default" &&
+        explicitFolder === "default"
+      ) {
+        activeFolderId.value = "default";
       } else if (favorites.value.length > 0) {
         activeFolderId.value = FAVORITES_FOLDER_ID;
       } else {

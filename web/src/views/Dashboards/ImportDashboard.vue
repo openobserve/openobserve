@@ -280,6 +280,7 @@ import dashboardService from "../../services/dashboards.js";
 import axios from "axios";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
 import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
+import { markExplicitDashboardFolderNav } from "@/utils/dashboard/explicitFolderNav";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -632,6 +633,7 @@ export default defineComponent({
           break;
       }
 
+      markExplicitDashboardFolderNav(selectedFolder.value);
       return router.push({
         path: "/dashboards",
         query: {
@@ -745,11 +747,13 @@ export default defineComponent({
       setFormField("url", "");
       jsonStr.value = "";
       filesImportResults.value = [];
+      const folder = route?.query?.folder || "default";
+      markExplicitDashboardFolderNav(folder);
       return router.push({
         path: "/dashboards",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
-          folder: route?.query?.folder || "default",
+          folder,
         },
       });
     };
