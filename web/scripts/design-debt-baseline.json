@@ -1,10 +1,10 @@
 {
   "totals": {
     "rawProjectRamp": 139,
-    "rawVarInComponent": 576,
+    "rawVarInComponent": 565,
     "arbZ": 33,
     "darkMechanism": 20,
-    "unscopedStyle": 7,
+    "unscopedStyle": 6,
     "stylePxUnit": 90
   },
   "files": {
@@ -145,10 +145,6 @@
     },
     "components/pipeline/NodeForm/CreateDestinationForm.vue": {
       "arbZ": 1
-    },
-    "components/pipeline/PipelineEditor.vue": {
-      "unscopedStyle": 1,
-      "rawVarInComponent": 11
     },
     "components/pipeline/PipelineSectionTabs.vue": {
       "rawProjectRamp": 2
