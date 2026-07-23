@@ -22,6 +22,8 @@ use async_trait::async_trait;
 #[cfg(feature = "enterprise")]
 use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
+#[cfg(feature = "enterprise")]
+use common::utils::http::get_or_create_trace_id;
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -43,6 +45,11 @@ use config::{
     },
 };
 use cron::Schedule;
+use db::{
+    self,
+    authz::{remove_ownership, set_ownership},
+    folders,
+};
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     schema::unwrap_stream_settings,
@@ -58,31 +65,20 @@ use o2_openfga::{
     config::get_config as get_openfga_config,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
+use search::sql::RE_ONLY_SELECT;
 use svix_ksuid::Ksuid;
 #[cfg(feature = "enterprise")]
 use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use crate::auth::check_permissions;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::http::get_or_create_trace_id;
-#[cfg(feature = "enterprise")]
-use crate::service::workflows::WorkflowTriggerType;
+use crate::workflows::WorkflowTriggerType;
 use crate::{
-    common::{
-        infra::config::ORGANIZATIONS,
-        meta::authz::Authz,
-        utils::{
-            auth::{is_ofga_unsupported, remove_ownership, set_ownership},
-            ssrf_guard::SsrfGuard,
-        },
-    },
-    service::{
-        alerts::{QueryConditionExt, build_sql, destinations},
-        db, folders,
-        search::sql::RE_ONLY_SELECT,
-        short_url,
-    },
+    alerts::{QueryConditionExt, build_sql, destinations},
+    auth::is_ofga_unsupported,
+    common::{infra::config::ORGANIZATIONS, meta::authz::Authz, utils::ssrf_guard::SsrfGuard},
+    short_url,
 };
 
 /// Errors that can occur when interacting with alerts.
@@ -373,7 +369,7 @@ async fn prepare_alert(
 
     #[cfg(feature = "enterprise")]
     for workflow in alert.workflows.iter() {
-        match crate::service::workflows::get_workflow_by_id(org_id, workflow).await {
+        match crate::workflows::get_workflow_by_id(org_id, workflow).await {
             Ok(None) => {
                 return Err(AlertError::AlertWorkflowNotFound {
                     id: workflow.to_owned(),
@@ -872,7 +868,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::service::alerts::incidents::correlate_alert_to_incident(
+        match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
             notify,
@@ -954,7 +950,7 @@ pub async fn trigger_by_name(
         let synthetic_row = synthetic_row.as_object().unwrap();
         let notify = std::slice::from_ref(synthetic_row);
 
-        match crate::service::alerts::incidents::correlate_alert_to_incident(
+        match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
             synthetic_row,
             notify,
@@ -1216,7 +1212,7 @@ impl AlertExt for Alert {
             .collect();
 
             for workflow in self.workflows.iter() {
-                if let Err(e) = crate::service::workflows::send_workflow_trigger(
+                if let Err(e) = crate::workflows::send_workflow_trigger(
                     _trace_id,
                     &self.org_id,
                     source_id.clone(),
@@ -1396,7 +1392,7 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     } else {
         reqwest::Client::builder()
     };
-    let client = crate::common::utils::ssrf_guard::build_safe_client(builder)?;
+    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
     let mut req = match endpoint.method {
         HTTPType::POST => client.post(url),
@@ -2305,16 +2301,17 @@ async fn permitted_alerts(
     // If the user has `GET` permission on the folder, then they will be able to see the folder and
     // all its contents. This includes the dashboards inside the folder.
 
+    use db::user::get as get_user;
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
-    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+    use crate::auth::AuthExtractor;
 
     if let Some(folder_id) = folder_id {
         let user_role = match get_user(Some(org_id), user_id).await {
             Ok(Some(user)) => user.role,
             _ => return Err(AlertError::UserNotFound),
         };
-        let permitted = crate::service::authz::check_permissions(
+        let permitted = crate::authz::check_permissions(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
@@ -2346,7 +2343,7 @@ async fn permitted_alerts(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::service::authz::list_objects_for_user(
+    let permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",
@@ -2364,7 +2361,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::service::alerts::{Condition, build_expr};
+    use crate::alerts::{Condition, build_expr};
 
     #[test]
     fn test_format_variable_value() {

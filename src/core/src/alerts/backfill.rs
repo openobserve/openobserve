@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use svix_ksuid::{Ksuid, KsuidLike};
 use utoipa::ToSchema;
 
-use crate::service::db;
+use crate::db;
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct BackfillRequest {
@@ -172,7 +172,7 @@ pub async fn create_backfill_job(
     delete_before_backfill: bool,
 ) -> Result<String, anyhow::Error> {
     // 1. Validate pipeline exists and is scheduled
-    let pipeline = crate::service::pipeline::store::get_by_id(pipeline_id).await?;
+    let pipeline = crate::pipeline::store::get_by_id(pipeline_id).await?;
 
     if !pipeline.source.is_scheduled() {
         return Err(anyhow::anyhow!("Pipeline is not a scheduled pipeline"));
@@ -312,8 +312,7 @@ async fn create_backfill_job_status(
     created_at: Option<i64>,
 ) -> Result<BackfillJobStatus, anyhow::Error> {
     // Get pipeline name
-    let pipeline_name = match crate::service::pipeline::store::get_by_id(&config.pipeline_id).await
-    {
+    let pipeline_name = match crate::pipeline::store::get_by_id(&config.pipeline_id).await {
         Ok(pipeline) => Some(pipeline.name),
         Err(_) => None,
     };
@@ -566,8 +565,7 @@ pub async fn update_backfill_job(
 
     // Validate deletion is not enabled for pipelines with remote destinations
     if req.delete_before_backfill {
-        let pipeline =
-            crate::service::pipeline::store::get_by_id(&existing_config.pipeline_id).await?;
+        let pipeline = crate::pipeline::store::get_by_id(&existing_config.pipeline_id).await?;
         let has_remote_destination = pipeline.nodes.iter().any(|node| {
             matches!(
                 &node.data,

@@ -32,20 +32,14 @@ use config::{
 };
 use infra::table::workflows::{Workflow, WorkflowRunErrors};
 use openobserve_api_management::request::alerts::history::escape_like;
+use openobserve_core::auth::UserEmail;
+use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail, http::get_or_create_trace_id, stream::get_settings_max_query_range,
-        },
-    },
+    common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
     handler::http::extractors::Headers,
-    service::{
-        search as SearchService,
-        workflows::{self, InputMap, WorkflowTriggerType},
-    },
+    service::workflows::{self, InputMap, WorkflowTriggerType},
 };
 
 #[derive(Deserialize)]
@@ -198,7 +192,7 @@ pub async fn list_workflows(
                 _permitted = list;
             }
             Err(e) => {
-                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -384,7 +378,7 @@ pub async fn get_workflow_errors(
         }
     };
 
-    let data = match crate::service::workflows::get_error_input_data(&errors).await {
+    let data = match openobserve_core::workflows::get_error_input_data(&errors).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("error getting input data for {org_id}/{workflow_id}/{run_id}");

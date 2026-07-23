@@ -17,16 +17,14 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
-
+use db::authz::{remove_ownership, set_ownership};
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::UserEmail;
+use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
+
 #[cfg(feature = "enterprise")]
 use crate::handler::http::extractors::Headers;
 use crate::{
-    common::{
-        meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
-        utils::auth::{is_ofga_object_visible, remove_ownership, set_ownership},
-    },
+    common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     handler::http::models::scorers::{
         ListScorerVersionsResponseBody, ListScorersQuery, ListScorersResponseBody,
         LlmJudgeOutputSchemaRequestBody, LlmJudgeOutputSchemaResponseBody, ScorerRequestBody,
@@ -463,7 +461,7 @@ async fn run_scorer_test(
     match &scorer.scorer_type {
         infra::table::scorers::ScorerType::LlmJudge => {
             let prepared =
-                crate::service::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
+                openobserve_core::llm_evaluations::prepared_scorers::PreparedLlmJudgeScorer::prepare_with_score_config_info(
                     org_id,
                     &scorer,
                     score_config_info,
@@ -505,7 +503,7 @@ async fn run_scorer_test(
         }
         infra::table::scorers::ScorerType::Remote => {
             let remote_cfg =
-                crate::service::llm_evaluations::prepared_scorers::PreparedRemoteScorer::prepare(
+                openobserve_core::llm_evaluations::prepared_scorers::PreparedRemoteScorer::prepare(
                     org_id, &scorer,
                 )
                 .await

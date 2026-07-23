@@ -32,7 +32,8 @@ use config::{
 use dashmap::DashMap;
 use hashbrown::HashMap;
 use infra::table::short_urls::ShortUrlRecord;
-pub use transform::{QUERY_FUNCTIONS, enrichment::ENRICHMENT_TABLES};
+#[cfg(test)]
+use transform::QUERY_FUNCTIONS;
 
 use crate::meta::{
     maxmind::MaxmindClient,

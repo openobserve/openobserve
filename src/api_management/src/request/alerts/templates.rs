@@ -14,19 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{Json, extract::Path, http::StatusCode, response::Response};
-use openobserve_core::http::template_error_response;
-
+use db::user::is_root_user;
+use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use openobserve_core::auth::check_permissions;
+use openobserve_core::{alerts::templates, auth::UserEmail, http::template_error_response};
+
 use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::auth::{UserEmail, is_root_user},
-    },
-    extractors::Headers,
+    common::meta::http::HttpResponse as MetaHttpResponse,
     models::destinations::Template,
     request::{BulkDeleteRequest, BulkDeleteResponse},
-    service::alerts::templates,
 };
 
 /// CreateTemplate
@@ -196,7 +193,7 @@ pub async fn list_templates(
                 _permitted = list;
             }
             Err(e) => {
-                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -387,9 +384,8 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
+    use db::alerts::templates::TemplateError;
     use openobserve_core::http::template_error_response;
-
-    use crate::service::db::alerts::templates::TemplateError;
 
     fn status(err: TemplateError) -> StatusCode {
         template_error_response(err).status()

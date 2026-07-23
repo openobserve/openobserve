@@ -13,12 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "cloud")]
+use config::DEFAULT_ORG;
+#[cfg(all(feature = "enterprise", not(feature = "cloud")))]
+use openobserve_core::{organization, users};
+#[cfg(feature = "cloud")]
+use openobserve_core::{
+    organization::list_org_users_by_user,
+    self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
+};
 #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
 use {
-    crate::{
-        common::meta::user::RoleOrg,
-        service::{organization, users},
-    },
+    crate::common::meta::user::RoleOrg,
     config::meta::user::{UserOrg, UserRole},
     o2_dex::config::get_config as get_dex_config,
     o2_openfga::authorizer::authz::{get_add_user_to_org_tuples, get_user_role_deletion_tuple},
@@ -29,7 +35,7 @@ use {
 };
 #[cfg(feature = "enterprise")]
 use {
-    crate::{common::meta::user::TokenValidationResponse, service::db},
+    crate::common::meta::user::TokenValidationResponse,
     config::meta::user::DBUser,
     jsonwebtoken::TokenData,
     o2_openfga::authorizer::authz::{get_new_user_creation_tuple, update_tuples},
@@ -41,13 +47,9 @@ use {
 };
 
 #[cfg(feature = "cloud")]
-use crate::{
-    common::meta::{
-        organization::{DEFAULT_ORG, Organization, USER_DEFAULT},
-        telemetry,
-    },
-    service::organization::list_org_users_by_user,
-    service::self_reporting::cloud_events::{CloudEvent, EventType, enqueue_cloud_event},
+use crate::common::meta::{
+    organization::{Organization, USER_DEFAULT},
+    telemetry,
 };
 
 #[cfg(feature = "enterprise")]
@@ -87,9 +89,8 @@ pub async fn process_token(
 
     #[cfg(not(feature = "cloud"))]
     {
+        use common::meta::user::UserOrgRole;
         use config::get_config;
-
-        use crate::common::meta::user::UserOrgRole;
 
         let dex_cfg = get_dex_config();
         let openfga_cfg = get_openfga_config();
@@ -287,10 +288,10 @@ pub async fn process_token(
                 match users::update_user(
                     &org.name,
                     &user_email,
-                    crate::common::meta::user::UserUpdateMode::OtherUpdate,
+                    common::meta::user::UserUpdateMode::OtherUpdate,
                     &get_config().auth.root_user_email,
-                    crate::common::meta::user::UpdateUser {
-                        role: Some(crate::common::meta::user::UserRoleRequest {
+                    common::meta::user::UpdateUser {
+                        role: Some(common::meta::user::UserRoleRequest {
                             role: org.role.to_string(),
                             custom: None,
                         }),
@@ -825,7 +826,7 @@ async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
         }),
     };
 
-    crate::service::self_reporting::publish_error(error_data).await;
+    openobserve_core::self_reporting::publish_error(error_data).await;
 }
 
 #[cfg(feature = "cloud")]
@@ -836,8 +837,7 @@ pub async fn check_and_add_to_org(
     use config::{ider, utils::json};
     use o2_enterprise::enterprise::cloud::OrgInviteStatus;
     use o2_openfga::authorizer::authz::save_org_tuples;
-
-    use crate::service::users::{add_admin_to_org, create_new_user};
+    use openobserve_core::users::{add_admin_to_org, create_new_user};
     let o2cfg = get_openfga_config();
 
     let mut is_new_user = false;
@@ -897,7 +897,7 @@ pub async fn check_and_add_to_org(
     }
     let org_users = org_users.map(|orgs| {
         orgs.into_iter()
-            .filter(|o| !crate::service::db::org_status::is_blocked(&o.org_id))
+            .filter(|o| !db::org_status::is_blocked(&o.org_id))
             .collect::<Vec<_>>()
     });
 
@@ -1078,53 +1078,52 @@ async fn process_custom_claim_parsing(
     // Use String as compiled program type for Send compatibility
     let vrl_compile_fn = |function_content: &str| -> Result<String, anyhow::Error> {
         // Just validate that it compiles, but return the source for execution
-        crate::service::ingestion::compile_vrl_function(function_content, "_meta")
+        transform::compile_vrl_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
         Ok(function_content.to_string())
     };
 
-    let vrl_execute_fn = |function_content: &String,
-                          claims: Value|
-     -> Result<Value, anyhow::Error> {
-        use transform::vrl::compiler::{TargetValue, runtime::Runtime};
+    let vrl_execute_fn =
+        |function_content: &String, claims: Value| -> Result<Value, anyhow::Error> {
+            use vrl::compiler::{TargetValue, runtime::Runtime};
 
-        // Compile the VRL function
-        let vrl_config = crate::service::ingestion::compile_vrl_function(function_content, "_meta")
-            .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
+            // Compile the VRL function
+            let vrl_config = transform::compile_vrl_function(function_content, "_meta")
+                .map_err(|e| anyhow::anyhow!("VRL compilation failed: {}", e))?;
 
-        let mut runtime = Runtime::default();
-        let timezone = transform::vrl::compiler::TimeZone::Local;
-        let mut target = TargetValue {
-            value: claims.into(),
-            metadata: transform::vrl::value::Value::Object(Default::default()),
-            secrets: transform::vrl::value::Secrets::new(),
-        };
+            let mut runtime = Runtime::default();
+            let timezone = vrl::compiler::TimeZone::Local;
+            let mut target = TargetValue {
+                value: claims.into(),
+                metadata: vrl::value::Value::Object(Default::default()),
+                secrets: vrl::value::Secrets::new(),
+            };
 
-        let result = match transform::vrl::compiler::VrlRuntime::default() {
-            transform::vrl::compiler::VrlRuntime::Ast => {
-                runtime.resolve(&mut target, &vrl_config.program, &timezone)
+            let result = match vrl::compiler::VrlRuntime::default() {
+                vrl::compiler::VrlRuntime::Ast => {
+                    runtime.resolve(&mut target, &vrl_config.program, &timezone)
+                }
+            };
+
+            match result {
+                Ok(res) => {
+                    let output: Value = res
+                        .try_into()
+                        .map_err(|e| anyhow::anyhow!("Failed to convert VRL result: {:?}", e))?;
+                    Ok(output)
+                }
+                Err(e) => Err(anyhow::anyhow!("VRL execution failed: {}", e)),
             }
         };
-
-        match result {
-            Ok(res) => {
-                let output: Value = res
-                    .try_into()
-                    .map_err(|e| anyhow::anyhow!("Failed to convert VRL result: {:?}", e))?;
-                Ok(output)
-            }
-            Err(e) => Err(anyhow::anyhow!("VRL execution failed: {}", e)),
-        }
-    };
 
     let js_execute_fn = |function_content: &str, claims: Value| -> Result<Value, anyhow::Error> {
         // Compile the JavaScript function
-        let js_config = crate::service::ingestion::compile_js_function(function_content, "_meta")
+        let js_config = transform::js::compile_js_function(function_content, "_meta")
             .map_err(|e| anyhow::anyhow!("JavaScript compilation failed: {}", e))?;
 
         // Execute JavaScript with claims as input
         let (result, error) =
-            crate::service::ingestion::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
+            transform::js::apply_js_fn(&js_config, claims, "_meta", &[String::new()]);
 
         if let Some(err) = error {
             return Err(anyhow::anyhow!("JavaScript execution failed: {}", err));
@@ -1158,7 +1157,7 @@ async fn process_custom_claim_parsing(
                     }),
                 };
 
-                crate::service::self_reporting::publish_error(error_data).await;
+                openobserve_core::self_reporting::publish_error(error_data).await;
             }) as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>
         };
 
@@ -1305,7 +1304,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_token_with_invalid_token() {
-        use crate::common::meta::user::TokenValidationResponse;
+        use common::meta::user::TokenValidationResponse;
 
         let validation_response = TokenValidationResponse {
             user_name: "Test User".to_string(),

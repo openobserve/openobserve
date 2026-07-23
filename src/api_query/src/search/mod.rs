@@ -37,41 +37,36 @@ use config::{
     },
     utils::{base64, json, time::now_micros, util::DISTINCT_STREAM_PREFIX},
 };
+use db::enrichment_table;
 use error_utils::map_error_to_http_response;
 use hashbrown::HashMap;
 use http::HeaderMap;
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
+#[cfg(feature = "cloud")]
+use openobserve_core::organization::is_org_in_free_trial_period;
 #[cfg(feature = "enterprise")]
-use search_service::sql::visitor::cipher_key::get_cipher_key_names;
+use search::sql::visitor::cipher_key::get_cipher_key_names;
+use search::{
+    datafusion::plan::projections::get_result_schema, sql::visitor::pickup_where::pickup_where,
+    utils::is_permissable_function_error,
+};
+use search_service as SearchService;
+use search_service::query_range::get_settings_max_query_range;
 use tracing::{Instrument, Span};
+use transform as functions;
+use usage_reporting::{http_report_metrics, report_request_usage_stats};
 #[cfg(feature = "enterprise")]
 use utils::{StreamPermissionResourceType, check_stream_permissions};
 
-#[cfg(feature = "cloud")]
-use crate::service::organization::is_org_in_free_trial_period;
-use crate::{
-    common::{
-        meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail,
-            functions,
-            http::{
-                get_clear_cache_from_request, get_dashboard_info_from_request,
-                get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
-                get_is_ui_histogram_from_request, get_or_create_trace_id,
-                get_search_event_context_from_request, get_search_type_from_request,
-                get_stream_type_from_request, get_use_cache_from_request, get_work_group,
-            },
-            stream::get_settings_max_query_range,
-        },
-    },
-    extractors::Headers,
-    service::{
-        db::enrichment_table,
-        search::{
-            self as SearchService, datafusion::plan::projections::get_result_schema,
-            sql::visitor::pickup_where::pickup_where, utils::is_permissable_function_error,
-        },
-        self_reporting::{http_report_metrics, report_request_usage_stats},
+use crate::common::{
+    meta::http::HttpResponse as MetaHttpResponse,
+    utils::http::{
+        get_clear_cache_from_request, get_dashboard_info_from_request,
+        get_fallback_order_by_col_from_request, get_is_multi_stream_search_from_request,
+        get_is_ui_histogram_from_request, get_or_create_trace_id,
+        get_search_event_context_from_request, get_search_type_from_request,
+        get_stream_type_from_request, get_use_cache_from_request, get_work_group,
     },
 };
 
@@ -127,9 +122,7 @@ async fn can_use_distinct_stream(
     // all the fields used in the query sent must be in the distinct stream
     #[allow(deprecated)]
     let query_fields: Vec<String> =
-        match search_service::sql::Sql::new(&(query.clone().into()), org_id, stream_type, None)
-            .await
-        {
+        match search::sql::Sql::new(&(query.clone().into()), org_id, stream_type, None).await {
             // if sql is invalid, we let it follow the original search and fail
             Err(_) => return false,
             Ok(sql) => {
@@ -335,7 +328,7 @@ pub async fn search(
     if is_ui_histogram {
         histogram_breakdown_field = if !is_multi_stream_search {
             if let Some(stream_name) = stream_names.first() {
-                search_service::sql::histogram::resolve_histogram_breakdown_field(
+                search::sql::histogram::resolve_histogram_breakdown_field(
                     &org_id,
                     stream_name,
                     stream_type,
@@ -349,7 +342,7 @@ pub async fn search(
         };
 
         // Convert the original query to a histogram query
-        match search_service::sql::histogram::convert_to_histogram_query(
+        match search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
@@ -424,7 +417,7 @@ pub async fn search(
 
     #[cfg(feature = "enterprise")]
     {
-        use crate::common::meta;
+        use common::meta;
         let keys_used = match get_cipher_key_names(&req.query.sql) {
             Ok(v) => v,
             Err(e) => {
@@ -443,16 +436,13 @@ pub async fn search(
             {
                 use o2_openfga::meta::mapping::OFGA_MODELS;
 
-                use crate::{
-                    common::utils::auth::{AuthExtractor, is_root_user},
-                    service::users::get_user,
-                };
+                use crate::service::{auth::AuthExtractor, users::get_user};
 
-                if !is_root_user(user_id) {
+                if !db::user::is_root_user(user_id) {
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::service::authz::check_permissions(
+                    if !openobserve_core::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -1996,16 +1986,13 @@ pub async fn result_schema(
             {
                 use o2_openfga::meta::mapping::OFGA_MODELS;
 
-                use crate::{
-                    common::utils::auth::{AuthExtractor, is_root_user},
-                    service::users::get_user,
-                };
+                use crate::service::{auth::AuthExtractor, users::get_user};
 
-                if !is_root_user(user_id) {
+                if !db::user::is_root_user(user_id) {
                     let user: config::meta::user::User =
                         get_user(Some(&org_id), user_id).await.unwrap();
 
-                    if !crate::service::authz::check_permissions(
+                    if !openobserve_core::authz::check_permissions(
                         user_id,
                         AuthExtractor {
                             auth: "".to_string(),
@@ -2038,18 +2025,17 @@ pub async fn result_schema(
     }
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();
-    let sql =
-        match search_service::sql::Sql::new(&query, &org_id, stream_type, req.search_type).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Error parsing sql: {e}");
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
+    let sql = match search::sql::Sql::new(&query, &org_id, stream_type, req.search_type).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Error parsing sql: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
+            )
+                .into_response();
+        }
+    };
 
     let res_schema = match get_result_schema(sql, is_streaming, use_cache).await {
         Ok(v) => v,
@@ -2071,7 +2057,7 @@ pub async fn result_schema(
     {
         use std::collections::HashSet as StdHashSet;
 
-        use crate::service::db::organization::get_org_setting;
+        use db::organization::get_org_setting;
 
         let field_alias_map = &res_schema.field_alias_map;
 

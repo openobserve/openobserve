@@ -30,6 +30,7 @@ use config::{
         json, schema::infer_json_schema_from_map, time::now_micros, util::get_distinct_stream_name,
     },
 };
+use db;
 use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
@@ -40,12 +41,9 @@ use tokio::sync::{RwLock, mpsc};
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    service::{
-        db,
-        ingestion::{self, get_thread_id},
-        metadata::{Metadata, MetadataItem},
-        schema::get_schema_changes,
-    },
+    ingestion::{self, get_thread_id},
+    metadata::{Metadata, MetadataItem},
+    schema::get_schema_changes,
 };
 
 const CHANNEL_SIZE: usize = 10240;
