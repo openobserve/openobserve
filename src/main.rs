@@ -86,6 +86,7 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::Registry;
 use utoipa::OpenApi;
+use web::ui_routes;
 #[cfg(feature = "enterprise")]
 use {
     config::Config,
@@ -747,7 +748,7 @@ async fn init_http_server() -> Result<(), anyhow::Error> {
     );
 
     // Build the router
-    let app = apply_common_middlewares(create_app_router()).layer(CompressionLayer::new());
+    let app = apply_common_middlewares(create_app_router(ui_routes)).layer(CompressionLayer::new());
     // Skip the request tracing layer when tracing is enabled only for search
     let app = if !cfg.common.tracing_enabled
         && (cfg.common.tracing_search_enabled || cfg.common.search_inspector_enabled)
