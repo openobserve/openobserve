@@ -52,7 +52,9 @@ export class LogsPage {
         // Quick Pick (no-stream-selected sidebar state) locators
         this.quickPickContainer = '[data-test="logs-search-stream-quick-pick"]';
         this.quickPickButton = (streamName) => `[data-test="logs-search-stream-quick-pick-${streamName}"]`;
-        this.quickPickButtonWildcard = '[data-test^="logs-search-stream-quick-pick-"]';
+        // Match only the per-stream quick-pick buttons, NOT the "-more" footer
+        // span (which also starts with `logs-search-stream-quick-pick-`).
+        this.quickPickButtonWildcard = '[data-test^="logs-search-stream-quick-pick-"]:not([data-test="logs-search-stream-quick-pick-more"])';
         this.quickPickMoreFooter = '[data-test="logs-search-stream-quick-pick-more"]';
         // Hero state (main content no-stream-selected) locators
         this.noStreamHero = '[data-test="logs-search-no-stream-selected-text"]';
@@ -11254,6 +11256,65 @@ export class LogsPage {
         const btn = this.page.locator(this.quickPickButton(streamName));
         await btn.waitFor({ state: 'visible', timeout: 10000 });
         await btn.click();
+    }
+
+    /**
+     * Seeds `count` logs streams named `${prefix}${i}` (1-based) by ingesting a
+     * single record into each. First-time ingestion creates the stream, so this
+     * is how the footer test pushes the org above the quick-pick limit (8) to make
+     * the "more" footer render. Returns the created stream names.
+     *
+     * Freshly-ingested streams have no computed stats yet, so they sort to the
+     * bottom of the quick pick (ordered by stats.doc_time_max desc) and do NOT
+     * displace already-active streams like e2e_automate. These streams are swept
+     * by cleanup.spec.js via the matching `${prefix}` regex.
+     * @param {string} prefix — e.g. "e2e_qp_more_stream_"
+     * @param {number} count
+     * @returns {Promise<string[]>}
+     */
+    async seedLogStreams(prefix, count) {
+        const names = [];
+        for (let i = 1; i <= count; i++) {
+            const name = `${prefix}${i}`;
+            await this.ingestData(name, [{
+                level: 'info',
+                job: 'quickpick_more_footer_seed',
+                message: `quick-pick more-footer seed record ${i}`,
+            }]);
+            names.push(name);
+        }
+        testLogger.info(`Seeded ${names.length} quick-pick streams`, { prefix });
+        return names;
+    }
+
+    /**
+     * Polls the streams API until every name in `names` is listed (logs type),
+     * so a subsequent page load reflects the newly-seeded streams. Best-effort:
+     * returns true once all appear, false on timeout.
+     * @param {string[]} names
+     * @param {number} timeout
+     */
+    async waitForStreamsListed(names, timeout = 20000) {
+        const fetch = (await import('node-fetch')).default;
+        const orgId = getOrgIdentifier();
+        const url = `${process.env.INGESTION_URL}/api/${orgId}/streams?type=logs`;
+        const deadline = Date.now() + timeout;
+        while (Date.now() < deadline) {
+            try {
+                const res = await fetch(url, { headers: getAuthHeaders() });
+                const body = await res.json();
+                const existing = new Set((body.list || []).map((s) => s.name));
+                if (names.every((n) => existing.has(n))) {
+                    testLogger.info('All seeded streams are listed', { count: names.length });
+                    return true;
+                }
+            } catch (e) {
+                testLogger.debug(`waitForStreamsListed retry: ${e.message}`);
+            }
+            await this.page.waitForTimeout(1000);
+        }
+        testLogger.warn('Not all seeded streams listed before timeout', { names });
+        return false;
     }
 
     /**

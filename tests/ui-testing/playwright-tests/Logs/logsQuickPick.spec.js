@@ -127,33 +127,47 @@ test.describe("Logs No-Stream Quick Pick testcases", () => {
     testLogger.info('Deselect and re-pick workflow completed');
   });
 
-  // ── P2: Quick pick "X more" footer (conditional on > 8 streams) ────
-  test("should show more footer when org has more than 8 streams", {
+  // ── P2: Quick pick "X more" footer (seeds > 8 streams, then verifies) ─
+  // QUICK_PICK_LIMIT is 8 (IndexList.vue). The quick pick caps at 8 buttons and
+  // shows a "Search above for N more" footer whenever the org has more than 8
+  // logs streams. This test CREATES 9 streams so the condition always holds, then
+  // asserts the cap + footer.
+  //
+  // Stream names carry a per-run unique token (e2e_qp_more_stream_<token>_N) so
+  // repeat/parallel runs never collide with a still-deleting same-named stream
+  // (stream deletion in OpenObserve is async). Freshly-ingested streams have no
+  // stats yet, so they sort to the bottom of the quick pick and never displace
+  // already-active streams (e.g. e2e_automate) that sibling tests rely on. The
+  // seeds are swept by cleanup.spec.js via the `e2e_qp_more_stream_` prefix.
+  test("should create more than 8 streams and show the quick pick more footer", {
     tag: ['@logs-stream-quick-pick', '@all', '@logs']
   }, async ({ page }) => {
-    testLogger.info('Testing quick pick more footer');
+    testLogger.info('Testing quick pick more footer with seeded streams');
+
+    const QUICK_PICK_LIMIT = 8;
+    const runToken = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
+    const seedPrefix = `e2e_qp_more_stream_${runToken}_`;
+
+    // Create one more than the limit so streamList always exceeds it.
+    const seededStreams = await pm.logsPage.seedLogStreams(seedPrefix, QUICK_PICK_LIMIT + 1);
+    await pm.logsPage.waitForStreamsListed(seededStreams);
+
+    // Reload the no-stream logs page so the stream list picks up the new streams.
+    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
     await pm.logsPage.expectQuickPickContainerVisible();
 
-    // Count how many quick pick stream buttons are visible
+    // The quick pick must cap visible stream buttons at the limit.
     const count = await pm.logsPage.getQuickPickButtonCount();
+    expect(count, 'Quick pick should cap visible buttons at the limit (8)').toBe(QUICK_PICK_LIMIT);
 
-    // This test is conditional: it only asserts the footer when the org has > 8 streams.
-    // QUICK_PICK_LIMIT is 8 (IndexList.vue:549), so ≤ 8 buttons means the footer
-    // won't appear. Skip gracefully with a clear message.
-    if (count < 8) {
-      testLogger.info(`Quick pick shows ${count} buttons (≤ 8), skipping more-footer test`);
-      test.skip(true, `Org has fewer than 8 streams (${count} visible), more-footer not applicable`);
-      return;
-    }
-
-    // Footer should be visible when streamList > quickPickStreams
+    // The "more" footer must be visible and report a positive remaining count.
     await pm.logsPage.expectQuickPickMoreFooterVisible();
+    const footerText = await page.locator(pm.logsPage.quickPickMoreFooter).innerText();
+    expect(footerText, 'More footer should report a remaining count').toMatch(/\d+/);
 
-    // The number of visible quick pick buttons must not exceed the limit
-    expect(count, 'Quick pick button count should not exceed 8').toBeLessThanOrEqual(8);
-
-    testLogger.info('Quick pick more footer verified');
+    testLogger.info(`Quick pick more footer verified (${footerText.trim()})`);
   });
 
   // ── P2: Hero "Recent:" chip selects stream and triggers search ─────
