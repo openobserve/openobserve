@@ -4012,7 +4012,7 @@
       "logs": "Kirim logs",
       "logsDesc": "Curl, Filebeat, Fluentbit, Vector & lainnya",
       "traces": "Kirim traces",
-      "tracesDesc": "OTLP / Jaeger / Zipkin distributed tracing",
+      "tracesDesc": "Tracing terdistribusi OTLP / Jaeger / Zipkin",
       "metrics": "Kirim metrics",
       "metricsDesc": "Prometheus, OTel Collector, Telegraf & lainnya",
       "or": "Atau:",
@@ -4090,7 +4090,7 @@
       "night": "Bekerja Larut"
     },
     "welcome": {
-      "taglineLead": "I'm",
+      "taglineLead": "Saya",
       "taglineHighlight": "Asisten O2",
       "taglineTail": ". I can tulis your",
       "taglineSql": "SQL",
@@ -4497,7 +4497,7 @@
         "distinctGroupsAffected": "berbeda groups apakah affected",
         "metricsMatchCriteria": "deret cocok criteria",
         "matchingLogsFound": "matching log found",
-        "groupsPassFilter": "groups pass filter criteria",
+        "groupsPassFilter": "grup memenuhi kriteria filter",
         "distinctGroups": "berbeda groups found",
         "resultRows": "hasil rows returned",
         "timeSeries": "aktif time series found",
@@ -4660,9 +4660,9 @@
         "eventsPlural": "peristiwa",
         "eventSingular": "peristiwa",
         "moreThan": "lainnya than",
-        "exactly": "exactly",
+        "exactly": "tepatnya",
         "orFewer": "atau fewer",
-        "fewerThan": "fewer than",
+        "fewerThan": "kurang dari",
         "not": "tidak",
         "occurInAny": "occur di any",
         "period": "periode",
@@ -5089,7 +5089,7 @@
       "enterSqlFirst": "masukkan a SQL kueri first",
       "clickLoadDataHint": "Klik Muat Data ke pratinjau the waktu deret",
       "seasonalityWeekly": "jam + day-of-week",
-      "seasonalityDaily": "hour-of-day",
+      "seasonalityDaily": "jam-dalam-hari",
       "notifications": "Notifikasi",
       "notificationsTooltip": "When enabled, a notification will be sent to the selected tujuan whenever an anomaly is detected.",
       "enabled": "Diaktifkan",
@@ -5359,7 +5359,7 @@
     "active": "aktif",
     "bucketName": "bucket nama",
     "region": "wilayah",
-    "serverUrl": "server url",
+    "serverUrl": "url server",
     "accessKey": "akses kunci",
     "secretKey": "rahasia kunci",
     "roleArn": "peran arn",
@@ -6243,7 +6243,7 @@
       "chooseTypeTitle": "Choose Tipe",
       "selectProviderDescCont": "once configured, semua new data for this org will be written to your own storage infrastructure.",
       "irreversibleWarnPre": "This aksi is ",
-      "irreversibleWarnEmphasis": "irreversible",
+      "irreversibleWarnEmphasis": "tidak dapat dibatalkan",
       "irreversibleWarnPost": ". Once set, you cannot switch to a different storage provider or hapus this configuration. To use a different provider, you must buat a new organization.",
       "credentialsOnlyInfo": "Once configured, only credential fields can be updated. Semua other fields will be locked.",
       "selectStorageProviderLabel": "Pilih Storage Provider ",
@@ -6292,7 +6292,7 @@
       "noAdditionalDimensions": "Tidak additional dimensions detected.",
       "noSampleData": "Tidak sampel data tersedia for this bidang.",
       "uniqueValuesDetected": "{n} unik values detected",
-      "locations": "locations",
+      "locations": "lokasi",
       "recommendedConfigApplied": "Direkomendasikan configuration applied. Click \"Simpan Konfigurasi\" to save.",
       "selectAtLeastOneTrackedAlias": "Pilih at least one tracked alias group.",
       "cardinalityClassLabel": " ({cardinality} cardinality)",
@@ -6436,7 +6436,7 @@
       "kind": {
         "service": "Layanan",
         "database": "Datastores",
-        "queue": "Queues",
+        "queue": "Antrean",
         "external": "Eksternal",
         "rpc": "RPC",
         "agent": "Agen",
@@ -6472,7 +6472,7 @@
       "title": "Mulai sending trace ke OpenObserve",
       "description": "No jejak streams found in this organisasi yet. Instrument your services and traces will appear here automatically.",
       "otlp": "Kirim traces via OTLP",
-      "otlpDesc": "Jaeger, Zipkin & any OpenTelemetry-compatible SDK",
+      "otlpDesc": "Jaeger, Zipkin & SDK apa pun yang kompatibel dengan OpenTelemetry",
       "otelCollector": "OTel Collector / Agen",
       "otelCollectorDesc": "Route semua telemetry signals through the OTel Collector",
       "or": "Atau:",
@@ -6733,7 +6733,7 @@
         "cost": "Biaya",
         "cache": "Cache",
         "spans": "Span",
-        "llmCalls": "LLM calls",
+        "llmCalls": "panggilan LLM",
         "toolCalls": "Alat calls",
         "otherCalls": "Lainnya",
         "otherCallsTooltip": "gen_ai spans with unrecognised operasi names:"
@@ -6777,7 +6777,7 @@
         "all": "Semua",
         "service": "Layanan",
         "datastore": "Datastores",
-        "queue": "Queues",
+        "queue": "Antrean",
         "external": "Eksternal",
         "rpc": "RPC"
       },
@@ -7056,7 +7056,7 @@
     },
     "flameGraphView": {
       "spans": "span",
-      "depth": "depth",
+      "depth": "kedalaman",
       "noSpansToDisplay": "Tidak spans ke tampilan",
       "service": "Layanan:",
       "duration": "Durasi:",
@@ -7950,7 +7950,7 @@
         "legendP95": "p95",
         "legendThreshold": "ambang {direction} {value}",
         "legendHealthy": "sehat",
-        "legendUnhealthy": "unhealthy",
+        "legendUnhealthy": "tidak sehat",
         "legendHealthyRate": "Sehat rate",
         "legendTrueRate": "Benar rate",
         "legendTrueCount": "benar ({count})",
@@ -8280,7 +8280,7 @@
         "producesEmpty": "This scorer doesn't write to any Konfigurasi Skor.",
         "promptSection": "Prompt Hakim",
         "requestTemplateSection": "Permintaan Template",
-        "variablesSuffix": "variables",
+        "variablesSuffix": "variabel",
         "outputSchemaSection": "Keluaran Skema",
         "usedBySection": "Digunakan Oleh",
         "usedByIntro": "Jobs that referensi this scorer di their pipeline.",
@@ -8458,7 +8458,7 @@
         "colName": "Field Nama",
         "colType": "Tipe",
         "colDescription": "Deskripsi",
-        "namePlaceholder": "field_name",
+        "namePlaceholder": "nama_bidang",
         "descriptionPlaceholder": "Apa should the LLM put di this bidang?",
         "addButton": "+ Tambah Field",
         "previewSchema": "Lihat Generated Schema",
@@ -8479,7 +8479,7 @@
       "remoteEndpointPlaceholder": "https://eval.internal.corp/check",
       "remoteTimeoutLabel": "Waktu Habis (ms)",
       "remoteRetriesLabel": "Maks Retries",
-      "remoteBackoffLabel": "Backoff",
+      "remoteBackoffLabel": "Cooldown",
       "remoteBackoff": {
         "exponential": "Eksponensial",
         "linear": "Linear",
@@ -8667,7 +8667,7 @@
       "presets": {
         "label": "Cepat presets",
         "rootSpans": "Akar spans hanya",
-        "llmCalls": "LLM calls",
+        "llmCalls": "panggilan LLM",
         "toolCalls": "Alat calls"
       },
       "backTo": "Kembali to Eval Jobs",
@@ -8824,19 +8824,19 @@
             "title": "Span Cocok",
             "hint": "Once you've picked a stream and filter, this panel will tampilkan how many spans your job will match.",
             "matchedSuffix": "spans matched · terakhir 24h",
-            "matchedLoading": "Counting matched spans…"
+            "matchedLoading": "Menghitung span yang cocok..."
           },
           "trace": {
             "title": "Matched Jejak",
             "hint": "Once you've picked a stream and filter, this panel will tampilkan how many traces your job will match.",
             "matchedSuffix": "trace matched · terakhir 24h",
-            "matchedLoading": "Counting matched traces…"
+            "matchedLoading": "Menghitung trace yang cocok..."
           },
           "session": {
             "title": "Matched Sesi",
             "hint": "Once you've picked a stream and filter, this panel will tampilkan how many sessions your job will match.",
             "matchedSuffix": "sessions matched · terakhir 24h",
-            "matchedLoading": "Counting matched sessions…"
+            "matchedLoading": "Menghitung sesi yang cocok..."
           }
         },
         "matchedError": "Couldn't load the match jumlah",
@@ -9822,7 +9822,7 @@
       "hitTimeout": "hit waktu Habis",
       "selectorTestId": "Selector (Uji ID)",
       "tabClosed": "Tab ditutup",
-      "tabClosedReason": "tab closed",
+      "tabClosedReason": "tab ditutup",
       "timeout": "Timeout Kesalahan",
       "waited": "Menunggu"
     },
