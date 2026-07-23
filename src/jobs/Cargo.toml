@@ -14,18 +14,43 @@ enterprise = [
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
+    "compaction/enterprise",
+    "enrichment-data/enterprise",
     "openobserve-core/enterprise",
+    "promql-service/enterprise",
     "search_service/enterprise",
+    "stream/enterprise",
 ]
-cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
-vectorscan = ["openobserve-core/vectorscan", "search_service/vectorscan"]
-vortex = ["openobserve-core/vortex", "search_service/vortex"]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-core/cloud",
+    "stream/cloud",
+]
+vectorscan = [
+    "openobserve-core/vectorscan",
+    "promql-service/vectorscan",
+    "search_service/vectorscan",
+    "stream/vectorscan",
+]
+vortex = [
+    "compaction/vortex",
+    "openobserve-core/vortex",
+    "promql-service/vortex",
+    "search_service/vortex",
+]
 
 [dependencies]
 audit.workspace = true
 common.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
+ingestion-common.workspace = true
+schema.workspace = true
+compaction.workspace = true
+stream.workspace = true
+enrichment-data.workspace = true
+promql-service.workspace = true
 search.workspace = true
 search_service.workspace = true
 anyhow.workspace = true

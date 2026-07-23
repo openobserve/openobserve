@@ -254,7 +254,7 @@ pub async fn cache() -> Result<(), anyhow::Error> {
         && !config::get_config().common.mmdb_disable_download
     {
         log::info!("[PIPELINE:CACHE] waiting mmdb data to be available");
-        Lazy::force(&crate::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
+        Lazy::force(&enrichment_data::enrichment_table::geoip::MMDB_INIT_NOTIFIER)
             .notified()
             .await;
         log::info!("[PIPELINE:CACHE] done waiting");

@@ -20,14 +20,12 @@ use axum::{
     response::Response,
 };
 use config::{SIZE_IN_MB, utils::schema::format_stream_name};
+use enrichment_data::enrichment_table::{extract_multipart, save_enrichment_data};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    common::meta::http::HttpResponse as MetaHttpResponse,
-    service::enrichment_table::{extract_multipart, save_enrichment_data},
-};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// CreateEnrichmentTable
 
@@ -232,7 +230,7 @@ pub async fn save_enrichment_table_from_url(
 ) -> Response {
     use config::meta::enrichment_table::{EnrichmentTableStatus, EnrichmentTableUrlJob};
     use db::enrichment_table::{delete_url_job, get_url_jobs_for_table, save_url_job};
-    use openobserve_core::enrichment_table::url_processor::trigger_url_job_processing;
+    use enrichment_data::enrichment_table::url_processor::trigger_url_job_processing;
 
     let request_body = body;
 
@@ -511,7 +509,7 @@ pub async fn save_enrichment_table_from_url(
         // Retry: already checked before, reuse the value
         if !resume && !retry {
             let supports_range = {
-                use openobserve_core::enrichment_table::url_processor::check_range_support_for_url;
+                use enrichment_data::enrichment_table::url_processor::check_range_support_for_url;
                 match check_range_support_for_url(&job.url, &org_id, &table_name).await {
                     Ok(true) => {
                         log::info!(

@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{
-    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, METADATA_LABEL, Metadata, VALUE_LABEL},
+    meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, Metadata, VALUE_LABEL},
     utils::hash::{Sum64, gxhash},
 };
 use datafusion::arrow::datatypes::Schema;
@@ -67,26 +67,7 @@ pub fn metric_value(v: f64) -> Option<config::utils::json::Value> {
 }
 
 pub fn get_prom_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
-    let metadata = schema.metadata.get(METADATA_LABEL)?;
-    let mut metadata: Metadata = match config::utils::json::from_str(metadata) {
-        Ok(metadata) => metadata,
-        Err(e) => {
-            // this used to panic the process on a single corrupt schema entry
-            log::warn!("failed to parse {METADATA_LABEL} from schema: {e}, input: {metadata}");
-            return None;
-        }
-    };
-
-    // Historical schemas carry a JSON-quoted family name: the OTLP writer used to build it with
-    // `Value::to_string()`, which yields the serialised JSON (`"name"`, quotes included) rather
-    // than the string content. Reversing that is exactly a JSON-string parse -- a clean name is
-    // not valid JSON, so it is left alone. The stored bytes are not rewritten; we simply decline
-    // to serve the quotes, which is what makes the family join work on data already written.
-    let family_name = metadata.metric_family_name.trim();
-    metadata.metric_family_name = config::utils::json::from_str::<String>(family_name)
-        .unwrap_or_else(|_| family_name.to_string());
-
-    Some(metadata)
+    config::meta::promql::get_metadata_from_schema(schema)
 }
 
 /// `signature_without_labels` is just as [`signature`], but only for labels not
@@ -121,7 +102,7 @@ fn get_exclude_labels() -> Vec<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use config::utils::json;
+    use config::{meta::promql::METADATA_LABEL, utils::json};
 
     use super::*;
 
