@@ -2,7 +2,7 @@
   "totals": {
     "rawVarInComponent": 559,
     "arbZ": 0,
-    "darkMechanism": 8,
+    "darkMechanism": 7,
     "unscopedStyle": 2,
     "stylePxUnit": 84
   },
@@ -276,9 +276,6 @@
       "darkMechanism": 2
     },
     "utils/logs/convertLogData.ts": {
-      "darkMechanism": 1
-    },
-    "utils/themeManager.ts": {
       "darkMechanism": 1
     },
     "views/Dashboards/DashboardSettings.vue": {
