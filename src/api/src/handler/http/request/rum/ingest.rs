@@ -25,7 +25,7 @@ use config::utils::json;
 use flate2::read::ZlibDecoder;
 use openobserve_core::{
     auth::UserEmail,
-    ingestion_types::{IngestUser, IngestionRequest},
+    ingestion_contracts::{IngestUser, IngestionRequest},
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

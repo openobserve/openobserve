@@ -22,7 +22,9 @@ use serde::Deserialize;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    ingestion_types::{HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType},
+    ingestion_contracts::{
+        HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType,
+    },
 };
 
 #[derive(Deserialize, Clone)]

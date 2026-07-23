@@ -48,7 +48,7 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
-    ingestion_types::IngestionStatus,
+    ingestion_contracts::IngestionStatus,
     metadata::{MetadataItem, MetadataType, distinct_values::DvItem, write},
     schema::{check_for_schema, stream_schema_exists},
 };

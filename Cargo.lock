@@ -2322,6 +2322,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "compaction"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "config",
+ "datafusion",
+ "db",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "parking_lot 0.12.5",
+ "parquet",
+ "rand 0.10.1",
+ "schema",
+ "search",
+ "search_service",
+ "tantivy_utils",
+ "tokio",
+]
+
+[[package]]
 name = "compression-codecs"
 version = "0.4.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5318,6 +5347,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ingestion-contracts"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "common",
+ "config",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
 name = "inherent"
 version = "1.0.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7023,35 +7064,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "openobserve-compaction"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arrow",
- "arrow-schema",
- "bytes",
- "chrono",
- "config",
- "datafusion",
- "db",
- "futures",
- "hashbrown 0.16.1",
- "infra",
- "ingester",
- "itertools 0.14.0",
- "log",
- "o2_enterprise",
- "parking_lot 0.12.5",
- "parquet",
- "rand 0.10.1",
- "schema-service",
- "search",
- "search_service",
- "tantivy_utils",
- "tokio",
-]
-
-[[package]]
 name = "openobserve-core"
 version = "0.1.0"
 dependencies = [
@@ -7070,6 +7082,7 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "common",
+ "compaction",
  "config",
  "cron",
  "csv",
@@ -7085,6 +7098,7 @@ dependencies = [
  "http-body-util",
  "infra",
  "ingester",
+ "ingestion-contracts",
  "itertools 0.14.0",
  "jsonwebtoken",
  "lettre",
@@ -7096,8 +7110,6 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
- "openobserve-compaction",
- "openobserve-ingestion-types",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7115,7 +7127,7 @@ dependencies = [
  "reqwest 0.13.2",
  "rustls",
  "rustls-native-certs",
- "schema-service",
+ "schema",
  "sea-orm",
  "search",
  "search_service",
@@ -7147,18 +7159,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "openobserve-ingestion-types"
-version = "0.1.0"
-dependencies = [
- "bytes",
- "common",
- "config",
- "serde",
- "serde_json",
- "utoipa",
-]
-
-[[package]]
 name = "openobserve-jobs"
 version = "0.1.0"
 dependencies = [
@@ -7169,6 +7169,7 @@ dependencies = [
  "bytes",
  "chrono",
  "common",
+ "compaction",
  "config",
  "db",
  "futures",
@@ -7179,7 +7180,6 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
- "openobserve-compaction",
  "openobserve-core",
  "prometheus",
  "proto",
@@ -9552,7 +9552,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "schema-service"
+name = "schema"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -9563,8 +9563,8 @@ dependencies = [
  "db",
  "hashbrown 0.16.1",
  "infra",
+ "ingestion-contracts",
  "log",
- "openobserve-ingestion-types",
  "serde_json",
  "tokio",
 ]
@@ -10781,12 +10781,12 @@ dependencies = [
  "async-recursion",
  "bytes",
  "common",
+ "compaction",
  "config",
  "db",
  "infra",
  "log",
  "o2_enterprise",
- "openobserve-compaction",
  "openobserve-core",
  "serde",
  "serde_json",

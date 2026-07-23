@@ -28,7 +28,9 @@ use promql_parser::{
 };
 use proto::loki_rpc;
 
-use crate::ingestion_types::{IngestUser, IngestionRequest, IngestionResponse, IngestionValueType};
+use crate::ingestion_contracts::{
+    IngestUser, IngestionRequest, IngestionResponse, IngestionValueType,
+};
 
 pub enum LokiRequest {
     Json(LokiPushRequest),

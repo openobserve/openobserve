@@ -25,7 +25,7 @@ pub mod authz;
 pub mod bootstrap;
 pub mod cache;
 pub mod cluster_info;
-pub use openobserve_compaction as compact;
+pub use compaction;
 pub mod dashboards;
 use ::common;
 use ::db;
@@ -41,7 +41,7 @@ pub mod grpc;
 pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
-pub use openobserve_ingestion_types as ingestion_types;
+pub use ingestion_contracts;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
@@ -65,7 +65,7 @@ pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod runtime_metrics;
-pub use schema_service as schema;
+pub use schema;
 pub mod schema_watcher;
 use search_service as search;
 #[cfg(feature = "enterprise")]

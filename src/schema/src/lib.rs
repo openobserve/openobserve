@@ -49,7 +49,7 @@ use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
     unwrap_stream_settings,
 };
-use openobserve_ingestion_types::StreamSchemaChk;
+use ingestion_contracts::StreamSchemaChk;
 use serde_json::{Map, Value};
 
 const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";

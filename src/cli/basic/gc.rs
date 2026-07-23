@@ -22,7 +22,7 @@
 //! directory on remote storage whose data is entirely older than the cutoff.
 //!
 //! The deletion decision mirrors the compactor retention logic
-//! ([`openobserve_core::compact::retention`]): a stream's effective retention is
+//! ([`openobserve_core::compaction::retention`]): a stream's effective retention is
 //! `stream_settings.data_retention` (falling back to
 //! `ZO_COMPACT_DATA_RETENTION_DAYS`), and any day overlapping an
 //! `extended_retention_days` range is preserved.

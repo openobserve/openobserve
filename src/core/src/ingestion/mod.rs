@@ -53,7 +53,7 @@ use super::{
 use crate::{
     alerts::alert::AlertExt,
     common::{infra::config::STREAM_ALERTS, meta::stream::SchemaRecords},
-    ingestion_types::IngestionRequest,
+    ingestion_contracts::IngestionRequest,
 };
 
 pub mod grpc;

@@ -70,7 +70,7 @@ use crate::{
 pub async fn otlp_proto(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: crate::ingestion_contracts::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let request = match ExportMetricsServiceRequest::decode(body) {
         Ok(v) => v,
@@ -98,7 +98,7 @@ pub async fn otlp_proto(
 pub async fn otlp_json(
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_types::IngestUser,
+    user: crate::ingestion_contracts::IngestUser,
 ) -> Result<HttpResponse, std::io::Error> {
     let mut body_json = match serde_json::from_slice::<json::Value>(body.as_ref()) {
         Ok(v) => v,
@@ -133,7 +133,7 @@ pub async fn handle_otlp_request(
     org_id: &str,
     request: ExportMetricsServiceRequest,
     req_type: OtlpRequestType,
-    user: crate::ingestion_types::IngestUser,
+    user: crate::ingestion_contracts::IngestUser,
 ) -> Result<HttpResponse, anyhow::Error> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, None).await {

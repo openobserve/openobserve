@@ -72,7 +72,7 @@ mod tests {
     use openobserve_core::{
         alerts::scheduler::handlers::handle_triggers,
         enrichment::storage::{Values, local},
-        ingestion_types::IngestionResponse,
+        ingestion_contracts::IngestionResponse,
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};

@@ -24,7 +24,7 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
-use openobserve_core::{compact, file_list, users};
+use openobserve_core::{compaction, file_list, users};
 
 use crate::{
     cli::data::{
@@ -291,7 +291,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     // load stream list
                     db::schema::cache().await?;
                     // update stats from file list
-                    compact::stats::update_stats_from_file_list()
+                    compaction::stats::update_stats_from_file_list()
                         .await
                         .expect("file list remote calculate stats failed");
                 }

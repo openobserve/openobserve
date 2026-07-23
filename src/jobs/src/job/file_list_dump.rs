@@ -15,8 +15,8 @@
 
 use std::sync::Arc;
 
+use compaction::dump;
 use config::{cluster, get_config};
-use openobserve_compaction::dump;
 use tokio::sync::{Mutex, mpsc};
 
 const DUMP_JOB_MIN_INTERVAL: i64 = 30;
@@ -67,7 +67,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 }
                             }
                         });
-                        if let Err(e) = openobserve_compaction::dump::dump(&job).await {
+                        if let Err(e) = compaction::dump::dump(&job).await {
                             log::error!(
                                 "[FILE_LIST_DUMP:JOB:{thread_id}] dump for stream [{}/{}/{}] offset {}: error: {e}",
                                 job.org_id,
@@ -103,7 +103,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         // sleep
         tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
         // run
-        if let Err(e) = openobserve_compaction::dump::run(tx.clone()).await {
+        if let Err(e) = compaction::dump::run(tx.clone()).await {
             log::error!("[FILE_LIST_DUMP:JOB] error in running dump: {e}");
         }
     }

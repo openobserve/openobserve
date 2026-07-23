@@ -72,7 +72,7 @@ use crate::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, grpc::get_val,
         write_file,
     },
-    ingestion_types::IngestUser,
+    ingestion_contracts::IngestUser,
     logs::O2IngestJsonData,
     metadata::{
         MetadataItem, MetadataType, distinct_values::DvItem, trace_list_index::TraceListItem, write,

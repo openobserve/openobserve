@@ -460,12 +460,17 @@ pub async fn delete_from_file_list(
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
-    crate::compact::retention::delete_from_file_list(org_id, stream_type, stream_name, time_range)
-        .await
-        .map_err(|e| {
-            log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
-            e
-        })?;
+    crate::compaction::retention::delete_from_file_list(
+        org_id,
+        stream_type,
+        stream_name,
+        time_range,
+    )
+    .await
+    .map_err(|e| {
+        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
+        e
+    })?;
 
     #[cfg(feature = "enterprise")]
     {

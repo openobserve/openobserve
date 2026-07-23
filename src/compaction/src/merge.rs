@@ -47,7 +47,7 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
-use schema_service::generate_schema_for_defined_schema_fields;
+use schema::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
     merge::{self, MergeParquetResult},
@@ -387,7 +387,7 @@ pub async fn merge_by_stream(
     );
 
     // A job whose offset hour has not yet fully passed is an incremental round on the
-    // still-open current hour (enqueued by the ingester, see service::compact::incremental):
+    // still-open current hour (enqueued by the ingester, see service::compaction::incremental):
     // only seal full-size groups and carry the remainder, so each file is merged into a
     // sealed output exactly once. The scheduled hour-end pass seals whatever is left.
     let offset = offset - offset % hour_micros(1);

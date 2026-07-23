@@ -106,7 +106,8 @@ pub async fn traces_write(
     // log start processing time
     let process_time = get_process_time();
 
-    let user = openobserve_core::ingestion_types::IngestUser::from_user_email(&user_email.user_id);
+    let user =
+        openobserve_core::ingestion_contracts::IngestUser::from_user_email(&user_email.user_id);
 
     #[cfg(feature = "cloud")]
     match check_ingestion_allowed(&org_id, StreamType::Traces, None).await {

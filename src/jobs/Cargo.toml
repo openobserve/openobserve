@@ -14,14 +14,14 @@ enterprise = [
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
-    "openobserve-compaction/enterprise",
+    "compaction/enterprise",
     "openobserve-core/enterprise",
     "search_service/enterprise",
 ]
 cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
 vectorscan = ["openobserve-core/vectorscan", "search_service/vectorscan"]
 vortex = [
-    "openobserve-compaction/vortex",
+    "compaction/vortex",
     "openobserve-core/vortex",
     "search_service/vortex",
 ]
@@ -31,7 +31,7 @@ audit.workspace = true
 common.workspace = true
 db.workspace = true
 openobserve-core.workspace = true
-openobserve-compaction.workspace = true
+compaction.workspace = true
 search.workspace = true
 search_service.workspace = true
 anyhow.workspace = true
