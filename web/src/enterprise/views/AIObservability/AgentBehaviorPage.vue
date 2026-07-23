@@ -134,6 +134,8 @@ import { useStore } from "vuex";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
+import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
+import { buildAgentSelectOptions } from "@/plugins/traces/agentOptionFormat";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 
@@ -163,12 +165,9 @@ const isRefreshing = ref(false);
 const agents = ref<GenAiAgentListItem[]>([]);
 const agentsLoaded = ref(false);
 const activeAgentKey = ref<string>("");
-const agentKey = (a: GenAiAgentListItem) => `${a.source_stream}::${a.name}`;
+const agentKey = (a: GenAiAgentListItem) => agentOptionKey(a);
 const agentSelectOptions = computed(() =>
-  agents.value.map((a) => ({
-    label: a.id ? `${a.name} (${a.id})` : a.name,
-    value: agentKey(a),
-  })),
+  buildAgentSelectOptions(agents.value, t),
 );
 const selectedAgent = computed<GenAiAgentListItem | null>(
   () => agents.value.find((a) => agentKey(a) === activeAgentKey.value) ?? null,

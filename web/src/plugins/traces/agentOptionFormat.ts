@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import { agentOptionKey } from "./llmAgentFilter";
+import { agentOptionKey, ALL_AGENTS_VALUE } from "./llmAgentFilter";
 
 /** One-line label: `name (id) · env · vVERSION`, omitting absent segments. */
 export function formatAgentOption(agent: GenAiAgentListItem): string {
@@ -31,6 +31,7 @@ function variantLabel(
 export function buildAgentSelectOptions(
   agents: GenAiAgentListItem[],
   t: (k: string) => string,
+  options: { includeAllAgents?: boolean } = {},
 ): SelectOption[] {
   const byName = new Map<string, GenAiAgentListItem[]>();
   for (const agent of agents) {
@@ -38,16 +39,19 @@ export function buildAgentSelectOptions(
     list.push(agent);
     byName.set(agent.name, list);
   }
-  const options: SelectOption[] = [];
+  const result: SelectOption[] = [];
+  if (options.includeAllAgents) {
+    result.push({ label: t("traces.allAgents"), value: ALL_AGENTS_VALUE });
+  }
   for (const [name, variants] of byName) {
-    options.push({ label: name, header: true });
+    result.push({ label: name, header: true });
     for (const agent of variants) {
-      options.push({
+      result.push({
         label: variantLabel(agent, t),
         value: agentOptionKey(agent),
         agent,
       });
     }
   }
-  return options;
+  return result;
 }

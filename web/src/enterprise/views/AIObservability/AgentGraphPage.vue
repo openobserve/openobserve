@@ -201,6 +201,8 @@ import { getConsumableRelativeTime } from "@/utils/date";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
+import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
+import { buildAgentSelectOptions } from "@/plugins/traces/agentOptionFormat";
 
 defineOptions({ name: "AIAgentGraphPage" });
 
@@ -288,14 +290,11 @@ const agentsLoaded = ref(false);
 const activeAgentKey = ref<string>("");
 
 // Stream-scoped identity, mirroring LLM Insights — same-named agents in
-// different streams don't collide.
-const agentKey = (a: GenAiAgentListItem) => `${a.source_stream}::${a.name}`;
+// different streams (or different env/version) don't collide.
+const agentKey = (a: GenAiAgentListItem) => agentOptionKey(a);
 
 const agentSelectOptions = computed(() =>
-  agents.value.map((a) => ({
-    label: a.id ? `${a.name} (${a.id})` : a.name,
-    value: agentKey(a),
-  })),
+  buildAgentSelectOptions(agents.value, t),
 );
 
 // Streams offered in the Stream picker are ONLY those that actually carry agent
