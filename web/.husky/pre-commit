@@ -1,4 +1,0 @@
-# Hooks run from the git root, but the npm project (and lint-staged config)
-# lives in web/. cd in so eslint/prettier resolve their configs, and so
-# lint-staged only considers staged files under web/.
-cd web && npx lint-staged
