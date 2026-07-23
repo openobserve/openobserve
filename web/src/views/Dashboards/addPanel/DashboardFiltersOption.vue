@@ -23,7 +23,7 @@
       </div>
       <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="m-1.25 flex-wrap droppable scroll flex items-center min-h-10"
+        class="pl-0.5 flex-wrap droppable scroll flex items-center min-h-8"
         data-test="dashboard-filter-layout"
         :data-condition-count="conditionCount"
       >

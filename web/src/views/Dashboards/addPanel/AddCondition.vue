@@ -21,6 +21,7 @@
           <OButton
             variant="ghost"
             size="chip-12"
+            class="!pe-0"
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
@@ -136,7 +137,7 @@
       <OButton
         variant="ghost"
         size="icon-chip"
-        class="shrink-0 !w-4"
+        class="shrink-0 !w-4 -ms-1"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
       >

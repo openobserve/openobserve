@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
-        class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
+        class="axis-container droppable scroll flex-1 w-full flex flex-wrap items-center min-h-8 border-transparent border-dashed border-2"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
           'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-source-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-indigo-ol-border bg-surface-panel"
+          class="axis-field overflow-hidden mr-2 my-0.5 border border-border-default border-s-2 border-s-badge-indigo-ol-border bg-surface-panel"
           radius="sm"
           :divided="false"
           v-if="
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-source-item-${sourceLabel}`"
               >
                 <AxisFieldChipLabel :label="sourceLabel" />
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4"
+            class="!w-4 -ms-1"
             :data-test="`dashboard-source-item-${sourceLabel}-remove`"
             @click="removeSource()"
           >
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="text-xs font-bold text-center w-full"
           data-test="dashboard-sankey-source-empty-hint"
           v-if="
             dashboardPanelData.data.queries[
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ].fields.source == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
-        class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
+        class="axis-container droppable scroll flex-1 w-full flex flex-wrap items-center min-h-8 border-transparent border-dashed border-2"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
           'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-target-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-orange-ol-border bg-surface-panel"
+          class="axis-field overflow-hidden mr-2 my-0.5 border border-border-default border-s-2 border-s-badge-orange-ol-border bg-surface-panel"
           radius="sm"
           :divided="false"
           v-if="
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-target-item-${targetLabel}`"
               >
                 <AxisFieldChipLabel :label="targetLabel" />
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4"
+            class="!w-4 -ms-1"
             :data-test="`dashboard-target-item-${targetLabel}-remove`"
             @click="removeTarget()"
           >
@@ -265,14 +265,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="text-xs font-bold text-center w-full"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.target == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator flex items-center ml-0.5 mr-0.5">:</span>
       <div
-        class="axis-container droppable scroll flex-1 w-full flex flex-wrap border-transparent border-dashed border-2"
+        class="axis-container droppable scroll flex-1 w-full flex flex-wrap items-center min-h-8 border-transparent border-dashed border-2"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white border-dotted': dashboardPanelData.meta.dragAndDrop.dragging,
           'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-success-ol-border bg-surface-panel"
+          class="axis-field overflow-hidden mr-2 my-0.5 border border-border-default border-s-2 border-s-badge-success-ol-border bg-surface-panel"
           radius="sm"
           :divided="false"
           v-if="
@@ -338,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-value-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4"
+            class="!w-4 -ms-1"
             :data-test="`dashboard-value-item-${valueLabel}-remove`"
             @click="removeValue()"
           >
@@ -395,14 +395,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="text-xs font-bold text-center w-full"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.value == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>

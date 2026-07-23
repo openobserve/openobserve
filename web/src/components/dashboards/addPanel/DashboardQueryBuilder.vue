@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span class="layout-separator flex items-center mx-0.5">:</span>
           <div
-            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-10 border-2 border-dashed border-transparent"
+            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-8 border-2 border-dashed border-transparent"
             :class="{
               'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
               'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="chip-12"
-                      class="!ps-1"
+                      class="!ps-1 !pe-0"
                       :data-test="`dashboard-x-item-${itemX?.alias}`"
                     >
                       <AxisFieldChipLabel :label="xLabel[index]" />
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-chip"
-                  class="!w-4"
+                  class="!w-4 -ms-1"
                   :data-test="`dashboard-x-item-${itemX?.alias}-remove`"
                   @click="removeXAxisItemByIndex(Number(index))"
                 >
@@ -157,14 +157,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+              class="text-xs font-bold text-center w-full flex justify-center items-center"
               v-if="
                 dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.x?.length < 1
               "
             >
-              <div class="mt-1">{{ xAxisHint }}</div>
+              <div>{{ xAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <span class="layout-separator flex items-center mx-0.5">:</span>
           <div
-            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-10 border-2 border-dashed border-transparent"
+            class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-8 border-2 border-dashed border-transparent"
             :class="{
               'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
               'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -282,7 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="chip-12"
-                      class="!ps-1"
+                      class="!ps-1 !pe-0"
                       :data-test="`dashboard-b-item-${itemB?.alias}`"
                     >
                       <AxisFieldChipLabel :label="bLabel[index]" />
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-chip"
-                  class="!w-4"
+                  class="!w-4 -ms-1"
                   :data-test="`dashboard-b-item-${itemB?.alias}-remove`"
                   @click="removeBreakdownItemByIndex(Number(index))"
                 >
@@ -334,14 +334,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButtonGroup>
             </div>
             <div
-              class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+              class="text-xs font-bold text-center w-full flex justify-center items-center"
               v-if="
                 !dashboardPanelData.data.queries[
                   dashboardPanelData.layout.currentQueryIndex
                 ].fields?.breakdown?.length
               "
             >
-              <div class="mt-1">{{ bAxisHint }}</div>
+              <div>{{ bAxisHint }}</div>
             </div>
           </div>
         </div>
@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="layout-separator flex items-center mx-0.5">:</span>
       <div
-        class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-10 border-2 border-dashed border-transparent"
+        class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-8 border-2 border-dashed border-transparent"
         :class="{
           'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
           'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -423,7 +423,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="chip-12"
-                  class="!ps-1"
+                  class="!ps-1 !pe-0"
                   :data-test="`dashboard-y-item-${itemY?.alias}`"
                 >
                   <AxisFieldChipLabel :label="yLabel[index]" />
@@ -470,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="icon-chip"
-              class="!w-4"
+              class="!w-4 -ms-1"
               :data-test="`dashboard-y-item-${itemY?.alias}-remove`"
               @click="removeYAxisItemByIndex(Number(index))"
             >
@@ -479,14 +479,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButtonGroup>
         </div>
         <div
-          class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+          class="text-xs font-bold text-center w-full flex justify-center items-center"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.y?.length < 1
           "
         >
-          <div class="mt-1">{{ yAxisHint }}</div>
+          <div>{{ yAxisHint }}</div>
         </div>
       </div>
     </div>
@@ -507,7 +507,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <span class="layout-separator flex items-center mx-0.5">:</span>
         <div
-          class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-10 border-2 border-dashed border-transparent"
+          class="axis-container droppable scroll flex flex-1 w-full text-center flex-wrap items-center min-h-8 border-2 border-dashed border-transparent"
           :class="{
             'bg-[rgba(0,0,0,0.042)] [border-style:dotted] border-white': dashboardPanelData.meta.dragAndDrop.dragging,
             'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -569,7 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OButton
                     variant="ghost"
                     size="chip-12"
-                    class="!ps-1"
+                    class="!ps-1 !pe-0"
                     :data-test="`dashboard-z-item-${itemZ?.alias}`"
                   >
                     <AxisFieldChipLabel :label="zLabel[index]" />
@@ -612,7 +612,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-chip"
-                class="!w-4"
+                class="!w-4 -ms-1"
                 :data-test="`dashboard-z-item-${itemZ?.alias}-remove`"
                 @click="removeZAxisItemByIndex(Number(index))"
               >
@@ -621,14 +621,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButtonGroup>
           </div>
           <div
-            class="text-xs font-bold text-center py-1 w-full flex justify-center items-center"
+            class="text-xs font-bold text-center w-full flex justify-center items-center"
             v-if="
               dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.z?.length < 1
             "
           >
-            <div class="mt-1">{{ zAxisHint }}</div>
+            <div>{{ zAxisHint }}</div>
           </div>
         </div>
       </div>

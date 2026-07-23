@@ -41,7 +41,7 @@
       <ODropdown v-model:open="showAddMenu">
         <template #trigger>
           <OButton
-            variant="dashed"
+            variant="outline"
             size="icon-chip"
             data-test="dashboard-add-condition-add"
             icon-left="add"

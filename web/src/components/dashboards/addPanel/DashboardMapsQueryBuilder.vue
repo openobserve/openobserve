@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex items-center ml-0.5 mr-0.5">:</span>
       <div
-        class="axis-container flex-1 w-full flex flex-wrap droppable border-transparent border-dashed border-2 scroll"
+        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border-2 scroll"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
           'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-name-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-indigo-ol-border bg-surface-panel"
+          class="axis-field overflow-hidden mr-2 my-0.5 border border-border-default border-s-2 border-s-badge-indigo-ol-border bg-surface-panel"
           radius="sm"
           :divided="false"
           v-if="
@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-name-item-${nameLabel}`"
               >
                 <AxisFieldChipLabel :label="nameLabel" />
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4"
+            class="!w-4 -ms-1"
             :data-test="`dashboard-name-item-${nameLabel}-remove`"
             @click="removeMapName()"
           >
@@ -134,14 +134,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="text-xs font-bold text-center w-full"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.name == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <span class="flex items-center ml-0.5 mr-0.5">:</span>
       <div
-        class="axis-container flex-1 w-full flex flex-wrap droppable border-transparent border-dashed border-2 scroll"
+        class="axis-container flex-1 w-full flex flex-wrap items-center min-h-8 droppable border-transparent border-dashed border-2 scroll"
         :class="{
           'bg-[rgba(0,0,0,0.042)] border-white [border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
           'transition-all duration-200 bg-field-list-row-hover-bg':
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value_for_maps-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-success-ol-border bg-surface-panel"
+          class="axis-field overflow-hidden mr-2 my-0.5 border border-border-default border-s-2 border-s-badge-success-ol-border bg-surface-panel"
           radius="sm"
           :divided="false"
           v-if="
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="chip-12"
-                class="!ps-1"
+                class="!ps-1 !pe-0"
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               >
                 <AxisFieldChipLabel :label="valueLabel" />
@@ -257,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OButton
             variant="ghost"
             size="icon-chip"
-            class="!w-4"
+            class="!w-4 -ms-1"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
             @click="removeMapValue()"
           >
@@ -265,14 +265,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center py-1"
+          class="text-xs font-bold text-center w-full"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields.value_for_maps == null
           "
         >
-          <div class="mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>

@@ -16,11 +16,11 @@
         {{ t("panel.joins") }}
       </div>
       <span class="flex items-center mx-0.5">:</span>
-      <div class="m-1.25 flex flex-row items-center flex-wrap gap-2 min-h-10" data-test="dashboard-filter-layout">
+      <div class="pl-0.5 flex flex-row items-center flex-wrap gap-2 min-h-8" data-test="dashboard-filter-layout">
         <div
           v-for="(joinObj, index) in currentJoins"
           :key="index"
-          class="flex flex-row mr-2 my-1"
+          class="flex flex-row mr-2 my-0.5"
         >
           <OButtonGroup
             class="axis-field border border-border-default border-s-2 border-s-badge-teal-ol-border bg-surface-panel"
@@ -32,6 +32,7 @@
                 <OButton
                   variant="ghost"
                   size="chip-12"
+                  class="!pe-0"
                   :data-test="`dashboard-join-item-${index}`"
                   icon-right="arrow-drop-down"
                 >
@@ -69,7 +70,7 @@
             <OButton
               variant="ghost"
               size="icon-chip"
-              class="!w-4"
+              class="!w-4 -ms-1"
               :data-test="`dashboard-join-item-${index}-remove`"
               @click="handleRemoveJoin(index)"
               :aria-label="t('panel.removeJoin')"
@@ -80,7 +81,7 @@
           </OButtonGroup>
         </div>
         <OButton
-          variant="dashed"
+          variant="outline"
           size="icon-chip"
           data-test="dashboard-add-join-btn"
           @click="handleAddJoin"
