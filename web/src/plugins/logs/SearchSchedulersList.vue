@@ -108,7 +108,7 @@
           </template>
           <template #expansion="{ row }">
             <div class="app-tabs-schedule-list px-4 py-0 h-fit w-fit">
-              <app-tabs
+              <AppTabs
                 data-test="expanded-list-tabs"
                 class="mr-3"
                 :tabs="tabs"
@@ -215,7 +215,7 @@
               <div
                 class="text-left mb-2 px-4 py-0 w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] max-h-screen overflow-hidden flex flex-col"
               >
-                <query-editor
+                <QueryEditor
                   style="height: 130px"
                   :key="row.trace_id"
                   :ref="`QueryEditorRef${row.trace_id}`"

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
     </template>
 
-    <base-import
+    <BaseImport
       v-if="activeTab !== 'import_built_in_patterns'"
       ref="baseImportRef"
       :title="t('settings.importRegexPattern.title')"
@@ -163,7 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </template>
-    </base-import>
+    </BaseImport>
 
     <!-- Built-in Patterns Tab (full width, no custom import button handling) -->
     <div
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="bg-card-glass-bg pt-2 px-2.5">
         <div class="app-tabs-container h-9 w-fit">
-          <app-tabs
+          <AppTabs
             data-test="regex-pattern-import-tabs"
             class="tabs-selection-container"
             :tabs="allTabs"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <built-in-patterns-tab
+      <BuiltInPatternsTab
         ref="builtInPatternsTabRef"
         @import-patterns="handleBuiltInPatternsImport"
         data-test="built-in-patterns-tab"

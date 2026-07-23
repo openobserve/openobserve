@@ -309,7 +309,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OPageLayout>
     <div v-else>
-      <add-enrichment-table
+      <AddEnrichmentTable
         v-model="formData"
         :isUpdating="isUpdated"
         @update:list="refreshList"

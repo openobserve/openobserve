@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Tabs Section -->
               <div class="bg-card-glass-bg py-2.5 px-page-edge mb-1 shrink-0">
                 <div class="app-tabs-container h-9 w-fit">
-                  <app-tabs
+                  <AppTabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
                     :tabs="tabs"
@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"

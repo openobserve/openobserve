@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          The SQL editor stays bare so validateSqlQuery() remains a pre-submit
          guard inside saveQueryData (the form's onSubmit). -->
       <OForm :form="form" class="w-full h-full rounded-default stream-routing-container">
-        <scheduled-pipeline
+        <ScheduledPipeline
           ref="scheduledPipelineRef"
           :columns="filteredColumns"
           :conditions="[]"
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OForm>
     </div>
   </ODrawer>
-  <confirm-dialog
+  <ConfirmDialog
     v-model="dialog.show"
     :title="dialog.title"
     :message="dialog.message"

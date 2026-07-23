@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </div>
     </div>
-    <add-update-organization
+    <AddUpdateOrganization
       :open="showAddOrganizationDialog"
       @update:open="onDrawerOpenChange"
       @updated="updateOrganizationList"

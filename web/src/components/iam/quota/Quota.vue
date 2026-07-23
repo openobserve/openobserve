@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @update:model-value="handleOrgSelect"
               />
               <div class="app-tabs-container h-9 w-fit">
-                <app-tabs
+                <AppTabs
                   data-test="quota-tabs"
                   class="tabs-selection-container"
                   :tabs="tabs"
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div v-if="selectedOrganization" class="flex items-center float-right ml-auto">
               <div class="app-tabs-container h-9 w-fit mr-3">
-                <app-tabs
+                <AppTabs
                   data-test="time-unit-tabs"
                   class="tabs-selection-container"
                   :tabs="timeUnitTabs"
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div class="app-tabs-container h-9 w-fit">
-                <app-tabs
+                <AppTabs
                   data-test="table-json-type-selection-tabs"
                   class="tabs-selection-container"
                   :tabs="typeTabs"
@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg pb-2.5 flex-1 min-h-0"
         v-if="activeTab == 'api-limits' && activeType == 'json'"
       >
-        <query-editor
+        <QueryEditor
           data-test="json-view-roles-editor"
           ref="queryEditorRef"
           editor-id="json-view-roles-editor"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-card-glass-bg flex-1 min-h-0"
         v-if="activeTab == 'role-limits' && activeType == 'json'"
       >
-        <query-editor
+        <QueryEditor
           data-test="json-view-roles-editor"
           ref="queryEditorRef"
           editor-id="json-view-roles-editor"

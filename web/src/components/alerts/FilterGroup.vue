@@ -140,7 +140,7 @@
       </div>
     </div>
   </div>
-  <confirm-dialog
+  <ConfirmDialog
     v-model="confirmDialog.show"
     :title="confirmDialog.title"
     :message="confirmDialog.message"

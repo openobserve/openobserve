@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("alerts.previewEmptyState") }}
                   </span>
                 </div>
-                <preview-alert
+                <PreviewAlert
                   class="w-full h-full"
                   v-else
                   ref="previewAlertRef"
@@ -489,7 +489,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :destinations="destinations"
                 :wizard-step="3"
               />
-              <alert-summary
+              <AlertSummary
                 class="h-full"
                 v-else
                 :formData="formData"

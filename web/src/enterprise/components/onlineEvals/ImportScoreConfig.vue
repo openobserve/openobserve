@@ -6,7 +6,7 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     :title="t('onlineEvals.scoreConfig.import.title')"
     test-prefix="score-config"
@@ -168,7 +168,7 @@ the Free Software Foundation, either version 3 of the License, or
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script setup lang="ts">

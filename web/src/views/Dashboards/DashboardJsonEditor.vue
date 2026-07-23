@@ -19,7 +19,7 @@
     >
       <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
       <div class="flex-1 min-h-0">
-        <query-editor
+        <QueryEditor
           data-test="dashboard-json-editor"
           ref="queryEditorRef"
           editor-id="dashboard-json-editor"

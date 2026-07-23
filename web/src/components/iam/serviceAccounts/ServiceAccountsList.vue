@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTable>
       </div>
     </div>
-    <add-service-account
+    <AddServiceAccount
       v-model:open="showAddUserDialog"
       v-model="selectedUser"
       :isUpdated="isUpdated"

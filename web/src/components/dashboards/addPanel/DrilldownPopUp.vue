@@ -91,7 +91,7 @@
                  fills this box. Putting h-20 on the editor itself collides with
                  that h-full and collapses the editor. -->
               <div class="h-20 mt-1">
-                <query-editor
+                <QueryEditor
                   class="h-full"
                   data-test="scheduled-alert-sql-editor"
                   ref="queryEditorRef"

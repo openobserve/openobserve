@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <confirm-dialog
+    <ConfirmDialog
       v-model="deleteDialog.show"
       :title="deleteDialog.title"
       :message="deleteDialog.message"

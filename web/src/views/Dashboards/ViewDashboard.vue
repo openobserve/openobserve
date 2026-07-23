@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-show="store.state.printMode !== true"
             :dashboardId="currentDashboardData.data?.dashboardId"
           />
-          <share-button
+          <ShareButton
             v-if="!isFullscreen"
             v-show="store.state.printMode !== true"
             :url="dashboardShareURL"

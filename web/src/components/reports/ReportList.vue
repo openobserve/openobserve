@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #toolbar>
                 <div class="flex items-center gap-2 w-full">
                   <div class="app-tabs-container">
-                    <app-tabs
+                    <AppTabs
                       class="tabs-selection-container"
                       :tabs="tabs"
                       v-model:active-tab="activeTab"

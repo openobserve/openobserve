@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ></div>
         </template>
         <template #after>
-          <markdown-renderer
+          <MarkdownRenderer
             :markdown-content="markdownContent"
             :variables-data="initialVariableValues"
             :tabId="tabId"

@@ -18,17 +18,17 @@
     >
       <div class="add-dashboard-form-card-section flex flex-col gap-4">
         <!-- select folder or create new folder and select -->
-        <select-folder-dropdown @folder-selected="updateActiveFolderId" />
+        <SelectFolderDropdown @folder-selected="updateActiveFolderId" />
 
         <!-- select folder or create new folder and select -->
-        <select-dashboard-dropdown
+        <SelectDashboardDropdown
           v-if="activeFolderId"
           :folder-id="activeFolderId"
           @dashboard-selected="updateSelectedDashboard"
         />
 
         <!-- select tab or create new tab and select -->
-        <select-tab-dropdown
+        <SelectTabDropdown
           v-if="activeFolderId && selectedDashboard"
           :folder-id="activeFolderId"
           :dashboard-id="selectedDashboard"

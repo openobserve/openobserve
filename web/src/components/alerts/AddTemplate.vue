@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="w-full pb-3">
               <div class="app-tabs-container w-fit">
-                <app-tabs
+                <AppTabs
                   class="tabs-selection-container"
                   :tabs="tabs"
                   :active-tab="templateType"
@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  without this the editor keeps its mount-time language and paints
                  a markdown body with JSON errors (pre-migration got the remount
                  for free from two v-if/v-else editors). -->
-              <query-editor
+              <QueryEditor
                 :key="bodyLanguage"
                 data-test="template-body-editor"
                 editor-id="template-body-editor"

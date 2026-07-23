@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="entry in topEntries"
         :key="entry.type === 'group' ? `g-${entry.key}` : `l-${entry.item.name}`"
       >
-        <menu-link
+        <MenuLink
           v-if="entry.type === 'link'"
           :link-name="entry.item.name"
           v-bind="{ ...entry.item, mini: miniMode }"

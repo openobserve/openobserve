@@ -24,7 +24,7 @@
     :scroll="false"
   >
     <template #actions>
-      <date-time
+      <DateTime
         ref="dateTimeRef"
         auto-apply
         menu-align="end"

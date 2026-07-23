@@ -81,12 +81,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         tabindex="0"
                       />
                     </div>
-                    <add-openobserve-type
+                    <AddOpenobserveType
                       v-if="storeType === 'local'"
                       class="mt-2"
                       :is-update="isUpdatingCipherKey"
                     />
-                    <add-akeyless-type
+                    <AddAkeylessType
                       v-else-if="storeType === 'akeyless'"
                       class="mt-2"
                       :is-update="isUpdatingCipherKey"
@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon="add"
                   :done="step > 2"
                 >
-                  <add-encryption-mechanism />
+                  <AddEncryptionMechanism />
                   <div class="flex gap-2 mt-4">
                     <OButton
                       data-test="add-cipher-key-step2-back-btn"

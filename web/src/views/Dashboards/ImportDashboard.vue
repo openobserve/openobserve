@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="w-full h-full flex flex-col min-h-0">
                 <div class="bg-card-glass-bg py-2.5 px-page-edge mb-1 shrink-0">
                   <div class="app-tabs-container h-9 w-fit">
-                    <app-tabs
+                    <AppTabs
                       data-test="dashboard-import-type-tabs"
                       class="tabs-selection-container"
                       :tabs="tabs"
@@ -82,13 +82,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="dashboard-folder-dropdown"
                         class="import-folder-dropdown-container w-[calc(30%)]"
                       >
-                        <select-folder-dropdown
+                        <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
                         />
                       </div>
                     </div>
-                    <query-editor
+                    <QueryEditor
                       data-test="dashboard-import-url-editor"
                       ref="queryEditorFileRef"
                       editor-id="dashboards-query-editor-file"
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         />
                       </div>
                       <div class="import-folder-dropdown-container w-[calc(30%)]">
-                        <select-folder-dropdown
+                        <SelectFolderDropdown
                           @folder-selected="selectedFolder = $event"
                           :activeFolderId="selectedFolder.value"
                         />
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </div>
                       </div>
                     </div>
-                    <query-editor
+                    <QueryEditor
                       data-test="dashboard-import-json-file-editor"
                       ref="queryEditorJsonRef"
                       editor-id="dashboards-query-editor-json"

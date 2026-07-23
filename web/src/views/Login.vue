@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <login v-if="user.email == '' && !showInvitations" />
+  <Login v-if="user.email == '' && !showInvitations" />
   <div v-if="showInvitations && config.isCloud == 'true'">
     <div class="flex relative-position px-3 pt-2">
       <img
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       />
     </div>
-    <invitation-list
+    <InvitationList
       v-if="showInvitations"
       :user-email="user.email"
       @invitations-processed="handleInvitationsProcessed"

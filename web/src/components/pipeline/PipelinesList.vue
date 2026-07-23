@@ -328,17 +328,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="showCreatePipeline"
     size="lg"
   >
-    <stream-selection @save="savePipeline" />
+    <StreamSelection @save="savePipeline" />
   </ODrawer>
 
-  <confirm-dialog
+  <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"
     @update:cancel="resetConfirmDialog"
     v-model="confirmDialogMeta.show"
   />
-  <resume-pipeline-dialog
+  <ResumePipelineDialog
     :shouldStartfromNow="shouldStartfromNow"
     :lastPausedAt="resumePipelineDialogMeta.data?.paused_at"
     @update:ok="resumePipelineDialogMeta.onConfirm()"
@@ -348,7 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   />
 
   <!-- Backfill Job Dialog -->
-  <create-backfill-job-dialog
+  <CreateBackfillJobDialog
     v-model="backfillDialog.show"
     :pipeline-id="backfillDialog.pipelineId"
     :pipeline-name="backfillDialog.pipelineName"

@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div v-if="!isSidebarOpen" :style="{ width: `calc(100% - ${leftWidth}px)` }">
-            <span-block
+            <SpanBlock
               :span="(spans as any[])[virtualRow.index]"
               :depth="depth"
               :baseTracePosition="baseTracePosition"

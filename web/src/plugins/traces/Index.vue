@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                panels below (matches the Logs page). -->
           <div class="w-full h-full">
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
-            <search-bar
+            <SearchBar
               data-test="logs-search-bar"
               ref="searchBarRef"
               :fieldValues="fieldValues"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="activeTab === 'service-graph' && config.isEnterprise == 'true'"
               class="h-full overflow-hidden"
             >
-              <service-graph
+              <ServiceGraph
                 ref="serviceGraphRef"
                 class="h-full"
                 @view-traces="handleServiceGraphViewTraces"
@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Services Catalog Tab Content -->
             <div v-if="activeTab === 'services-catalog'" class="h-full overflow-hidden">
-              <services-catalog
+              <ServicesCatalog
                 ref="servicesCatalogRef"
                 class="h-full"
                 @view-traces="handleServicesCatalogViewTraces"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #before>
                   <div class="h-full border-r border-border-default bg-surface-panel">
-                    <index-list
+                    <IndexList
                       v-show="searchObj.meta.showFields"
                       ref="indexListRef"
                       :field-list="searchObj.data.stream.selectedStreamFields"
@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                     </div>
                     <div v-else data-test="logs-search-search-result" class="h-full!">
-                      <search-result
+                      <SearchResult
                         ref="searchResultRef"
                         :show-error-only="showErrorOnly"
                         :ai-enabled="isAiEnabled"

@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     title="Import Semantic Groups"
     test-prefix="semantic-groups"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 
   <!-- Group Details Dialog -->
   <ODialog

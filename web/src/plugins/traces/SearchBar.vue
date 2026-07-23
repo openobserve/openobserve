@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class="flex items-center gap-1.5"
         >
-          <date-time
+          <DateTime
             ref="dateTimeRef"
             auto-apply
             menu-align="end"
@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OIcon name="download" size="sm" />
           </OButton>
-          <share-button
+          <ShareButton
             data-test="logs-search-bar-share-link-btn"
             :url="tracesShareURL"
             variant="outline"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
         <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ml-auto">
           <div class="flex items-center gap-2">
-            <date-time
+            <DateTime
               ref="dateTimeRef"
               auto-apply
               :default-type="searchObj.data.datetime.type"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Services Catalog right toolbar: DateTime, Refresh -->
         <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ml-auto">
           <div class="flex items-center gap-2">
-            <date-time
+            <DateTime
               ref="dateTimeRef"
               auto-apply
               menu-align="end"
@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="flex flex-1 min-h-0 border-b border-border-default"
     >
       <div class="flex flex-col overflow-hidden h-full w-full relative">
-        <code-query-editor
+        <CodeQueryEditor
           ref="queryEditorRef"
           editor-id="traces-query-editor"
           v-model:query="searchObj.data.editorValue"

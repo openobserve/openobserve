@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-xs text-text-secondary mb-1">
                 {{ t("aiToolset.credContentHint") }}
               </div>
-              <query-editor
+              <QueryEditor
                 :editor-id="`cred-file-editor-${idx}`"
                 class="w-full min-h-50! rounded-default border border-card-glass-border resize-y overflow-auto"
                 language="yaml"
@@ -276,7 +276,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("aiToolset.skillConfig") }}
             </div>
             <div class="mb-1 text-xs text-text-muted">{{ t("aiToolset.skillContent") }} *</div>
-            <query-editor
+            <QueryEditor
               data-test="ai-toolset-skill-content"
               editor-id="skill-content-editor"
               class="w-full min-h-100! rounded-default border border-card-glass-border resize-y overflow-auto mb-3"

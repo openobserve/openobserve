@@ -30,7 +30,7 @@
         @pagination-change="onPaginationChange"
       >
         <template #empty>
-          <no-data />
+          <NoData />
         </template>
       </OTable>
     </div>

@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div v-show="expandState.functions" class="mb-1.5 relative flex-1 min-h-0">
                   <!-- Unified Query Editor (with built-in AI bar) -->
-                  <unified-query-editor
+                  <UnifiedQueryEditor
                     data-test="logs-vrl-function-editor"
                     data-test-prefix="function-vrl"
                     ref="editorRef"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </div>
-  <confirm-dialog
+  <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"

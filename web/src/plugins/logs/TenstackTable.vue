@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-for="headerGroup in table.getHeaderGroups()"
         :key="headerGroup.id"
       >
-        <vue-draggable
+        <VueDraggable
           v-model="columnOrder"
           :element="'table'"
           :animation="200"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
           </th>
-        </vue-draggable>
+        </VueDraggable>
 
         <tr v-if="!loading && errMsg != ''" class="w-full">
           <td :colspan="columnOrder.length" class="font-bold opacity-70">
@@ -315,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`log-search-result-expanded-row-${virtualRow.index}`"
               class="w-full relative"
             >
-              <json-preview
+              <JsonPreview
                 :value="tableRows[virtualRow.index - 1] as any"
                 show-copy-button
                 class="py-1.5"
@@ -385,7 +385,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 /></OButton>
 
                 <template v-if="activeCellActionId === `${cell.id}_${cell.column.id}`">
-                  <cell-actions
+                  <CellActions
                     v-if="
                       (cell.column.columnDef.meta as any)?.closable &&
                       (cell.row.original as any)[cell.column.id]

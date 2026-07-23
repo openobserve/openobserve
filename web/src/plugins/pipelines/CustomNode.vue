@@ -495,7 +495,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
     </FlowNodeCard>
   </div>
 
-  <confirm-dialog
+  <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"

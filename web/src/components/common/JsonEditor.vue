@@ -2,7 +2,7 @@
   <div class="h-[calc(100vh-3.75rem)] flex min-h-0 dark:bg-surface-base">
     <div class="flex flex-col flex-1 min-h-0 min-w-0">
       <div class="flex flex-col flex-1 min-h-0">
-        <query-editor
+        <QueryEditor
           data-test="common-json-editor"
           ref="queryEditorRef"
           editor-id="common-json-editor"

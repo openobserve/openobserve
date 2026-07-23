@@ -30,7 +30,7 @@
         </div>
       </div>
       <div class="[&_#date-time-button]:h-9!">
-        <date-time
+        <DateTime
           data-test-name="search-history-date-time"
           ref="searchDateTimeRef"
           auto-apply
@@ -97,7 +97,7 @@
                    tabs line up with the query content instead of sitting flush
                    to the cell edge (same inset the scheduler list uses). -->
           <div class="app-tabs-container w-fit my-1 px-4">
-            <app-tabs
+            <AppTabs
               data-test="expanded-list-tabs"
               class="tabs-selection-container"
               :tabs="tabs"
@@ -226,7 +226,7 @@
           <!-- px-4 keeps the More Details editor aligned with the tabs and
                    the query blocks above. -->
           <div v-show="activeTab === 'more_details'" class="px-4">
-            <query-editor
+            <QueryEditor
               style="height: 200px"
               :ref="`QueryEditorRef${row.trace_id + row.sql}`"
               :editor-id="`search-query-editor${row.trace_id + row.sql}`"

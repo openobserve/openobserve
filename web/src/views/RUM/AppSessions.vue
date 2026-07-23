@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex items-start gap-1">
             <!-- Query editor (flex-grow to fill available space) -->
             <div class="flex-1 min-w-0 relative">
-              <query-editor
+              <QueryEditor
                 ref="sessionQueryEditorRef"
                 editor-id="session-replay-query-editor"
                 :class="[
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <!-- Controls on the right -->
             <div class="flex items-start gap-1 shrink-0">
-              <syntax-guide />
+              <SyntaxGuide />
               <DateTime
                 auto-apply
                 menu-align="end"

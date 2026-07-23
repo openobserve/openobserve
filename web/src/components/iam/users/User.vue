@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout :title="t('iam.basicUsers')" :subtitle="t('user.subtitle')" icon="person" bleed>
     <template #actions>
-      <member-invitation
+      <MemberInvitation
         v-if="config.isCloud == 'true'"
         :key="currentUserRole"
         v-model:currentrole="currentUserRole"
@@ -188,14 +188,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <update-user-role
+    <UpdateUserRole
       v-if="config.isCloud == 'false'"
       v-model:open="showUpdateUserDialog"
       v-model="selectedUser"
       @updated="updateMember"
     />
 
-    <add-user
+    <AddUser
       v-model:open="showAddUserDialog"
       v-model="selectedUser"
       :isUpdated="isUpdated"

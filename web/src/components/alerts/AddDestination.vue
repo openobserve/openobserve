@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Tabs for non-alert destinations OR custom alert destinations -->
           <div v-if="!isAlerts || (isAlerts && dtVal === 'custom')" class="w-full pb-3">
             <div class="app-tabs-container h-9 mr-2 w-fit">
-              <app-tabs
+              <AppTabs
                 data-test="add-destination-tabs"
                 :tabs="tabs"
                 class="tabs-selection-container"

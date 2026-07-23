@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <OTabPanel name="json">
           <OCardSection data-test="log-detail-json-content" class="px-page-edge pt-2 mb-6">
-            <json-preview
+            <JsonPreview
               :value="rowData"
               show-copy-button
               mode="sidebar"

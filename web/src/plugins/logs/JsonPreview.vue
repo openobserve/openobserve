@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="pb-1 flex justify-start px-3 copy-log-btn">
-      <app-tabs
+      <AppTabs
         v-if="filteredTabs.length"
         class="mb-1.5 mr-2 h-fit overflow-hidden border-t border-l border-r border-solid border-card-glass-border rounded-default"
         data-test="logs-json-preview-tabs"
@@ -60,7 +60,7 @@
         <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
              every .monaco-editor app-wide. The focus-border is left off so this
              editor stays borderless like the others. -->
-        <code-query-editor
+        <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"

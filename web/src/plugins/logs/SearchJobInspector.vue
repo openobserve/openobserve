@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #empty>
-              <no-data />
+              <NoData />
             </template>
           </OTable>
         </div>

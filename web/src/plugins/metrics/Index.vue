@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <syntax-guide-metrics />
+      <SyntaxGuideMetrics />
       <MetricLegends />
       <DateTimePickerDashboard
         v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type) && selectedDate"
@@ -94,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <add-to-dashboard
+    <AddToDashboard
       v-model:open="showAddToDashboardDialog"
       :dashboardPanelData="dashboardPanelData"
       @save="addPanelToDashboard"

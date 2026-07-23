@@ -87,7 +87,7 @@
           {{ t("common.query") + " *" }}
         </div>
         <div class="relative w-full">
-          <query-editor
+          <QueryEditor
             data-test="vrl-function-test-sql-editor"
             ref="queryEditorRef"
             editor-id="test-function-query-input-editor"
@@ -166,7 +166,7 @@
         class="relative"
         data-test="test-function-input-editor-section"
       >
-        <query-editor
+        <QueryEditor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
@@ -226,7 +226,7 @@
             {{ outputMessage }}
           </div>
         </div>
-        <query-editor
+        <QueryEditor
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"

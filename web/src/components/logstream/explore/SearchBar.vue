@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="download"
         />
         <div class="float-left" v-show="queryData.streamType !== 'enrichment_tables'">
-          <date-time
+          <DateTime
             data-test="logs-search-bar-date-time-dropdown"
             auto-apply
             :default-type="searchObj.data.datetime.type"
@@ -62,13 +62,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-[calc(100%-40px)]!">
       <div class="flex flex-col border-t border-border-default h-25">
         <b>Query Editor:</b>
-        <code-query-editor
+        <CodeQueryEditor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
           v-model:query="query"
           @update:query="updateQueryValue"
           @run-query="searchData"
-        ></code-query-editor>
+        ></CodeQueryEditor>
       </div>
     </div>
   </div>

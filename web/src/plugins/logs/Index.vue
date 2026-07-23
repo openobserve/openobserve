@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                lines the toolbar/editor up with the 10px field-list & results
                panels below. -->
           <div class="w-full h-full">
-            <search-bar
+            <SearchBar
               data-test="logs-search-bar"
               ref="searchBarRef"
               :fieldValues="fieldValues"
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   class="relative-position h-full pt-2.5 border-r border-border-default bg-surface-panel"
                 >
-                  <index-list
+                  <IndexList
                     v-if="searchObj.meta.showFields"
                     data-test="logs-search-index-list"
                     @setInterestingFieldInSQLQuery="setInterestingFieldInSQLQuery"
@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="logs-search-search-result"
                       class="h-full max-h-full overflow-hidden"
                     >
-                      <search-result
+                      <SearchResult
                         ref="searchResultRef"
                         :expandedLogs="expandedLogs"
                         :stream-doc-time-range="streamDocTimeRange"
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OSplitter>
     </div>
     <div v-show="showSearchHistory" class="h-full max-h-full overflow-hidden">
-      <search-history
+      <SearchHistory
         v-if="store.state.zoConfig.usage_enabled"
         ref="searchHistoryRef"
         @closeSearchHistory="closeSearchHistoryfn"

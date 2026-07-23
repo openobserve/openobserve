@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </OPageLayout>
     <div v-else>
-      <add-cipher-key @cancel:hideform="hideAddDialog" />
+      <AddCipherKey @cancel:hideform="hideAddDialog" />
     </div>
   </div>
   <ConfirmDialog

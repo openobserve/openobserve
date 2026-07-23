@@ -566,7 +566,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="text-center mt-2 flex items-center">
                         <div class="flex items-center">
                           <span class="font-bold"> Select Date</span>
-                          <date-time
+                          <DateTime
                             class="mx-2"
                             @on:date-change="dateChangeValue"
                             disable-relative

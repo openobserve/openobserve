@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <template #empty>
             <div class="h-screen w-full">
-              <no-data />
+              <NoData />
             </div>
           </template>
 

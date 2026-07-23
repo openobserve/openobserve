@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="invoice-history-container" class="rounded-default flex flex-col h-full">
     <div class="flex-1 min-h-0">
       <div class="w-full h-full">
-        <invoice-table></invoice-table>
+        <InvoiceTable></InvoiceTable>
       </div>
     </div>
   </div>

@@ -443,7 +443,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Logs View -->
         <template v-if="searchObj.meta.logsVisualizeToggle === 'logs'">
-          <tenstack-table
+          <TenstackTable
             ref="searchTableRef"
             :columns="getColumns || []"
             :rows="searchObj.data.queryResults?.hits || []"

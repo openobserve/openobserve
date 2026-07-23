@@ -122,7 +122,7 @@ export default [
       vue,
       "@typescript-eslint": typescript,
       prettier,
-      "local": noLegacyO2Tokens,
+      local: noLegacyO2Tokens,
     },
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
@@ -181,6 +181,12 @@ export default [
       "prettier/prettier": "off",
       "vue/max-attributes-per-line": "off",
       "vue/multi-word-component-names": "off",
+      // Always use PascalCase for component tags in templates (auto-fixable).
+      "vue/component-name-in-template-casing": [
+        "error",
+        "PascalCase",
+        { registeredComponentsOnly: true, ignores: [] },
+      ],
       //
       // Zero current violations → locked straight to "error".
       "no-shadow-restricted-names": "error",
@@ -236,7 +242,6 @@ export default [
       "vue/no-mutating-props": "error",
       "vue/no-unused-components": "error",
       "vue/no-unused-vars": "error",
-
     },
   },
   {

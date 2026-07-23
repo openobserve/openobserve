@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
 
             <!-- Share button -->
-            <share-button
+            <ShareButton
               v-if="showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
@@ -326,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
 
             <!-- Share button (standalone mode) -->
-            <share-button
+            <ShareButton
               v-if="isStandaloneMode && showShareButton"
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
@@ -513,7 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: isSidebarOpen ? leftWidth + 'px' : '100%',
                 }"
               >
-                <trace-header
+                <TraceHeader
                   data-test="trace-details-header"
                   :baseTracePosition="baseTracePosition"
                   :splitterWidth="leftWidth"
@@ -541,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="absolute resize h-full cursor-col-resize top-0 w-px bg-border-default hover:bg-accent rounded-default transition-colors duration-200 after:content-[''] after:absolute after:h-full after:-left-2.5 after:-right-2.5 after:top-0 after:bottom-0 after:z-999"
                         @mousedown="startResize"
                       />
-                      <trace-tree
+                      <TraceTree
                         data-test="trace-details-tree"
                         :collapseMapping="collapseMapping"
                         :spans="spanPositionList"
@@ -577,7 +577,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: `calc(100% - ${leftWidth}px)`,
                 }"
               >
-                <trace-details-sidebar
+                <TraceDetailsSidebar
                   data-test="trace-details-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
                   :baseTracePosition="baseTracePosition"
@@ -636,7 +636,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   width: `${100 - dagLeftWidth}%`,
                 }"
               >
-                <trace-details-sidebar
+                <TraceDetailsSidebar
                   data-test="trace-details-dag-sidebar"
                   :span="spanMap[effectiveSpanId as string]"
                   :baseTracePosition="baseTracePosition"
@@ -709,7 +709,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="border-l border-l-solid border-l-card-glass-border h-full overflow-hidden"
                 style="width: 40%; min-width: 300px"
               >
-                <trace-details-sidebar
+                <TraceDetailsSidebar
                   data-test="trace-details-thread-sidebar"
                   :span="spanMap[selectedSpanId as string]"
                   :baseTracePosition="baseTracePosition"
