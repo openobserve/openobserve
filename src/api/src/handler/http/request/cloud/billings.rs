@@ -43,6 +43,34 @@ use crate::{
     },
 };
 
+fn billing_event_data(
+    email: &str,
+    org_id: &str,
+    plan: Option<&str>,
+) -> HashMap<String, json::Value> {
+    let mut event_data = HashMap::from([
+        ("email".to_string(), json::Value::String(email.to_string())),
+        (
+            "org_id".to_string(),
+            json::Value::String(org_id.to_string()),
+        ),
+    ]);
+    if let Some(plan) = plan {
+        event_data.insert("plan".to_string(), json::Value::String(plan.to_string()));
+    }
+    event_data
+}
+
+async fn send_billing_event(event: &str, event_data: HashMap<String, json::Value>) {
+    let mut telemetry_instance = telemetry::Telemetry::new();
+    telemetry_instance
+        .send_track_event(event, Some(event_data.clone()), false, false)
+        .await;
+    telemetry_instance
+        .send_keyevent_track_event(event, Some(event_data), false, false)
+        .await;
+}
+
 /// GetSubscriptionUrl
 #[utoipa::path(
     get,
@@ -195,31 +223,8 @@ pub async fn process_session_detail(
                 org_id
             );
             // Send event to ActiveCampaign
-            let segment_event_data = HashMap::from([
-                ("email".to_string(), json::Value::String(email.to_string())),
-                (
-                    "plan".to_string(),
-                    json::Value::String(query.plan.to_string()),
-                ),
-            ]);
-            let mut telemetry_instance = telemetry::Telemetry::new();
-            telemetry_instance
-                .send_track_event(
-                    "OpenObserve - New subscription started",
-                    Some(segment_event_data.clone()),
-                    false,
-                    false,
-                )
-                .await;
-
-            telemetry_instance
-                .send_keyevent_track_event(
-                    "OpenObserve - New subscription started",
-                    Some(segment_event_data),
-                    false,
-                    false,
-                )
-                .await;
+            let event_data = billing_event_data(email, &org_id, Some(&query.plan));
+            send_billing_event("OpenObserve - New subscription started", event_data).await;
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
                 org_name: org.name.clone(),
@@ -274,6 +279,8 @@ pub async fn unsubscribe(
     match o2_cloud_billings::unsubscribe(&org_id, email).await {
         Err(err) => err.into_http_response(),
         Ok(()) => {
+            let event_data = billing_event_data(email, &org_id, None);
+            send_billing_event("OpenObserve - Subscription cancelled", event_data).await;
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
                 org_name: org.name.clone(),
@@ -564,4 +571,27 @@ pub async fn handle_azure_event(headers: HeaderMap, payload: axum::body::Bytes) 
     //                 stream_name: None,
     //             })
     //             .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_billing_event_data_includes_org_id_and_plan_for_subscription() {
+        let event_data = billing_event_data("user@example.com", "org-1", Some("professional"));
+
+        assert_eq!(event_data["email"], json::json!("user@example.com"));
+        assert_eq!(event_data["org_id"], json::json!("org-1"));
+        assert_eq!(event_data["plan"], json::json!("professional"));
+    }
+
+    #[test]
+    fn test_billing_event_data_omits_plan_for_unsubscribe() {
+        let event_data = billing_event_data("user@example.com", "org-1", None);
+
+        assert_eq!(event_data["email"], json::json!("user@example.com"));
+        assert_eq!(event_data["org_id"], json::json!("org-1"));
+        assert!(!event_data.contains_key("plan"));
+    }
 }
