@@ -1,8 +1,8 @@
 {
   "totals": {
     "rawProjectRamp": 139,
-    "rawVarInComponent": 585,
-    "arbZ": 34,
+    "rawVarInComponent": 576,
+    "arbZ": 33,
     "darkMechanism": 20,
     "unscopedStyle": 7,
     "stylePxUnit": 90
@@ -148,7 +148,7 @@
     },
     "components/pipeline/PipelineEditor.vue": {
       "unscopedStyle": 1,
-      "rawVarInComponent": 20
+      "rawVarInComponent": 11
     },
     "components/pipeline/PipelineSectionTabs.vue": {
       "rawProjectRamp": 2
@@ -408,7 +408,7 @@
       "rawProjectRamp": 2
     },
     "plugins/pipelines/CustomNode.vue": {
-      "arbZ": 2,
+      "arbZ": 1,
       "rawVarInComponent": 10
     },
     "plugins/pipelines/PipelineFlow.vue": {
