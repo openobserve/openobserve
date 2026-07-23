@@ -7023,6 +7023,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-compaction"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "chrono",
+ "config",
+ "datafusion",
+ "db",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "ingester",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "parking_lot 0.12.5",
+ "parquet",
+ "rand 0.10.1",
+ "schema-service",
+ "search",
+ "search_service",
+ "tantivy_utils",
+ "tokio",
+]
+
+[[package]]
 name = "openobserve-core"
 version = "0.1.0"
 dependencies = [
@@ -7067,6 +7096,8 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "object_store",
+ "openobserve-compaction",
+ "openobserve-ingestion-types",
  "opentelemetry",
  "opentelemetry-proto",
  "parking_lot 0.12.5",
@@ -7084,6 +7115,7 @@ dependencies = [
  "reqwest 0.13.2",
  "rustls",
  "rustls-native-certs",
+ "schema-service",
  "sea-orm",
  "search",
  "search_service",
@@ -7115,6 +7147,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "openobserve-ingestion-types"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "common",
+ "config",
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
 name = "openobserve-jobs"
 version = "0.1.0"
 dependencies = [
@@ -7135,6 +7179,7 @@ dependencies = [
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
+ "openobserve-compaction",
  "openobserve-core",
  "prometheus",
  "proto",
@@ -9507,6 +9552,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "schema-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow-schema",
+ "common",
+ "config",
+ "dashmap",
+ "db",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "openobserve-ingestion-types",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "schemars"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10723,6 +10786,7 @@ dependencies = [
  "infra",
  "log",
  "o2_enterprise",
+ "openobserve-compaction",
  "openobserve-core",
  "serde",
  "serde_json",
@@ -11007,6 +11071,8 @@ name = "tantivy_utils"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrow",
+ "arrow-schema",
  "async-trait",
  "bitflags 2.11.0",
  "byteorder",
@@ -11019,10 +11085,12 @@ dependencies = [
  "log",
  "object_store",
  "parking_lot 0.12.5",
+ "parquet",
  "serde",
  "serde_json",
  "tantivy",
  "tokio",
+ "vortex",
  "zstd",
 ]
 
