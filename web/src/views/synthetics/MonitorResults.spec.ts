@@ -66,7 +66,12 @@ vi.mock("@/utils/date", () => ({
   }),
 }));
 
-// Mock syntheticsService.get — called on mount to fetch fresh check data
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn()),
+}));
+
+// Mock syntheticsService.get — called via bootstrap() when MonitorRuns emits
+// need-check-data (only when there are zero runs and no lastTriggeredAt).
 const mockSyntheticsServiceGet = vi.fn().mockResolvedValue({
   data: { name: "Test Monitor", status: "healthy", last_triggered_at: 0 },
 });
@@ -136,7 +141,7 @@ function makeWrapper() {
               <button data-test="trigger-jump-to-window" @click="$emit('jump-to-window', 1000, 2000)" />
             </div>
           `,
-          props: ["monitorId", "monitorName", "monitorStatus"],
+          props: ["monitorId", "monitorName", "monitorStatus", "lastTriggeredAt", "checkType"],
         },
         RunDetail: {
           template: '<div data-test="run-detail" />',

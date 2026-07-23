@@ -495,18 +495,6 @@ const activeFolderName = computed(() => {
   return folder?.name ?? 'Default'
 })
 
-// When the user switches organizations while editing a check, silently redirect
-// to the synthetics list of the new org — the check ID belongs to the previous
-// org and shouldn't be resolved against the new one.
-watch(
-  () => store.state.selectedOrganization.identifier,
-  (newOrg, oldOrg) => {
-    if (oldOrg && newOrg !== oldOrg) {
-      router.push({ name: 'synthetics' })
-    }
-  },
-)
-
 watch(activeFolderId, async (newFolderId) => {
   selectedMonitorIds.value = []
   if (searchAcrossFolders.value) {
@@ -591,6 +579,8 @@ const onMoveUpdated = async () => {
 const openDetail = (monitor: any) => {
   const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name }
   if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt)
+  const orgIdentifier = route.query.org_identifier
+  if (typeof orgIdentifier === "string" && orgIdentifier) query.org_identifier = orgIdentifier
   router.push({
     name: 'synthetic-monitor-results',
     params: { id: String(monitor.id) },

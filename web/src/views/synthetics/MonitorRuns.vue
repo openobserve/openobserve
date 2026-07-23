@@ -1100,10 +1100,14 @@ interface Props {
    * Used by the page-level empty state to distinguish "never run" vs "no runs in
    * this time window" and compute the jump-to-latest-data target. */
   lastTriggeredAt?: number;
+  /** Check type ("browser" | "http" | etc.) — provided by the parent after it
+   * fetches the check. Controls the tabs grid layout and step analysis visibility. */
+  checkType?: string;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
   lastTriggeredAt: 0,
+  checkType: "browser",
 });
 
 // ── Synthetic results composable ──────────────────────────────────────────
@@ -1151,21 +1155,8 @@ function locationIcon(region: string): string {
 // ── State ────────────────────────────────────────────────────────────────
 const activeTab = ref("overview");
 
-// ── Monitor type resolution ──────────────────────────────────────────────
-const isBrowser = ref(true);
-let monitorTypeResolved = false;
-
-async function resolveMonitorType() {
-  try {
-    const res = await syntheticsService.get(orgIdentifier.value, props.monitorId, folderName.value);
-    const type = (res.data as any)?.type ?? "browser";
-    isBrowser.value = type === "browser";
-    monitorTypeResolved = true;
-  } catch {
-    // Default to browser on fetch failure — safe fallback
-    monitorTypeResolved = true;
-  }
-}
+// ── Monitor type — derived from the prop set by parent's fetchCheck() call ──
+const isBrowser = computed(() => props.checkType === "browser");
 
 // ── Seeded random (for fallback mock data in charts/timeline) ────────────
 function seedRand(seed: number) {
@@ -2345,9 +2336,6 @@ function openRun(row: { id: number }) {
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
   timeRangeMicros.value = { startTime, endTime };
-  if (!monitorTypeResolved) {
-    resolveMonitorType();
-  }
   await synthetics.fetchAll(props.monitorId, startTime, endTime);
 }
 
