@@ -89,7 +89,17 @@ export const ingestionSearchIndex: SearchableItem[] = [
   {
     name: "frontendMonitoring",
     label: "RUM",
-    keywords: ["rum", "frontend", "monitoring", "browser"],
+    keywords: [
+      "rum",
+      "frontend",
+      "monitoring",
+      "browser",
+      "react native",
+      "mobile",
+      "ios",
+      "android",
+      "session replay",
+    ],
     parentTab: "recommended",
   },
 
