@@ -472,72 +472,55 @@ describe("WorkflowNode", () => {
     });
   });
 
-  describe("hover-`+` -> step picker", () => {
-    it("renders a single `+` for a logic node and opens the step picker on click", async () => {
+  // The hover-`+` under the card is gone: clicking the node's SOURCE HANDLE
+  // opens the step picker. Terminal (output) nodes render no source handle, so
+  // there is nothing to click on them.
+  describe("source handle -> step picker", () => {
+    const outputClick = (w: any, x = 120, y = 240) =>
+      w.findComponent({ name: "FlowNodeCard" }).vm.$emit("outputClick", {
+        clientX: x,
+        clientY: y,
+      } as MouseEvent);
+
+    it("opens the step picker anchored at the click for a logic node", async () => {
       wrapper = mountNode("c1", CONDITION.data);
-      await wrapper.trigger("mouseenter");
-      const plus = wrapper.find('[data-test="workflow-node-condition-add-out"]');
-      expect(plus.exists()).toBe(true);
-      await plus.trigger("click");
+      outputClick(wrapper, 120, 240);
+      await nextTick();
       expect(workflowObj.stepPicker).toEqual({
         show: true,
         source: "c1",
         handle: "out",
+        mode: "next",
+        position: null,
+        anchor: { x: 120, y: 240 },
       });
     });
 
-    it("renders a `+` for the trigger too", () => {
+    it("opens the step picker for the trigger too", async () => {
       wrapper = mountNode("t1", TRIGGER.data);
-      expect(
-        wrapper.find('[data-test="workflow-node-workflow_trigger-add-out"]').exists(),
-      ).toBe(true);
+      outputClick(wrapper);
+      await nextTick();
+      expect(workflowObj.stepPicker.show).toBe(true);
+      expect(workflowObj.stepPicker.source).toBe("t1");
     });
 
-    it("renders NO `+` for a terminal (output) destination node", () => {
+    it("renders a source handle on a logic node", () => {
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(true);
+    });
+
+    it("renders NO source handle on a terminal (output) destination node", () => {
       wrapper = mountNode("d1", DESTINATION.data);
-      expect(wrapper.find(".wf-plus").exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(false);
     });
 
-    it("renders NO `+` for an unknown node type (no meta)", () => {
-      wrapper = mountNode("x1", { node_type: "not_a_type" });
-      expect(wrapper.find(".wf-plus").exists()).toBe(false);
-    });
-
-    it("hides the `+` until hover", () => {
+    it("does nothing on the read-only Runs canvas", async () => {
+      workflowObj.readOnly = true;
       wrapper = mountNode("c1", CONDITION.data);
-      expect(wrapper.find(".wf-plus").element.style.display).toBe("none");
-    });
-
-    it("shows the `+` on hover", async () => {
-      wrapper = mountNode("c1", CONDITION.data);
-      await wrapper.trigger("mouseenter");
-      expect(wrapper.find(".wf-plus").element.style.display).not.toBe("none");
-    });
-
-    it("does not render a branch tag (the condition is a single-output filter)", () => {
-      wrapper = mountNode("c1", CONDITION.data);
-      expect(wrapper.find(".wf-plus-tag").exists()).toBe(false);
-    });
-
-    it("cancels a pending hide when the cursor moves onto the `+`", async () => {
-      vi.useFakeTimers();
-      wrapper = mountNode("c1", CONDITION.data);
-      await wrapper.trigger("mouseenter");
-      await wrapper.trigger("mouseleave");
-      await wrapper.find(".wf-plus").trigger("mouseenter");
-      vi.advanceTimersByTime(500);
+      outputClick(wrapper);
       await nextTick();
-      expect(wrapper.find(".wf-plus").element.style.display).not.toBe("none");
-    });
-
-    it("schedules the hide when the cursor leaves the `+`", async () => {
-      vi.useFakeTimers();
-      wrapper = mountNode("c1", CONDITION.data);
-      await wrapper.trigger("mouseenter");
-      await wrapper.find(".wf-plus").trigger("mouseleave");
-      vi.advanceTimersByTime(200);
-      await nextTick();
-      expect(wrapper.find(".wf-plus").element.style.display).toBe("none");
+      expect(workflowObj.stepPicker.show).toBe(false);
+      workflowObj.readOnly = false;
     });
   });
 
@@ -751,9 +734,8 @@ describe("WorkflowNode", () => {
       expect(workflowObj.deleteConfirm).toEqual({ show: true, nodeId: "c1" });
     });
 
-    it("renders no `+` (no meta) and no body label crash", () => {
+    it("renders no body label and does not crash (no meta)", () => {
       wrapper = mountNode("c1", undefined);
-      expect(wrapper.find(".wf-plus").exists()).toBe(false);
       expect(wrapper.text()).toBe("");
     });
   });

@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ref="vueFlowRef"
       v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
       v-model:edges="pipelineObj.currentSelectedPipeline.edges"
+      :connect-on-click="false"
       @node-change="onNodeChange"
       @nodes-change="onNodesChange"
       @edges-change="onEdgesChange"
@@ -104,10 +105,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       class="controls-grp"
         position="top-left">
+        <!-- Node-rail toggle. `#top` puts it ABOVE zoom-in / zoom-out / fit-view
+             (the default slot would append it below them). The glyph is a bare
+             32x32 currentColor <svg>, exactly like Vue Flow's own control icons
+             — an OIcon here rendered at a different weight and box, so it read
+             as a foreign control in the stack. `.vue-flow__controls-button svg`
+             does the sizing, so no width/height of our own. -->
+        <template #top>
+          <ControlButton
+            data-test="pipeline-node-sidebar-collapse-btn"
+            :title="pipelineObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')"
+            @click="pipelineObj.showNodePalette = !pipelineObj.showNodePalette"
+          >
+            <!-- » chevrons; mirrored in place to « once the rail is open. -->
+            <svg viewBox="0 0 32 32">
+              <path
+                :transform="pipelineObj.showNodePalette ? 'translate(32,0) scale(-1,1)' : undefined"
+                d="M2 5.5 5.5 2 19.5 16 5.5 30 2 26.5 12.5 16ZM14.5 5.5 18 2 32 16 18 30 14.5 26.5 25 16Z"
+              />
+            </svg>
+          </ControlButton>
+        </template>
     </Controls>
     </VueFlow>
-    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-text-muted text-[1.5em] text-center pointer-events-none z-10">
-      {{ t('pipeline.dragDropNodesHere') }}
+    <!-- Empty-canvas start node. It is an OVERLAY, not a Vue Flow node: a real
+         node would land in `currentSelectedPipeline.nodes` and show up in save,
+         validation and the dirty flag. It borrows `vue-flow__node-input` so it
+         is chrome-for-chrome the same card a Stream/Query source renders as —
+         picking a source swaps the icon and label, and the frame never moves.
+         Sits near the TOP, not the middle: the graph runs downwards, so the
+         first node belongs where a source lives, leaving the canvas below it
+         free for the steps that follow. -->
+
+    <div
+      v-if="isCanvasEmpty"
+      class="absolute top-32 left-1/2 -translate-x-1/2 z-10"
+    >
+      <!-- Scaled by the LIVE viewport zoom. Real nodes are drawn inside
+           `.vue-flow__viewport`, which carries the canvas transform, so at the
+           default 0.8 zoom this overlay — a sibling of that transform, not a
+           child — rendered 1.25x larger than the node it stands in for.
+           Matching the zoom keeps it the size of the node it becomes.
+
+           `relative!` / `origin-top!` undo two things `.vue-flow__node` sets for
+           nodes VUE FLOW positions: `position:absolute` (which took this card
+           out of flow, collapsing the centring wrapper to zero width) and
+           `transform-origin:0 0` (which scaled it toward the top-left). This
+           card is positioned by us, so it needs neither. -->
+      <div
+        data-test="pipeline-flow-start-node"
+        class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom)] cursor-pointer!"
+        :style="{ '--ghost-zoom': viewport.zoom }"
+        @click="openSourcePicker($event)"
+      >
+        <FlowNodeCard
+          icon="add"
+          io-type="input"
+          :has-input="false"
+          :has-output="false"
+        >
+          <template #body>{{ t("pipeline.chooseSource") }}</template>
+        </FlowNodeCard>
+      </div>
     </div>
     <!-- Add UI elements or buttons to interact with the methods -->
 </template>
@@ -117,10 +176,17 @@ import { ref, onMounted, watch, computed } from "vue";
 import type { Ref } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import type { VueFlowStore } from "@vue-flow/core";
-import { Controls } from '@vue-flow/controls'
+import { Controls, ControlButton } from '@vue-flow/controls'
 // import vueFlowConfig from "./vueFlowConfig";
+// Shared, token-driven canvas styling — the SAME file the workflow canvas
+// imports, so the two canvases cannot drift. It owns the vue-flow node chrome
+// and the input/default/output role colours (including their dark variants);
+// PipelineEditor.vue used to carry a private copy of those rules, which is why
+// the two editors' nodes rendered differently in dark mode.
+import "@/components/flow/flow-canvas.css";
 import CustomNode from "./CustomNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
+import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
@@ -131,7 +197,7 @@ import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 
 export default {
-  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls, FlowEdge
+  components: { VueFlow, CustomNode, OIcon, DropzoneBackground, Controls, ControlButton, FlowEdge, FlowNodeCard
    },
   setup() {
     const { t } = useI18n();
@@ -145,6 +211,7 @@ export default {
       onEdgesChange,
       onConnect,
       validateConnection,
+      openSourcePicker,
       pipelineObj,
     } = useDragAndDrop();
     const store = useStore();
@@ -163,7 +230,9 @@ export default {
     const showEdgeHelpNotification = ref(false);
     let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const { setViewport } = useVueFlow()
+    // `viewport` is the live canvas transform; the empty-canvas start node
+    // reads its zoom so it renders at the same scale as real nodes.
+    const { setViewport, viewport } = useVueFlow()
 
     // Handle edge click events
     const onEdgeClick = () => {
@@ -234,6 +303,8 @@ function resetTransform() {
       vueFlowRef,
       resetTransform,
       isCanvasEmpty,
+      openSourcePicker,
+      viewport,
       store,
       setViewport,
       t,

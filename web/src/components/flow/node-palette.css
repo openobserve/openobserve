@@ -43,39 +43,11 @@
  * be scoped or folded into flow-canvas.css.
  * ───────────────────────────────────────────────────────────────────────────── */
 
-/* ── Header: title with a brand-accent underline ─────────────────────────── */
-.np-header {
-  color: var(--color-text-heading);
-  border-bottom: 0.125rem solid var(--color-primary-600);
-}
-
-/* ── Panel wrapping the node cards ───────────────────────────────────────────
- * Plain grey primitives, no brand tint:
- *   light  --color-grey-200 (#e5e5e5)
- *   dark   --color-grey-900 (#171717) — the primitive is a FIXED value, so dark
- *          must be stated explicitly or the panel renders as a near-white slab
- *          on the #0d1117 canvas. #171717 is 1.7 from the app's own dark panel
- *          surface (--d-panel #181818), so it matches the other rails anyway. */
-.np-panel {
-  background: var(--color-blue-50);
-  backdrop-filter: blur(0.75rem);
-  border: 1px solid var(--color-border-default);
-  border-radius: 0.75rem;
-  box-shadow: 0 0.25rem 1rem color-mix(in srgb, var(--color-black) 8%, transparent);
-  padding: 0.75rem 0.5rem;
-  margin: 0.25rem 0.125rem;
-  transition: all 0.3s ease-in-out;
-}
-.np-panel:hover {
-  box-shadow: 0 0.375rem 1.25rem color-mix(in srgb, var(--color-black) 12%, transparent);
-}
-.dark .np-panel {
-  background: var(--color-grey-900);
-  box-shadow: 0 0.375rem 1.5rem color-mix(in srgb, var(--color-black) 40%, transparent);
-}
-.dark .np-panel:hover {
-  box-shadow: 0 0.5rem 2rem color-mix(in srgb, var(--color-black) 50%, transparent);
-}
+/* The palette is a RAIL (same shape as the Dashboards/Alerts folder rail): a
+ * flush, full-height column with a border-r against the canvas, carrying its
+ * node cards directly. It has no header rule here because it has no header —
+ * both the old floating `.np-panel` card and the "Nodes" title were dropped, so
+ * the cards below are the only surfaces the rail draws. */
 
 /* Drag-affordance dots. (The old `.drag-handle:hover .dot` rules were dropped —
    no element in this template ever carried `.drag-handle`, so they were dead.) */

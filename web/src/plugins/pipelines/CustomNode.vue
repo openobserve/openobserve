@@ -85,6 +85,14 @@ const props = defineProps({
   io_type: {
     type: String,
   },
+  // Set by the read-only list-row preview (PipelineView). The editor leaves it
+  // false. Mirrors `workflowObj.readOnly`, which WorkflowNode checks for the
+  // same reason: this component renders on a non-interactive surface too, and
+  // its click handlers mutate the SHARED pipelineObj singleton.
+  readOnly: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 defineEmits(["delete:node"]);
@@ -285,6 +293,20 @@ const { t } = useI18n();
 const router = useRouter();
 const store = useStore();
 
+// Click handlers are inert on the read-only preview: both mutate the shared
+// pipelineObj singleton, so a stray click there would leak state into the
+// editor that opens next (the picker would pop open unbidden, anchored at the
+// stale click, pointing at a node id from a different pipeline).
+const onCardClick = () => {
+  if (props.readOnly) return;
+  editNode(props.id);
+};
+
+const onOutputClick = (event: MouseEvent) => {
+  if (props.readOnly) return;
+  openStepPicker(props.id, event);
+};
+
 const editNode = (id: string) => {
   //from id find the node from pipelineObj.currentSelectedPipelineData.nodes
   const fullNode = pipelineObj.currentSelectedPipeline.nodes.find(
@@ -383,7 +405,8 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
       class="btn-fixed-width"
       @mouseenter="handleNodeHover(id, io_type)"
       @mouseleave="handleNodeLeave(id)"
-      @click="editNode(id)"
+      @click="onCardClick"
+      @output-click="onOutputClick"
     >
       <!-- Per-type label content -->
       <template #body>
@@ -488,27 +511,6 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         </div>
       </template>
 
-      <!-- hover-`+` "add next step" — non-terminal (non-output) nodes only. -->
-      <template #footer>
-        <div
-          v-show="showButtons && io_type !== 'output'"
-          class="pl-plus nodrag"
-          :data-test="`pipeline-node-${io_type}-add`"
-          @pointerdown.stop
-          @click.stop
-          @mouseenter="handleActionButtonsEnter"
-          @mouseleave="handleActionButtonsLeave"
-        >
-          <button
-            type="button"
-            class="pl-plus-btn border-2 border-dashed border-border-strong bg-surface-overlay text-text-muted hover:border-solid hover:border-accent hover:text-accent hover:bg-accent/10"
-            :data-test="`pipeline-node-${io_type}-add-btn`"
-            @click.stop="openStepPicker(id)"
-          >
-            <OIcon name="add" size="xs" />
-          </button>
-        </div>
-      </template>
     </FlowNodeCard>
   </div>
 
@@ -530,31 +532,14 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
    CustomNode renders in two places (the editor canvas and the list-row preview),
    so these must travel with the component rather than live in the editor.
 
-   hover-`+` "add next step" affordance — positioned below the node card. Its
-   colours live on the element as token utilities (see the template); only
-   geometry is here. Two legacy dark overrides were dropped rather than ported:
-   they keyed off Quasar's old body-level dark class, which this app never sets,
-   so they had been dead for a while — and the tokens now flip with the theme
-   on their own, which is what those rules were reaching for. */
-.pl-plus {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-top: 0.75rem;
-  transform: translateX(-50%);
-  z-index: 5;
-}
-.pl-plus-btn {
-  width: 1.625rem;
-  height: 1.625rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.14s;
-}
+   The hover-`+` "add next step" button (`.pl-plus` / `.pl-plus-btn`) that used
+   to sit below the card is gone — clicking the source handle opens the step
+   picker instead, so the button and its geometry rules went with it. */
 
+/* The source handle doubles as the "add next step" affordance, so it takes a
+   pointer cursor rather than Vue Flow's connect crosshair. */
 :deep(.node_handle_custom) {
+  cursor: pointer;
   width: 1rem !important;
   height: 1rem !important;
   border: 0.1875rem solid color-mix(in srgb, var(--color-white) 90%, transparent);

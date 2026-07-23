@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "ステップを追加",
       "search": "ステップを検索...",
       "noMatch": "一致するステップがありません"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "リンク成功: {ok} 件、失敗: {failed} 件",
       "linkError": "アラートをリンクできませんでした。"
     },
-    "canvasEmpty": "トリガーを追加してワークフローの構築を開始",
     "node": {
       "kindTrigger": "トリガー",
       "kindLogic": "ロジック",
@@ -2229,8 +2227,6 @@
       "notConfigured": "未設定",
       "configComingSoon": "{node} の設定は後続のステップで行います",
       "addNext": "次のステップを追加",
-      "stepDialogTitle": "ステップを追加",
-      "paletteTitle": "ノード",
       "sectionTransform": "変換",
       "sectionDestination": "宛先",
       "paletteCollapse": "折りたたむ",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "ノードを削除",
     "deleteNodeLlmEvalConfirm": "この LLM 評価ノードを削除してよろしいですか?",
     "cancel": "[キャンセル]",
-    "dragDropNodesHere": "ここにノードをドラッグアンドドロップ",
     "promqlOnlyForMetrics": "PromQL はメトリクスストリームタイプでのみ使用できます",
     "invalidCronExpression": "cron 表現が無効です",
     "cronRequired": "Cron式は必須です",

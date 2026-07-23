@@ -114,9 +114,14 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
 export const nodeMeta = (nodeType: string): WorkflowNodeMeta | undefined =>
   WORKFLOW_NODE_TYPES[nodeType];
 
-// Node types offered by the hover-`+` StepMenu (everything but the trigger,
-// which is fixed and can only be the first node).
+// Node types offered by the step picker when extending a node (everything but
+// the triggers, which can only ever be the FIRST node).
 export const ADDABLE_NODE_TYPES = ["condition", "function", "destination"];
+
+// Node types offered by the empty-canvas start node. One today; the list is the
+// seam where further trigger kinds land, and the picker already handles n of
+// them — which is why the start node is a picker and not a fixed seeded node.
+export const TRIGGER_NODE_TYPES = ["workflow_trigger"];
 
 // A node's configured detail, shown as a subtitle on the canvas card and used as
 // the differentiator in the Test "Run From" dropdown. Function -> VRL function
@@ -199,9 +204,25 @@ const defaultObject = {
   // Edge to create when the staged node's drawer is saved (add flow).
   pendingEdge: <any>null,
   dialog: { ...defaultDialog },
-  // Step picker (the searchable "add next step" dialog). The hover-`+` opens it
-  // with the source node + handle; picking a type calls addNodeAfter.
-  stepPicker: { show: false, source: "", handle: "out" },
+  // Step picker (the searchable "add next step" popover). Clicking a node's
+  // source handle opens it with that node + handle; picking a type calls
+  // addNodeAfter. `anchor` is the click point in viewport coords, so the
+  // popover opens at the handle instead of centred on screen.
+  // `mode` is "next" when extending a node (source + handle carry the parent)
+  // and "trigger" when the empty-canvas start node was clicked, where there is
+  // no parent and `position` carries where to place the first node instead.
+  stepPicker: {
+    show: false,
+    source: "",
+    handle: "out",
+    mode: "next" as "next" | "trigger",
+    position: null as { x: number; y: number } | null,
+    anchor: null as { x: number; y: number } | null,
+  },
+  // Node rail open/closed. Lives here because the toggle sits in the canvas's
+  // control stack (WorkflowCanvas) while the rail is rendered by the editor.
+  // Starts CLOSED so the canvas gets the full width on open.
+  showNodePalette: false,
   // Node type currently being dragged from the palette (drag-and-drop add).
   draggedNodeType: "",
   // Pending node-delete confirmation. Both delete entry points (hover-`x` on the
@@ -596,11 +617,40 @@ export default function useWorkflowCanvas() {
   }
 
   // Hover-`+` opens the step picker dialog anchored to this source + handle.
-  function openStepPicker(sourceId: string, handle: string) {
-    workflowObj.stepPicker = { show: true, source: sourceId, handle };
+  function openStepPicker(sourceId: string, handle: string, event?: MouseEvent) {
+    workflowObj.stepPicker = {
+      show: true,
+      source: sourceId,
+      handle,
+      mode: "next",
+      position: null,
+      anchor: event ? { x: event.clientX, y: event.clientY } : null,
+    };
   }
+
+  // The empty-canvas start node opens the SAME picker, restricted to triggers.
+  // The click point becomes the node's position, so it lands where the
+  // placeholder the user clicked was sitting.
+  function openTriggerPicker(event: MouseEvent) {
+    workflowObj.stepPicker = {
+      show: true,
+      source: "",
+      handle: "out",
+      mode: "trigger",
+      position: screenToFlowCoordinate({ x: event.clientX, y: event.clientY }),
+      anchor: { x: event.clientX, y: event.clientY },
+    };
+  }
+
   function closeStepPicker() {
-    workflowObj.stepPicker = { show: false, source: "", handle: "out" };
+    workflowObj.stepPicker = {
+      show: false,
+      source: "",
+      handle: "out",
+      mode: "next",
+      position: null,
+      anchor: null,
+    };
   }
 
   // The node at the end of the chain (no outgoing edge) — the palette appends
@@ -627,9 +677,30 @@ export default function useWorkflowCanvas() {
     return nodeMeta(node?.data?.node_type)?.ioType === "output";
   }
 
+  // A workflow must BEGIN with a trigger — it's the only source, and the palette
+  // holds none (triggers come from the empty-canvas start node). So every
+  // palette add (click + drop) is blocked until a trigger exists; otherwise a
+  // user who drags a step onto the empty canvas strands themselves with no
+  // trigger and no way to add one (the start node only shows while empty).
+  function hasTrigger(): boolean {
+    return workflowObj.currentSelectedWorkflow.nodes.some(
+      (n: any) => n.data?.node_type === "workflow_trigger",
+    );
+  }
+  function warnTriggerFirst() {
+    toast({
+      message: "Choose a trigger node to start your workflow",
+      variant: "warning",
+    });
+  }
+
   // Palette add: append a node after the chain's end node (stages + opens the
   // config drawer, same as the hover-`+`).
   function addNodeToEnd(nodeType: string) {
+    if (!hasTrigger()) {
+      warnTriggerFirst();
+      return;
+    }
     const src = endNodeId();
     if (!src) return;
     if (isTerminal(src)) {
@@ -668,6 +739,13 @@ export default function useWorkflowCanvas() {
     const meta = nodeMeta(nodeType);
     if (!meta) return;
 
+    // Trigger-first: a dropped step before any trigger exists would be a
+    // dead-end (see hasTrigger). Block it and point the user at the start node.
+    if (!hasTrigger()) {
+      warnTriggerFirst();
+      return;
+    }
+
     const flow = screenToFlowCoordinate({ x: event.clientX, y: event.clientY });
     // Roughly center the node on the cursor (half a node card).
     const position = { x: flow.x - 120, y: flow.y - 26 };
@@ -694,6 +772,45 @@ export default function useWorkflowCanvas() {
   // only when the drawer is saved (commitNode), or discarded on cancel
   // (cancelNodeDrawer). Pipeline pattern. `handle` is always "out" (the single
   // output; the Condition is a filter, not a true/false branch).
+  // Start node picked: ADD the workflow's first (trigger) node to the canvas and
+  // open its panel.
+  //
+  // Committed immediately rather than staged (the addNodeAfter / onDrop
+  // pattern): a staged node only lands via commitNode, which runs from the
+  // drawer's Save — and the trigger panel is a READ-ONLY payload reference with
+  // no footer and no Save (WorkflowNodeDrawer's `readonlyBody`). Staged, it
+  // could never be committed, so the node never appeared on the canvas.
+  //
+  // `triggerKind` maps to the backend WorkflowTriggerKind; the node type stays
+  // "workflow_trigger" for all kinds.
+  function addTriggerNode(
+    nodeType: string,
+    triggerKind: string,
+    position: { x: number; y: number } | null,
+  ) {
+    const meta = nodeMeta(nodeType);
+    if (!meta) return;
+
+    const id = getUUID();
+    workflowObj.currentSelectedWorkflow.nodes = [
+      ...workflowObj.currentSelectedWorkflow.nodes,
+      {
+        id,
+        type: meta.ioType,
+        position: position ?? { x: 320, y: 80 },
+        data: {
+          label: id,
+          node_type: nodeType,
+          trigger_kind: triggerKind,
+          alert_ids: [],
+        },
+      },
+    ];
+    // Open the (read-only) trigger panel on the now-real node, so closing it
+    // dismisses a panel rather than discarding the node.
+    editNode(id);
+  }
+
   const NODE_W = 240;
   function addNodeAfter(sourceId: string, handle: string, nodeType: string) {
     const wf = workflowObj.currentSelectedWorkflow;
@@ -796,7 +913,18 @@ export default function useWorkflowCanvas() {
     workflowObj.currentSelectedNodeData = null;
     workflowObj.currentSelectedNodeID = "";
     workflowObj.dialog = { ...defaultDialog };
-    workflowObj.stepPicker = { show: false, source: "", handle: "out" };
+    // Must carry EVERY key the default object declares — a partial rewrite left
+    // `mode`/`position` undefined, so `isTriggerStep` silently read false after
+    // a reset.
+    workflowObj.stepPicker = {
+      show: false,
+      source: "",
+      handle: "out",
+      mode: "next",
+      position: null,
+      anchor: null,
+    };
+    workflowObj.showNodePalette = false;
     workflowObj.isEditWorkflow = false;
     workflowObj.isEditNode = false;
     workflowObj.dirtyFlag = false;
@@ -828,7 +956,9 @@ export default function useWorkflowCanvas() {
     validateConnection,
     // node ops
     openStepPicker,
+    openTriggerPicker,
     closeStepPicker,
+    addTriggerNode,
     addNodeAfter,
     addNodeToEnd,
     endNodeId,

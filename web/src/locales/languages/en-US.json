@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Add a Step",
       "search": "Search Steps…",
       "noMatch": "No matching steps"
     },
@@ -2066,7 +2065,7 @@
   "workflow": {
     "header": "Workflows",
     "subtitle": "Automate Actions With Triggers, Logic, And Destinations",
-    "create": "New Workflow",
+    "create": "New workflow",
     "createTitle": "Create Workflow",
     "createConfirm": "Create",
     "createSuccess": "Workflow Created Successfully",
@@ -2217,7 +2216,7 @@
       "linkPartial": "Linked To {ok} Alert(s), {failed} Failed",
       "linkError": "Unable To Link Alerts."
     },
-    "canvasEmpty": "Add A Trigger To Start Building Your Workflow",
+    "chooseTrigger": "Choose a Trigger",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
@@ -2229,8 +2228,6 @@
       "notConfigured": "Not Configured Yet",
       "configComingSoon": "{node} Configuration Is Coming In A Later Step",
       "addNext": "Add Next Step",
-      "stepDialogTitle": "Add a step",
-      "paletteTitle": "Nodes",
       "sectionTransform": "Transform",
       "sectionDestination": "Destination",
       "paletteCollapse": "Collapse",
@@ -2376,7 +2373,11 @@
     "deleteNodeTitle": "Delete Node",
     "deleteNodeLlmEvalConfirm": "Are you sure you want to delete this LLM evaluation node?",
     "cancel": "Cancel",
-    "dragDropNodesHere": "Drag and drop nodes here",
+    "collapseNodes": "Collapse Nodes",
+    "openNodes": "Open Nodes",
+    "chooseSource": "Choose a Source",
+    "sourceStreamDesc": "Process data in realtime as it is ingested into a stream",
+    "sourceQueryDesc": "Run a query on a schedule and process its results",
     "promqlOnlyForMetrics": "PromQL is only available for metrics stream type",
     "invalidCronExpression": "Invalid cron expression",
     "cronRequired": "Cron expression is required",

@@ -435,7 +435,20 @@ export class PipelinesPage {
         await this.streamButton.click();
     }
 
+    /**
+     * The node rail now starts COLLAPSED (toggled from the canvas control
+     * stack), so its buttons are not in the DOM until it is opened. Every
+     * palette interaction has to go through here first.
+     */
+    async ensureNodePaletteOpen() {
+        const rail = this.page.locator('[data-test="pipeline-node-sidebar"]');
+        if (await rail.isVisible().catch(() => false)) return;
+        await this.page.locator('[data-test="pipeline-node-sidebar-collapse-btn"]').click();
+        await rail.waitFor({ state: 'visible' });
+    }
+
     async dragStreamToTarget(streamElement, offset = { x: 0, y: 0 }) {
+        await this.ensureNodePaletteOpen();
         // The pipeline NodeSidebar uses HTML5 `@dragstart` (draggable="true"),
         // and the canvas's `@drop` reads `pipelineObj.draggedNode` set in
         // `onDragStart`. Playwright's `mouse.move/down/up` does NOT dispatch

@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Добавить шаг",
       "search": "Поиск шагов…",
       "noMatch": "Нет подходящих шагов"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Привязано к {ok} оповещению(ям), {failed} не удалось",
       "linkError": "Не удалось привязать оповещения."
     },
-    "canvasEmpty": "Добавьте триггер, чтобы начать создание рабочего процесса",
     "node": {
       "kindTrigger": "Триггер",
       "kindLogic": "Логика",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Еще не настроено",
       "configComingSoon": "Конфигурация {node} появится на следующем шаге",
       "addNext": "Добавить следующий шаг",
-      "stepDialogTitle": "Добавить шаг",
-      "paletteTitle": "Узлы",
       "sectionTransform": "Преобразование",
       "sectionDestination": "Назначение",
       "paletteCollapse": "Свернуть",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Удалить узел",
     "deleteNodeLlmEvalConfirm": "Вы уверены, что хотите удалить этот узел оценки LLM?",
     "cancel": "Отмена",
-    "dragDropNodesHere": "Перетащите узлы сюда",
     "promqlOnlyForMetrics": "PromQL доступен только для типа потока метрик",
     "invalidCronExpression": "Недопустимое выражение cron",
     "cronRequired": "Необходимо указать выражение cron",
