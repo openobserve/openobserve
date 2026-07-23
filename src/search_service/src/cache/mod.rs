@@ -1080,7 +1080,7 @@ pub fn apply_vrl_to_response(
             Ok(program) => {
                 let registry = program
                     .config
-                    .get_custom::<transform::vector_enrichment::TableRegistry>()
+                    .get_custom::<vector_enrichment::TableRegistry>()
                     .unwrap();
                 registry.finish_load();
                 Some(program)

@@ -5,9 +5,11 @@
     :subtitle="t('synthetics.pageSubtitle')"
     icon="radar"
     bleed
+    tabs-below
   >
       <template #actions>
         <OButton
+          v-if="activeSection === 'checks'"
           size="sm"
           variant="primary"
           data-test="synthetic-monitoring-new-check-btn"
@@ -15,11 +17,37 @@
         >
           {{ t('synthetics.newCheck.button') }}
         </OButton>
+        <OButton
+          v-else
+          size="sm"
+          variant="primary"
+          data-test="synthetic-monitoring-setup-agent-btn"
+          @click="openSetupDrawer()"
+        >
+          {{ t('synthetics.privateLocations.setupAgent') }}
+        </OButton>
+      </template>
+
+      <template #header-tabs>
+        <OTabs
+          :model-value="activeSection"
+          align="left"
+          @change="activeSection = ($event as 'checks' | 'private')"
+        >
+          <OTab name="checks">
+            <OIcon name="radar" size="sm" />
+            <span>{{ t('synthetics.tabs.checks') }}</span>
+          </OTab>
+          <OTab name="private">
+            <OIcon name="location-on" size="sm" />
+            <span>{{ t('synthetics.tabs.private') }}</span>
+          </OTab>
+        </OTabs>
       </template>
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
       <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
-      <div v-if="activeTab !== 'private'" class="w-rail shrink-0 overflow-y-auto">
+      <div v-if="activeSection === 'checks'" class="w-rail shrink-0 overflow-y-auto">
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
@@ -29,28 +57,16 @@
 
       <!-- ── PRIVATE LOCATIONS TAB ── -->
       <PrivateLocations
-        v-if="activeTab === 'private'"
+        v-if="activeSection === 'private'"
         :locations="privateLocations"
         :loading="locationsLoading"
         @refresh="loadPrivateLocations"
-        @setup="openSetupDrawer()"
         @copy-setup="openSetupDrawer"
         @delete="confirmDeleteLocation"
-      >
-        <template #tabs>
-          <OToggleGroup
-            :model-value="activeTab"
-            @update:model-value="onTabChange"
-          >
-            <OToggleGroupItem v-for="tab in typeTabs" :key="tab.key" :value="tab.key" size="sm">
-              {{ tab.label }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-        </template>
-      </PrivateLocations>
+      />
 
       <!-- RIGHT MAIN: filter bar + table -->
-      <div v-else class="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div v-if="activeSection === 'checks'" class="flex-1 flex flex-col overflow-hidden min-w-0">
 
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
@@ -268,6 +284,8 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -431,6 +449,7 @@ onMounted(() => {
   initPage()
 })
 
+const activeSection   = ref<'checks' | 'private'>('checks');
 const activeTab      = ref("all");
 const monitorTableMode = computed(() => activeTab.value === 'browser' ? 'browser' : 'all');
 const statusFilter   = ref("all");
@@ -533,7 +552,7 @@ const openDetail = (monitor: any) => {
   const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name }
   if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt)
   router.push({
-    name: 'synthetics-monitor-results',
+    name: 'synthetic-monitor-results',
     params: { id: String(monitor.id) },
     query,
   });
@@ -546,16 +565,11 @@ const typeTabs = computed(() => [
     label: t(`synthetics.tabs.${ct}`),
     icon: CHECK_TYPE_CARDS.find(c => c.type === ct)?.icon,
   })),
-  { key: 'private', label: t('synthetics.tabs.private') },
 ]);
 
 const onTabChange = (v: unknown) => {
   const tab = v as string;
   activeTab.value = tab;
-  if (tab === 'private') {
-    loadPrivateLocations();
-    return;
-  }
   typeFilter.value = tab === 'all' ? 'all' : tab.toUpperCase();
 };
 

@@ -19,8 +19,7 @@ use config::{QUERY_WITH_NO_LIMIT, ider, meta::stream::StreamType};
 use infra::db as infra_db;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::TaskStatus;
-
-use crate::{common::infra::config::ENRICHMENT_TABLES, service::enrichment::StreamTable};
+use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     let key = "/enrichment_table/";
@@ -94,7 +93,7 @@ pub async fn get_enrichment_table_data(
     name: &str,
     _apply_primary_region_if_specified: bool,
     end_time: i64,
-) -> Result<crate::service::enrichment::storage::Values, anyhow::Error> {
+) -> Result<crate::enrichment::storage::Values, anyhow::Error> {
     let start_time = ::db::enrichment_table::get_start_time(org_id, name).await;
     let query = config::meta::search::Query {
         sql: format!("SELECT * FROM \"{name}\""),
@@ -135,7 +134,7 @@ pub async fn get_enrichment_table_data(
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
     #[cfg(feature = "enterprise")]
-    crate::service::search::SEARCH_SERVER
+    crate::search::SEARCH_SERVER
         .insert(
             trace_id.clone(),
             TaskStatus::new_leader(
@@ -153,7 +152,7 @@ pub async fn get_enrichment_table_data(
         )
         .await;
 
-    let result = crate::service::search::cluster::http::search_inner(
+    let result = crate::search::cluster::http::search_inner(
         request,
         search_query,
         regions,
@@ -164,9 +163,7 @@ pub async fn get_enrichment_table_data(
     .await;
 
     #[cfg(feature = "enterprise")]
-    let _ = crate::service::search::SEARCH_SERVER
-        .remove(&trace_id, false)
-        .await;
+    let _ = crate::search::SEARCH_SERVER.remove(&trace_id, false).await;
 
     match result {
         Ok((batches, ..)) => {
@@ -174,9 +171,7 @@ pub async fn get_enrichment_table_data(
                 "get enrichment table {org_id}/{name} data success with {} rows",
                 batches.iter().map(|b| b.num_rows()).sum::<usize>()
             );
-            Ok(crate::service::enrichment::storage::Values::RecordBatch(
-                batches,
-            ))
+            Ok(crate::enrichment::storage::Values::RecordBatch(batches))
         }
         Err(err) => {
             log::error!("get enrichment table {org_id}/{name} data error: {err}");

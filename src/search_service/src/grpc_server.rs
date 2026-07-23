@@ -40,7 +40,7 @@ use {
 };
 
 use crate as SearchService;
-pub use crate::Searcher;
+use crate::searcher::Searcher;
 
 #[tonic::async_trait]
 impl Search for Searcher {

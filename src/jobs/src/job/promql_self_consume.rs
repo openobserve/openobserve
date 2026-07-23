@@ -34,9 +34,10 @@ use tonic::{
     metadata::{MetadataKey, MetadataValue},
 };
 
-use crate::{
-    common::meta::ingestion::{IngestUser, SystemJobType},
-    service::{self, grpc::get_ingester_channel},
+use crate::service::{
+    self,
+    grpc::get_ingester_channel,
+    ingestion_types::{IngestUser, SystemJobType},
 };
 
 static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {

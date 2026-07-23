@@ -34,7 +34,7 @@ use o2_enterprise::enterprise::actions::{
     meta::{ActionTriggerResult, TriggerSource},
 };
 use proto::cluster_rpc::SearchQuery;
-use transform::vector_enrichment::TableRegistry;
+use vector_enrichment::TableRegistry;
 
 use crate::{SearchResult, cluster::flight, sql::Sql, utils::is_default_query_limit_exceeded};
 

@@ -36,6 +36,7 @@ use config::{
         schema_ext::SchemaExt,
     },
 };
+use db;
 use hashbrown::HashSet;
 use infra::{
     schema::{
@@ -45,6 +46,10 @@ use infra::{
     storage,
 };
 use ingester::WAL_PARQUET_METADATA;
+use search::datafusion::{
+    exec::TableBuilder,
+    merge::{self, MergeParquetResult},
+};
 use tokio::{
     fs::remove_file,
     sync::{Mutex, RwLock},
@@ -65,15 +70,7 @@ use {
 
 use crate::{
     common::infra::wal,
-    service::{
-        db,
-        schema::generate_schema_for_defined_schema_fields,
-        search::datafusion::{
-            exec::TableBuilder,
-            merge::{self, MergeParquetResult},
-        },
-        tantivy::create_tantivy_index,
-    },
+    service::{schema::generate_schema_for_defined_schema_fields, tantivy::create_tantivy_index},
 };
 
 static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> = Lazy::new(|| RwLock::new(HashSet::new()));
@@ -567,7 +564,7 @@ async fn move_files(
         };
 
         // trigger an incremental merge of the current hour once enough files have piled up
-        crate::service::compact::incremental::incr_pending_file(
+        openobserve_core::compact::incremental::incr_pending_file(
             &org_id,
             stream_type,
             &stream_name,
@@ -799,7 +796,7 @@ async fn merge_files(
     .await;
 
     // clear session data
-    search_service::datafusion::storage::file_list::clear(&trace_id);
+    search::datafusion::storage::file_list::clear(&trace_id);
 
     let buf = match merge_result {
         Ok(v) => v,
@@ -872,8 +869,7 @@ async fn merge_files(
             && valid_stream_type
         {
             // Get stream count for this type (cached, 5-min TTL — counts rarely change).
-            let stream_count =
-                crate::service::db::schema::get_stream_count_cached(&org_id, stream_type).await;
+            let stream_count = db::schema::get_stream_count_cached(&org_id, stream_type).await;
 
             // Get coverage deficit: how many known services are missing streams of this type.
             // Derived entirely from the in-memory cache — no DB I/O.
@@ -981,10 +977,8 @@ async fn queue_services_from_data_file(
     let start = std::time::Instant::now();
 
     // Get semantic field groups upfront (before spawning tasks)
-    let semantic_groups =
-        crate::service::db::system_settings::get_semantic_field_groups(org_id).await;
-    let identity_config =
-        crate::service::db::system_settings::get_service_identity_config(org_id).await;
+    let semantic_groups = db::system_settings::get_semantic_field_groups(org_id).await;
+    let identity_config = db::system_settings::get_service_identity_config(org_id).await;
 
     // Create bounded channel for backpressure - drops records if consumer can't keep up
     // ARROW-NATIVE: Channel now sends RecordBatch directly (no HashMap conversion!)

@@ -21,18 +21,24 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::cluster::NodeInfo;
+use db::user::is_root_user;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::{
+    auth::{UserEmail, check_permissions},
+    organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
+};
 #[cfg(feature = "cloud")]
 use {
-    crate::common::meta::organization::OrganizationInvites,
-    crate::common::meta::organization::{
+    axum::body::Body,
+    axum::http::StatusCode,
+    common::meta::organization::OrganizationInvites,
+    common::meta::organization::{
         AllOrgListDetails, AllOrganizationResponse, CreateExternalContractRequest,
         EnableOrgStorageRequest, ExtendExternalContractRequest, ExtendTrialPeriodRequest,
         OrganizationInviteUserRecord, SetAiUsageLimitRequest,
     },
-    axum::body::Body,
-    axum::http::StatusCode,
     o2_enterprise::enterprise::cloud::{
         billings::{MeteringProvider, SubscriptionType},
         list_customer_billings,
@@ -40,20 +46,13 @@ use {
     svix_ksuid::KsuidLike,
 };
 
-use crate::{
-    common::{
-        meta::{
-            http::HttpResponse as MetaHttpResponse,
-            organization::{
-                ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgCreateRequest, OrgDetails,
-                OrgRenameBody, OrgUser, Organization, OrganizationCreationResponse,
-                OrganizationResponse, PasscodeResponse, RumIngestionResponse, THRESHOLD,
-            },
-        },
-        utils::auth::{UserEmail, check_permissions, is_root_user},
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    organization::{
+        ClusterInfo, ClusterInfoResponse, NodeListResponse, OrgCreateRequest, OrgDetails,
+        OrgRenameBody, OrgUser, Organization, OrganizationCreationResponse, OrganizationResponse,
+        PasscodeResponse, RumIngestionResponse, THRESHOLD,
     },
-    extractors::Headers,
-    service::organization::{self, get_passcode, get_rum_token, update_passcode, update_rum_token},
 };
 
 /// GetOrganizations
@@ -127,7 +126,7 @@ pub async fn organizations(
         // them via the dedicated all_organizations endpoint instead. This matches
         // the blocked_orgs middleware, which also gates on is_blocked.
         #[cfg(feature = "cloud")]
-        if crate::service::db::org_status::is_blocked(&org.identifier) {
+        if db::org_status::is_blocked(&org.identifier) {
             continue;
         }
         id += 1;
@@ -228,7 +227,7 @@ pub async fn all_organizations(
                 None
             }
         });
-        let settings = crate::service::db::organization::get_org_setting(&org.identifier)
+        let settings = db::organization::get_org_setting(&org.identifier)
             .await
             .unwrap_or_default();
         let org = AllOrgListDetails {
@@ -239,8 +238,8 @@ pub async fn all_organizations(
             plan: billing_info
                 .map(|(st, ..)| i16::from(*st) as i32)
                 .unwrap_or_default(),
-            credits_used: crate::service::trial_quota::get_used(&org.identifier),
-            credits_limit: crate::service::trial_quota::get_limit(&org.identifier),
+            credits_used: openobserve_core::trial_quota::get_used(&org.identifier),
+            credits_limit: openobserve_core::trial_quota::get_limit(&org.identifier),
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -252,7 +251,7 @@ pub async fn all_organizations(
             status: org.status.clone(),
             deleted_at: org.deleted_at,
             grace_period_days: if org.status == "pending_deletion" {
-                Some(crate::service::org_cleanup::grace_period_days())
+                Some(openobserve_core::org_cleanup::grace_period_days())
             } else {
                 None
             },
@@ -558,7 +557,7 @@ pub async fn create_org(
         organization::create_org(&mut org, &user_email.user_id, req.make_billed_member_of).await;
     match result {
         Ok((created_org, service_account_info)) => {
-            use crate::common::meta::organization::OrganizationCreationResponse;
+            use common::meta::organization::OrganizationCreationResponse;
             let response = OrganizationCreationResponse {
                 organization: created_org,
                 service_account: service_account_info,
@@ -593,7 +592,7 @@ pub async fn extend_trial_period(
     Path(org_id): Path<String>,
     Json(req): Json<ExtendTrialPeriodRequest>,
 ) -> Response {
-    use crate::service::db::organization::ORG_KEY_PREFIX;
+    use db::organization::ORG_KEY_PREFIX;
 
     let org = org_id;
     if org != "_meta" {
@@ -639,7 +638,7 @@ pub async fn extend_trial_period(
     security(("Authorization" = [])),
     request_body(content = inline(SetAiUsageLimitRequest), content_type = "application/json"),
     responses(
-        (status = 200, description = "Updated AI credit usage", body = crate::service::trial_quota::AiUsageResponse),
+        (status = 200, description = "Updated AI credit usage", body = openobserve_core::trial_quota::AiUsageResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Organization not found"),
     ),
@@ -656,10 +655,11 @@ pub async fn set_ai_usage_limit(
         return MetaHttpResponse::not_found("organization not found");
     }
 
-    if let Err(err) = crate::service::trial_quota::set_limit(&req.org_id, req.credits_limit).await {
+    if let Err(err) = openobserve_core::trial_quota::set_limit(&req.org_id, req.credits_limit).await
+    {
         return MetaHttpResponse::internal_error(err);
     }
-    MetaHttpResponse::json(crate::service::trial_quota::get_usage(&req.org_id).await)
+    MetaHttpResponse::json(openobserve_core::trial_quota::get_usage(&req.org_id).await)
 }
 
 /// CreateExternalContract
@@ -943,21 +943,18 @@ pub async fn enable_org_storage(
 
     let target_org_id = req.org_id;
 
-    let mut org_settings =
-        match crate::service::db::organization::get_org_setting(&target_org_id).await {
-            Ok(org) => org,
-            Err(e) => {
-                return MetaHttpResponse::not_found(e.to_string());
-            }
-        };
+    let mut org_settings = match db::organization::get_org_setting(&target_org_id).await {
+        Ok(org) => org,
+        Err(e) => {
+            return MetaHttpResponse::not_found(e.to_string());
+        }
+    };
     if org_settings.org_storage_enabled {
         return MetaHttpResponse::bad_request("org storage already enabled for this org");
     }
     org_settings.org_storage_enabled = true;
 
-    if let Err(e) =
-        crate::service::db::organization::set_org_setting(&target_org_id, &org_settings).await
-    {
+    if let Err(e) = db::organization::set_org_setting(&target_org_id, &org_settings).await {
         return MetaHttpResponse::internal_error(format!(
             "error while saving settings for org {target_org_id} : {e}"
         ));
@@ -1025,7 +1022,7 @@ pub async fn rename_org(
     )
 )]
 pub async fn get_org_invites(Path(path): Path<String>) -> Response {
-    use crate::common::meta::user::InviteStatus;
+    use common::meta::user::InviteStatus;
 
     let org = path;
 
@@ -1331,14 +1328,14 @@ pub async fn initiate_org_deletion(
     // users (members of no org) and users whose role in *this* org is Admin.
     let allowed = is_root_user(&user_email.user_id)
         || matches!(
-            crate::service::users::get_user(Some(&org_id), &user_email.user_id).await,
+            openobserve_core::users::get_user(Some(&org_id), &user_email.user_id).await,
             Some(user) if user.role == UserRole::Admin
         );
     if !allowed {
         return MetaHttpResponse::forbidden("Not allowed");
     }
 
-    match crate::service::org_cleanup::initiate_deletion(&org_id, &user_email.user_id).await {
+    match openobserve_core::org_cleanup::initiate_deletion(&org_id, &user_email.user_id).await {
         Ok(()) => MetaHttpResponse::ok("Organization deletion initiated"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -1357,7 +1354,7 @@ pub async fn resurrect_org_deletion(
     if meta_org != "_meta" {
         return MetaHttpResponse::forbidden("Not allowed");
     }
-    match crate::service::org_cleanup::resurrect_org(&target_org_id, &user_email.user_id).await {
+    match openobserve_core::org_cleanup::resurrect_org(&target_org_id, &user_email.user_id).await {
         Ok(()) => MetaHttpResponse::ok("Organization resurrected"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -1434,7 +1431,7 @@ async fn get_super_cluster_nodes(regions: &[String]) -> Result<NodeListResponse,
         let cluster_name = cluster.get_cluster();
 
         // Fetch child nodes from this cluster
-        match crate::service::node::get_node_list(&trace_id, cluster).await {
+        match openobserve_core::node::get_node_list(&trace_id, cluster).await {
             Ok(cluster_nodes) => {
                 for node in cluster_nodes {
                     response.add_node(node.clone(), region.clone(), cluster_name.clone());
@@ -1505,7 +1502,7 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
         let cluster_name = cluster.get_cluster();
 
         // Fetch cluster info from this cluster node
-        match crate::service::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
+        match openobserve_core::cluster_info::get_super_cluster_info(&trace_id, cluster).await {
             Ok(cluster_info_obj) => {
                 response.add_cluster_info(cluster_info_obj, cluster_name.clone(), region.clone());
             }

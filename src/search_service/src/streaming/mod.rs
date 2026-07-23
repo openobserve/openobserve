@@ -49,7 +49,7 @@ use sqlparser::ast::VisitMut;
 use tokio::sync::mpsc;
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
-use transform::vector_enrichment::TableRegistry;
+use vector_enrichment::TableRegistry;
 
 // Only used by the enterprise pattern-extraction path (per-pattern volume buckets).
 #[cfg(feature = "enterprise")]

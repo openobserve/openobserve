@@ -15,6 +15,7 @@
 
 use std::collections::HashMap;
 
+use common::meta::loki::{LokiError, LokiPushRequest};
 use config::{
     DEFAULT_STREAM_NAME, MESSAGE_COL_NAME, STREAM_NAME_LABEL, STREAM_NAME_LABEL_OLD,
     TIMESTAMP_COL_NAME,
@@ -27,10 +28,7 @@ use promql_parser::{
 };
 use proto::loki_rpc;
 
-use crate::common::meta::{
-    ingestion::{IngestUser, IngestionRequest, IngestionResponse, IngestionValueType},
-    loki::{LokiError, LokiPushRequest},
-};
+use crate::ingestion_types::{IngestUser, IngestionRequest, IngestionResponse, IngestionValueType};
 
 pub enum LokiRequest {
     Json(LokiPushRequest),

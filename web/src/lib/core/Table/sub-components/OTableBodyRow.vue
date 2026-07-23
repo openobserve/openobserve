@@ -329,12 +329,15 @@ function onRowBlur() {
       :class="[
         'w-4 min-w-4 px-0 text-center align-middle',
         bordered ? 'border-b border-table-row-divider' : '',
-        rowDraggable === false ? 'invisible' : '',
       ]"
       class="o2-table-drag-handle"
       data-test="o2-table-row-drag-handle"
     >
-      <OIcon name="drag-indicator" size="xs" class="text-text-secondary cursor-grab transition-opacity" />
+      <OIcon
+        name="drag-indicator" size="xs"
+        :class="[rowDraggable === false ? 'invisible' : '']"
+        class="text-text-secondary cursor-grab transition-opacity"
+      />
     </td>
 
     <!-- Data cells -->

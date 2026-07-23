@@ -26,9 +26,7 @@ use super::{datafusion::exec::TableBuilder, index::IndexCondition};
 pub mod flight;
 pub mod storage;
 pub mod wal;
-pub use ::search::{file_cache::calc_target_partitions, types::QueryParams};
-
-pub use super::tantivy::cache as tantivy_result_cache;
+use ::search::types::QueryParams;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u64>)>;
 

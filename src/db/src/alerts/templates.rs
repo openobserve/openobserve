@@ -15,11 +15,11 @@
 
 use std::sync::Arc;
 
-use common::{
-    infra::config::{ALERTS, ALERTS_TEMPLATES, DESTINATIONS},
-    meta::organization::DEFAULT_ORG,
+use common::infra::config::{ALERTS, ALERTS_TEMPLATES, DESTINATIONS};
+use config::{
+    DEFAULT_ORG,
+    meta::destinations::{Module, Template},
 };
-use config::meta::destinations::{Module, Template};
 use infra::table;
 use itertools::Itertools;
 
