@@ -11326,7 +11326,9 @@ export class LogsPage {
      * `[data-select-separator]` — lets Reka toggle it OFF. See OSelect.vue
      * handleItemClickCapture. The generic `deselectStream` clicks the option row
      * (label zone), so it cannot clear a single selected stream here — this helper
-     * clicks the far-left checkbox zone by position instead.
+     * clicks inside the checkbox zone instead, computing the x offset from the
+     * separator's position (falling back to a small fixed offset) so it stays
+     * correct if the checkbox/padding dimensions change.
      * @param {string} streamName
      */
     async deselectStreamViaCheckbox(streamName) {
@@ -11353,9 +11355,17 @@ export class LogsPage {
         ).first();
         await option.waitFor({ state: 'visible', timeout: 5000 });
         const box = await option.boundingBox();
-        // Click near the far-left checkbox zone (left of the separator) so Reka
-        // toggles the option off instead of re-selecting it.
-        await option.click({ position: { x: 6, y: box ? box.height / 2 : 12 } });
+        // The checkbox zone spans from the option's left edge to the separator.
+        // Click its midpoint so Reka toggles the option off (instead of the label
+        // zone, which would re-select it). Derive the x from the separator's
+        // position; fall back to a small fixed offset if it can't be measured.
+        const sepBox = await option
+            .locator('[data-select-separator]')
+            .first()
+            .boundingBox()
+            .catch(() => null);
+        const x = (sepBox && box) ? Math.max(4, (sepBox.x - box.x) / 2) : 6;
+        await option.click({ position: { x, y: box ? box.height / 2 : 12 } });
         await this.page.keyboard.press('Escape').catch(() => {});
         testLogger.info(`Deselected stream via checkbox zone: ${streamName}`);
     }
@@ -11469,16 +11479,33 @@ export class LogsPage {
     }
 
     /**
-     * Waits for the field list to appear after selecting a stream via quick pick.
-     * Accepts either the fields table or the "no field found" text as a valid post-selection state.
+     * Waits for the field list to settle after selecting a stream via quick pick.
+     * Resolves as soon as EITHER the fields table or the "no field found" text
+     * appears (both are valid post-selection states). THROWS if neither shows
+     * within the timeout — a stream whose field list silently never loads is a
+     * real failure, not a state to swallow.
      */
     async waitForFieldListAfterStreamSelection() {
-        const fieldTable = this.page.locator(this.timestampFieldTable);
+        // The logs field list renders one `logs-field-list-item-<name>` row per
+        // field (GroupedFieldList / FieldRow), or the "no field found" empty text
+        // when the stream has no fields. (The old `log-search-index-list-fields-table`
+        // data-test only exists in the traces IndexList, never the logs one.)
+        const fieldItem = this.page.locator('[data-test^="logs-field-list-item-"]').first();
         const noField = this.page.locator(this.noFieldFoundText);
-        await Promise.race([
-            fieldTable.waitFor({ state: 'visible', timeout: 20000 }),
-            noField.waitFor({ state: 'visible', timeout: 20000 }),
-        ]).catch(() => {});
+        // Promise.any resolves on the first success and only rejects if BOTH
+        // waits time out (unlike Promise.race, which would reject on the first
+        // timeout even when the other locator is about to appear).
+        try {
+            await Promise.any([
+                fieldItem.waitFor({ state: 'visible', timeout: 20000 }),
+                noField.waitFor({ state: 'visible', timeout: 20000 }),
+            ]);
+        } catch {
+            throw new Error(
+                'Field list did not load after stream selection: neither the fields '
+                + 'table nor the "no field found" text appeared within 20s',
+            );
+        }
         testLogger.info('Field list loaded after stream selection');
     }
 }
