@@ -41,7 +41,7 @@ pub mod grpc;
 pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
-pub use ingestion_contracts;
+pub use ingestion_common;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;

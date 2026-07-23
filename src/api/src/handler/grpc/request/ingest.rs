@@ -27,7 +27,7 @@ use tonic::{Request, Response, Status};
 
 use crate::service::{
     ingestion::create_log_ingestion_req,
-    ingestion_contracts::{IngestUser, SystemJobType},
+    ingestion_common::{IngestUser, SystemJobType},
 };
 
 #[derive(Default)]

@@ -62,7 +62,7 @@ use crate::{
     ingestion::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
-    ingestion_contracts::IngestUser,
+    ingestion_common::IngestUser,
     pipeline::batch_execution::ExecutablePipeline,
     schema::{check_for_schema, stream_schema_exists},
 };

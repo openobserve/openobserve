@@ -30,7 +30,7 @@ use config::{
 use openobserve_core::ingestion::check_ingestion_allowed;
 use openobserve_core::{
     auth::UserEmail,
-    ingestion_contracts::{
+    ingestion_common::{
         GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest,
         KinesisFHIngestionResponse, KinesisFHRequest,
     },

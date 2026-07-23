@@ -37,7 +37,7 @@ use tonic::{
 use crate::service::{
     self,
     grpc::get_ingester_channel,
-    ingestion_contracts::{IngestUser, SystemJobType},
+    ingestion_common::{IngestUser, SystemJobType},
 };
 
 static METRICS_WHITELIST: Lazy<HashSet<String>> = Lazy::new(|| {

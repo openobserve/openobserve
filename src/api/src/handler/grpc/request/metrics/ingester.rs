@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{meta::otlp::OtlpRequestType, metrics};
-use openobserve_core::ingestion_contracts::IngestUser;
+use openobserve_core::ingestion_common::IngestUser;
 use opentelemetry_proto::tonic::collector::metrics::v1::{
     ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     metrics_service_server::MetricsService,

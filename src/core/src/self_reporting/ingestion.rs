@@ -34,7 +34,7 @@ use hashbrown::{HashMap, hash_map::Entry};
 use proto::cluster_rpc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
-use crate::ingestion_contracts::{self as ingestion, IngestUser, SystemJobType};
+use crate::ingestion_common::{self as ingestion, IngestUser, SystemJobType};
 
 pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {

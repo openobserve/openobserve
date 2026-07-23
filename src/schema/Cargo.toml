@@ -18,7 +18,7 @@ db.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 log.workspace = true
-ingestion-contracts.workspace = true
+ingestion-common.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]

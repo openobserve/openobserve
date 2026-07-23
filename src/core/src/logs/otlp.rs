@@ -51,7 +51,7 @@ use crate::{
         check_ingestion_allowed,
         grpc::{get_val, get_val_with_type_retained},
     },
-    ingestion_contracts::{IngestionStatus, StreamStatus},
+    ingestion_common::{IngestionStatus, StreamStatus},
     schema::{get_future_discard_error, get_upto_discard_error},
 };
 

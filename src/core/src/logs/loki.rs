@@ -28,7 +28,7 @@ use promql_parser::{
 };
 use proto::loki_rpc;
 
-use crate::ingestion_contracts::{
+use crate::ingestion_common::{
     IngestUser, IngestionRequest, IngestionResponse, IngestionValueType,
 };
 

@@ -36,7 +36,7 @@ use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    ingestion_contracts::{
+    ingestion_common::{
         BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
     },
     logs::{ingestion_log_enabled, log_failed_record},
@@ -50,7 +50,7 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_contracts::IngestUser,
+    user: crate::ingestion_common::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -404,7 +404,7 @@ pub fn add_record_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ingestion_contracts::IngestUser;
+    use crate::ingestion_common::IngestUser;
 
     #[test]
     fn test_add_record_status() {

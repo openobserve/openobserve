@@ -19,7 +19,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 };
 use tonic::{Response, Status};
 
-use crate::service::{ingestion_contracts::IngestUser, traces::handle_otlp_request};
+use crate::service::{ingestion_common::IngestUser, traces::handle_otlp_request};
 
 #[derive(Default)]
 pub struct TraceServer;

@@ -248,7 +248,7 @@ members = [
     "src/api_management",
     "src/api_query",
     "src/api_common",
-    "src/ingestion_contracts",
+    "src/ingestion_common",
     "src/schema",
     "src/compaction",
     "src/common",
@@ -290,7 +290,7 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
-ingestion-contracts = { path = "src/ingestion_contracts" }
+ingestion-common = { path = "src/ingestion_common" }
 schema = { path = "src/schema" }
 compaction = { path = "src/compaction" }
 web = { path = "src/web" }

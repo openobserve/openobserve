@@ -55,7 +55,7 @@ use transform::TRANSFORM_FAILED;
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     ingestion::check_ingestion_allowed,
-    ingestion_contracts::{
+    ingestion_common::{
         AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
         IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
         IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
