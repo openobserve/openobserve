@@ -1037,9 +1037,9 @@ function locationLabel(id: string): string {
 onMounted(async () => {
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
-    const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
+    const locations: { id: string; label: string; region: string }[] = (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
   } catch (err) {
     console.error("[synthetics] failed to load locations", err);

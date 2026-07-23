@@ -24,8 +24,9 @@ const props = withDefaults(
     runId: string
     executionId: string
     drawerMode?: boolean
+    locationNames?: Record<string, string>
   }>(),
-  { drawerMode: false },
+  { drawerMode: false, locationNames: () => ({}) },
 )
 
 const emit = defineEmits<{
@@ -73,6 +74,10 @@ async function loadAssertionDefs() {
 }
 
 onMounted(loadAssertionDefs)
+
+function locationLabel(id: string): string {
+  return props.locationNames?.[id] ?? id
+}
 
 watch(
   () => [props.runId, props.executionId] as [string, string],
@@ -316,7 +321,7 @@ const showAssertions = computed(
           <div class="px-3 py-3 grid grid-cols-2 gap-3 text-sm">
             <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
               <span class="text-xs text-text-muted">{{ t('synthetics.protocolRun.location') }}</span>
-              <span class="font-medium">{{ run.location || '—' }}</span>
+              <span class="font-medium">{{ locationLabel(run.location) || '—' }}</span>
             </div>
             <div class="flex flex-col gap-1.5 p-3 rounded-default bg-surface-subtle">
               <span class="text-xs text-text-muted">{{ t('synthetics.protocolRun.runtime') }}</span>

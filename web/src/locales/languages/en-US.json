@@ -9393,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Are you sure you want to delete {count} check(s)? This action cannot be undone.",
       "bulkDeleteTitle": "Delete Checks",
+      "deleteSingleBody": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+      "deleteSingleTitle": "Delete Check",
       "duplicateTitle": "Duplicate Check"
     },
     "empty": {
@@ -10034,7 +10036,8 @@
       "nameRequired": "Name is required",
       "selectorRequired": "Selector is required for \"{step}\"",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
-      "urlRequired": "Starting URL is required"
+      "urlRequired": "Starting URL is required",
+      "fixHighlightedFields": "Fix the highlighted fields before saving"
     },
     "privateLocations": {
       "searchPlaceholder": "Search locations...",
