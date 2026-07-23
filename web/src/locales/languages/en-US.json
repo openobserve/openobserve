@@ -6423,6 +6423,7 @@
     "querySource": "Query Source"
   },
   "traces": {
+    "agentDefaultVariant": "default",
     "serviceGraph": {
       "searchPlaceholder": "Search Services",
       "noStreamsDetected": "No streams detected. Ensure service graph metrics include stream_name labels.",
