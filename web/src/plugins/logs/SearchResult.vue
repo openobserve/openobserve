@@ -522,7 +522,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             expansion="multiple"
             :expanded-ids="expandedLogIds"
             data-test="logs-search-result-logs-table"
-            class="w-full"
+            class="w-full logs-results-otable"
             :class="[
               !searchObj.meta.showHistogram ||
               (searchObj.meta.showHistogram &&
@@ -998,12 +998,23 @@ export default defineComponent({
       this.searchObj.meta.isFtsDefaultColumn = false;
       let selectedFields = this.reorderSelectedFields();
 
-      const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.id);
-      this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
+      // `col` is the OTable columnDef: it carries `id` (=== the field name) but
+      // NOT the original `name` prop (useTableCore rebuilds the def and drops it).
+      // resultGrid.columns holds column OBJECTS, so the old `indexOf(col.id)` —
+      // a string lookup against an object array — always returned -1 and
+      // `splice(-1, 1)` silently removed the LAST column instead. Match by id,
+      // and fall back to id for the selectedFields (string) lookup since `name`
+      // is undefined. Guard both against -1 so a miss is a no-op, not a mis-splice.
+      const field = col.name ?? col.id;
+      const RGIndex = this.searchObj.data.resultGrid.columns.findIndex(
+        (c: any) => c.id === col.id,
+      );
+      if (RGIndex !== -1)
+        this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
-      const SFIndex = selectedFields.indexOf(col.name);
+      const SFIndex = selectedFields.indexOf(field);
 
-      selectedFields.splice(SFIndex, 1);
+      if (SFIndex !== -1) selectedFields.splice(SFIndex, 1);
 
       this.searchObj.data.stream.selectedFields = selectedFields.filter(
         (_field) =>
@@ -2346,6 +2357,16 @@ export default defineComponent({
 
 
 <style lang="scss" scoped>
+/* keep(lib-override:logs-cell-font): restore the monospace log-cell font the
+   legacy logs table used (`.logs-table td { font-family: var(--font-mono) }`).
+   OTable renders body cells (td) via OTableBodyCell, so the rule must reach them
+   through :deep(). Scoped to the DATA cells (`o2-table-cell-*`) so the expanded
+   row (JsonPreview) keeps its own typography. Fixes #2239: "On Logs font style
+   is changed". */
+.logs-results-otable :deep(td[data-test^="o2-table-cell-"]) {
+  font-family: var(--font-mono);
+}
+
 /* keep(generated-content): pin-breakdown tooltip. The rows are built from data
    via v-for with per-row inline colours, and the whole tooltip is
    <Teleport to="body">; Vue still stamps the scope id onto teleported nodes, so
