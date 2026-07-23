@@ -214,7 +214,10 @@ mod tests {
             updated_at: 4,
         };
         let active: ActiveModel = record.into();
-        assert_eq!(active.env.into_value(), Some(Some("prod".to_string()).into()));
+        assert_eq!(
+            active.env.into_value(),
+            Some(Some("prod".to_string()).into())
+        );
         assert_eq!(
             active.agent_version.into_value(),
             Some(Some("1.2.0".to_string()).into())
