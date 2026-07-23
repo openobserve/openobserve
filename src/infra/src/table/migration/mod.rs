@@ -138,6 +138,7 @@ mod m20260720_000001_add_alert_workflows_col;
 mod m20260720_000001_create_workflow_errors_table;
 mod m20260720_000001_create_workflow_run_data_table;
 mod m20260720_000001_create_workflows_table;
+mod m20260723_000001_add_env_version_to_gen_ai_agents;
 
 pub struct Migrator;
 
@@ -265,6 +266,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260720_000001_create_workflow_errors_table::Migration),
             Box::new(m20260720_000001_create_workflow_run_data_table::Migration),
             Box::new(m20260720_000001_add_alert_workflows_col::Migration),
+            Box::new(m20260723_000001_add_env_version_to_gen_ai_agents::Migration),
         ]
     }
 }
