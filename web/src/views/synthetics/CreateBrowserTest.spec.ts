@@ -63,6 +63,8 @@ vi.mock("@/composables/useSyntheticsRecorder", () => ({
     replay: vi.fn().mockResolvedValue({}),
     stopReplay: vi.fn().mockResolvedValue({}),
     stopReplayAndForget: vi.fn(),
+    registerAutoDetect: vi.fn(),
+    isReplaying: { value: false },
   }),
 }));
 
@@ -297,9 +299,9 @@ describe("CreateBrowserTest", () => {
       await recordBtn.trigger("click");
       await flushPromises();
 
-      // Now we should be on the extension setup phase - check for setup elements
+      // Now we should be on the extension setup phase - check for the Open & Record button
       expect(
-        wrapper.find('[data-test="synthetics-setup-recheck-btn"]').exists(),
+        wrapper.find('[data-test="synthetics-setup-open-record-btn"]').exists(),
       ).toBe(true);
     });
   });

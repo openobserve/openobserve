@@ -209,7 +209,7 @@ const useEnterpriseRoutes = () => {
         },
       },
       {
-        path: "synthetic/:id/results",
+        path: "synthetics/:id/results",
         name: "synthetic-monitor-results",
         component: () => import("@/views/synthetics/MonitorResults.vue"),
         meta: { title: "Monitor Results" },
