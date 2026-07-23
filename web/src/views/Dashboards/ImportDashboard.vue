@@ -136,21 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :activeFolderId="selectedFolder.value"
                       />
                     </div>
-                    <div v-if="filesImportResults.length" class="py-2" data-test="dashboard-import-file-results">
-                      <div v-for="(importResult, index) in filesImportResults" :key="index">
-                        <span
-                          v-if="importResult.status == 'rejected'"
-                          class="text-status-negative"
-                          data-test="dashboard-import-file-rejected"
-                        >
-                          <code
-                            class="bg-surface-panel p-0.75"
-                          >{{ importResult?.reason?.file }}</code
-                          >
-                          : {{ importResult?.reason?.error }}
-                        </span>
-                      </div>
-                    </div>
                   </div>
                   <query-editor
                     data-test="dashboard-import-json-file-editor"
@@ -247,6 +232,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{
                       errorMessage.message || errorMessage
                     }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Import / API failures (e.g. a 404 on URL or file import)
+                   belong in this dedicated Error Validations panel, not squished
+                   into the file-input row where they were before (QA issue 2239
+                   item 2: "get error at a wrong place"). -->
+              <div
+                v-if="filesImportResults.some((r) => r.status === 'rejected')"
+                class="error-section p-2.5 mb-2.5 shrink-0 overflow-auto"
+                data-test="dashboard-import-file-results"
+              >
+                <div
+                  v-for="(importResult, index) in filesImportResults"
+                  :key="'file-' + index"
+                >
+                  <div
+                    v-if="importResult.status == 'rejected'"
+                    class="error-item py-1.25 text-sm text-status-negative"
+                    data-test="dashboard-import-file-rejected"
+                  >
+                    <code
+                      v-if="importResult?.reason?.file"
+                      class="bg-surface-panel p-0.75"
+                    >{{ importResult.reason.file }}</code>
+                    <template v-if="importResult?.reason?.file"> : </template>{{ importResult?.reason?.error }}
                   </div>
                 </div>
               </div>
