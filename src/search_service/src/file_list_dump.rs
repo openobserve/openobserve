@@ -185,7 +185,7 @@ pub async fn exec(
     // load files to local cache
     let start = std::time::Instant::now();
     let mut scan_stats = ScanStats::default();
-    let (cache_type, ..) = crate::grpc::storage::cache_files(
+    let (cache_type, ..) = search::file_cache::cache_files(
         trace_id,
         &files
             .iter()

@@ -20,11 +20,12 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::meta::function::{FunctionList, TestVRLRequest, Transform};
-
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use openobserve_core::auth::check_permissions;
+
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
         extractors::Headers,
         request::{BulkDeleteRequest, BulkDeleteResponse},
@@ -64,7 +65,7 @@ pub async fn save_function(Path(org_id): Path<String>, Json(func): Json<Transfor
     let mut transform = func;
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
-    match crate::service::functions::save_function(org_id, transform).await {
+    match openobserve_core::functions::save_function(org_id, transform).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -121,13 +122,13 @@ pub async fn list_functions(
                 _permitted = list;
             }
             Err(e) => {
-                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
     }
 
-    match crate::service::functions::list_functions(org_id, _permitted).await {
+    match openobserve_core::functions::list_functions(org_id, _permitted).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -164,7 +165,7 @@ pub async fn list_functions(
     )
 )]
 pub async fn delete_function(Path((org_id, name)): Path<(String, String)>) -> Response {
-    match crate::service::functions::delete_function(&org_id, &name).await {
+    match openobserve_core::functions::delete_function(&org_id, &name).await {
         Ok(_) => (
             StatusCode::OK,
             Json(MetaHttpResponse::message(
@@ -254,7 +255,7 @@ pub async fn delete_function_bulk(
     let mut err = None;
 
     for name in req.ids {
-        match crate::service::functions::delete_function(&org_id, &name).await {
+        match openobserve_core::functions::delete_function(&org_id, &name).await {
             Ok(_) | Err(FunctionDeleteError::NotFound) => {
                 successful.push(name);
             }
@@ -312,7 +313,7 @@ pub async fn update_function(
     let mut transform = func;
     transform.name = transform.name.trim().to_string();
     transform.function = transform.function.trim().to_string();
-    match crate::service::functions::update_function(&org_id, name, transform).await {
+    match openobserve_core::functions::update_function(&org_id, name, transform).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -351,7 +352,7 @@ pub async fn update_function(
 pub async fn list_pipeline_dependencies(
     Path((org_id, fn_name)): Path<(String, String)>,
 ) -> Response {
-    match crate::service::functions::get_pipeline_dependencies(&org_id, &fn_name).await {
+    match openobserve_core::functions::get_pipeline_dependencies(&org_id, &fn_name).await {
         Ok(resp) => resp,
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
     }
@@ -395,7 +396,8 @@ pub async fn test_function(
     } = req_body;
 
     // test_run_function will auto-detect VRL vs JS if trans_type is None
-    match crate::service::functions::test_run_function(&org_id, function, events, trans_type).await
+    match openobserve_core::functions::test_run_function(&org_id, function, events, trans_type)
+        .await
     {
         Ok(result) => result,
         Err(err) => (StatusCode::BAD_REQUEST, err.to_string()).into_response(),

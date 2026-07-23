@@ -14,9 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
-mod enterprise;
+pub mod enterprise;
 #[cfg(feature = "enterprise")]
 pub mod registry;
-
-#[cfg(feature = "enterprise")]
-pub use enterprise::{KeyAddRequest, KeyGetResponse, KeyInfo, KeyListResponse};

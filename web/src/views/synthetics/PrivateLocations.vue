@@ -18,7 +18,6 @@
     >
       <template #toolbar>
         <div class="flex items-center gap-2 flex-1 min-w-0">
-          <slot name="tabs" />
           <div class="flex-1 min-w-0">
             <OInput
               v-model="search"
@@ -31,15 +30,6 @@
       </template>
 
       <template #toolbar-trailing>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="code"
-          data-test="synthetics-private-locations-setup-btn"
-          @click="emit('setup')"
-        >
-          {{ t("synthetics.privateLocations.setupAgent") }}
-        </OButton>
         <OButton
           variant="outline"
           size="icon-sm"
@@ -134,9 +124,7 @@
           :filtered="!!search"
           :title="t('synthetics.privateLocations.empty.title')"
           :description="t('synthetics.privateLocations.empty.description')"
-          :action-label="t('synthetics.privateLocations.empty.action')"
           data-test="synthetics-private-locations-empty-state"
-          @action="onEmptyAction"
         />
       </template>
     </OTable>
@@ -163,7 +151,6 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{
   (e: "refresh"): void;
-  (e: "setup"): void;
   (e: "copy-setup", row: SyntheticLocation): void;
   (e: "delete", row: SyntheticLocation): void;
 }>();
@@ -274,11 +261,4 @@ const openDetail = (row: SyntheticLocation) => {
   router.push({ name: "synthetic-private-location", params: { id: row.id } });
 };
 
-const onEmptyAction = (id?: string) => {
-  if (id === "clear-filters") {
-    search.value = "";
-    return;
-  }
-  emit("setup");
-};
 </script>

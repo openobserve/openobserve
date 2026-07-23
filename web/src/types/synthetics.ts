@@ -159,6 +159,11 @@ export type RecorderPortInbound =
   | RecorderPortMessage
   | { type: 'synthetics-response'; response: unknown }
 
+// ---- Bridge transport types (content-script relay, replaces chrome.runtime.*) ----
+
+export type BridgeStatusMessage =
+  | { type: 'bridge-disconnected' }
+
 /**
  * Check types creatable from the UI. Only types both the control plane and the
  * probes run end-to-end today — dns/ping/api exist server-side but have no
@@ -278,6 +283,17 @@ export interface AgentSetup {
   script_url: string
   /** Legacy docker one-liner (drawer fallback when composing is impossible). */
   install: string
+}
+
+// Full location record for admin/settings panel (GET /api/{org}/synthetics/locations)
+export interface SyntheticsLocationRecord {
+  id: string
+  name: string
+  region: string
+  provider: string
+  enabled: boolean
+  kind: string
+  pool: string
 }
 
 export interface SyntheticsDevice {

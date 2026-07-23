@@ -2651,6 +2651,7 @@
     "kubernetes": "Kubernetes",
     "windows": "Janela",
     "linux": "Linux",
+    "macos": "macOS",
     "awsconfig": "Amazon Web Services (AWS)",
     "gcpconfig": "Plataforma de nuvem do Google (GCP)",
     "azure": "Microsoft Azure",

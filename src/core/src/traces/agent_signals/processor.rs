@@ -74,7 +74,7 @@ pub async fn process_agent_signals_stream(
     // → embedded fallback), not a hardcoded set. Keep ONLY the configured columns
     // that actually exist on this stream — referencing a missing column is a hard
     // search error, so the SQL must COALESCE existing columns only.
-    let taxonomy = crate::service::system_settings::get_agent_signals_taxonomy(org_id).await;
+    let taxonomy = crate::system_settings::get_agent_signals_taxonomy(org_id).await;
     let detail_fields: Vec<String> = taxonomy
         .error_detail_fields
         .iter()
@@ -103,10 +103,8 @@ pub async fn process_agent_signals_stream(
             &taxonomy.failure_rules,
             has_agent_id,
         );
-        match crate::service::traces::service_graph::run_graph_search(
-            org_id, sql, start_time, end_time,
-        )
-        .await
+        match crate::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+            .await
         {
             Ok(hits) => records.extend(map_failure_hits(org_id, stream_name, ts, &hits)),
             Err(e) => {
@@ -117,10 +115,8 @@ pub async fn process_agent_signals_stream(
     // R2 loop ratio — needs gen_ai_tool_name.
     if has_tool {
         let sql = build_loop_ratio_sql(stream_name, start_time, end_time);
-        match crate::service::traces::service_graph::run_graph_search(
-            org_id, sql, start_time, end_time,
-        )
-        .await
+        match crate::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+            .await
         {
             Ok(hits) => records.extend(map_loop_hits(org_id, stream_name, ts, &hits)),
             Err(e) => log::warn!("[AgentSignals] loop pass failed for {org_id}/{stream_name}: {e}"),
@@ -129,10 +125,8 @@ pub async fn process_agent_signals_stream(
     // R4 cost/diagnosis — needs gen_ai_usage_cost.
     if has_cost {
         let sql = build_cost_sql(stream_name, start_time, end_time, has_agent_id);
-        match crate::service::traces::service_graph::run_graph_search(
-            org_id, sql, start_time, end_time,
-        )
-        .await
+        match crate::traces::service_graph::run_graph_search(org_id, sql, start_time, end_time)
+            .await
         {
             Ok(hits) => records.extend(map_cost_hits(org_id, stream_name, ts, &hits)),
             Err(e) => log::warn!("[AgentSignals] cost pass failed for {org_id}/{stream_name}: {e}"),

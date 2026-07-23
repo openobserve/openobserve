@@ -100,6 +100,9 @@ const syntheticsService = {
   deleteLocation: (orgIdentifier: string, id: string) =>
     http().delete(`/api/${orgIdentifier}/synthetics/locations/${id}`),
 
+  bulkDeleteLocations: (orgIdentifier: string, ids: string[]) =>
+    http().delete(`/api/${orgIdentifier}/synthetics/locations`, { data: { ids } }),
+
   listRunsPayload(
     monitorId: string,
     startTime: number,

@@ -133,6 +133,18 @@ export default defineComponent({
         contentClass: "tab_content",
       },
       {
+        name: "ingestFromMacOS",
+        to: {
+          name: "ingestFromMacOS",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/macos.png"),
+        label: t("ingestion.macos"),
+        contentClass: "tab_content",
+      },
+      {
         name: "AWSConfig",
         to: {
           name: "AWSConfig",

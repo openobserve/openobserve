@@ -17,7 +17,8 @@ const props = defineProps<{
   locations: SyntheticsLocation[]
   /** Shows the private-locations subsection + setup CTA (protocol checks only —
    *  browser tests are Lambda-only and pass the public list without this). */
-  allowPrivate?: boolean
+  allowPrivate?: boolean,
+  validationErrors?: Record<string, string>;
 }>()
 const emit = defineEmits<{
   'update:check': [value: BrowserCheck]
@@ -187,6 +188,13 @@ function agentSubtext(location: SyntheticsLocation): string {
       >
         {{ t('synthetics.locations.empty') }}
       </div>
+      <p
+      v-if="props.validationErrors?.locations"
+      class="mt-2 text-xs text-status-error-text"
+      data-test="synthetics-check-locations-error"
+      >
+          {{ props.validationErrors.locations }}
+      </p>
     </div>
   </div>
 </template>

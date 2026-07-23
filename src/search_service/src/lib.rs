@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#![recursion_limit = "256"]
+
 use std::sync::{Arc, LazyLock as Lazy};
 
 use arrow::array::RecordBatch;
@@ -73,14 +75,14 @@ pub mod grpc_search;
 pub mod grpc_server;
 pub mod partition;
 pub mod query_range;
-mod searcher;
+pub mod searcher;
 pub mod streaming;
 #[cfg(feature = "enterprise")]
 pub mod super_cluster;
 pub mod work_group;
 
-pub use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
-pub use searcher::Searcher;
+use ::search::{bloom_pruner, datafusion, index, inspector, sql, tantivy, utils};
+use searcher::Searcher;
 
 /// The result of search in cluster
 /// data, scan_stats, wait_in_queue, is_partial, partial_err
@@ -463,7 +465,7 @@ pub async fn search_multi(
             Ok(program) => {
                 let registry = program
                     .config
-                    .get_custom::<transform::vector_enrichment::TableRegistry>()
+                    .get_custom::<vector_enrichment::TableRegistry>()
                     .unwrap();
                 registry.finish_load();
                 Some(program)

@@ -19,6 +19,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};
 #[cfg(feature = "enterprise")]
 use {
@@ -26,14 +27,9 @@ use {
     o2_enterprise::enterprise::common::settings,
 };
 
-use crate::{
-    common::meta::{
-        http::HttpResponse as MetaHttpResponse,
-        organization::{
-            OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse,
-        },
-    },
-    service::db::organization::{get_org_setting, set_org_setting},
+use crate::common::meta::{
+    http::HttpResponse as MetaHttpResponse,
+    organization::{OrganizationSetting, OrganizationSettingPayload, OrganizationSettingResponse},
 };
 
 /// Organization specific settings

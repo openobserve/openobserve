@@ -711,7 +711,7 @@ export default defineComponent({
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex(
-        (l: any) => l.name === "synthetic",
+        (l: any) => l.name === "synthetics",
       );
 
       if (!isSyntheticsEnabled.value) {
@@ -736,8 +736,8 @@ export default defineComponent({
       linksList.value.splice(insertAt, 0, {
         title: t("menu.synthetic"),
         icon: "radar",
-        link: "/synthetic",
-        name: "synthetic",
+        link: "/synthetics",
+        name: "synthetics",
       });
     };
 

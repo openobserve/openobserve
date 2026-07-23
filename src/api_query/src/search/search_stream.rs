@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use ::search::AuditContext;
+#[cfg(feature = "enterprise")]
+use audit::audit;
 use axum::{
     body::Bytes,
     extract::{Path, Query},
@@ -21,6 +25,8 @@ use axum::{
 };
 #[cfg(feature = "enterprise")]
 use axum::{http::StatusCode, response::IntoResponse};
+#[cfg(feature = "enterprise")]
+use common::utils::http::get_extract_patterns_from_request;
 use config::{
     get_config,
     meta::{
@@ -38,39 +44,30 @@ use o2_enterprise::enterprise::common::{
     auditor::{AuditMessage, Protocol, ResponseMeta},
     config::get_config as get_o2_config,
 };
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_permissions;
+use search::utils::is_permissable_function_error;
+use search_service::streaming::process_search_stream_request;
 use tokio::sync::mpsc;
 use tracing::Span;
 
 #[cfg(feature = "enterprise")]
-use crate::common::utils::http::get_extract_patterns_from_request;
-#[cfg(feature = "enterprise")]
-use crate::{
-    common::meta::search::AuditContext,
-    common::utils::auth::check_permissions,
-    search::utils::{StreamPermissionResourceType, check_stream_permissions},
-    service::self_reporting::audit,
-};
+use crate::search::utils::{StreamPermissionResourceType, check_stream_permissions};
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail,
-            http::{
-                get_clear_cache_from_request, get_fallback_order_by_col_from_request,
-                get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
-                get_or_create_trace_id, get_search_event_context_from_request,
-                get_search_type_from_request, get_stream_type_from_request,
-                get_use_cache_from_request,
-            },
+        utils::http::{
+            get_clear_cache_from_request, get_fallback_order_by_col_from_request,
+            get_is_multi_stream_search_from_request, get_is_ui_histogram_from_request,
+            get_or_create_trace_id, get_search_event_context_from_request,
+            get_search_type_from_request, get_stream_type_from_request, get_use_cache_from_request,
         },
     },
-    extractors::Headers,
     search::{
         build_search_request_per_field, error_utils::map_error_to_http_response,
         utils::SearchStreamGuard,
-    },
-    service::search::{
-        streaming::process_search_stream_request, utils::is_permissable_function_error,
     },
 };
 
@@ -308,7 +305,7 @@ pub async fn search_http2_stream(
     if is_ui_histogram {
         histogram_breakdown_field = if !is_multi_stream_search {
             if let Some(stream_name) = stream_names.first() {
-                search_service::sql::histogram::resolve_histogram_breakdown_field(
+                search::sql::histogram::resolve_histogram_breakdown_field(
                     &org_id,
                     stream_name,
                     stream_type,
@@ -322,7 +319,7 @@ pub async fn search_http2_stream(
         };
 
         // Convert the original query to a histogram query
-        match search_service::sql::histogram::convert_to_histogram_query(
+        match search::sql::histogram::convert_to_histogram_query(
             &req.query.sql,
             &stream_names,
             is_multi_stream_search,
@@ -1015,6 +1012,6 @@ async fn get_sql(
     org_id: &str,
     stream_type: StreamType,
     search_type: Option<SearchEventType>,
-) -> Result<search_service::sql::Sql, infra::errors::Error> {
-    search_service::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type).await
+) -> Result<search::sql::Sql, infra::errors::Error> {
+    search::sql::Sql::new(&query.clone().into(), org_id, stream_type, search_type).await
 }

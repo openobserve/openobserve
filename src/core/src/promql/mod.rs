@@ -16,10 +16,6 @@
 // Compatibility re-exports for call sites (alerts, HTTP handlers) that mix
 // these with `MetricsQueryRequest` and `search`. New code should depend on the
 // `promql` crate directly.
-pub use ::promql::{
-    DEFAULT_LOOKBACK, MAX_DATA_POINTS, MINIMAL_INTERVAL, adjust_start_end, micros, name_visitor,
-    round_step,
-};
 use config::meta::search::SearchEventType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

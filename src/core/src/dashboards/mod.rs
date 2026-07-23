@@ -23,6 +23,10 @@ use config::{
     },
     utils::time::now_micros,
 };
+use db::{
+    authz::{remove_ownership, set_ownership},
+    system_settings,
+};
 use futures::future::join_all;
 use hashbrown::HashMap;
 use infra::{
@@ -34,13 +38,7 @@ use infra::{
 };
 
 use super::{db::distinct_values, folders, stream::save_stream_settings};
-use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{remove_ownership, set_ownership},
-    },
-    service::db::system_settings,
-};
+use crate::common::meta::authz::Authz;
 pub mod reports;
 pub mod timed_annotations;
 
@@ -58,7 +56,7 @@ use o2_openfga::{
 };
 
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use crate::auth::check_permissions;
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -568,7 +566,7 @@ pub async fn delete_dashboard(org_id: &str, dashboard_id: &str) -> Result<(), Da
     if let Err(e) = infra::coordinator::dashboards::emit_delete_event(org_id, dashboard_id).await {
         log::error!("[Dashboard] error emitting coordinator delete event for {dashboard_id}: {e}");
     }
-    crate::common::infra::config::DASHBOARD_ID_TO_ORG
+    common::infra::config::DASHBOARD_ID_TO_ORG
         .write()
         .await
         .remove(dashboard_id);
@@ -744,7 +742,7 @@ async fn put(
         if let Err(e) = infra::coordinator::dashboards::emit_put_event(org_id, id).await {
             log::error!("[Dashboard] error emitting coordinator put event for {id}: {e}");
         }
-        crate::common::infra::config::DASHBOARD_ID_TO_ORG
+        common::infra::config::DASHBOARD_ID_TO_ORG
             .write()
             .await
             .insert(id.to_string(), org_id.to_string());
@@ -1096,16 +1094,17 @@ async fn filter_permitted_dashboards(
     // If the user has `GET` permission on the folder, then they will be able to see the folder and
     // all its contents. This includes the dashboards inside the folder.
 
+    use db::user::get as get_user;
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
-    use crate::{common::utils::auth::AuthExtractor, service::db::user::get as get_user};
+    use crate::auth::AuthExtractor;
 
     if let Some(folder_id) = folder_id {
         let user_role = match get_user(Some(org_id), user_id).await {
             Ok(Some(user)) => user.role,
             _ => return Err(DashboardError::UserNotFound),
         };
-        let permitted = crate::service::authz::check_permissions(
+        let permitted = crate::authz::check_permissions(
             user_id,
             AuthExtractor {
                 org_id: org_id.to_string(),
@@ -1134,7 +1133,7 @@ async fn filter_permitted_dashboards(
     // to see the dashboard. This is used to check if the user has permission to see a specific
     // dashboard.
 
-    let permitted_objects = crate::service::authz::list_objects_for_user(
+    let permitted_objects = crate::authz::list_objects_for_user(
         org_id,
         user_id,
         "GET_INDIVIDUAL_FROM_ROLE",

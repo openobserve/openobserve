@@ -20,7 +20,7 @@
 //!
 //! ## Usage Example
 //! ```no_run
-//! use crate::service::github::GitHubDataService;
+//! use crate::github::GitHubDataService;
 //!
 //! let service = GitHubDataService::new();
 //! let data = service

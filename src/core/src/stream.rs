@@ -39,6 +39,7 @@ use config::{
 #[cfg(feature = "enterprise")]
 use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use db::{self, distinct_values};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::stats,
@@ -55,17 +56,14 @@ use o2_enterprise::enterprise::re_patterns::PATTERN_MANAGER;
 
 use super::db::enrichment_table;
 #[cfg(feature = "vectorscan")]
-use crate::service::db::re_pattern::process_association_changes;
+use crate::db::re_pattern::process_association_changes;
 use crate::{
     common::meta::{
         authz::Authz,
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
         stream::{FieldUpdate, Stream, StreamCreate},
     },
-    service::{
-        db::{self, distinct_values},
-        metrics::get_prom_metadata_from_schema,
-    },
+    metrics::get_prom_metadata_from_schema,
 };
 
 const LOCAL: &str = "disk";
@@ -1038,14 +1036,14 @@ pub async fn delete_stream(
 
     // delete associated feature resources, i.e. pipelines, alerts
     if del_related_feature_resources {
-        for pipeline in crate::service::pipeline::store::get_by_stream(&StreamParams::new(
+        for pipeline in crate::pipeline::store::get_by_stream(&StreamParams::new(
             org_id,
             stream_name,
             stream_type,
         ))
         .await
         {
-            if let Err(e) = crate::service::pipeline::store::delete(&pipeline.id).await {
+            if let Err(e) = crate::pipeline::store::delete(&pipeline.id).await {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
                     [(ERROR_HEADER, format!("failed to delete stream: {e}"))],
@@ -1120,7 +1118,7 @@ pub async fn delete_stream(
     // enrichment table cleanup
 
     if stream_type == StreamType::EnrichmentTables {
-        crate::service::enrichment_table::cleanup_enrichment_table_resources(
+        crate::enrichment_table::cleanup_enrichment_table_resources(
             org_id,
             stream_name,
             stream_type,
@@ -1129,12 +1127,7 @@ pub async fn delete_stream(
     }
 
     // delete ownership
-    crate::common::utils::auth::remove_ownership(
-        org_id,
-        stream_type.as_str(),
-        Authz::new(stream_name),
-    )
-    .await;
+    db::authz::remove_ownership(org_id, stream_type.as_str(), Authz::new(stream_name)).await;
 
     Ok(MetaHttpResponse::ok("stream deleted"))
 }
@@ -1232,7 +1225,7 @@ pub async fn delete_stream_data_by_time_range(
     };
 
     // Create a job to delete the data by the time range
-    let (key, _created) = match crate::service::db::compact::retention::delete_stream(
+    let (key, _created) = match crate::db::compact::retention::delete_stream(
         org_id,
         stream_type,
         stream_name,
@@ -1254,7 +1247,7 @@ pub async fn delete_stream_data_by_time_range(
         created_at: Utc::now().timestamp_micros(),
         ended_at: 0,
     };
-    crate::service::db::compact::compactor_manual_jobs::add_job(job).await
+    crate::db::compact::compactor_manual_jobs::add_job(job).await
 }
 
 async fn transform_stats(
