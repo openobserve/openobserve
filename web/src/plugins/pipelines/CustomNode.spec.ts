@@ -788,15 +788,17 @@ describe("CustomNode.vue", () => {
       expect(edge.style.stroke).toBe("#f59e0b"); // default color
     });
 
-    it("sets showDeleteTooltip to true on mouseenter of delete button", async () => {
+    // The delete button now labels itself with the central OTooltip (same as the
+    // workflow node and the rest of the app) — the hand-rolled `showDeleteTooltip`
+    // state it replaced is gone, so there is nothing bespoke left to assert here.
+    it("renders an OTooltip on the delete button", async () => {
       wrapper = createWrapper();
       const vm = wrapper.vm as any;
       vm.showButtons = true;
       await nextTick();
       const deleteBtn = wrapper.find('[data-test="pipeline-node-default-delete-btn"]');
       if (deleteBtn.exists()) {
-        await deleteBtn.trigger("mouseenter");
-        expect(vm.showDeleteTooltip).toBe(true);
+        expect(deleteBtn.findComponent({ name: "OTooltip" }).exists()).toBe(true);
       }
     });
   });

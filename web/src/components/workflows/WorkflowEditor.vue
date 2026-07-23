@@ -113,19 +113,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- workspace: docked palette + canvas (+ drawer region for node forms). The
          history drawer portals in here (below the toolbar) so it can sit
          side-by-side with the canvas. -->
-    <div id="workflow-workspace" class="relative flex min-h-0 flex-1 px-2 pt-3">
+    <div id="workflow-workspace" class="relative flex min-h-0 flex-1">
       <!-- Docked node palette — same shared component as Pipelines, so the two
            palettes can never drift apart. Workflows add click-to-append. -->
       <NodePalette
+        v-if="workflowObj.showNodePalette"
         :items="paletteItems"
-        :title="t('workflow.node.paletteTitle')"
         test-prefix="workflow-palette"
         :on-drag-start="paletteDragStart"
         :on-item-click="paletteClick"
       />
-      <!-- Canvas drop area — gray rounded-default inset card, matching the pipeline
-           editor's `#pipelineChartContainer` so both look identical. -->
-      <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
+      <!-- Canvas drop area — flush gray pane running to the viewport edges,
+           matching the pipeline editor's `#pipelineChartContainer` so both look
+           identical. `dark:bg-transparent` is part of that match: in dark mode
+           the canvas falls through to the page background rather than sitting
+           on the lighter `surface-subtle` slab, which is what made the two
+           editors read as different shades. -->
+      <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
         <WorkflowCanvas />
       </div>
     </div>
@@ -135,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <StepPickerDialog
       v-if="workflowObj.stepPicker.show"
       :items="stepItems"
-      :title="t('workflow.node.stepDialogTitle')"
+      :anchor="workflowObj.stepPicker.anchor"
       :search-placeholder="t('workflow.node.stepSearchPlaceholder')"
       :no-match-text="t('workflow.node.stepNoMatch')"
       test-prefix="workflow-step"
@@ -202,7 +206,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { getUUID } from "@/utils/zincutils";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
@@ -217,6 +220,7 @@ import useWorkflowCanvas, {
   hydrateWorkflow,
   nodeMeta,
   ADDABLE_NODE_TYPES,
+  TRIGGER_NODE_TYPES,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -239,10 +243,10 @@ const headerTitle = computed(() =>
 );
 const {
   resetWorkflowData,
-  editNode,
   deleteNode,
   cancelDeleteNode,
   addNodeAfter,
+  addTriggerNode,
   closeStepPicker,
   onDragStart,
   addNodeToEnd,
@@ -279,9 +283,13 @@ const paletteItems = computed(() => {
 const paletteDragStart = (e: DragEvent, item: any) => onDragStart(e, item.subtype);
 const paletteClick = (item: any) => addNodeToEnd(item.subtype);
 
-// Items for the shared step picker (the addable step types).
+// In "trigger" mode the picker is the workflow's FIRST node, so it offers the
+// trigger types; otherwise it offers the addable step types.
+const isTriggerStep = computed(() => workflowObj.stepPicker.mode === "trigger");
+
+// Items for the shared step picker.
 const stepItems = computed(() =>
-  ADDABLE_NODE_TYPES.map((nt: string) => {
+  (isTriggerStep.value ? TRIGGER_NODE_TYPES : ADDABLE_NODE_TYPES).map((nt: string) => {
     const m = nodeMeta(nt);
     const img = m?.image;
     return {
@@ -292,44 +300,37 @@ const stepItems = computed(() =>
       iconTint:
         m?.category === "action"
           ? "bg-badge-success-soft-bg text-badge-success-soft-text"
-          : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
+          : m?.category === "trigger"
+            ? "bg-badge-blue-soft-bg text-badge-blue-soft-text"
+            : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
+      // v1 has one trigger kind; when more land they become their own
+      // TRIGGER_NODE_TYPES entries carrying their own kind.
+      trigger_kind: "alert_fired",
     };
   }),
 );
 
 const onStepPick = (item: any) => {
-  const { source, handle } = workflowObj.stepPicker;
+  const { source, handle, mode, position } = workflowObj.stepPicker;
   closeStepPicker();
-  addNodeAfter(source, handle, item.key);
+  // The trigger has nothing before it, so it is placed rather than appended.
+  if (mode === "trigger") addTriggerNode(item.key, item.trigger_kind, position);
+  else addNodeAfter(source, handle, item.key);
 };
 
 const orgId = () => store.state.selectedOrganization.identifier as string;
 
-// Seed a fresh workflow with the chosen trigger anchored near the top-center.
-// `triggerKind` maps to the future backend WorkflowTriggerKind (B1); the node
-// type stays "workflow_trigger" for all kinds in v1.
-const seedTrigger = (triggerKind = "alert_fired") => {
+// Start a fresh workflow on an EMPTY canvas. It used to pre-place an Alert
+// Trigger node here; the canvas now shows a "Choose a Trigger" start node that
+// opens the trigger picker, the same shape as the pipeline editor's source
+// start node. That scales as more trigger kinds land — a seeded node can only
+// ever pick one — and keeps create/extend a single interaction.
+//
+// Nothing is staged here, so no drawer opens on arrival: the config panel is a
+// consequence of CHOOSING a trigger, not of landing on the page.
+const startNewWorkflow = () => {
   resetWorkflowData();
-  const id = getUUID();
-  workflowObj.currentSelectedWorkflow.nodes = [
-    {
-      id,
-      // VueFlow node type selects the render template (source-only trigger).
-      type: "input",
-      position: { x: 320, y: 80 },
-      data: {
-        label: id,
-        node_type: "workflow_trigger",
-        trigger_kind: triggerKind,
-        alert_ids: [],
-      },
-    },
-  ];
   workflowObj.isEditWorkflow = false;
-  // Auto-open the trigger's panel on create so users discover that nodes are
-  // clickable (Outputs / Test live there). Only on create — editing a saved
-  // workflow doesn't pop it open.
-  editNode(id);
 };
 
 // Deep-link / refresh fallback: no GET /workflows/{id} yet (backend B5), so
@@ -552,7 +553,7 @@ onMounted(async () => {
     // re-fetch on a cold load (deep link / refresh) where it's missing.
     if (workflowObj.currentSelectedWorkflow?.id !== id) await loadWorkflow(id);
   } else {
-    seedTrigger((query.trigger as string) || "alert_fired");
+    startNewWorkflow();
   }
 });
 

@@ -22,6 +22,18 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   useDashboardPanelData: vi.fn(),
 }));
 
+// In the app all config sections start collapsed (see searchLabelsConfig +
+// useConfigPanel.spec, which owns that behaviour). This integration spec
+// asserts that the correct controls render/bind *when a section is open*, so we
+// force every section expanded at mount by overriding DEFAULT_EXPANDED_SECTIONS.
+vi.mock("@/utils/dashboard/searchLabelsConfig", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  const allExpanded = Object.fromEntries(
+    Object.keys(actual.DEFAULT_EXPANDED_SECTIONS as Record<string, boolean>).map((k) => [k, true]),
+  );
+  return { ...actual, DEFAULT_EXPANDED_SECTIONS: allExpanded };
+});
+
 import ConfigPanel from "@/components/dashboards/addPanel/ConfigPanel.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";

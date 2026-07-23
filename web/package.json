@@ -4,6 +4,9 @@
   "license": "AGPL-3.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite --base /web/",
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
@@ -32,6 +35,8 @@
     "lint:design:strict": "node scripts/check-design-consistency.mjs --strict",
     "format": "prettier --write \"src/**/*.{ts,tsx,vue,js,json,scss,css,md}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,vue,js,json,scss,css,md}\"",
+    "verify": "npm run type-check:app && npm run lint:ci && npm run lint:styles && npm run lint:tokens && npm run lint:token-purity && npm run lint:design:strict",
+    "verify:all": "npm run verify && npm run test:coverage:check",
     "prepare": "cd .. && husky web/.husky || true"
   },
   "lint-staged": {

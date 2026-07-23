@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-page-edge">
                 <MonitorStatusTimeline
                   :segments="timelineSegments"
+                  :is-browser="isBrowser"
                   :fail-count="timelineFailCount"
                   :pass-count="timelinePassCount"
                   :mixed-count="timelineMixedCount"
@@ -121,9 +122,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- KPI Cards — gated on KPI + last-run queries -->
             <template v-if="kpiLoading || !kpiHasLoadedOnce">
               <div class="px-page-edge">
-                <div class="grid grid-cols-5 gap-2.5">
+                <div class="grid grid-cols-6 gap-2.5">
                   <div
-                    v-for="n in 5"
+                    v-for="n in 6"
                     :key="n"
                     class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
                   >
@@ -135,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template v-else>
               <div class="px-page-edge">
-                <div class="grid grid-cols-5 gap-2.5">
+                <div class="grid grid-cols-6 gap-2.5">
                   <div
                     v-for="card in kpiCards"
                     :key="card.key"
@@ -1227,6 +1228,15 @@ const actionOptions: SelectOption[] = [
 function toMockRun(r: SyntheticRun, idx: number): MockRun {
   const eng = r.browserEngine;
   const browser = eng ? eng.charAt(0).toUpperCase() + eng.slice(1) : eng;
+  const mappedStatus = (
+    r.status === "passed"
+      ? "pass"
+      : r.status === "warning"
+        ? "warning"
+        : r.status === "error"
+          ? "error"
+          : "fail"
+  ) as MockRun["status"];
   return {
     id: idx + 1,
     runId: r.runId || "unknown-" + idx,
@@ -1235,7 +1245,7 @@ function toMockRun(r: SyntheticRun, idx: number): MockRun {
     timestamp: r.timestamp,
     triggerType: r.triggerType,
     duration: r.durationMs,
-    status: r.status === "passed" ? ("pass" as const) : ("fail" as const),
+    status: mappedStatus,
     location: r.location,
     browser,
     device: r.device,
@@ -1313,12 +1323,22 @@ const kpiCards = computed<KpiCard[]>(() => {
         key: "last-run",
         label: t("synthetics.results.lastRun"),
         value: k.lastRunStatus
-          ? k.lastRunStatus === "failed"
-            ? t("synthetics.results.failed")
-            : t("synthetics.results.passed")
+          ? k.lastRunStatus === "passed"
+            ? t("synthetics.results.passed")
+            : k.lastRunStatus === "warning"
+              ? t("synthetics.protocolRun.warning")
+              : k.lastRunStatus === "error"
+                ? t("synthetics.results.error")
+                : t("synthetics.results.failed")
           : "—",
         valueClass:
-          k.lastRunStatus === "failed" ? "text-status-error-text!" : "text-status-success-text!",
+          k.lastRunStatus === "passed"
+            ? "text-status-success-text!"
+            : k.lastRunStatus === "warning"
+              ? "text-status-warning-text!"
+              : k.lastRunStatus
+                ? "text-status-error-text!"
+                : undefined,
       },
       {
         key: "pass-rate",
@@ -1337,6 +1357,12 @@ const kpiCards = computed<KpiCard[]>(() => {
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
       {
+        key: "warning-runs",
+        label: t("synthetics.runs.warningRuns"),
+        value: String(k.warningRuns),
+        valueClass: k.warningRuns > 0 ? "text-status-warning-text!" : undefined,
+      },
+      {
         key: "failed-runs",
         label: t("synthetics.results.failedRuns"),
         value: String(k.failedRuns),
@@ -1348,29 +1374,44 @@ const kpiCards = computed<KpiCard[]>(() => {
   const fallbackPassPct =
     allRuns.value.length > 0
       ? (
-          (allRuns.value.filter((r) => r.status === "pass").length / allRuns.value.length) *
+          (allRuns.value.filter((r) => r.status === "pass" || r.status === "warning").length /
+            allRuns.value.length) *
           100
         ).toFixed(1) + "%"
       : "100%";
   const lastRun = allRuns.value[0];
   return [
+    {
+      key: "last-run",
+      label: t("synthetics.results.lastRun"),
+      value: lastRun
+        ? lastRun.status === "pass"
+          ? t("synthetics.results.passed")
+          : lastRun.status === "warning"
+            ? t("synthetics.protocolRun.warning")
+            : t("synthetics.results.failed")
+        : "—",
+      valueClass:
+        lastRun?.status === "pass"
+          ? "text-status-success-text!"
+          : lastRun?.status === "warning"
+            ? "text-status-warning-text!"
+            : lastRun
+              ? "text-status-error-text!"
+              : undefined,
+    },
     { key: "pass-rate", label: t("synthetics.runs.passRate"), value: fallbackPassPct },
     { key: "p95-duration", label: t("synthetics.results.p95Duration"), value: "—" },
     { key: "retry-rate", label: t("synthetics.runs.retryRate"), value: "0.0%" },
     {
+      key: "warning-runs",
+      label: t("synthetics.runs.warningRuns"),
+      value: String(allRuns.value.filter((r) => r.status === "warning").length),
+    },
+    {
       key: "failed-runs",
       label: t("synthetics.results.failedRuns"),
       value: String(totalFails.value),
-    },
-    {
-      key: "last-run",
-      label: t("synthetics.results.lastRun"),
-      value:
-        lastRun?.status === "fail"
-          ? t("synthetics.results.failed")
-          : t("synthetics.results.passed"),
-      valueClass:
-        lastRun?.status === "fail" ? "text-status-error-text!" : "text-status-success-text!",
     },
   ];
 });
@@ -1380,14 +1421,14 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "fail";
+  status: "pass" | "warning" | "fail" | "error";
   statusIcon: string;
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   color: string;
   title: string;
   /** Epoch ms of the first execution in this logical run. */
@@ -1416,36 +1457,56 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
 
   return groupOrder.map((runId) => {
     const executions = groupMap.get(runId)!;
-    const allPass = executions.every((e) => e.status === "pass");
-    const allFail = executions.every((e) => e.status === "fail");
-    const status: TimelineSegment["status"] = allPass ? "all-pass" : allFail ? "all-fail" : "mixed";
+    const allPass = executions.every((e) => e.status === "pass" || e.status === "warning");
+    const allFail = executions.every((e) => e.status === "fail" || e.status === "error");
+    const allWarning = executions.every((e) => e.status === "warning");
+    const status: TimelineSegment["status"] = allPass
+      ? allWarning
+        ? "all-warning"
+        : "all-pass"
+      : allFail
+        ? "all-fail"
+        : "mixed";
 
     const color =
       status === "all-pass"
         ? "bg-badge-success-solid-bg/80"
-        : status === "all-fail"
-          ? "bg-badge-error-solid-bg/80"
-          : "bg-badge-orange-solid-bg/80";
+        : status === "all-warning"
+          ? "bg-badge-warning-solid-bg/80"
+          : status === "all-fail"
+            ? "bg-badge-error-solid-bg/80"
+            : "bg-badge-orange-solid-bg/80";
 
-    const passCount = executions.filter((e) => e.status === "pass").length;
+    const passCount = executions.filter(
+      (e) => e.status === "pass" || e.status === "warning",
+    ).length;
     const failCount = executions.length - passCount;
     const title =
       status === "all-pass"
         ? t("synthetics.runs.timelineAllPassed", { count: executions.length })
-        : status === "all-fail"
-          ? t("synthetics.runs.timelineAllFailed", { count: executions.length })
-          : t("synthetics.runs.timelineMixed", {
-              passed: passCount,
-              failed: failCount,
-              total: executions.length,
-            });
+        : status === "all-warning"
+          ? t("synthetics.runs.timelineAllWarning", { count: executions.length })
+          : status === "all-fail"
+            ? t("synthetics.runs.timelineAllFailed", { count: executions.length })
+            : t("synthetics.runs.timelineMixed", {
+                passed: passCount,
+                failed: failCount,
+                total: executions.length,
+              });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
       location: e.location,
       browserEngine: e.browser,
       device: e.device,
-      status: e.status === "pass" ? "pass" : "fail",
-      statusIcon: e.status === "pass" ? "check_circle" : "cancel",
+      status:
+        e.status === "pass"
+          ? "pass"
+          : e.status === "warning"
+            ? "warning"
+            : e.status === "error"
+              ? "error"
+              : "fail",
+      statusIcon: e.status === "pass" || e.status === "warning" ? "check_circle" : "cancel",
       errorSnippet: e.errorPattern ? e.errorPattern.split(":")[0].substring(0, 50) : null,
     }));
 
@@ -1467,7 +1528,9 @@ const timelinePassCount = computed(() =>
   String(timelineSegments.value.filter((s) => s.status === "all-pass").length),
 );
 const timelineMixedCount = computed(() =>
-  String(timelineSegments.value.filter((s) => s.status === "mixed").length),
+  String(
+    timelineSegments.value.filter((s) => s.status === "mixed" || s.status === "all-warning").length,
+  ),
 );
 
 function formatTimelineDate(ms: number): string {
@@ -1527,7 +1590,7 @@ const browserBreakdown = computed<BreakdownItem[]>(() => {
     const key = run.browser || "Unknown";
     const g = groups.get(key) ?? { pass: 0, total: 0 };
     g.total++;
-    if (run.status === "pass") g.pass++;
+    if (run.status === "pass" || run.status === "warning") g.pass++;
     groups.set(key, g);
   }
   const browserIconMap: Record<string, string> = {
@@ -1553,7 +1616,7 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
     const key = run.location || "Unknown";
     const g = groups.get(key) ?? { pass: 0, total: 0 };
     g.total++;
-    if (run.status === "pass") g.pass++;
+    if (run.status === "pass" || run.status === "warning") g.pass++;
     groups.set(key, g);
   }
 
@@ -1590,7 +1653,7 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
     const key = run.device || "Unknown";
     const g = groups.get(key) ?? { pass: 0, total: 0 };
     g.total++;
-    if (run.status === "pass") g.pass++;
+    if (run.status === "pass" || run.status === "warning") g.pass++;
     groups.set(key, g);
   }
   return Array.from(groups.entries()).map(([id, g]) => {
@@ -1644,6 +1707,7 @@ const locationDurationBreakdown = computed<BreakdownItem[]>(() => {
 const statusOptions = [
   { key: "all", label: t("synthetics.filters.all"), dot: "var(--color-text-secondary)" },
   { key: "pass", label: t("synthetics.results.passed"), dot: "var(--color-status-success-text)" },
+  { key: "warning", label: t("synthetics.runs.warning"), dot: "var(--color-status-warning-text)" },
   { key: "fail", label: t("synthetics.results.failed"), dot: "var(--color-status-error-text)" },
 ];
 
@@ -1713,7 +1777,7 @@ interface MockRun {
   scheduledTs: number;
   timestamp: number;
   duration: number;
-  status: "pass" | "fail";
+  status: "pass" | "warning" | "fail" | "error";
   location: string;
   browser: string;
   device: string;
@@ -1743,7 +1807,10 @@ function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): M
     const intervalFraction = logicalRunIdx / NUM_LOGICAL_RUNS;
     const scheduledBase = baseTime - Math.round(intervalFraction * timeSpan);
     for (let execIdx = 0; execIdx < numExecutions; execIdx++) {
-      const isFail = r() < 0.22;
+      const rand = r();
+      const status: MockRun["status"] =
+        rand < 0.05 ? "warning" : rand < 0.22 ? "fail" : rand < 0.24 ? "error" : "pass";
+      const isFail = status === "fail" || status === "error";
       const dur = isFail ? Math.round(20000 + r() * 15000) : Math.round(1800 + r() * 3200);
       const errIdx = Math.floor(r() * errs.length);
       const failedStep = isFail ? steps[8 + Math.floor(r() * 4)] : null;
@@ -1756,7 +1823,7 @@ function generateRuns(timeRange?: { startTimeMs: number; endTimeMs: number }): M
         timestamp: scheduledBase + Math.round(r() * 30000),
         triggerType: "schedule",
         duration: dur,
-        status: isFail ? "fail" : "pass",
+        status,
         location: locations[Math.floor(r() * locations.length)],
         browser: browsers[Math.floor(r() * browsers.length)],
         device: devices[r() < 0.7 ? 0 : r() < 0.85 ? 1 : 2],
@@ -1823,12 +1890,20 @@ interface VisibleRun {
 
 const visibleRuns = computed<VisibleRun[]>(() => {
   return filteredRuns.value.map((run) => {
-    const isFail = run.status === "fail";
+    const isPass = run.status === "pass";
+    const isWarning = run.status === "warning";
+    const isError = run.status === "error";
     return {
       id: run.id,
-      statusBadgeVariant: isFail ? "error-soft" : "success-soft",
-      statusIcon: isFail ? "cancel" : "check_circle",
-      statusLabel: isFail ? t("synthetics.results.failed") : t("synthetics.results.passed"),
+      statusBadgeVariant: isPass ? "success-soft" : isWarning ? "warning-soft" : "error-soft",
+      statusIcon: isPass || isWarning ? "check_circle" : "cancel",
+      statusLabel: isPass
+        ? t("synthetics.results.passed")
+        : isWarning
+          ? t("synthetics.protocolRun.warning")
+          : isError
+            ? t("synthetics.results.error")
+            : t("synthetics.results.failed"),
       scheduledTs: run.scheduledTs,
       lastRunTs: run.timestamp,
       triggerType:

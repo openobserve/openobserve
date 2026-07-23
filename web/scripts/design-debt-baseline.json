@@ -1,10 +1,10 @@
 {
   "totals": {
     "rawProjectRamp": 139,
-    "rawVarInComponent": 585,
-    "arbZ": 35,
+    "rawVarInComponent": 565,
+    "arbZ": 33,
     "darkMechanism": 20,
-    "unscopedStyle": 7,
+    "unscopedStyle": 6,
     "stylePxUnit": 90
   },
   "files": {
@@ -145,10 +145,6 @@
     },
     "components/pipeline/NodeForm/CreateDestinationForm.vue": {
       "arbZ": 1
-    },
-    "components/pipeline/PipelineEditor.vue": {
-      "unscopedStyle": 1,
-      "rawVarInComponent": 20
     },
     "components/pipeline/PipelineSectionTabs.vue": {
       "rawProjectRamp": 2
@@ -382,9 +378,6 @@
     "lib/navigation/Tabs/OTab.vue": {
       "rawProjectRamp": 1
     },
-    "lib/overlay/Dropdown/ODropdown.vue": {
-      "arbZ": 1
-    },
     "lib/overlay/Tooltip/OTooltip.vue": {
       "arbZ": 1
     },
@@ -411,7 +404,7 @@
       "rawProjectRamp": 2
     },
     "plugins/pipelines/CustomNode.vue": {
-      "arbZ": 2,
+      "arbZ": 1,
       "rawVarInComponent": 10
     },
     "plugins/pipelines/PipelineFlow.vue": {

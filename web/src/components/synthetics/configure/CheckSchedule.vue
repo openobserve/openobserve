@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import type { BrowserCheck, BrowserCheckSchedule } from "@/types/synthetics";
+import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -98,6 +99,34 @@ const cron = computed({
   get: () => props.check.schedule.cron ?? "",
   set: (v: string) => updateSchedule({ cron: v }),
 });
+
+const cronError = ref("");
+
+watch(
+  () => [props.check.schedule.cron, props.check.schedule.type] as const,
+  ([cronVal, type]) => {
+    if (type !== "cron") {
+      cronError.value = "";
+      return;
+    }
+    const trimmed = (cronVal ?? "").trim();
+    if (!trimmed) {
+      cronError.value = t("reports.validation.invalidCron");
+      return;
+    }
+    // Single-space split matches the 6-field check in CreateReport.schema.ts
+    if (trimmed.split(" ").length !== 6) {
+      cronError.value = t("reports.validation.cronSixFields");
+      return;
+    }
+    try {
+      getCronIntervalDifferenceInSeconds(trimmed);
+      cronError.value = "";
+    } catch {
+      cronError.value = t("reports.validation.invalidCron");
+    }
+  },
+);
 
 function buildTimezoneOptions(): { label: string; value: string }[] {
   try {
@@ -254,13 +283,33 @@ const startTime = computed({
 
       <!-- Cron inputs -->
       <div v-if="check.schedule.type === 'cron'" class="flex flex-wrap items-start gap-3">
-        <OInput
-          v-model="cron"
-          :label="t('synthetics.scheduleAlert.cronExpression')"
-          placeholder="*/5 * * * *"
-          class="w-83!"
-          data-test="synthetics-check-schedule-cron-input"
-        />
+        <div>
+          <div class="text-text-secondary mb-1 font-bold">
+            {{ t("synthetics.scheduleAlert.cronExpression") }}
+            <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
+              <OTooltip side="right" align="center">
+                <template #content>
+                  <span style="font-size: var(--text-sm); white-space: pre-line">
+                    {{ t("reports.cronFormatTooltip") }}
+                  </span>
+                </template>
+              </OTooltip>
+            </OIcon>
+          </div>
+          <OInput
+            v-model="cron"
+            placeholder="0 */5 * * * *"
+            class="w-83!"
+            data-test="synthetics-check-schedule-cron-input"
+          />
+          <p
+            v-if="cronError"
+            class="text-status-error-text mt-1 text-xs"
+            data-test="synthetics-check-schedule-cron-error"
+          >
+            {{ cronError }}
+          </p>
+        </div>
         <OSelect
           v-model="timezone"
           :label="t('synthetics.scheduleAlert.timezone')"

@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Adicionar uma etapa",
       "search": "Pesquisar etapas…",
       "noMatch": "Nenhuma etapa correspondente"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Vinculado a {ok} alerta(s), {failed} falhou",
       "linkError": "Não foi possível vincular os alertas."
     },
-    "canvasEmpty": "Adicione um gatilho para começar a construir seu fluxo de trabalho",
     "node": {
       "kindTrigger": "Gatilho",
       "kindLogic": "Lógica",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Ainda não configurado",
       "configComingSoon": "A configuração de {node} virá em uma etapa posterior",
       "addNext": "Adicionar próxima etapa",
-      "stepDialogTitle": "Adicionar uma etapa",
-      "paletteTitle": "Nós",
       "sectionTransform": "Transformar",
       "sectionDestination": "Destino",
       "paletteCollapse": "Recolher",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Excluir Node",
     "deleteNodeLlmEvalConfirm": "Tem certeza de que deseja excluir esse nó de avaliação do LLM?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arraste e solte os nós aqui",
     "promqlOnlyForMetrics": "O ProMQL só está disponível para o tipo de fluxo de métricas",
     "invalidCronExpression": "Expressão cron inválida",
     "cronRequired": "A expressão cron é obrigatória",

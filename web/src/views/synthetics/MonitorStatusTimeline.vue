@@ -102,36 +102,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <span
                         class="h-2 w-2 shrink-0 rounded-full"
                         :class="{
-                          'bg-badge-success-solid-bg': group.status === 'all-pass',
-                          'bg-color-badge-orange-solid-bg': group.status === 'mixed',
-                          'bg-color-badge-error-solid-bg': group.status === 'all-fail',
+                          'bg-[var(--color-badge-success-solid-bg)]': group.status === 'all-pass',
+                          'bg-[var(--color-badge-warning-solid-bg)]':
+                            group.status === 'mixed' || group.status === 'all-warning',
+                          'bg-[var(--color-badge-error-solid-bg)]': group.status === 'all-fail',
                         }"
                       />
                       <span class="text-text-secondary text-xs font-semibold">
                         {{ group.location }}
                       </span>
                     </div>
-                    <div
-                      v-for="(exec, eIdx) in group.executions"
-                      :key="eIdx"
-                      class="flex items-center gap-1.5 py-0.5 pl-4"
-                    >
-                      <span
-                        class="h-2 w-2 shrink-0 rounded-full"
-                        :class="
-                          exec.status === 'pass'
-                            ? 'bg-[var(--color-badge-success-solid-bg)]'
-                            : 'bg-[var(--color-badge-error-solid-bg)]'
-                        "
-                      />
-                      <img
-                        v-if="browserIconUrl(exec.browserEngine)"
-                        :src="browserIconUrl(exec.browserEngine)"
-                        class="h-3.5 w-3.5"
-                        alt=""
-                      />
-                      <span class="text-text-secondary text-xs">{{ exec.device }}</span>
-                    </div>
+                    <!--
+                      Per-execution detail rows: only rendered for browser monitors
+                      where each execution carries a browser engine + device.
+                      Non-browser monitors only have locations — the group header
+                      above (dot + location name) is the full summary.
+                    -->
+                    <template v-if="isBrowser">
+                      <div
+                        v-for="(exec, eIdx) in group.executions"
+                        :key="eIdx"
+                        class="flex items-center gap-1.5 py-0.5 pl-4"
+                      >
+                        <span
+                          class="h-2 w-2 shrink-0 rounded-full"
+                          :class="{
+                            'bg-[var(--color-badge-success-solid-bg)]': exec.status === 'pass',
+                            'bg-[var(--color-badge-warning-solid-bg)]': exec.status === 'warning',
+                            'bg-[var(--color-badge-error-solid-bg)]':
+                              exec.status === 'fail' || exec.status === 'error',
+                          }"
+                        />
+                        <img
+                          v-if="browserIconUrl(exec.browserEngine)"
+                          :src="browserIconUrl(exec.browserEngine)"
+                          class="h-3.5 w-3.5"
+                          alt=""
+                        />
+                        <span class="text-text-secondary text-xs">{{ exec.device }}</span>
+                      </div>
+                    </template>
                   </template>
                 </div>
               </template>
@@ -185,13 +195,13 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "fail";
+  status: "pass" | "warning" | "fail" | "error";
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   color: string;
   title: string;
   /** Epoch ms of the first execution in this logical run. */
@@ -206,8 +216,11 @@ interface Props {
   mixedCount: string;
   startLabel: string;
   endLabel: string;
+  isBrowser?: boolean;
 }
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  isBrowser: true,
+});
 
 const browserIconUrl = (name: string): string => {
   switch (name) {
@@ -224,12 +237,12 @@ const browserIconUrl = (name: string): string => {
 
 interface ExecGroup {
   location: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   executions: TimelineExecution[];
 }
 
 function passCountLocal(execs: TimelineExecution[]): number {
-  return execs.filter((e) => e.status === "pass").length;
+  return execs.filter((e) => e.status === "pass" || e.status === "warning").length;
 }
 function failCountLocal(execs: TimelineExecution[]): number {
   return execs.filter((e) => e.status === "fail").length;
@@ -243,9 +256,16 @@ function groupedByLocation(execs: TimelineExecution[]): ExecGroup[] {
     else map.set(exec.location, [exec]);
   }
   return Array.from(map, ([location, executions]) => {
-    const allPass = executions.every((e) => e.status === "pass");
-    const allFail = executions.every((e) => e.status === "fail");
-    const status = allPass ? "all-pass" : allFail ? "all-fail" : "mixed";
+    const allPass = executions.every((e) => e.status === "pass" || e.status === "warning");
+    const allFail = executions.every((e) => e.status === "fail" || e.status === "error");
+    const allWarning = executions.every((e) => e.status === "warning");
+    const status = allPass
+      ? allWarning
+        ? "all-warning"
+        : "all-pass"
+      : allFail
+        ? "all-fail"
+        : "mixed";
     return { location, status, executions };
   });
 }

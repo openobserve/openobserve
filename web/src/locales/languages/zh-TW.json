@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "新增步驟",
       "search": "搜尋步驟…",
       "noMatch": "沒有符合的步驟"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "已連結至 {ok} 個警示，{failed} 個失敗",
       "linkError": "無法連結警示。"
     },
-    "canvasEmpty": "新增觸發器以開始建置工作流程",
     "node": {
       "kindTrigger": "觸發器",
       "kindLogic": "邏輯",
@@ -2229,8 +2227,6 @@
       "notConfigured": "尚未設定",
       "configComingSoon": "{node} 設定將在後續步驟中出現",
       "addNext": "新增下一步",
-      "stepDialogTitle": "新增一個步驟",
-      "paletteTitle": "節點",
       "sectionTransform": "轉換",
       "sectionDestination": "目的地",
       "paletteCollapse": "折疊",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "刪除節點",
     "deleteNodeLlmEvalConfirm": "確定要刪除此 LLM 評估節點嗎？",
     "cancel": "取消",
-    "dragDropNodesHere": "將節點拖曳至此處",
     "promqlOnlyForMetrics": "PromQL 僅適用於指標串流類型",
     "invalidCronExpression": "無效的 cron 運算式",
     "cronRequired": "Cron 運算式為必填項",

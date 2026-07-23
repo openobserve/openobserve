@@ -1090,7 +1090,7 @@ export default defineComponent({
     const correlationDashboardProps = ref<any>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
-    const detailTableInitialTab = ref<string>("json");
+    const detailTableInitialTab = ref<string>("table");
     const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
@@ -1361,7 +1361,7 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-      detailTableInitialTab.value = "json"; // Reset to default tab
+      detailTableInitialTab.value = "table"; // Reset to default tab
 
       // Prepare correlation context (but don't open panel automatically)
       const logData = searchObj.data.queryResults?.hits?.[index];

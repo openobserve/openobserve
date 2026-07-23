@@ -151,11 +151,40 @@ const mountEditor = () =>
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 const wf = () => workflowObj.currentSelectedWorkflow;
+
+// The editor no longer pre-places a trigger — the canvas starts empty and the
+// start node opens the trigger picker. Tests that need an existing trigger to
+// build on place one directly, which is what committing the picker produces.
+const placeTrigger = (id = "t1") => {
+  wf().nodes = [
+    {
+      id,
+      type: "input",
+      position: { x: 320, y: 80 },
+      data: {
+        label: id,
+        node_type: "workflow_trigger",
+        trigger_kind: "alert_fired",
+        alert_ids: [],
+      },
+    },
+  ];
+  return id;
+};
 const dialogByTitle = (w: any, title: string) =>
   w.findAllComponents(ConfirmDialogStub).find((d: any) => d.props("title") === title)!;
 const saveTestDialog = (w: any) => dialogByTitle(w, t("workflow.test.saveToTestTitle"));
 const deleteDialog = (w: any) => dialogByTitle(w, t("workflow.deleteNodeTitle"));
 const palette = (w: any) => w.findComponent({ name: "NodePalette" });
+
+// The rail starts COLLAPSED and `resetWorkflowData()` (run on editor mount)
+// re-closes it, so it must be opened AFTER bootstrapping — same as the user
+// clicking the toggle in the canvas control stack.
+const openRail = async (w: any) => {
+  workflowObj.showNodePalette = true;
+  await nextTick();
+  return w;
+};
 const linkDialog = (w: any) => w.findComponent({ name: "WorkflowLinkAlertsDialog" });
 
 const clickSave = async (w: any) => {
@@ -213,27 +242,57 @@ describe("WorkflowEditor", () => {
   // ── create bootstrap ───────────────────────────────────────────────────────
 
   describe("create mode", () => {
-    it("seeds an Alert Trigger node and opens its config drawer", async () => {
+    it("starts on an EMPTY canvas (the start node opens the trigger picker)", async () => {
       wrapper = mountEditor();
       await flushPromises();
 
+      expect(wf().nodes).toHaveLength(0);
+      expect(workflowObj.isEditWorkflow).toBe(false);
+      // Nothing is staged, so no drawer pops open on arrival.
+      expect(workflowObj.dialog.show).toBe(false);
+    });
+
+    it("adds the picked trigger to the canvas and opens its panel", async () => {
+      wrapper = mountEditor();
+      await flushPromises();
+
+      workflowObj.stepPicker = {
+        show: true,
+        source: "",
+        handle: "out",
+        mode: "trigger",
+        position: { x: 100, y: 40 },
+        anchor: { x: 10, y: 10 },
+      };
+      await nextTick();
+      wrapper
+        .findComponent({ name: "StepPickerDialog" })
+        .vm.$emit("pick", { key: "workflow_trigger", trigger_kind: "alert_fired" });
+      await nextTick();
+
+      // Committed straight onto the canvas — the trigger panel is read-only and
+      // has no Save, so a staged node could never be committed.
       expect(wf().nodes).toHaveLength(1);
       expect(wf().nodes[0]).toMatchObject({
         type: "input",
-        position: { x: 320, y: 80 },
+        position: { x: 100, y: 40 },
         data: { node_type: "workflow_trigger", trigger_kind: "alert_fired", alert_ids: [] },
       });
-      expect(workflowObj.isEditWorkflow).toBe(false);
-      // trigger drawer auto-opens on create
+      // ...and its panel opens in EDIT mode, so closing it keeps the node.
+      expect(workflowObj.isEditNode).toBe(true);
       expect(workflowObj.dialog.show).toBe(true);
-      expect(wrapper.find('[data-test="WorkflowNodeDrawer"]').exists()).toBe(true);
+      expect(workflowObj.stepPicker.show).toBe(false);
     });
 
-    it("honours the ?trigger query for the seeded trigger kind", async () => {
-      mockRouter.currentRoute.value = { query: { trigger: "schedule" } };
+    it("never auto-opens the config drawer, even with a ?trigger query", async () => {
+      // The list used to pass ?trigger=alert_fired on every create, which
+      // staged a trigger and popped its drawer before the user chose anything.
+      mockRouter.currentRoute.value = { query: { trigger: "alert_fired" } };
       wrapper = mountEditor();
       await flushPromises();
-      expect(wf().nodes[0].data.trigger_kind).toBe("schedule");
+      expect(wf().nodes).toHaveLength(0);
+      expect(workflowObj.dialog.show).toBe(false);
+      expect(workflowObj.currentSelectedNodeData).toBeNull();
     });
 
     it("does not fetch anything on create", async () => {
@@ -380,6 +439,7 @@ describe("WorkflowEditor", () => {
     it("groups the addable node types under Transform / Destination headers", async () => {
       wrapper = mountEditor();
       await flushPromises();
+      await openRail(wrapper);
 
       const items = palette(wrapper).props("items") as any[];
       expect(items.map((i) => i.label)).toEqual([
@@ -400,7 +460,8 @@ describe("WorkflowEditor", () => {
     it("appends a node to the end of the chain on palette click", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      const triggerId = wf().nodes[0].id;
+      await openRail(wrapper);
+      const triggerId = placeTrigger();
 
       palette(wrapper).props("onItemClick")({ subtype: "condition" });
       await nextTick();
@@ -416,6 +477,7 @@ describe("WorkflowEditor", () => {
     it("records the dragged node type on palette drag start", async () => {
       wrapper = mountEditor();
       await flushPromises();
+      await openRail(wrapper);
 
       const event: any = { dataTransfer: { setData: vi.fn(), effectAllowed: "" } };
       palette(wrapper).props("onDragStart")(event, { subtype: "function" });
@@ -437,7 +499,15 @@ describe("WorkflowEditor", () => {
     it("lists every addable step type", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      workflowObj.stepPicker = { show: true, source: wf().nodes[0].id, handle: "out" };
+      const src = placeTrigger();
+      workflowObj.stepPicker = {
+        show: true,
+        source: src,
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      };
       await nextTick();
 
       const items = wrapper.findComponent({ name: "StepPickerDialog" }).props("items") as any[];
@@ -452,8 +522,15 @@ describe("WorkflowEditor", () => {
     it("stages the picked step after the source node and closes the picker", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      const triggerId = wf().nodes[0].id;
-      workflowObj.stepPicker = { show: true, source: triggerId, handle: "out" };
+      const triggerId = placeTrigger();
+      workflowObj.stepPicker = {
+        show: true,
+        source: triggerId,
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      };
       await nextTick();
 
       wrapper.findComponent({ name: "StepPickerDialog" }).vm.$emit("pick", { key: "function" });
@@ -470,13 +547,27 @@ describe("WorkflowEditor", () => {
     it("closes the picker on close", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      workflowObj.stepPicker = { show: true, source: "x", handle: "out" };
+      workflowObj.stepPicker = {
+        show: true,
+        source: "x",
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      };
       await nextTick();
 
       wrapper.findComponent({ name: "StepPickerDialog" }).vm.$emit("close");
       await nextTick();
 
-      expect(workflowObj.stepPicker).toEqual({ show: false, source: "", handle: "out" });
+      expect(workflowObj.stepPicker).toEqual({
+        show: false,
+        source: "",
+        handle: "out",
+        mode: "next",
+        position: null,
+        anchor: null,
+      });
     });
   });
 
@@ -529,6 +620,7 @@ describe("WorkflowEditor", () => {
     it("requires at least one step after the trigger", async () => {
       wrapper = mountEditor();
       await flushPromises();
+      placeTrigger();
       wf().name = "wf";
 
       await clickSave(wrapper);
@@ -543,6 +635,7 @@ describe("WorkflowEditor", () => {
     it("blocks the save when a node is left unconnected", async () => {
       wrapper = mountEditor();
       await flushPromises();
+      placeTrigger();
       wf().name = "wf";
       wf().nodes = [
         ...wf().nodes,
@@ -591,6 +684,7 @@ describe("WorkflowEditor", () => {
     it("treats a workflow with no edges array as fully unconnected", async () => {
       wrapper = mountEditor();
       await flushPromises();
+      placeTrigger();
       wf().name = "wf";
       wf().nodes = [
         ...wf().nodes,
@@ -610,7 +704,7 @@ describe("WorkflowEditor", () => {
     it("passes validation once every non-trigger node has an incoming edge", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      const triggerId = wf().nodes[0].id;
+      const triggerId = placeTrigger();
       wf().name = "wf";
       wf().nodes = [
         ...wf().nodes,
@@ -628,7 +722,7 @@ describe("WorkflowEditor", () => {
 
   describe("create (save)", () => {
     const seedValidCreate = () => {
-      const triggerId = wf().nodes[0].id;
+      const triggerId = placeTrigger();
       wf().name = "  my workflow  ";
       wf().description = "desc";
       wf().nodes = [
@@ -709,7 +803,7 @@ describe("WorkflowEditor", () => {
     it("defaults io_type, position and the trigger kind when they are missing", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      const triggerId = wf().nodes[0].id;
+      const triggerId = placeTrigger();
       wf().name = "wf";
       wf().nodes = [
         // no `type`, no `position`, no trigger_kind
@@ -729,7 +823,7 @@ describe("WorkflowEditor", () => {
     it("serializes a node that carries no data or meta at all", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      const triggerId = wf().nodes[0].id;
+      const triggerId = placeTrigger();
       wf().name = "wf";
       wf().nodes = [...wf().nodes, { id: "bare" }];
       wf().edges = [{ id: "e1", source: triggerId, target: "bare" }];
@@ -981,6 +1075,7 @@ describe("WorkflowEditor", () => {
     it("resets the shared state on unmount", async () => {
       wrapper = mountEditor();
       await flushPromises();
+      placeTrigger();
       expect(wf().nodes).toHaveLength(1);
 
       wrapper.unmount();
@@ -1164,7 +1259,7 @@ describe("WorkflowEditor", () => {
 
   describe("node delete confirmation", () => {
     const seedTwoNodes = () => {
-      const triggerId = wf().nodes[0].id;
+      const triggerId = placeTrigger();
       wf().nodes = [
         ...wf().nodes,
         { id: "d1", type: "output", position: { x: 0, y: 0 }, data: { node_type: "destination" } },

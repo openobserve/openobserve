@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            and must be copied verbatim, so translators should leave them alone. -->
       <template #guidelines>
         <div
-          class="bg-banner-warning-bg text-banner-warning-text rounded-default mt-4 flex w-full flex-col gap-2 p-3"
+          class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default mt-4 flex w-full flex-col gap-2 border p-3"
           data-test="workflow-condition-note"
         >
           <div class="text-sm font-bold">

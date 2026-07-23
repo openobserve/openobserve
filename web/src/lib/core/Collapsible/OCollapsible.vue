@@ -87,47 +87,52 @@ watch(
         'transition-colors duration-150 outline-none',
         'hover:bg-collapsible-trigger-hover-bg active:bg-collapsible-trigger-active-bg',
         'focus-visible:ring-collapsible-trigger-focus-ring focus-visible:ring-2 focus-visible:ring-offset-1',
-        variant === 'sidebar' ? 'min-h-9 rounded-none px-3 py-0' : 'rounded-default px-2 py-2',
+        variant === 'config'
+          ? [
+              'group min-h-9 rounded-none px-3 py-0',
+              // z-20 keeps the sticky header above section content while
+              // scrolling — OToggleGroup items are positioned at z-10, so a
+              // z-10 header would tie and let the toggle bleed over it.
+              'bg-surface-panel sticky top-11 z-20',
+              'border-l-2 border-l-transparent',
+              'data-[state=open]:bg-collapsible-trigger-open-bg',
+              'data-[state=open]:border-l-collapsible-open-accent',
+            ]
+          : variant === 'sidebar'
+            ? 'min-h-9 rounded-none px-3 py-0'
+            : 'rounded-default px-2 py-2',
         triggerClass,
       ]"
     >
-      <!-- Sidebar: left-side chevron (always before slot or label) -->
-      <OIcon
-        v-if="variant === 'sidebar'"
-        name="chevron-right"
-        size="md"
-        class="text-collapsible-icon transition-transform duration-200"
-        :class="isOpen ? 'rotate-90' : 'rotate-0'"
-      />
-
-      <!-- Custom trigger slot - renders after sidebar chevron if present -->
-      <template v-if="hasCustomTrigger">
-        <slot name="trigger" :open="isOpen" />
-      </template>
-
-      <!-- Default trigger ΓÇö label / icon / caption / chevron -->
-      <template v-else>
-        <!-- OIcon registry name (kebab-case SVG icon) -->
+      <!--
+        Config variant (dashboard panel config only): one consistent frame for
+        every section header — [section icon] [content] [right chevron] — with
+        an open-state accent and a sticky header. Sections that supply a custom
+        #trigger (e.g. an info tooltip) get the same icon+chevron frame.
+      -->
+      <template v-if="variant === 'config'">
         <OIcon
           v-if="icon && isOIcon"
           :name="icon as any"
-          size="md"
-          class="text-collapsible-icon shrink-0"
+          size="sm"
+          class="text-collapsible-icon group-data-[state=open]:text-collapsible-icon-open shrink-0"
         />
-        <!-- Fallback: Material icon font glyph (legacy underscore names) -->
         <span
           v-else-if="icon"
-          class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0"
+          class="material-icons-outlined text-icon-sm text-collapsible-icon group-data-[state=open]:text-collapsible-icon-open shrink-0"
           aria-hidden="true"
           >{{ icon }}</span
         >
 
-        <span class="flex min-w-0 flex-1 flex-col">
+        <span
+          v-if="hasCustomTrigger"
+          class="group-data-[state=open]:text-collapsible-icon-open flex min-w-0 flex-1 items-center gap-2"
+        >
+          <slot name="trigger" :open="isOpen" />
+        </span>
+        <span v-else class="flex min-w-0 flex-1 flex-col">
           <span
-            :class="[
-              'text-collapsible-label truncate font-medium',
-              variant === 'sidebar' ? 'text-compact' : 'text-sm',
-            ]"
+            class="text-collapsible-label text-compact group-data-[state=open]:text-collapsible-icon-open truncate font-medium"
             >{{ label }}</span
           >
           <span v-if="caption" class="text-collapsible-caption truncate text-xs">{{
@@ -135,19 +140,77 @@ watch(
           }}</span>
         </span>
 
-        <!-- Right chevron — default variant only -->
         <OIcon
-          v-if="variant === 'default'"
-          name="expand-more"
+          name="chevron-right"
+          size="sm"
+          class="text-collapsible-icon group-data-[state=open]:text-collapsible-icon-open shrink-0 transition-transform duration-200"
+          :class="isOpen ? 'rotate-90' : 'rotate-0'"
+        />
+      </template>
+
+      <!-- default / sidebar variants -->
+      <template v-else>
+        <!-- Sidebar: left-side chevron (always before slot or label) -->
+        <OIcon
+          v-if="variant === 'sidebar'"
+          name="chevron-right"
           size="md"
           class="text-collapsible-icon transition-transform duration-200"
-          :class="isOpen ? 'rotate-180' : 'rotate-0'"
+          :class="isOpen ? 'rotate-90' : 'rotate-0'"
         />
+
+        <!-- Custom trigger slot -->
+        <template v-if="hasCustomTrigger">
+          <slot name="trigger" :open="isOpen" />
+        </template>
+
+        <!-- Default trigger — icon / label / caption / chevron -->
+        <template v-else>
+          <OIcon
+            v-if="icon && isOIcon"
+            :name="icon as any"
+            size="md"
+            class="text-collapsible-icon shrink-0"
+          />
+          <span
+            v-else-if="icon"
+            class="material-icons-outlined text-icon-md text-collapsible-icon shrink-0"
+            aria-hidden="true"
+            >{{ icon }}</span
+          >
+
+          <span class="flex min-w-0 flex-1 flex-col">
+            <span
+              :class="[
+                'text-collapsible-label truncate font-medium',
+                variant === 'sidebar' ? 'text-compact' : 'text-sm',
+              ]"
+              >{{ label }}</span
+            >
+            <span v-if="caption" class="text-collapsible-caption truncate text-xs">{{
+              caption
+            }}</span>
+          </span>
+
+          <!-- Right chevron — default variant only -->
+          <OIcon
+            v-if="variant === 'default'"
+            name="expand-more"
+            size="md"
+            class="text-collapsible-icon transition-transform duration-200"
+            :class="isOpen ? 'rotate-180' : 'rotate-0'"
+          />
+        </template>
       </template>
     </CollapsibleTrigger>
 
-    <!-- Animated content -->
-    <CollapsibleContent class="o-collapsible-content overflow-hidden">
+    <!-- Animated content. data-test lets e2e wait for the open/close height
+         animation to finish before interacting with section content (a repeated
+         component-level hook, like o-dialog-primary-btn). -->
+    <CollapsibleContent
+      class="o-collapsible-content overflow-hidden"
+      data-test="o-collapsible-content"
+    >
       <slot />
     </CollapsibleContent>
   </CollapsibleRoot>

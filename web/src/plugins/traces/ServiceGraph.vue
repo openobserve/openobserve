@@ -183,13 +183,9 @@
             </div>
           </div>
         </ODropdown>
-        <OSeparator
-          vertical
-          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
-          class="mx-1 self-stretch"
-        />
+        <OSeparator vertical v-if="resolvedVizType === 'graph'" class="mx-1 self-stretch" />
         <div
-          v-if="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+          v-if="resolvedVizType === 'graph'"
           data-test="sg-node-size-info"
           class="flex min-w-0 flex-row items-center gap-2"
         >
@@ -356,7 +352,16 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from "vue";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  onBeforeUnmount,
+  computed,
+  watch,
+  nextTick,
+  type PropType,
+} from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -444,6 +449,21 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Optional external control of visualization + layout type. When set (the
+    // Agent Graph page owns its own Tree/Graph + layout selection), these win
+    // over the shared traces store `searchObj.meta.serviceGraph*Type`. This
+    // keeps the Agent Graph fully decoupled from the Traces Service Graph tab:
+    // its type no longer bleeds in from that tab, and a remount can't paint the
+    // stale shared state. Undefined = fall back to the shared store (the Traces
+    // Service Graph tab, which is driven by the SearchBar toolbar).
+    vizType: {
+      type: String as PropType<"tree" | "graph" | undefined>,
+      default: undefined,
+    },
+    layoutType: {
+      type: String,
+      default: undefined,
+    },
   },
   emits: ["view-traces", "request:stream-change", "jump-to-stream-data"],
   setup(props, { emit, expose }) {
@@ -453,6 +473,19 @@ export default defineComponent({
     const { t } = useI18n();
     const { getStreams } = useStreams();
     const { searchObj } = useTraces();
+
+    // Resolved visualization + layout type. A parent that owns its own type
+    // selection (the Agent Graph page) passes `vizType`/`layoutType` props;
+    // those win. Otherwise fall back to the shared traces store, which the
+    // Traces Service Graph tab drives via the SearchBar toolbar. All reads below
+    // go through these — never `searchObj.meta.serviceGraph*Type` directly — so
+    // the two surfaces stay decoupled.
+    const resolvedVizType = computed<"tree" | "graph">(
+      () => props.vizType ?? searchObj.meta.serviceGraphVisualizationType,
+    );
+    const resolvedLayoutType = computed<string>(
+      () => props.layoutType ?? searchObj.meta.serviceGraphLayoutType,
+    );
 
     const loading = ref(false);
     // Stamped when a graph load settles — lets a parent page show a
@@ -738,8 +771,8 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const vizType = searchObj.meta.serviceGraphVisualizationType;
-      const layoutType = searchObj.meta.serviceGraphLayoutType;
+      const vizType = resolvedVizType.value;
+      const layoutType = resolvedLayoutType.value;
 
       // Don't use cache if filters are active (search filter)
       const hasActiveFilters = searchFilter.value?.trim();
@@ -914,7 +947,7 @@ export default defineComponent({
 
       // Tree view: emphasis.focus:'relative' in the series config handles dimming natively.
       // No manual dispatch needed — ECharts triggers it on mouseover automatically.
-      if (searchObj.meta.serviceGraphVisualizationType !== "graph") return;
+      if (resolvedVizType.value !== "graph") return;
 
       const rawEdges: any[] = filteredGraphData.value.edges || [];
 
@@ -1459,7 +1492,7 @@ export default defineComponent({
     // but the series type swaps via setOption. Re-register tooltip handlers so both
     // ZRender (tree) and ECharts edge events (graph) work correctly after the swap.
     watch(
-      () => searchObj.meta.serviceGraphVisualizationType,
+      () => resolvedVizType.value,
       async () => {
         if (edgeTooltipCleanup) {
           edgeTooltipCleanup();
@@ -1648,9 +1681,10 @@ export default defineComponent({
       );
     };
 
-    // Watch composable viz/layout state changes from SearchBar toolbar
+    // Watch resolved viz/layout state changes (SearchBar toolbar for the Traces
+    // Service Graph tab, or the Agent Graph page's own selector via props).
     watch(
-      () => searchObj.meta.serviceGraphVisualizationType,
+      () => resolvedVizType.value,
       () => {
         // Only clear the cache — do NOT bump chartKey (that would recreate the
         // ChartRenderer and replay the tree expand animation). The clean series
@@ -1662,7 +1696,7 @@ export default defineComponent({
     );
 
     watch(
-      () => searchObj.meta.serviceGraphLayoutType,
+      () => resolvedLayoutType.value,
       () => {
         chartKey.value++;
       },
@@ -1799,6 +1833,7 @@ export default defineComponent({
       chartRendererRef,
       graphContainerRef,
       searchObj,
+      resolvedVizType,
       loadServiceGraph,
       formatNumber,
       applyFilters,

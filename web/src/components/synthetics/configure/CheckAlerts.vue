@@ -126,7 +126,7 @@ const silenceMinutes = computed({
       <!-- ── Cooldown Period ────────────────────────────────────────────── -->
       <div class="flex items-center gap-2">
         <label class="text-text-body flex w-32 items-center text-sm font-medium">
-          {{ t("synthetics.scheduleAlert.cooldownPeriod") }} *
+          {{ t("synthetics.scheduleAlert.cooldownPeriod") }}
         </label>
         <div class="flex items-center">
           <div class="w-21.75">

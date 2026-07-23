@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="selectedNodeType == 'output'"
-                class="note-message bg-banner-warning-bg text-banner-warning-text rounded-default flex w-full flex-col gap-2 p-3"
+                class="note-message bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default flex w-full flex-col gap-2 border p-3"
               >
                 <div class="text-banner-warning-text text-sm">Guidelines:</div>
                 <div class="text-banner-warning-text flex flex-col gap-1 text-sm">

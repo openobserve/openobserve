@@ -1,9 +1,12 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
   <OPageLayout
-    :title="detail?.name || t('synthetics.privateLocations.detail.title')"
+    :title="detail?.label || t('synthetics.privateLocations.detail.title')"
     icon="location-on"
-    :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetic' } }"
+    :back="{
+      label: t('synthetics.privateLocations.detail.back'),
+      to: { name: 'synthetics', query: { section: 'private' } },
+    }"
     bleed
   >
     <template #title-trail>
@@ -18,7 +21,7 @@
         icon-left="content-copy"
         :disabled="!detail"
         data-test="synthetics-private-location-detail-setup-btn"
-        @click="openSetup"
+        @click="openSetup()"
       >
         {{ t("synthetics.privateLocations.copySetupCmd") }}
       </OButton>
@@ -120,6 +123,18 @@
             <template #cell-lastSeen="{ row }">
               {{ formatTimeAgoUs((row as any).last_seen_at) }}
             </template>
+            <template #cell-actions="{ row }">
+              <div class="flex items-center gap-1" @click.stop>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="content-copy"
+                  :title="t('synthetics.privateLocations.detail.recoverAgent')"
+                  :data-test="`synthetics-private-location-agent-recover-btn-${(row as any).id}`"
+                  @click="openSetup((row as any).name)"
+                />
+              </div>
+            </template>
           </OTable>
         </div>
 
@@ -172,8 +187,9 @@
     <AgentSetupDrawer
       v-model:open="showSetup"
       :install="detail?.install"
-      :location-name="detail?.name"
+      :location-name="detail?.label"
       :location-id="detail?.id"
+      :agent-name="setupAgentName"
       :token="agentSetup?.token"
       :org="agentSetup?.org"
       :o2-url="agentSetup?.o2_url"
@@ -209,8 +225,18 @@ const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
 const showSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const setupAgentName = ref<string | null>(null);
 
-async function openSetup() {
+/** Opens the setup drawer. With an explicit agentName (from a specific
+ *  Agents-table row's "Recover" action), the drawer pre-fills --agent-name
+ *  so recovering a known — possibly offline — agent is a straight
+ *  copy-paste. Without one (the page-level button), default to this
+ *  location's sole agent when there's exactly one — the common case, and
+ *  restarting it should keep the same identity. Ambiguous with 0 or 2+
+ *  agents, so leave it blank (auto-generate) there. */
+async function openSetup(agentName?: string) {
+  const agents = detail.value?.agents ?? [];
+  setupAgentName.value = agentName ?? (agents.length === 1 ? agents[0].name : null);
   showSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -290,6 +316,15 @@ const agentColumns = computed<OTableColumnDef[]>(() => [
     size: 110,
     minSize: 90,
     sortable: true,
+  },
+  {
+    id: "actions",
+    header: "",
+    accessorKey: "id",
+    size: 60,
+    minSize: 60,
+    sortable: false,
+    isAction: true,
   },
 ]);
 

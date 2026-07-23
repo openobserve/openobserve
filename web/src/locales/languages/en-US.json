@@ -376,6 +376,12 @@
     "datetimeMessage": "* You can choose multiple dates",
     "datetimeRelative": "RELATIVE",
     "datetimeAbsolute": "ABSOLUTE",
+    "dateRange": "Date range",
+    "copyRange": "Copy time range to clipboard",
+    "pasteRange": "Paste time range",
+    "dateRangeCopied": "Date range copied",
+    "dateRangePasted": "Date range pasted",
+    "dateRangePasteError": "Could not parse date range",
     "relative": "Relative",
     "absolute": "Absolute",
     "move": "Move",
@@ -512,7 +518,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Add a Step",
       "search": "Search Steps…",
       "noMatch": "No matching steps"
     },
@@ -2066,7 +2071,7 @@
   "workflow": {
     "header": "Workflows",
     "subtitle": "Automate Actions With Triggers, Logic, And Destinations",
-    "create": "New Workflow",
+    "create": "New workflow",
     "createTitle": "Create Workflow",
     "createConfirm": "Create",
     "createSuccess": "Workflow Created Successfully",
@@ -2217,7 +2222,7 @@
       "linkPartial": "Linked To {ok} Alert(s), {failed} Failed",
       "linkError": "Unable To Link Alerts."
     },
-    "canvasEmpty": "Add A Trigger To Start Building Your Workflow",
+    "chooseTrigger": "Choose a Trigger",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logic",
@@ -2229,8 +2234,6 @@
       "notConfigured": "Not Configured Yet",
       "configComingSoon": "{node} Configuration Is Coming In A Later Step",
       "addNext": "Add Next Step",
-      "stepDialogTitle": "Add a step",
-      "paletteTitle": "Nodes",
       "sectionTransform": "Transform",
       "sectionDestination": "Destination",
       "paletteCollapse": "Collapse",
@@ -2376,7 +2379,11 @@
     "deleteNodeTitle": "Delete Node",
     "deleteNodeLlmEvalConfirm": "Are you sure you want to delete this LLM evaluation node?",
     "cancel": "Cancel",
-    "dragDropNodesHere": "Drag and drop nodes here",
+    "collapseNodes": "Collapse Nodes",
+    "openNodes": "Open Nodes",
+    "chooseSource": "Choose a Source",
+    "sourceStreamDesc": "Process data in realtime as it is ingested into a stream",
+    "sourceQueryDesc": "Run a query on a schedule and process its results",
     "promqlOnlyForMetrics": "PromQL is only available for metrics stream type",
     "invalidCronExpression": "Invalid cron expression",
     "cronRequired": "Cron expression is required",
@@ -3325,6 +3332,8 @@
     "seriesName": "Series Name",
     "seriesValue": "Series Value",
     "axisValue": "Axis Value",
+    "expandAllSections": "Expand all sections",
+    "collapseAllSections": "Collapse all sections",
     "configSectionGeneral": "General",
     "configSectionPromqlTable": "PromQL Table Mode",
     "configSectionGeographic": "Geographic Configuration",
@@ -6352,6 +6361,7 @@
     "description": "Description",
     "cron": "Cron Job",
     "cronExpression": "Cron expression",
+    "cronFormatTooltip": "Pattern: * * * * * * means every second.\nFormat: [Second (optional) 0-59] [Minute 0-59] [Hour 0-23] [Day of Month 1-31, 'L'] [Month 1-12] [Day of Week 0-7 or '1L-7L', 0 and 7 for Sunday].\nUse '*' to represent any value, 'L' for the last day/weekday.\nExample: 0 0 12 * * ? - Triggers at 12:00 PM daily.",
     "timeRange": "Time Range",
     "frequency": "Frequency",
     "lastTriggeredAt": "Last Triggered At",
@@ -7728,7 +7738,11 @@
     "agentGraph": {
       "allAgents": "All agents",
       "stream": "Stream",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "No agents found",
+      "noAgentsDescription": "No agents were discovered in this time range. Try widening the time range, or check that your traces include gen_ai agent attributes.",
+      "agentCountSingular": "agent",
+      "agentCountPlural": "agents"
     },
     "kpi": {
       "totalCost": "Total Cost",
@@ -8981,7 +8995,9 @@
     "cellActions": {
       "copy": "Copy",
       "includeTerm": "Include Term",
-      "excludeTerm": "Exclude Term"
+      "excludeTerm": "Exclude Term",
+      "sendValueToAi": "Send Value to AI",
+      "sendRowToAi": "Send Row to AI"
     },
     "indexList": {
       "noMatchingFields": "No matching fields found",
@@ -9828,10 +9844,13 @@
       "tabSteps": "Steps",
       "timelineAllFailed": "All {count} failed",
       "timelineAllPassed": "All {count} passed",
+      "timelineAllWarning": "All {count} warning",
       "timelineMixed": "{passed} passed, {failed} failed of {total}",
       "timelineNow": "Now",
       "triggerManual": "Manual",
       "triggerSchedule": "Schedule",
+      "warning": "Warning",
+      "warningRuns": "Warning Runs",
       "window24h": "Last 24 hours",
       "window1h": "Last 1 hour",
       "windowDays": "Last {days} days",
@@ -10059,7 +10078,6 @@
         "step3Title": "Assign to checks",
         "step3Body": "Select this location when creating or editing any check. Checks will run from your own infrastructure.",
         "noToken": "Could not load the setup command — check your permissions and retry.",
-        "imagePlaceholderNote": "The agent image name is a placeholder until the published image is available.",
         "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Location name",
         "locationNamePlaceholder": "Corp HQ",
@@ -10067,7 +10085,6 @@
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
         "tabWindows": "Windows",
-        "windowsSoon": "Coming soon",
         "agentNameLabel": "Agent name (optional)",
         "agentNamePlaceholder": "auto-generated from hostname",
         "agentNameHint": "Leave blank to let the agent name itself from its hostname — useful when running multiple agents at one location."
@@ -10080,6 +10097,7 @@
         "agentsTitle": "Agents",
         "agentsSubtitle": "Agents self-register from your infrastructure and are read-only here.",
         "agentName": "Agent",
+        "recoverAgent": "Recover this agent — copy a setup command pre-filled with its name",
         "noAgents": "No agents have registered for this location yet.",
         "checksTitle": "Checks running from this location",
         "checkName": "Name",

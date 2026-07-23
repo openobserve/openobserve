@@ -19,27 +19,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Single Tab Row -->
     <div class="flex shrink-0 items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
-        <OTabs v-model="tab" align="left">
-          <OTab data-test="log-detail-json-tab" name="json" :label="t('common.json')" />
-          <OTab data-test="log-detail-table-tab" name="table" :label="t('common.table')" />
-          <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
+        <OTabs v-model="tab" align="left" reorderable @reorder="onTabReorder">
+          <!-- Correlation tabs are only present when service streams are enabled
+               and an enterprise license is active; see availableTabs. -->
           <OTab
-            data-test="correlated-logs-tab"
-            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-logs"
-            :label="t('correlation.correlatedLogs')"
-          />
-          <OTab
-            data-test="correlated-metrics-tab"
-            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-metrics"
-            :label="t('correlation.correlatedMetrics')"
-          />
-          <OTab
-            data-test="correlated-traces-tab"
-            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-traces"
-            :label="t('correlation.correlatedTraces')"
+            v-for="tabItem in tabOrder"
+            :key="tabItem.name"
+            :data-test="tabItem.dataTest"
+            :name="tabItem.name"
+            :label="tabItem.label"
           />
         </OTabs>
       </div>
@@ -312,7 +300,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-dimension-filters="true"
-            @close="tab = 'json'"
+            @close="tab = 'table'"
           />
           <!-- Loading/Empty state when no data -->
           <div v-else class="flex h-full items-center justify-center py-20">
@@ -354,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-dimension-filters="true"
-            @close="tab = 'json'"
+            @close="tab = 'table'"
           />
           <!-- Loading/Empty state when no data -->
           <div v-else class="flex h-full items-center justify-center py-20">
@@ -552,7 +540,7 @@ export default defineComponent({
     },
     initialTab: {
       type: String,
-      default: "json",
+      default: "table",
     },
   },
   methods: {
@@ -585,7 +573,7 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
-    const tab = ref(props.initialTab || "json");
+    const tab = ref(props.initialTab || "table");
     const selectedRelativeValue = ref<number>(10);
     const recordSizeOptions = ref<Array<{ label: string; value: number }>>([
       { label: "10", value: 10 },
@@ -696,6 +684,115 @@ export default defineComponent({
     const serviceStreamsEnabled = computed(() => {
       return store.state.zoConfig.service_streams_enabled !== false;
     });
+
+    // Tab bar is drag-to-reorder (same pattern as the home page): the list of
+    // tabs that *may* be shown is derived from config, while the user's chosen
+    // order lives in localStorage.
+    const LS_TAB_ORDER_KEY = "o2_log_detail_tab_order";
+
+    const availableTabs = computed(() => {
+      const tabs = [
+        {
+          name: "table",
+          label: t("common.table"),
+          dataTest: "log-detail-table-tab",
+        },
+        {
+          name: "json",
+          label: t("common.json"),
+          dataTest: "log-detail-json-tab",
+        },
+      ];
+      if (serviceStreamsEnabled.value && config.isEnterprise === "true") {
+        tabs.push(
+          {
+            name: "correlated-logs",
+            label: t("correlation.correlatedLogs"),
+            dataTest: "correlated-logs-tab",
+          },
+          {
+            name: "correlated-metrics",
+            label: t("correlation.correlatedMetrics"),
+            dataTest: "correlated-metrics-tab",
+          },
+          {
+            name: "correlated-traces",
+            label: t("correlation.correlatedTraces"),
+            dataTest: "correlated-traces-tab",
+          },
+        );
+      }
+      return tabs;
+    });
+
+    type DetailTab = { name: string; label: string; dataTest: string };
+
+    const loadTabOrder = (): DetailTab[] => {
+      try {
+        const saved = window.localStorage.getItem(LS_TAB_ORDER_KEY);
+        if (saved) {
+          const names: string[] = JSON.parse(saved);
+          const ordered = names
+            .map((name) => availableTabs.value.find((t) => t.name === name))
+            .filter(Boolean) as DetailTab[];
+          // Append any tab that is available but missing from the saved order.
+          availableTabs.value.forEach((t) => {
+            if (!ordered.find((o) => o.name === t.name)) ordered.push(t);
+          });
+          return ordered;
+        }
+      } catch {
+        /* ignore: fall back to the default tab order */
+      }
+      return [...availableTabs.value];
+    };
+
+    const tabOrder = ref<DetailTab[]>(loadTabOrder());
+
+    // Enterprise/service-stream config arrives asynchronously, so re-sync the
+    // order whenever the set of available tabs changes — keeping the user's
+    // order and appending anything new.
+    watch(
+      () => availableTabs.value.map((t) => t.name).join(","),
+      () => {
+        const merged: DetailTab[] = [];
+        tabOrder.value.forEach((t) => {
+          const match = availableTabs.value.find((a) => a.name === t.name);
+          if (match) merged.push(match);
+        });
+        availableTabs.value.forEach((a) => {
+          if (!merged.find((m) => m.name === a.name)) merged.push(a);
+        });
+        tabOrder.value = merged;
+      },
+    );
+
+    // OTabs reports the intended move (dragged name → target name + which side
+    // of the target); we apply it to our own list and persist it.
+    const onTabReorder = ({
+      from,
+      to,
+      before = true,
+    }: {
+      from: string | number;
+      to: string | number;
+      before?: boolean;
+    }) => {
+      if (from === to) return;
+      const order = [...tabOrder.value];
+      const fromIdx = order.findIndex((t) => t.name === from);
+      if (fromIdx === -1) return;
+
+      const [moved] = order.splice(fromIdx, 1);
+      // Recompute the target index after removal, then insert on the chosen side.
+      let toIdx = order.findIndex((t) => t.name === to);
+      if (toIdx === -1) return;
+      if (!before) toIdx += 1;
+      order.splice(toIdx, 0, moved);
+
+      tabOrder.value = order;
+      window.localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.name)));
+    };
 
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
@@ -931,6 +1028,8 @@ export default defineComponent({
       tableColumns,
       tableRows,
       serviceStreamsEnabled,
+      tabOrder,
+      onTabReorder,
       config,
       getContentSize,
       getDisplayValue,

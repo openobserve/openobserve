@@ -457,7 +457,7 @@ export function useConfigPanel(
 
   // ── Expand / collapse ─────────────────────────────────────────────────────
 
-  const isExpanded = (key: string): boolean => expandedSections.value[key] ?? true;
+  const isExpanded = (key: string): boolean => expandedSections.value[key] ?? false;
 
   const toggleSection = (sectionId: SectionId) => {
     expandedSections.value[sectionId] = !isExpanded(sectionId);

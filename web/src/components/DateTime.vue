@@ -55,26 +55,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="date-time-dialog z-10001 max-h-(--reka-popper-available-height,600px) w-81.25 overflow-y-auto"
         @keydown.capture="onPickerKeydown"
       >
-        <div v-if="!disableRelative" class="flex justify-evenly py-2">
-          <OButton
-            data-test="date-time-relative-tab"
-            class="w-38.5"
-            :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
-            size="sm"
-            @click="setDateType('relative')"
-          >
-            {{ t("common.relative") }}
-          </OButton>
-          <OSeparator vertical class="my-2" />
-          <OButton
-            data-test="date-time-absolute-tab"
-            class="w-38.5"
-            :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
-            size="sm"
-            @click="setDateType('absolute')"
-          >
-            {{ t("common.absolute") }}
-          </OButton>
+        <div class="flex items-center gap-1 px-3 py-2">
+          <div v-if="!disableRelative" class="flex flex-1 gap-1">
+            <OButton
+              data-test="date-time-relative-tab"
+              class="flex-1"
+              :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
+              size="sm"
+              @click="setDateType('relative')"
+            >
+              {{ t("common.relative") }}
+            </OButton>
+            <OButton
+              data-test="date-time-absolute-tab"
+              class="flex-1"
+              :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
+              size="sm"
+              @click="setDateType('absolute')"
+            >
+              {{ t("common.absolute") }}
+            </OButton>
+          </div>
+          <div v-else class="flex-1" />
+          <OTooltip :content="t('common.copyRange')">
+            <OButton
+              data-test="date-time-copy-btn"
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="content-copy"
+              :aria-label="t('common.copyRange')"
+              @click="copyRange"
+            />
+          </OTooltip>
+          <OTooltip :content="t('common.pasteRange')">
+            <OButton
+              data-test="date-time-paste-btn"
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="content-paste"
+              :aria-label="t('common.pasteRange')"
+              @click="pasteRange"
+            />
+          </OTooltip>
         </div>
         <OSeparator />
         <div class="overflow-y-visible">
@@ -244,7 +266,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mx-[0.4rem] my-2"
           />
         </div>
-        <div v-if="!autoApply" class="flex justify-end px-3 py-2">
+        <div v-if="!autoApply" class="border-border-default flex items-center border-t px-3 py-2">
+          <div class="flex-1" />
           <OButton
             data-test="date-time-apply-btn"
             variant="primary"
@@ -284,9 +307,16 @@ import {
   timestampToTimezoneDate,
 } from "../utils/zincutils";
 import { subtractRelativeTime } from "@/utils/date";
+import {
+  parseDateRangeString,
+  parseSingleDateTime,
+  type ParsedSingleDateTime,
+} from "@/utils/dateTimeRangeParse";
+import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { useI18n } from "vue-i18n";
-import { toZonedTime } from "date-fns-tz";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 interface ConsumableDateTime {
   startTime: number;
@@ -904,11 +934,16 @@ export default defineComponent({
      * What the trigger button renders.
      *
      * With `autoApply` the pending selection IS the applied one, so show it live.
-     * Without it, show the range that is in force; see `appliedDisplayValue`.
+     * Without it, show the live selection while the panel is open (so switching
+     * Relative/Absolute updates the label immediately, like the logs picker), and
+     * fall back to the range in force once closed — so closing without Apply snaps
+     * back to what's actually applied; see `appliedDisplayValue`.
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
     const triggerLabel = computed(() =>
-      props.autoApply ? getDisplayValue.value : appliedDisplayValue.value || getDisplayValue.value,
+      props.autoApply || menuOpen.value
+        ? getDisplayValue.value
+        : appliedDisplayValue.value || getDisplayValue.value,
     );
 
     const getDisplayValue = computed(() => {
@@ -932,6 +967,93 @@ export default defineComponent({
         }
       }
     });
+
+    // ----- Copy / paste of the selected range ---------------------------------
+    // Copy always resolves the selection (relative OR absolute) to a concrete
+    // absolute window, so the copied value is unambiguous. Paste accepts that
+    // format plus `Past N <Period>` and raw epoch timestamp pairs.
+    const copyRange = () => {
+      // Epoch microseconds side-step timezone ambiguity: pasting this into a
+      // tab with a different selected timezone still lands on the same
+      // instant, unlike a "yyyy/MM/dd HH:mm:ss" string (which paste would
+      // reinterpret using the pasting tab's own timezone).
+      const { startTime, endTime } = getConsumableDateTime();
+      const payload = JSON.stringify({ start_date: startTime, end_date: endTime });
+      copyToClipboard(payload, { successMessage: t("common.dateRangeCopied") });
+    };
+
+    // Converts a parsed absolute date[+time] string, interpreted as wall-clock
+    // time in the currently selected timezone, to epoch microseconds — the
+    // inverse of convertUnixTime.
+    const absoluteToMicros = (date: string, time: string): number => {
+      const iso = `${date.replace(/\//g, "-")}T${time}`;
+      return fromZonedTime(iso, store.state.timezone).getTime() * 1000;
+    };
+
+    const finalizeAbsoluteRange = (startMicros: number, endMicros: number) => {
+      selectedType.value = "absolute";
+      setAbsoluteTime(startMicros, endMicros);
+      if (props.autoApply) saveDate(null);
+    };
+
+    const applyParsedRange = (text: string): boolean => {
+      const parsed = parseDateRangeString(text);
+      if (!parsed) return false;
+      if (parsed.type === "timestamp") {
+        finalizeAbsoluteRange(parsed.startMicros, parsed.endMicros);
+      } else {
+        finalizeAbsoluteRange(
+          absoluteToMicros(parsed.startDate, parsed.startTime),
+          absoluteToMicros(parsed.endDate, parsed.endTime),
+        );
+      }
+      return true;
+    };
+
+    // Applies a single pasted date-time value to whichever side of the current
+    // range it sits closer to — e.g. a range of 5:00-10:00 pasted with 7:00
+    // becomes 7:00-10:00 (closer to start), while 13:00 becomes 5:00-13:00
+    // (closer to end). There's no cursor/selection to anchor a side to
+    // without a text field, so proximity is the next best signal of intent.
+    const applySingleDateTime = (parsed: ParsedSingleDateTime) => {
+      const micros =
+        parsed.type === "timestamp"
+          ? parsed.micros
+          : absoluteToMicros(parsed.date, parsed.time ?? "00:00:00");
+
+      const { startTime: baseStart, endTime: baseEnd } = getConsumableDateTime();
+      const isCloserToStart = Math.abs(micros - baseStart) <= Math.abs(micros - baseEnd);
+      finalizeAbsoluteRange(
+        isCloserToStart ? micros : baseStart,
+        isCloserToStart ? baseEnd : micros,
+      );
+    };
+
+    // Tries a full range first, then a single value applied to both sides.
+    const applyPastedText = (text: string): boolean => {
+      if (applyParsedRange(text)) return true;
+
+      const single = parseSingleDateTime(text);
+      if (!single) return false;
+
+      applySingleDateTime(single);
+      return true;
+    };
+
+    const pasteRange = async () => {
+      let text = "";
+      try {
+        text = await navigator.clipboard.readText();
+      } catch {
+        toast({ variant: "error", message: t("common.dateRangePasteError") });
+        return;
+      }
+      if (applyPastedText(text)) {
+        toast({ variant: "success", message: t("common.dateRangePasted") });
+      } else {
+        toast({ variant: "error", message: t("common.dateRangePasteError") });
+      }
+    };
 
     const timezoneFilterFn = (val: string, update: (cb: () => void) => void) => {
       filteredTimezone.value = filterColumns(timezoneOptions, val, update);
@@ -1180,6 +1302,8 @@ export default defineComponent({
       getPeriodLabel,
       displayValue,
       triggerLabel,
+      copyRange,
+      pasteRange,
       refresh,
       dateLocale,
       resetTime,

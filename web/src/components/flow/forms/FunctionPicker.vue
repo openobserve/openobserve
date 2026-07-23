@@ -162,9 +162,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Same theme-aware banner tokens the pipeline + workflow Condition
                notes use, so all three match and work in dark mode (the old
                #f9f290/#2d3748 were light-only). These were --color-note-* until
-               #13173 removed that set; banner-warning-* is its replacement. -->
+               #13173 removed that set; banner-warning-* is its replacement.
+               The `border-banner-warning-border` matters in LIGHT mode: the bg
+               (warning-50, ~#fefce8) is near-white, so without the border the
+               callout blends into the page and reads as unstyled — the canonical
+               warning banners (logstream/schema, settings/*) all carry it. -->
           <div
-            class="bg-banner-warning-bg text-banner-warning-text rounded-default flex w-full flex-col gap-2 p-3"
+            class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default flex w-full flex-col gap-2 border p-3"
           >
             <div class="text-sm">
               {{ t("flow.function.guidelinesTitle") }}

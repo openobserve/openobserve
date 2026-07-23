@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="h-full w-full pr-2.5">
-    <div class="bg-card-glass-bg h-[calc(100vh-50px)]">
+  <div class="flex h-full min-h-0 w-full flex-col">
+    <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col">
       <!-- The shell (Functions.vue) renders the "Pipelines › <name>" breadcrumb
            header; we contribute the editor actions to it via the portal and the
            pipeline name for NEW pipelines (edit mode shows it in the breadcrumb). -->
@@ -66,23 +66,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </Teleport>
 
-      <div class="mt-3 flex px-2">
-        <!-- Docked node palette (shared with Workflows). Same component drives
-             both editors, so the two palettes can never drift apart. -->
+      <!-- Rail + canvas, laid out exactly like the Dashboards list (folder rail +
+           table): a fixed-width flush rail on the left and a fluid pane on the
+           right. Both sides are h-full off the flex row, so the editor fills
+           whatever the shell gives it instead of guessing at viewport maths. -->
+      <div class="flex min-h-0 flex-1">
+        <!-- Left: docked node palette (shared with Workflows). Same component
+             drives both editors, so the two palettes can never drift apart. -->
         <NodePalette
+          v-if="pipelineObj.showNodePalette"
           v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
           :items="pipelineObj.nodeTypes"
-          :title="t('pipeline.nodes')"
           test-prefix="pipeline-node-sidebar"
           :on-drag-start="onDragStart"
         />
-        <div
-          id="pipelineChartContainer"
-          ref="chartContainerRef"
-          class="relative-position pipeline-chart-container o2vf_node rounded-default bg-surface-subtle h-[82.6vh] w-[calc(100%-200px)] dark:bg-transparent"
-          v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
-        >
-          <PipelineFlow />
+        <!-- Right: the canvas pane, flush to the rail and the viewport edges.
+             The rail toggle lives up in the page actions, so nothing sits
+             between the header and the canvas.
+
+             `relative` (was `relative-position`, a Quasar class that no longer
+             resolves — Quasar is not installed and nothing defines that rule)
+             makes this the offset parent for the canvas overlays: the start
+             node and the edge-help toast. Without it they anchored to some
+             ancestor further up, so the start node sat at a different height
+             than the workflow canvas's, which IS positioned. -->
+        <div class="h-full min-w-0 flex-1">
+          <div
+            id="pipelineChartContainer"
+            ref="chartContainerRef"
+            class="pipeline-chart-container o2vf_node bg-surface-subtle relative h-full w-full overflow-hidden dark:bg-transparent"
+            v-show="!pipelineObj.dialog.show || pipelineObj.dialog.name != 'query'"
+          >
+            <PipelineFlow />
+          </div>
         </div>
       </div>
     </div>
@@ -121,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <StepPickerDialog
     v-if="pipelineObj.stepPicker.show"
     :items="stepItems"
-    :title="t('flow.stepPicker.title')"
+    :anchor="pipelineObj.stepPicker.anchor"
     :search-placeholder="t('flow.stepPicker.search')"
     :no-match-text="t('flow.stepPicker.noMatch')"
     test-prefix="pipeline-step"
@@ -353,34 +369,58 @@ const nodeTypes: any = [
 ];
 const functions = ref<{ [key: string]: Function }>({});
 
-const { pipelineObj, resetPipelineData, addNodeAfter, closeStepPicker, onDragStart } =
-  useDragAndDrop();
+const {
+  pipelineObj,
+  resetPipelineData,
+  addNodeAfter,
+  addSourceNode,
+  closeStepPicker,
+  onDragStart,
+} = useDragAndDrop();
 
 // Items for the shared step picker: the downstream-addable node types
 // (Transform + Destination; sources aren't "added after" a node).
+// In "source" mode the picker is the pipeline's FIRST step, so it offers only
+// sources — and carries copy explaining realtime-vs-scheduled, which is the
+// part of that choice users cannot infer from the node names alone.
+const isSourceStep = computed(() => pipelineObj.stepPicker.mode === "source");
+
+const sourceDescriptions: Record<string, string> = {
+  stream: "pipeline.sourceStreamDesc",
+  query: "pipeline.sourceQueryDesc",
+};
+
 const stepItems = computed(() =>
   (pipelineObj.nodeTypes || [])
-    .filter((n: any) => !n.isSectionHeader && n.io_type !== "input")
+    .filter(
+      (n: any) =>
+        !n.isSectionHeader && (isSourceStep.value ? n.io_type === "input" : n.io_type !== "input"),
+    )
     .map((n: any) => ({
       key: `${n.subtype}-${n.io_type}`,
       title: n.label,
-      description: n.tooltip,
+      description: sourceDescriptions[n.subtype] ? t(sourceDescriptions[n.subtype]) : n.tooltip,
       icon: n.icon,
       // Soft badge tokens, not raw hex: the old literals had no dark variant, so
       // these tints stayed light-mode colours on a dark canvas.
       iconTint:
         n.io_type === "output"
           ? "bg-badge-success-soft-bg text-badge-success-soft-text"
-          : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
+          : n.io_type === "input"
+            ? "bg-badge-blue-soft-bg text-badge-blue-soft-text"
+            : "bg-badge-warning-soft-bg text-badge-warning-soft-text",
       subtype: n.subtype,
       io_type: n.io_type,
     })),
 );
 
 const onStepPick = (item: any) => {
-  const source = pipelineObj.stepPicker.source;
+  const { source, mode, position } = pipelineObj.stepPicker;
   closeStepPicker();
-  addNodeAfter(source, { subtype: item.subtype, io_type: item.io_type });
+  const picked = { subtype: item.subtype, io_type: item.io_type };
+  // The start node has nothing before it, so it is placed rather than appended.
+  if (mode === "source") addSourceNode(picked, position);
+  else addNodeAfter(source, picked);
 };
 pipelineObj.nodeTypes = nodeTypes;
 pipelineObj.functions = functions;
@@ -1168,166 +1208,3 @@ const cleanupPipelinesContextProvider = () => {
 
 // [END] Pipelines Context Provider Setup
 </script>
-
-<style>
-/* keep(lib-override:vue-flow): every rule below reaches DOM this component does
-   not render. `.vue-flow__*` are Vue Flow's own internals, emitted inside the
-   async <PipelineFlow> child — and the two `.vue-flow.dragging` / `.vue-flow:has()`
-   rules target the canvas ROOT, which is not in this template at all, so neither
-   scoping nor :deep() can reach them. `o2vf_node_*` is the shared pipeline
-   node-type convention: the same class names are now produced by the shared
-   NodePalette (which replaced NodeSidebar.vue), so this block must stay unscoped
-   and keep riding those names rather than moving to colocated utilities.
-
-   The `transition: none` blocks kill drag lag; NOTE: never set `transform: none`
-   here — Vue Flow positions each node via an inline `transform: translate(x, y)`,
-   so zeroing it would snap the node to the canvas origin mid-drag and only
-   restore on release. */
-.vue-flow.dragging *,
-.vue-flow:has(.vue-flow__node:active) * {
-  transition: none !important;
-  animation: none !important;
-}
-
-.vue-flow__node.dragging,
-.vue-flow__node:active {
-  transition: none !important;
-  animation: none !important;
-}
-
-.vue-flow__node.dragging *,
-.vue-flow__node:active * {
-  transition: none !important;
-  animation: none !important;
-}
-
-.o2vf_node .vue-flow__node {
-  padding: 0.5rem 1rem;
-  width: auto;
-  min-height: 2.75rem;
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease,
-    border-color 0.3s ease;
-  border-radius: var(--radius-surface);
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-black) 8%, transparent);
-  cursor: grab;
-  display: flex;
-  align-items: center;
-  background: var(--color-surface-base);
-  backdrop-filter: blur(0.625rem);
-}
-
-.o2vf_node .vue-flow__node:active,
-.o2vf_node .vue-flow__node.dragging {
-  cursor: grabbing;
-  transition: none !important;
-}
-
-.o2vf_node .vue-flow__node:active *,
-.o2vf_node .vue-flow__node.dragging * {
-  transition: none !important;
-}
-
-.o2vf_node .o2vf_node_input,
-.o2vf_node .vue-flow__node-input {
-  border: 1px solid var(--color-status-info-text);
-  color: var(--color-text-body);
-  border-radius: var(--radius-surface);
-  background: var(--color-status-info-bg);
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-info-text) 10%, transparent);
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease,
-    border-color 0.3s ease;
-  cursor: grab;
-  min-height: 2.25rem;
-  padding: 0.5rem 1rem;
-}
-
-.o2vf_node .o2vf_node_input:active,
-.o2vf_node .o2vf_node_input.dragging,
-.o2vf_node .vue-flow__node-input:active,
-.o2vf_node .vue-flow__node-input.dragging {
-  cursor: grabbing;
-  transition: none !important;
-}
-
-.o2vf_node .o2vf_node_input:active *,
-.o2vf_node .o2vf_node_input.dragging *,
-.o2vf_node .vue-flow__node-input:active *,
-.o2vf_node .vue-flow__node-input.dragging * {
-  transition: none !important;
-}
-
-.o2vf_node .vue-flow__node-output {
-  cursor: grab;
-  min-height: 2.25rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--color-status-positive);
-  color: var(--color-text-body);
-  border-radius: var(--radius-surface);
-  background: var(--color-status-success-bg);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--color-status-positive) 10%, transparent);
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease,
-    border-color 0.3s ease;
-}
-
-.o2vf_node .vue-flow__node-output:hover {
-  background: var(--color-status-success-bg);
-  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--color-status-positive) 20%, transparent);
-  border-color: var(--color-status-positive);
-}
-
-.o2vf_node .vue-flow__node-output:active,
-.o2vf_node .vue-flow__node-output.dragging {
-  cursor: grabbing;
-  transition: none !important;
-}
-
-.o2vf_node .vue-flow__node-output:active *,
-.o2vf_node .vue-flow__node-output.dragging * {
-  transition: none !important;
-}
-
-.o2vf_node .o2vf_node_default,
-.o2vf_node .vue-flow__node-default {
-  border: 1px solid var(--color-status-warning-text);
-  color: var(--color-text-body);
-  border-radius: var(--radius-surface);
-  background: var(--color-status-warning-bg);
-  box-shadow: 0 0.25rem 0.75rem
-    color-mix(in srgb, var(--color-status-warning-text) 10%, transparent);
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease,
-    border-color 0.3s ease;
-  cursor: grab;
-  min-height: 2.25rem;
-  padding: 0.5rem 1rem;
-}
-
-.o2vf_node .o2vf_node_default:hover,
-.o2vf_node .vue-flow__node-default:hover {
-  border: 1px solid var(--color-status-warning-text) !important;
-  background: var(--color-status-warning-bg) !important;
-  box-shadow: 0 0.375rem 1rem color-mix(in srgb, var(--color-status-warning-text) 20%, transparent) !important;
-}
-
-.o2vf_node .o2vf_node_default:active,
-.o2vf_node .o2vf_node_default.dragging,
-.o2vf_node .vue-flow__node-default:active,
-.o2vf_node .vue-flow__node-default.dragging {
-  cursor: grabbing;
-  transition: none !important;
-}
-
-.o2vf_node .o2vf_node_default:active *,
-.o2vf_node .o2vf_node_default.dragging *,
-.o2vf_node .vue-flow__node-default:active *,
-.o2vf_node .vue-flow__node-default.dragging * {
-  transition: none !important;
-}
-</style>

@@ -36,7 +36,9 @@ describe("syntheticResultsSchema query builders", () => {
     expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
     expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon-1'`);
     expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.passed}')`);
-    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} != '${STATUS_VALUES.passed}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.warning}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.failed}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.error}')`);
     expect(sql).toContain(`approx_percentile_cont(${SYNTHETIC_FIELDS.duration}, 0.95)`);
   });
 

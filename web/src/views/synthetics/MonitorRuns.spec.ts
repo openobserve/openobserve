@@ -37,15 +37,34 @@ vi.mock("@/composables/useSyntheticResults", () => {
       kpi: ref({
         uptimePct: 99.65,
         p95Ms: 2940,
+        passedRuns: 285,
+        warningRuns: 2,
         failedRuns: 1,
+        errorRuns: 0,
         totalRuns: 288,
         retriedRuns: 2,
         lastRunStatus: "passed",
         lastRunAt: Date.now() - 120_000,
       }),
       buckets: ref([
-        { tsMs: 1_700_000_000_000, avgMs: 1500, p95Ms: 2000, uptimePct: 100, failedRuns: 0 },
-        { tsMs: 1_700_003_600_000, avgMs: 1600, p95Ms: 2100, uptimePct: 99, failedRuns: 1 },
+        {
+          tsMs: 1_700_000_000_000,
+          avgMs: 1500,
+          p95Ms: 2000,
+          uptimePct: 100,
+          warningRuns: 0,
+          failedRuns: 0,
+          errorRuns: 0,
+        },
+        {
+          tsMs: 1_700_003_600_000,
+          avgMs: 1600,
+          p95Ms: 2100,
+          uptimePct: 99,
+          warningRuns: 0,
+          failedRuns: 1,
+          errorRuns: 0,
+        },
       ]),
       runs: ref([
         {
@@ -244,7 +263,15 @@ const baseStubs = {
   },
   MonitorStatusTimeline: {
     template: '<div data-test="monitor-status-timeline" />',
-    props: ["segments", "failCount", "passCount", "mixedCount", "startLabel", "endLabel"],
+    props: [
+      "segments",
+      "failCount",
+      "passCount",
+      "mixedCount",
+      "startLabel",
+      "endLabel",
+      "isBrowser",
+    ],
   },
   ChartRenderer: {
     template: '<div data-test="chart-renderer" />',

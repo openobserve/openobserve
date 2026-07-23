@@ -24,7 +24,6 @@
         :depth="0"
         :stream-fields="streamFields"
         :stream-fields-map="streamFieldsMap"
-        :show-sql-preview="true"
         condition-input-width="w-37.5"
         :allow-custom-columns="true"
         module="alerts"

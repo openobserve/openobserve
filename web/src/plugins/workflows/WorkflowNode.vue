@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="onClick"
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
+    @output-click="onOutputClick"
   >
     <!-- Per-type body — rendered via #body (typography is inherited from
          FlowNodeCard) so it stays identical to the pipeline custom node:
@@ -61,6 +62,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="requestDeleteNode(id)"
         >
           <OIcon name="delete" size="sm" />
+          <!-- Same OTooltip the test badges below use — the delete button simply
+               never had one. Preferred over the pipeline node's hand-rolled
+               tooltip div: reka-ui/Floating UI handles the Vue Flow node's
+               transformed ancestor, so it can't drift the way a bare `fixed`
+               element does. -->
+          <OTooltip
+            :content="t('workflow.deleteNodeTitle')"
+            side="top"
+            align="center"
+            :side-offset="8"
+          />
         </OButton>
       </div>
 
@@ -111,34 +123,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
         </OTooltip>
-      </div>
-    </template>
-
-    <!-- hover-`+` add-next affordance (shown on hover). Terminal (action) nodes
-         have none. -->
-    <template #footer>
-      <div
-        v-for="p in pluses"
-        v-show="showButtons"
-        :key="p.handle"
-        class="wf-plus nodrag"
-        :class="p.cls"
-        @pointerdown.stop
-        @click.stop
-        @mouseenter="handleActionsEnter"
-        @mouseleave="handleActionsLeave"
-      >
-        <button
-          type="button"
-          class="wf-plus-btn border-border-strong bg-surface-overlay text-text-muted hover:border-accent hover:text-accent hover:bg-accent/10 border-2 border-dashed hover:border-solid"
-          :data-test="`workflow-node-${data?.node_type}-add-${p.handle}`"
-          @click.stop="openStepPicker(id, p.handle)"
-        >
-          <OIcon name="add" size="xs" />
-        </button>
-        <span v-if="p.tag" class="wf-plus-tag" :class="`wf-plus-tag-${p.handle}`">
-          {{ p.tag }}
-        </span>
       </div>
     </template>
   </FlowNodeCard>
@@ -261,12 +245,14 @@ const handleActionsLeave = () => {
   }, 200);
 };
 
-// The `+` affordance under a node: none for a terminal action node, one
-// otherwise. The Condition is a filter, so it has a single output too.
-const pluses = computed(() => {
-  if (!meta.value || meta.value.ioType === "output") return [];
-  return [{ handle: "out", cls: "wf-plus-out", tag: "" }];
-});
+// Clicking the source handle is the "add next step" affordance (it replaced the
+// hover-`+` that used to sit under the card). Terminal action nodes render no
+// source handle at all, so this can only fire where a next step is legal — and
+// it stays inert on the read-only Runs canvas.
+const onOutputClick = (event: MouseEvent) => {
+  if (workflowObj.readOnly) return;
+  openStepPicker(props.id, "out", event);
+};
 
 // On the read-only Runs canvas the node body isn't editable — the error badge
 // (openResult) is the only affordance. In the editor, click opens the config.
@@ -335,36 +321,7 @@ const openResult = () => {
   text-align: center;
 }
 
-/* hover-`+` add affordance — positioned below the node card (the VueFlow node
-   wrapper is the positioned ancestor). */
-.wf-plus {
-  position: absolute;
-  top: 100%;
-  margin-top: 0.75rem;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  z-index: 5;
-}
-.wf-plus-out {
-  left: 50%;
-}
-.wf-plus-btn {
-  width: 1.625rem;
-  height: 1.625rem;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  transition: all 0.14s;
-}
-.wf-plus-tag {
-  margin-top: 0.25rem;
-  font-size: 0.625rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  padding: 0.0625rem 0.375rem;
-  border-radius: 0.3125rem;
-}
+/* The hover-`+` add affordance (`.wf-plus*`) that used to sit below the card is
+   gone — clicking the source handle opens the step picker instead, so the button
+   and its geometry rules went with it (same change as the pipeline node). */
 </style>

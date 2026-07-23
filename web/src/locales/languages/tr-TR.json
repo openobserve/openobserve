@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Adım Ekle",
       "search": "Adımları Ara…",
       "noMatch": "Eşleşen adım yok"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "{ok} Uyarıya Bağlandı, {failed} Başarısız",
       "linkError": "Uyarılar Bağlanamıyor."
     },
-    "canvasEmpty": "İş Akışınızı Oluşturmaya Başlamak İçin Bir Tetikleyici Ekleyin",
     "node": {
       "kindTrigger": "Tetikleyici",
       "kindLogic": "Mantık",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Henüz Yapılandırılmadı",
       "configComingSoon": "{node} Yapılandırması Daha Sonraki Bir Adımda Gelecek",
       "addNext": "Sonraki Adımı Ekle",
-      "stepDialogTitle": "Adım Ekle",
-      "paletteTitle": "Düğümler",
       "sectionTransform": "Dönüştür",
       "sectionDestination": "Hedef",
       "paletteCollapse": "Daralt",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Düğümü Sil",
     "deleteNodeLlmEvalConfirm": "Bu LLM değerlendirme düğümünü silmek istediğinizden emin misiniz?",
     "cancel": "İptal",
-    "dragDropNodesHere": "Düğümleri buraya sürükleyip bırakın",
     "promqlOnlyForMetrics": "PromQL yalnızca metrik akış türü için kullanılabilir",
     "invalidCronExpression": "Geçersiz cron ifadesi",
     "cronRequired": "Cron ifadesi gereklidir",

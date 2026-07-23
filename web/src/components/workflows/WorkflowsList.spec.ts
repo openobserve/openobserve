@@ -428,7 +428,7 @@ describe("WorkflowsList", () => {
       wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default", trigger: "alert_fired" },
+        query: { org_identifier: "default" },
       });
     });
 
@@ -446,13 +446,13 @@ describe("WorkflowsList", () => {
   // ── navigation ─────────────────────────────────────────────────────────────
 
   describe("navigation", () => {
-    it("routes to the create editor with the alert_fired trigger", async () => {
+    it("routes to the create editor (the trigger is chosen on the canvas)", async () => {
       wrapper = mountList();
       await flushPromises();
       await wrapper.find('[data-test="workflow-list-add-btn"]').trigger("click");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default", trigger: "alert_fired" },
+        query: { org_identifier: "default" },
       });
     });
 

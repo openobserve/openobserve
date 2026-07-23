@@ -97,6 +97,7 @@ export interface InputEmits {
   (_e: "keydown", _event: KeyboardEvent): void;
   (_e: "keyup", _event: KeyboardEvent): void;
   (_e: "keypress", _event: KeyboardEvent): void;
+  (_e: "paste", _event: ClipboardEvent): void;
 }
 
 export interface InputSlots {

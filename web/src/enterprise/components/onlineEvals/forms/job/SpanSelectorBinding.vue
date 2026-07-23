@@ -61,11 +61,10 @@
         <component :is="form.Field" name="filterReady">
           <template #default="{ field }">
             <JobFilterBuilder
+              name-prefix="filterGroup"
               target-scope="trace"
               purpose="selector"
-              :group="filterGroup"
               :stream-fields="streamFields"
-              @update:group="updateFilterGroup"
             />
             <OBanner
               v-if="field.state.meta.errors.length > 0"
@@ -143,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -191,9 +190,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-type JobFilterGroup = ReturnType<typeof createEmptyJobFilterGroup>;
 const drawerOpen = ref(false);
-const filterGroup = ref(createEmptyJobFilterGroup());
 const formId = computed(
   () => `span-selector-form-${props.scorerId.replace(/[^a-zA-Z0-9_-]/g, "-")}`,
 );
@@ -231,12 +228,25 @@ const form = useOForm<SpanSelectorForm>({
     fieldMode: "default",
     fields: [],
     maximumSpans: 5,
-    filterReady: false,
+    filterReady: true,
+    filterGroup: createEmptyJobFilterGroup(),
   },
   schema: spanSelectorSchema,
   onSubmit: saveSelector,
 });
 const formValues = form.useStore((state: any) => state.values as SpanSelectorForm);
+
+// The filter tree is form-owned (JobFilterBuilder renders in form mode via
+// name-prefix="filterGroup"), so every condition's leaf inputs bind to a
+// UNIQUE path filterGroup.conditions[i].*. Keep the schema's `filterReady`
+// flag in sync with it — the store replaces values immutably, so the ref
+// changes reference on every edit and a shallow watch sees it.
+const filterGroup = form.useStore(
+  (state: any) => state.values.filterGroup ?? createEmptyJobFilterGroup(),
+);
+watch(filterGroup, (group) => {
+  form.setFieldValue("filterReady", isJobFilterComplete(group));
+});
 
 const boundSelector = computed(() =>
   props.selectors.find((selector) => selector.id === props.binding),
@@ -250,14 +260,15 @@ function generatedId() {
 }
 
 function loadDraft(selector: SpanSelector) {
-  filterGroup.value = normalizeJobFilterCondition(selector.filterCondition);
+  const group = normalizeJobFilterCondition(selector.filterCondition);
   form.reset({
     id: selector.id,
     name: selector.name,
     fieldMode: selector.fieldMode,
     fields: [...(selector.fields || [])],
     maximumSpans: selector.maximumSpans,
-    filterReady: isJobFilterComplete(filterGroup.value),
+    filterReady: isJobFilterComplete(group),
+    filterGroup: group,
   });
   drawerOpen.value = true;
 }
@@ -281,16 +292,11 @@ function selectBinding(value: SelectModelValue) {
   emit("update:binding", typeof value === "string" ? value : "");
 }
 
-function updateFilterGroup(value: JobFilterGroup) {
-  filterGroup.value = value;
-  form.setFieldValue("filterReady", isJobFilterComplete(value));
-}
-
 function saveSelector(value: SpanSelectorForm) {
   const selector: SpanSelector = {
     id: value.id,
     name: value.name.trim(),
-    filterCondition: buildJobFilterConditionPayload(filterGroup.value),
+    filterCondition: buildJobFilterConditionPayload(value.filterGroup),
     fieldMode: value.fieldMode,
     fields: value.fieldMode === "custom" ? [...value.fields] : [],
     maximumSpans: Number(value.maximumSpans),

@@ -233,6 +233,9 @@
   /* Collapsible */
   --color-collapsible-trigger-hover-bg: var(--color-primary-900);
   --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
+  --color-collapsible-trigger-open-bg: var(--color-primary-900);
+  --color-collapsible-open-accent: var(--color-primary-400);
+  --color-collapsible-icon-open: var(--color-primary-400);
 
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg: var(--color-primary-900);
