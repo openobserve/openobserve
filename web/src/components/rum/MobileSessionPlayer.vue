@@ -57,6 +57,7 @@ const speed = ref<number>(1);
 const skipInactivity = ref(false);
 const stageRef = ref<HTMLElement | null>(null);
 const stageWidth = ref(0);
+const stageHeight = ref(0);
 
 const currentTime = computed(() => timeline.value.startTime + playhead.value);
 const viewport = computed(() => viewportAt(timeline.value.records, currentTime.value));
@@ -68,15 +69,29 @@ const progressPct = computed(() =>
   timeline.value.duration > 0 ? (playhead.value / timeline.value.duration) * 100 : 0,
 );
 
-// Scale the dp-based wireframe canvas to fit the available width.
-const scale = computed(() =>
-  viewport.value.width > 0 && stageWidth.value > 0
-    ? stageWidth.value / viewport.value.width
-    : 1,
-);
+// Fit the dp-based wireframe canvas inside the stage on BOTH axes.
+//
+// Scaling on width alone crops the recording: a phone is far taller than it is wide, so
+// filling a wide stage horizontally makes the canvas several times the stage's height, and
+// the stage's `overflow-hidden` silently clips everything below the fold. A 412x915dp screen
+// in a 1200px-wide stage scales 2.9x to ~2650px tall inside ~900px of stage — only the top
+// third is visible. Take the smaller ratio so the whole screen always fits.
+const scale = computed(() => {
+  const vw = viewport.value.width;
+  const vh = viewport.value.height;
+  if (vw <= 0 || vh <= 0 || stageWidth.value <= 0 || stageHeight.value <= 0) return 1;
+  return Math.min(stageWidth.value / vw, stageHeight.value / vh);
+});
+
+// Centre the scaled canvas in the leftover space. Fitting by height on a wide stage leaves
+// horizontal slack (and vice versa); without this the device sits pinned to the top-left.
+// Offsets are applied as `left`/`top` rather than folded into the transform so that
+// `transform-origin: top left` keeps wireframe child coordinates in dp, unshifted.
 const canvasStyle = computed(() => ({
   width: `${viewport.value.width}px`,
   height: `${viewport.value.height}px`,
+  left: `${Math.max(0, (stageWidth.value - viewport.value.width * scale.value) / 2)}px`,
+  top: `${Math.max(0, (stageHeight.value - viewport.value.height * scale.value) / 2)}px`,
   transform: `scale(${scale.value})`,
   "transform-origin": "top left",
 }));
@@ -174,16 +189,20 @@ function onBarClick(e: MouseEvent) {
   seekTo(ratio * timeline.value.duration);
 }
 
-// Measure the stage so we can scale to fit.
+// Measure the stage so we can scale to fit. BOTH axes are needed: the stage is
+// `flex-1 min-h-0`, so its height is whatever the flex column leaves over and changes
+// independently of its width (side panel toggled, window resized, controls wrapping).
 let resizeObserver: ResizeObserver | null = null;
+function measureStage(el: HTMLElement) {
+  stageWidth.value = el.clientWidth;
+  stageHeight.value = el.clientHeight;
+}
 watch(stageRef, (el) => {
   resizeObserver?.disconnect();
   if (el) {
-    resizeObserver = new ResizeObserver(() => {
-      stageWidth.value = el.clientWidth;
-    });
+    resizeObserver = new ResizeObserver(() => measureStage(el));
     resizeObserver.observe(el);
-    stageWidth.value = el.clientWidth;
+    measureStage(el);
   }
 });
 
@@ -219,7 +238,9 @@ onBeforeUnmount(() => {
       >
         <!-- Canvas is the recorded device screen — deliberately white in both
              themes, since it reproduces the app's own background, not our chrome. -->
-        <div class="absolute top-0 left-0 bg-white" :style="canvasStyle">
+        <!-- `left`/`top` come from canvasStyle (centring offsets), not from utility
+             classes — a static top-0/left-0 here would read as the source of truth. -->
+        <div class="absolute bg-white" :style="canvasStyle">
           <template v-for="wf in currentWireframes" :key="wf.id">
             <img
               v-if="wf.type === 'image' && imageSrc(wf)"
