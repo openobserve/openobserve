@@ -38,6 +38,10 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: (key: string) => key })),
 }));
 
+vi.mock("vue-router", () => ({
+  useRoute: vi.fn(() => ({ query: {} })),
+}));
+
 // ── Stubs for O2 and layout components ──────────────────────────────────────
 vi.mock("@/lib/core/PageHeader/OPageHeader.vue", () => ({
   default: {
