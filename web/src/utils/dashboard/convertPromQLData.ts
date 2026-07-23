@@ -32,7 +32,7 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
-import { chartColor } from "@/utils/chartTheme";
+import { chartColor, chartNumber } from "@/utils/chartTheme";
 import {
   calculateBottomLegendHeight,
   calculateRightLegendWidth,
@@ -1002,7 +1002,6 @@ export const convertPromQLData = async (
                 renderItem: function (params: any) {
                   const backgroundColor =
                     panelSchema?.config?.background?.value?.color;
-                  const isDarkTheme = store?.state?.theme === "dark";
                   return {
                     type: "text",
                     style: {
@@ -1017,7 +1016,11 @@ export const convertPromQLData = async (
                       verticalAlign: "middle",
                       x: params?.coordSys?.cx,
                       y: params?.coordSys?.cy,
-                      fill: getContrastColor(backgroundColor, isDarkTheme),
+                      fill: getContrastColor(
+                        backgroundColor,
+                        chartColor("--color-chart-metric-text"),
+                        chartNumber("--chart-metric-contrast-threshold", 0.5),
+                      ),
                     },
                   };
                 },

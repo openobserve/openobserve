@@ -354,6 +354,16 @@
   --color-trace-span-34: #A78BFA;
   --color-trace-span-35: #3B82F6;
 
+  /* --- Chart metric-panel text default — contrast fallback when a panel has no
+     background; read via chartColor() by getContrastColor's callers. --- */
+  --color-chart-metric-text: #000000;
+
+  /* --- Chart NUMERIC tokens (not colours) — read via chartNumber(); light/dark
+     swap lives in dark.css, so chart JS branches on neither token nor theme. --- */
+  --chart-area-fill-top-opacity: 0.9;
+  --chart-area-fill-bottom-opacity: 0.4;
+  --chart-metric-contrast-threshold: 0.5;
+
   /* --- White / Black --- */
   --color-white: #ffffff;
   --color-black: #000000;

@@ -15,7 +15,7 @@
 
 import { scaleLinear } from "d3-scale";
 import { isNumber } from "lodash-es";
-import { chartColor } from "../chartTheme";
+import { chartColor, chartNumber } from "../chartTheme";
 
 export enum ColorModeWithoutMinMax {
   PALETTE_CLASSIC_BY_SERIES = "palette-classic-by-series",
@@ -403,10 +403,11 @@ export const getGridLineStyle = (_theme?: string) => ({
  * from a translucent series color at the top to fully transparent at the
  * bottom. `color` should be the resolved concrete series color.
  */
-export const getAreaGradientColor = (color: string, theme?: string) => {
-  const isDark = theme === "dark";
-  const topAlpha = isDark ? 1 : 0.9;
-  const bottomAlpha = isDark ? 1 : 0.4;
+export const getAreaGradientColor = (color: string, _theme?: string) => {
+  // The fade opacities' light/dark swap lives in the --chart-area-fill-*-opacity
+  // tokens (base/dark css); `_theme` kept for call-site compatibility, ignored.
+  const topAlpha = chartNumber("--chart-area-fill-top-opacity", 0.9);
+  const bottomAlpha = chartNumber("--chart-area-fill-bottom-opacity", 0.4);
   return {
     type: "linear",
     x: 0,

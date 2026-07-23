@@ -121,6 +121,8 @@ const FALLBACKS: Record<string, string> = {
   "--color-trace-span-33": "#06B6D4",
   "--color-trace-span-34": "#A78BFA",
   "--color-trace-span-35": "#3B82F6",
+  // Metric-panel text default (contrast fallback when a panel has no background).
+  "--color-chart-metric-text": "#000000",
 };
 
 /** Resolve a `--color-*` (or `--text-*`) design token to its computed value. */
@@ -142,6 +144,22 @@ export function chartColor(token: `--${string}`): string {
 /** Clear the resolved-token cache. Call on theme change so charts pick up new values. */
 export function invalidateChartTheme(): void {
   cache.clear();
+}
+
+/**
+ * Resolve a NUMERIC design token (opacity, threshold, …) to a number — the number
+ * version of chartColor(). The token's light/dark values live in CSS (base/dark.css),
+ * so chart code branches on neither the token nor the theme. `fallback` is returned
+ * when there's no live CSSOM (jsdom / node-env / SSR) or the value doesn't parse.
+ */
+export function chartNumber(token: `--${string}`, fallback: number): number {
+  if (typeof document === "undefined" || typeof getComputedStyle === "undefined") {
+    return fallback;
+  }
+  const v = parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue(token),
+  );
+  return Number.isFinite(v) ? v : fallback;
 }
 
 // Convenience getters used by the dashboard/trace chart converters.

@@ -596,6 +596,12 @@
   --color-trace-span-33: #D9F99D;
   --color-trace-span-34: #A5B4FC;
   --color-trace-span-35: #FED7AA;
+
+  /* Chart metric text default + numeric tokens — dark overrides */
+  --color-chart-metric-text: #FFFFFF;
+  --chart-area-fill-top-opacity: 1;
+  --chart-area-fill-bottom-opacity: 1;
+  --chart-metric-contrast-threshold: 0.8;
 }
 
 /* ── Theme-driven runtime tokens, dark mode (utils/theme.ts) ──

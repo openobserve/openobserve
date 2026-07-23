@@ -2,7 +2,7 @@
   "totals": {
     "rawVarInComponent": 538,
     "arbZ": 0,
-    "darkMechanism": 7,
+    "darkMechanism": 2,
     "unscopedStyle": 0,
     "stylePxUnit": 84
   },
@@ -261,15 +261,6 @@
     },
     "plugins/traces/metrics/TracesAnalysisDashboard.vue": {
       "rawVarInComponent": 1
-    },
-    "utils/dashboard/colorPalette.ts": {
-      "darkMechanism": 2
-    },
-    "utils/dashboard/convertPromQLData.ts": {
-      "darkMechanism": 1
-    },
-    "utils/dashboard/sql/charts/convertSQLMetricChart.ts": {
-      "darkMechanism": 2
     },
     "utils/logs/convertLogData.ts": {
       "darkMechanism": 1
