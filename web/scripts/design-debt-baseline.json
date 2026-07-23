@@ -1,9 +1,9 @@
 {
   "totals": {
-    "rawVarInComponent": 559,
+    "rawVarInComponent": 538,
     "arbZ": 0,
     "darkMechanism": 7,
-    "unscopedStyle": 2,
+    "unscopedStyle": 0,
     "stylePxUnit": 84
   },
   "files": {
@@ -81,10 +81,6 @@
     },
     "components/logstream/schema.vue": {
       "rawVarInComponent": 2
-    },
-    "components/pipeline/PipelineEditor.vue": {
-      "unscopedStyle": 1,
-      "rawVarInComponent": 20
     },
     "components/pipeline/PipelineView.vue": {
       "rawVarInComponent": 15
@@ -286,10 +282,6 @@
     },
     "views/Dashboards/ScheduledDashboards.vue": {
       "rawVarInComponent": 5
-    },
-    "views/Dashboards/ViewDashboard.vue": {
-      "unscopedStyle": 1,
-      "rawVarInComponent": 1
     },
     "views/HomeView.vue": {
       "rawVarInComponent": 18
