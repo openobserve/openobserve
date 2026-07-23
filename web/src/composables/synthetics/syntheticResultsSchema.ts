@@ -87,7 +87,11 @@ export type RunStatus = "passed" | "warning" | "failed" | "error";
 export interface SyntheticKpi {
   uptimePct: number;
   p95Ms: number;
+  passedRuns: number;
+  warningRuns: number;
+  /** Count of runs with status = 'failed' (actual failures, not warnings or errors). */
   failedRuns: number;
+  errorRuns: number;
   totalRuns: number;
   /** Count of runs that had at least one retry (attempts > 1). */
   retriedRuns: number;
@@ -240,7 +244,10 @@ export interface SyntheticBucket {
   avgMs: number;
   p95Ms: number;
   uptimePct: number;
+  warningRuns: number;
+  /** Count of runs with status = 'failed' (actual failures, not warnings or errors). */
   failedRuns: number;
+  errorRuns: number;
 }
 
 // ── Step analysis types (used by aggregateStepStats) ──────────────────────
@@ -431,7 +438,9 @@ export function buildKpiSql(
   return `SELECT
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs,${retriedClause}
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.failed}') as failed_runs,
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.error}') as error_runs,${retriedClause}
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'`;
@@ -454,7 +463,9 @@ export function buildHistogramSql(monitorId: string, interval: string): string {
   COALESCE(approx_percentile_cont(${F.duration}, 0.95), 0) as p95_duration,
   COUNT(*) as total_runs,
   COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.passed}') as passed_runs,
-  COUNT(*) FILTER (WHERE ${F.status} != '${STATUS_VALUES.passed}') as failed_runs
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.warning}') as warning_runs,
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.failed}') as failed_runs,
+  COUNT(*) FILTER (WHERE ${F.status} = '${STATUS_VALUES.error}') as error_runs
 FROM ${TABLE}
 WHERE ${F.monitorId} = '${id}'
 GROUP BY ts
@@ -607,13 +618,18 @@ export function mapKpi(
 ): SyntheticKpi {
   const totalRuns = num(rawKpiRow?.total_runs);
   const passedRuns = num(rawKpiRow?.passed_runs);
+  const warningRuns = num(rawKpiRow?.warning_runs);
   const failedRuns = num(rawKpiRow?.failed_runs);
+  const errorRuns = num(rawKpiRow?.error_runs);
   const retriedRuns = num(rawKpiRow?.retried_runs);
   const lastRunTsRaw = rawLastRun ? num(rawLastRun.ts) : 0;
   return {
-    uptimePct: totalRuns > 0 ? (passedRuns / totalRuns) * 100 : 0,
+    uptimePct: totalRuns > 0 ? ((passedRuns + warningRuns) / totalRuns) * 100 : 0,
     p95Ms: num(rawKpiRow?.p95_duration),
+    passedRuns,
+    warningRuns,
     failedRuns,
+    errorRuns,
     totalRuns,
     retriedRuns,
     lastRunStatus: rawLastRun ? toRunStatus(rawLastRun.status) : null,
@@ -771,7 +787,9 @@ export function mapHistogram(
       avgMs: 0,
       p95Ms: 0,
       uptimePct: 100,
+      warningRuns: 0,
       failedRuns: 0,
+      errorRuns: 0,
     });
   }
 
@@ -780,12 +798,15 @@ export function mapHistogram(
     const tsMs = new Date(`${key}Z`).getTime();
     const total = num(hit.total_runs);
     const passed = num(hit.passed_runs);
+    const warning = num(hit.warning_runs);
     buckets.set(key, {
       tsMs: Number.isFinite(tsMs) ? tsMs : 0,
       avgMs: num(hit.avg_duration),
       p95Ms: num(hit.p95_duration),
-      uptimePct: total > 0 ? (passed / total) * 100 : 100,
+      uptimePct: total > 0 ? ((passed + warning) / total) * 100 : 100,
+      warningRuns: num(hit.warning_runs),
       failedRuns: num(hit.failed_runs),
+      errorRuns: num(hit.error_runs),
     });
   }
 

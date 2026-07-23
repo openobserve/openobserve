@@ -9406,6 +9406,7 @@
       "failed": "Failed",
       "passed": "Passed",
       "unknown": "Unknown",
+      "warning": "Warning",
       "warning": "Warning"
     },
     "footer": {
@@ -9830,10 +9831,13 @@
       "tabSteps": "Steps",
       "timelineAllFailed": "All {count} failed",
       "timelineAllPassed": "All {count} passed",
+      "timelineAllWarning": "All {count} warning",
       "timelineMixed": "{passed} passed, {failed} failed of {total}",
       "timelineNow": "Now",
       "triggerManual": "Manual",
       "triggerSchedule": "Schedule",
+      "warning": "Warning",
+      "warningRuns": "Warning Runs",
       "window24h": "Last 24 hours",
       "window1h": "Last 1 hour",
       "windowDays": "Last {days} days",
