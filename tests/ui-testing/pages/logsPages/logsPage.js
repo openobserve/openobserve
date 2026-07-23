@@ -3405,9 +3405,13 @@ export class LogsPage {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
         await expect(jsonTab).toBeVisible();
 
-        // Check if JSON tab is selected (has data-state="active" for Reka OTab)
-        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
-        expect(isJsonTabActive, 'JSON tab should be selected by default (Bug #9724)').toBe(true);
+        // The Reka OTab (TabsTrigger) carries data-state="active" when selected. The
+        // DetailTable drawer is an async component, so on open the trigger can render a
+        // tick before Reka's reactive data-state settles to "active". A one-shot
+        // getAttribute read does NOT retry and flakes under CI load, so poll with
+        // toHaveAttribute, which auto-retries until the attribute settles (Bug #9724).
+        await expect(jsonTab, 'JSON tab should be selected by default (Bug #9724)')
+            .toHaveAttribute('data-state', 'active', { timeout: 10000 });
 
         // Verify JSON content is visible
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
@@ -3452,8 +3456,10 @@ export class LogsPage {
      */
     async verifyTableTabSelected() {
         const tableTab = this.page.locator(this.logDetailTableTab);
-        const isTableTabActive = await tableTab.evaluate(el => el.getAttribute('data-state') === 'active');
-        expect(isTableTabActive, 'Table tab should be selected').toBe(true);
+        // Poll data-state via toHaveAttribute (auto-retries) rather than a one-shot
+        // getAttribute read, so the Reka tab-switch reactive update can settle under CI load.
+        await expect(tableTab, 'Table tab should be selected')
+            .toHaveAttribute('data-state', 'active', { timeout: 10000 });
         await expect(this.page.locator(this.logDetailTableContent)).toBeVisible();
         testLogger.info('✓ Table tab is selected and content is visible');
     }
@@ -3464,8 +3470,10 @@ export class LogsPage {
      */
     async verifyJsonTabSelected() {
         const jsonTab = this.page.locator(this.logDetailJsonTab);
-        const isJsonTabActive = await jsonTab.evaluate(el => el.getAttribute('data-state') === 'active');
-        expect(isJsonTabActive, 'JSON tab should be selected').toBe(true);
+        // Poll data-state via toHaveAttribute (auto-retries) rather than a one-shot
+        // getAttribute read, so the Reka tab-switch reactive update can settle under CI load.
+        await expect(jsonTab, 'JSON tab should be selected')
+            .toHaveAttribute('data-state', 'active', { timeout: 10000 });
         await expect(this.page.locator(this.logDetailJsonContent)).toBeVisible();
         testLogger.info('✓ JSON tab is selected and content is visible');
     }
