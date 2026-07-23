@@ -19,13 +19,8 @@ use arrow::array::{Int64Array, RecordBatch};
 use axum::response::Response;
 use config::{
     FILE_EXT_JSON, TIMESTAMP_COL_NAME, get_config,
-    meta::{
-        stream::{FileMeta, StreamType},
-        user::{User, UserRole},
-    },
+    meta::stream::{FileMeta, StreamType},
 };
-
-use crate::service::users;
 
 #[inline(always)]
 pub fn stream_type_query_param_error() -> Result<Response, Error> {
@@ -112,101 +107,17 @@ pub async fn populate_file_meta(
     Ok(())
 }
 
-/// Get the default maximum query range in hours considering the stream setting max query range
-/// and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
-pub fn get_default_max_query_range(stream_max_query_range: i64) -> i64 {
-    let cfg = get_config();
-    let default_max_query_range = cfg.limit.default_max_query_range_days * 24;
-
-    // This will allow the stream setting to override the global setting
-    if stream_max_query_range > 0 {
-        stream_max_query_range
-    } else {
-        default_max_query_range
-    }
-}
-
-/// Get the maximum query range considering service account specific restrictions,
-/// stream setting max query range and the environment variable ZO_DEFAULT_MAX_QUERY_RANGE_DAYS
-pub async fn get_settings_max_query_range(
-    stream_max_query_range: i64,
-    org_id: &str,
-    user_id: Option<&str>,
-) -> i64 {
-    let effective_max_query_range = get_default_max_query_range(stream_max_query_range);
-    if user_id.is_none() {
-        return effective_max_query_range;
-    }
-
-    if let Some(user) = users::get_user(Some(org_id), user_id.unwrap()).await {
-        // get_max_query_range_by_user_role will use the effective max query range internally
-        // Hence using the stream_max_query_range passed in
-        get_max_query_range_by_user_role(stream_max_query_range, &user)
-    } else {
-        effective_max_query_range
-    }
-}
-
-/// Get the maximum query range with service account specific restrictions
-pub fn get_max_query_range_by_user_role(stream_max_query_range: i64, user: &User) -> i64 {
-    let cfg = get_config();
-    let effective_max_query_range = get_default_max_query_range(stream_max_query_range);
-    // Then apply service account specific restrictions if applicable
-    if user.role == UserRole::ServiceAccount {
-        let max_query_range_sa = cfg.limit.max_query_range_for_sa;
-        return if max_query_range_sa > 0 && effective_max_query_range > 0 {
-            std::cmp::min(effective_max_query_range, max_query_range_sa)
-        } else if max_query_range_sa > 0 {
-            max_query_range_sa
-        } else {
-            effective_max_query_range
-        };
-    }
-
-    log::debug!(
-        "get_max_query_range_if_sa stream_max_query_range: {effective_max_query_range}, user_role: {:?}",
-        user.role
-    );
-
-    effective_max_query_range
-}
-
-/// Get the maximum query range for a list of streams in hours
-pub async fn get_max_query_range(
-    stream_names: &[String],
-    org_id: &str,
-    user_id: &str,
-    stream_type: StreamType,
-) -> i64 {
-    let user = users::get_user(Some(org_id), user_id).await;
-
-    futures::future::join_all(
-        stream_names
-            .iter()
-            .map(|stream_name| infra::schema::get_settings(org_id, stream_name, stream_type)),
-    )
-    .await
-    .into_iter()
-    .filter_map(|settings| {
-        settings.map(|s| {
-            if let Some(user) = &user {
-                get_max_query_range_by_user_role(s.max_query_range, user)
-            } else {
-                s.max_query_range
-            }
-        })
-    })
-    .max()
-    .unwrap_or(0)
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
 
+    use config::utils::query_range::get_default_max_query_range;
     use datafusion::arrow::{
         array::StringArray,
         datatypes::{DataType, Field, Schema},
+    };
+    use search_service::query_range::{
+        get_max_query_range, get_max_query_range_by_user_role, get_settings_max_query_range,
     };
 
     use super::*;

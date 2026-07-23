@@ -31,10 +31,8 @@ use maxminddb::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::Notify;
-use transform::{
-    vector_enrichment::{Case, Condition, IndexHandle, Table},
-    vrl::value::{ObjectMap, Value},
-};
+use vector_enrichment::{Case, Condition, IndexHandle, Table};
+use vrl::value::{ObjectMap, Value};
 
 /// Signals that the initial MaxMind database download and client setup finished.
 pub static MMDB_INIT_NOTIFIER: LazyLock<Arc<Notify>> = LazyLock::new(|| Arc::new(Notify::new()));
@@ -345,13 +343,13 @@ impl Table for Geoip {
         select: Option<&[String]>,
         _wildcard: Option<&Value>, // Use not known yet
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, transform::vector_enrichment::Error> {
+    ) -> Result<ObjectMap, vector_enrichment::Error> {
         let mut rows = self.find_table_rows(case, condition, select, _wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
-            Some(_) => Err(transform::vector_enrichment::Error::MoreThanOneRowFound),
-            None => Err(transform::vector_enrichment::Error::NoRowsFound),
+            Some(_) => Err(vector_enrichment::Error::MoreThanOneRowFound),
+            None => Err(vector_enrichment::Error::NoRowsFound),
         }
     }
 
@@ -365,22 +363,23 @@ impl Table for Geoip {
         select: Option<&[String]>,
         _wildcard: Option<&Value>, // Use not known yet
         _: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, transform::vector_enrichment::Error> {
+    ) -> Result<Vec<ObjectMap>, vector_enrichment::Error> {
         match condition.first() {
             Some(_) if condition.len() > 1 => {
-                Err(transform::vector_enrichment::Error::OnlyOneConditionAllowed)
+                Err(vector_enrichment::Error::OnlyOneConditionAllowed)
             }
             Some(Condition::Equals { value, .. }) => {
-                let ip = value.to_string_lossy().parse::<IpAddr>().map_err(|e| {
-                    transform::vector_enrichment::Error::InvalidAddress { source: e }
-                })?;
+                let ip = value
+                    .to_string_lossy()
+                    .parse::<IpAddr>()
+                    .map_err(|e| vector_enrichment::Error::InvalidAddress { source: e })?;
                 Ok(self
                     .lookup(ip, select)
                     .map(|values| vec![values])
                     .unwrap_or_default())
             }
-            Some(_) => Err(transform::vector_enrichment::Error::OnlyEqualityConditionAllowed),
-            None => Err(transform::vector_enrichment::Error::MissingCondition { kind: "IP" }),
+            Some(_) => Err(vector_enrichment::Error::OnlyEqualityConditionAllowed),
+            None => Err(vector_enrichment::Error::MissingCondition { kind: "IP" }),
         }
     }
 
@@ -393,11 +392,11 @@ impl Table for Geoip {
         &mut self,
         _: Case,
         fields: &[&str],
-    ) -> Result<IndexHandle, transform::vector_enrichment::Error> {
+    ) -> Result<IndexHandle, vector_enrichment::Error> {
         match fields.len() {
-            0 => Err(transform::vector_enrichment::Error::MissingRequiredField { field: "IP" }),
+            0 => Err(vector_enrichment::Error::MissingRequiredField { field: "IP" }),
             1 => Ok(IndexHandle(0)),
-            _ => Err(transform::vector_enrichment::Error::OnlyOneFieldAllowed),
+            _ => Err(vector_enrichment::Error::OnlyOneFieldAllowed),
         }
     }
 

@@ -4,6 +4,9 @@
   "license": "AGPL-3.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite --base /web/",
     "devcloud": "NODE_ENV=devcloud vite --mode=devcloud",
@@ -29,7 +32,9 @@
     "lint:tokens": "node scripts/check-css-tokens.mjs",
     "lint:token-purity": "node scripts/check-token-purity.mjs",
     "lint:design": "node scripts/check-design-consistency.mjs",
-    "lint:design:strict": "node scripts/check-design-consistency.mjs --strict"
+    "lint:design:strict": "node scripts/check-design-consistency.mjs --strict",
+    "verify": "npm run type-check:app && npm run lint:ci && npm run lint:styles && npm run lint:tokens && npm run lint:token-purity && npm run lint:design:strict",
+    "verify:all": "npm run verify && npm run test:coverage:check"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
@@ -53,7 +58,7 @@
     "d3-scale": "^4.0.2",
     "date-fns": "^4.1.0",
     "date-fns-tz": "^3.2.0",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.12",
     "echarts": "^6.1.0",
     "echarts-gl": "^2.1.0",
     "escodegen": "^2.1.0",

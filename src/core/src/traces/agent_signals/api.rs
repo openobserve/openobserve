@@ -22,9 +22,8 @@
 //! `service_graph::api::get_current_topology`.
 
 use axum::response::Response as HttpResponse;
+use common::meta::http::HttpResponse as MetaHttpResponse;
 use serde::Deserialize;
-
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Query params for the agent-signals read endpoint.
 #[derive(Debug, Deserialize)]
@@ -109,10 +108,11 @@ pub async fn get_agent_signals(
         use_cache: false,
         clear_cache: false,
         local_mode: Some(false),
+        agent_options: None,
     };
 
     let trace_id = config::ider::generate();
-    match crate::service::search::search(&trace_id, &org_id, StreamType::Logs, None, &req).await {
+    match crate::search::search(&trace_id, &org_id, StreamType::Logs, None, &req).await {
         Ok(resp) => MetaHttpResponse::json(serde_json::json!({ "signals": resp.hits })),
         Err(e) => {
             log::error!("[AgentSignals] read query failed for org '{org_id}': {e}");

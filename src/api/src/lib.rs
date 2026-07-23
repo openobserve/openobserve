@@ -17,9 +17,9 @@
 
 #![recursion_limit = "256"]
 
-#[cfg(feature = "enterprise")]
-pub use openobserve_core::cipher;
-pub use openobserve_core::{common, service};
+#[allow(clippy::single_component_path_imports)]
+use common;
+use openobserve_core as service;
 
 pub mod handler;
 pub mod router;

@@ -30,6 +30,7 @@ use infra::table::compactor_manual_jobs::{
     CompactorManualJob, CompactorManualJobResEntry, CompactorManualJobStatusRes,
     Status as CompactorManualJobStatus,
 };
+use openobserve_core::auth::UserEmail;
 
 use crate::{
     common::{
@@ -38,10 +39,7 @@ use crate::{
             http::HttpResponse as MetaHttpResponse,
             stream::{ListStream, StreamCreate, StreamDeleteFields, StreamUpdateFields},
         },
-        utils::{
-            auth::UserEmail,
-            http::{get_stream_type_from_request, get_ts_from_request_with_key},
-        },
+        utils::http::{get_stream_type_from_request, get_ts_from_request_with_key},
     },
     handler::http::extractors::Headers,
     service::stream,
@@ -504,7 +502,7 @@ pub async fn list(
                     _stream_list_from_rbac = stream_list;
                 }
                 Err(e) => {
-                    return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                    return common::meta::http::HttpResponse::forbidden(e.to_string());
                 }
             }
         }
@@ -668,7 +666,7 @@ pub async fn delete_stream_cache(
         format!("{org_id}/{stream_type}/{stream_name}")
     };
 
-    match crate::service::search::cluster::cacher::delete_cached_results(path, delete_ts).await {
+    match search_service::cluster::cacher::delete_cached_results(path, delete_ts).await {
         true => (
             StatusCode::OK,
             Json(MetaHttpResponse::message(
@@ -747,7 +745,7 @@ pub async fn delete_stream_data_by_time_range(
         }
     };
     let time_range = TimeRange::new(start, end);
-    let job_id = match crate::service::stream::delete_stream_data_by_time_range(
+    let job_id = match openobserve_core::stream::delete_stream_data_by_time_range(
         &org_id,
         stream_type,
         &stream_name,
@@ -878,7 +876,7 @@ fn job_belongs_to_org(res: &CompactorManualJobStatusRes, org_id: &str) -> bool {
 }
 
 async fn get_local_delete_status(id: &str) -> CompactorManualJobStatusRes {
-    let job = match crate::service::db::compact::compactor_manual_jobs::get_job(id).await {
+    let job = match db::compact::compactor_manual_jobs::get_job(id).await {
         Ok(job) => job,
         Err(e) => {
             log::error!("get_local_delete_status {id} error: {e}");
@@ -945,7 +943,7 @@ async fn get_super_cluster_delete_status(
     let mut errors = Vec::new();
 
     for cluster in clusters {
-        match crate::service::cluster_info::get_super_cluster_delete_job_status(
+        match openobserve_core::cluster_info::get_super_cluster_delete_job_status(
             &trace_id,
             cluster.clone(),
             id,

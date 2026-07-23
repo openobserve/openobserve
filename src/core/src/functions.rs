@@ -28,17 +28,18 @@ use config::{
     },
     utils::json::Value,
 };
+use db::{
+    self,
+    authz::{remove_ownership, set_ownership},
+};
+use transform::compile_vrl_function;
 
 use crate::{
-    common::{
-        self,
-        meta::{
-            authz::Authz,
-            http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-        },
-        utils::auth::{remove_ownership, set_ownership},
+    common::meta::{
+        authz::Authz,
+        http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     },
-    service::{db, http::map_error_to_http_response, ingestion::compile_vrl_function},
+    http::map_error_to_http_response,
 };
 
 const FN_SUCCESS: &str = "Function saved successfully";
@@ -83,8 +84,7 @@ pub async fn save_function(org_id: String, mut func: Transform) -> Result<HttpRe
             }
             1 => {
                 // JS function
-                if let Err(e) =
-                    crate::service::ingestion::compile_js_function(func.function.as_str(), &org_id)
+                if let Err(e) = transform::js::compile_js_function(func.function.as_str(), &org_id)
                 {
                     return Ok(MetaHttpResponse::bad_request(e));
                 }
@@ -156,7 +156,7 @@ async fn test_run_vrl_function(
         Ok(program) => {
             let registry = program
                 .config
-                .get_custom::<transform::vector_enrichment::TableRegistry>()
+                .get_custom::<vector_enrichment::TableRegistry>()
                 .unwrap();
             registry.finish_load();
             program
@@ -166,13 +166,13 @@ async fn test_run_vrl_function(
         }
     };
 
-    let mut runtime = common::utils::functions::init_vrl_runtime();
+    let mut runtime = transform::init_vrl_runtime();
     let fields = runtime_config.fields;
     let program = runtime_config.program;
 
     let mut transformed_events = vec![];
     if apply_over_hits {
-        let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+        let (ret_val, err) = transform::apply_vrl_fn(
             &mut runtime,
             &VRLResultResolver {
                 program: program.clone(),
@@ -208,7 +208,7 @@ async fn test_run_vrl_function(
             });
     } else {
         events.into_iter().for_each(|event| {
-            let (ret_val, err) = crate::service::ingestion::apply_vrl_fn(
+            let (ret_val, err) = transform::apply_vrl_fn(
                 &mut runtime,
                 &config::meta::function::VRLResultResolver {
                     program: program.clone(),
@@ -249,7 +249,7 @@ async fn test_run_js_function(
     let apply_over_array = RESULT_ARRAY.is_match(&function);
 
     // Compile the JS function
-    let js_config = match crate::service::ingestion::compile_js_function(&function, org_id) {
+    let js_config = match transform::js::compile_js_function(&function, org_id) {
         Ok(config) => config,
         Err(e) => {
             return Ok(MetaHttpResponse::bad_request(e));
@@ -260,12 +260,8 @@ async fn test_run_js_function(
 
     if apply_over_array {
         // #ResultArray# mode: apply function once over entire array
-        let (ret_val, err) = crate::service::ingestion::apply_js_fn(
-            &js_config,
-            Value::Array(events),
-            org_id,
-            &[String::new()],
-        );
+        let (ret_val, err) =
+            transform::js::apply_js_fn(&js_config, Value::Array(events), org_id, &[String::new()]);
 
         if let Some(err) = err {
             transformed_events.push(VRLResult::new(&err, Value::Null));
@@ -292,12 +288,8 @@ async fn test_run_js_function(
     } else {
         // Normal mode: apply function to each event
         for event in events {
-            let (ret_val, err) = crate::service::ingestion::apply_js_fn(
-                &js_config,
-                event.clone(),
-                org_id,
-                &[String::new()],
-            );
+            let (ret_val, err) =
+                transform::js::apply_js_fn(&js_config, event.clone(), org_id, &[String::new()]);
 
             if let Some(err) = err {
                 transformed_events.push(VRLResult::new(&err, event));
@@ -361,7 +353,7 @@ pub async fn update_function(
         }
         1 => {
             // JS function
-            if let Err(e) = crate::service::ingestion::compile_js_function(&func.function, org_id) {
+            if let Err(e) = transform::js::compile_js_function(&func.function, org_id) {
                 return Ok(MetaHttpResponse::bad_request(e));
             }
         }
@@ -377,10 +369,10 @@ pub async fn update_function(
     }
 
     // update associated pipelines
-    if let Ok(associated_pipelines) = db::pipeline::list_by_org(org_id).await {
+    if let Ok(associated_pipelines) = infra::pipeline::list_by_org(org_id).await {
         for pipeline in associated_pipelines {
             if pipeline.contains_function(&func.name)
-                && let Err(e) = db::pipeline::update(&pipeline, None).await
+                && let Err(e) = crate::pipeline::store::update(&pipeline, None).await
             {
                 return Ok((
                     http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -486,7 +478,7 @@ pub async fn get_pipeline_dependencies(
 }
 
 async fn get_dependencies(org_id: &str, func_name: &str) -> Vec<PipelineDependencyItem> {
-    db::pipeline::list_by_org(org_id)
+    infra::pipeline::list_by_org(org_id)
         .await
         .map_or(vec![], |mut pipelines| {
             pipelines.retain(|pl| pl.contains_function(func_name));

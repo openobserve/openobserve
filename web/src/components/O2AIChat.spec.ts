@@ -87,6 +87,15 @@ vi.mock("vue-router", () => ({
     replace: vi.fn(),
     currentRoute: { value: { path: "/" } },
   })),
+  // The component watches route.fullPath to hand a live stream off to the
+  // sidebar instance on navigation, so this mock must expose fullPath.
+  useRoute: vi.fn(() => ({
+    fullPath: "/",
+    path: "/",
+    name: "home",
+    query: {},
+    params: {},
+  })),
 }));
 
 vi.mock("dompurify", () => ({

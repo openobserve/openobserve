@@ -2651,6 +2651,7 @@
     "kubernetes": "Kubernetes",
     "windows": "Windows",
     "linux": "Linux",
+    "macos": "macOS",
     "awsconfig": "Amazon Web Services (AWS)",
     "gcpconfig": "Google Cloud Platform (GCP)",
     "azure": "Microsoft Azure",
@@ -8525,7 +8526,7 @@
         "chipSampling": "サンプリング制御"
       },
       "descriptionPlaceholder": "このジョブは何を監視しますか？",
-      "samplingValueHelp": "JSON: rate は0～1の数値、count は正の整数です。",
+      "samplingValueHelp": "0 から 1 までのサンプリング率を入力します。",
       "samplingValueAllHelp": "モードが All の場合は適用されません — 一致したすべてのイベントが評価されます。",
       "samplingHelp": "フィルターの後に適用されます。コストを制御します — 一致したスパンのみがレートにカウントされます。",
       "presets": {
@@ -8544,6 +8545,7 @@
         "sampling": "サンプリング"
       },
       "targetSection": "ターゲット",
+      "filteringSection": "フィルタリング",
       "scorersSection": "スコアラーとマッピング",
       "nameLabel": "[名前]",
       "namePlaceholder": "プロダクション・フィフネス・モニター",
@@ -8553,7 +8555,7 @@
       "streamTypePlaceholder": "トレース",
       "descriptionLabel": "[説明]",
       "samplingModeLabel": "サンプリングモード",
-      "samplingValueLabel": "サンプリング値 JSON",
+      "samplingValueLabel": "サンプリング率",
       "samplingModes": {
         "rate": "レート",
         "all": "[すべて]",

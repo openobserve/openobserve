@@ -18,12 +18,17 @@ use std::time::Duration;
 use axum::{
     Router,
     extract::{DefaultBodyLimit, FromRequestParts, Path, Request},
-    http::{Method, StatusCode, header},
+    http::{Method, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Redirect, Response},
     routing::{delete, get, patch, post, put},
 };
 use config::get_config;
+use openobserve_api_management::request::{
+    alerts, authz, dashboards, folders, organization, users,
+};
+use openobserve_api_query::{promql, search, traces};
+use openobserve_core::auth::AuthExtractor;
 use tower_http::{
     cors::{AllowOrigin, CorsLayer},
     decompression::RequestDecompressionLayer,
@@ -32,7 +37,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::self_reporting::audit,
+    audit::audit,
     axum::body::{Body, to_bytes},
     base64::{Engine as _, engine::general_purpose},
     config::utils::time::now_micros,
@@ -44,10 +49,7 @@ use {
 
 use super::request::*;
 use crate::{
-    common::{
-        meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
-        utils::auth::AuthExtractor,
-    },
+    common::meta::{middleware_data::RumExtraData, proxy::PathParamProxyURL},
     handler::http::{
         auth::validator::{
             RequestData, oo_validator, validator_aws, validator_gcp, validator_proxy_url,
@@ -60,9 +62,8 @@ use crate::{
 pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
-pub mod ui;
 
-pub use crate::common::meta::http::ERROR_HEADER;
+pub use common::meta::http::ERROR_HEADER;
 
 /// Custom header name for O2 Assistant session tracking (UUID v7)
 pub const X_O2_ASSISTANT_SESSION_ID: header::HeaderName =
@@ -156,6 +157,79 @@ pub(crate) fn is_origin_allowed(request_origin: &[u8], web_url: &str) -> bool {
     request_origin == allowed_origin.as_bytes()
 }
 
+/// If `resp` is a 401 for an MCP endpoint, attach the RFC 9728 `WWW-Authenticate`
+/// header so MCP clients start the OAuth flow. No-op for every other route/status.
+fn maybe_add_mcp_www_authenticate(uri: &Uri, resp: Response) -> Response {
+    if resp.status() != StatusCode::UNAUTHORIZED {
+        return resp;
+    }
+    // MCP endpoint == `/{org}/mcp`. `auth_middleware` runs inside the
+    // `.nest("/api", …)` router, so the `/api` prefix is already stripped by the
+    // time we see the URI. Match the SECOND segment specifically (mirroring
+    // `token.rs`'s `path_columns.get(1)`) so routes that merely END in a
+    // user-named `mcp` segment (e.g. a stream called "mcp") do not false-positive.
+    let path = uri.path();
+    let mut segments = path.trim_start_matches('/').split('/');
+    let Some(org_id) = segments.next() else {
+        return resp;
+    };
+    if segments.next() != Some("mcp") {
+        return resp;
+    }
+
+    // The org id is reflected into a quoted `WWW-Authenticate` parameter below.
+    // A `"` or `\` there would close the quoted-string and let a caller append
+    // an arbitrary extra challenge (e.g. `Basic realm="…"`, which browsers turn
+    // into a credential prompt on our own origin). Org identifiers are opaque
+    // alphanumeric tokens, so refuse to emit a challenge for anything else
+    // rather than trying to escape it.
+    if org_id.is_empty()
+        || !org_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
+    {
+        return resp;
+    }
+
+    // On the OSS build MCP OAuth discovery is a 404 anyway, so there is nothing
+    // to advertise — `attach_mcp_www_authenticate` is a no-op there.
+    attach_mcp_www_authenticate(org_id, resp)
+}
+
+/// Enterprise: attach the RFC 9728 `WWW-Authenticate` header pointing at this
+/// org's protected-resource metadata, unless Dex is disabled.
+#[cfg(feature = "enterprise")]
+fn attach_mcp_www_authenticate(org_id: &str, mut resp: Response) -> Response {
+    let dex = o2_dex::config::get_config();
+    if !dex.dex_enabled {
+        return resp; // no auth server to advertise
+    }
+    let cfg = config::get_config();
+    // Rebuild the externally-visible resource path from the validated `org_id`
+    // rather than reflecting the request URI, so nothing caller-controlled can
+    // reach the quoted header parameter. The RFC 9728 discovery doc lives at
+    // `<web_url>{base_uri}/.well-known/oauth-protected-resource` with that
+    // resource path appended (RFC 9728 §3.1).
+    let external_resource_path = format!("/api/{org_id}/mcp");
+    let resource_meta = format!(
+        "{}{}/.well-known/oauth-protected-resource{}",
+        cfg.common.web_url.trim_end_matches('/'),
+        cfg.common.base_uri,
+        external_resource_path
+    );
+    let value = format!(r#"Bearer resource_metadata="{resource_meta}""#);
+    if let Ok(hv) = header::HeaderValue::from_str(&value) {
+        resp.headers_mut().insert(header::WWW_AUTHENTICATE, hv);
+    }
+    resp
+}
+
+/// OSS: no MCP OAuth discovery, so the 401 is returned unchanged.
+#[cfg(not(feature = "enterprise"))]
+fn attach_mcp_www_authenticate(_org_id: &str, resp: Response) -> Response {
+    resp
+}
+
 /// Authentication middleware for API routes
 pub async fn auth_middleware(request: Request, next: Next) -> Response {
     // Extract request data FIRST, before any async calls
@@ -168,9 +242,10 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 
     // Extract auth info from request (synchronous now, no await)
     let (mut parts, body) = request.into_parts();
+    let uri = req_data.uri.clone();
     let auth_info = match AuthExtractor::from_request_parts(&mut parts, &()).await {
         Ok(info) => info,
-        Err(e) => return e.into_response(),
+        Err(e) => return maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     };
 
     // Validate authentication using extracted data
@@ -193,7 +268,7 @@ pub async fn auth_middleware(request: Request, next: Next) -> Response {
 
             next.run(Request::from_parts(parts, body)).await
         }
-        Err(e) => e.into_response(),
+        Err(e) => maybe_add_mcp_www_authenticate(&uri, e.into_response()),
     }
 }
 
@@ -316,10 +391,7 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
             .to_string()
             .ends_with("_stream")
             || path.ends_with("ai/chat_stream")
-            || crate::common::meta::ingestion_routes::is_ingestion_write(
-                &http_method,
-                ingestion_path,
-            ))
+            || common::meta::ingestion_routes::is_ingestion_write(&http_method, ingestion_path))
     {
         let query_params = request.uri().query().unwrap_or("").to_string();
         let org_id = {
@@ -421,24 +493,22 @@ pub async fn proxy(Path(params): Path<PathParamProxyURL>) -> impl IntoResponse {
     // SSRF protection: validate the target URL (incl. DNS resolution) before issuing
     // the proxied request. The reqwest client is built via `build_safe_client` so
     // redirect chains and connect-time DNS are re-validated too.
-    if let Err(e) = crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(
-        &params.target_url,
-    )
-    .await
+    if let Err(e) =
+        common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&params.target_url)
+            .await
     {
         return (StatusCode::BAD_REQUEST, format!("URL blocked: {e}")).into_response();
     }
-    let client =
-        match crate::common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
-            Ok(c) => c,
-            Err(e) => {
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Failed to build HTTP client: {e}"),
-                )
-                    .into_response();
-            }
-        };
+    let client = match common::utils::ssrf_guard::build_safe_client(reqwest::Client::builder()) {
+        Ok(c) => c,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to build HTTP client: {e}"),
+            )
+                .into_response();
+        }
+    };
     match client.get(&params.target_url).send().await {
         Ok(resp) => {
             let status = StatusCode::from_u16(resp.status().as_u16())
@@ -501,6 +571,20 @@ pub fn basic_routes() -> Router {
         "/.well-known/oauth-authorization-server",
         get(mcp::oauth_authorization_server_metadata),
     );
+
+    // OAuth 2.0 Protected Resource Metadata (RFC 9728) — public, points MCP
+    // clients at the auth server. Path-suffixed form per RFC 9728 §3.1, plus a
+    // bare root probe. Registered here (before auth_middleware nesting) so both
+    // stay unauthenticated.
+    router = router
+        .route(
+            "/.well-known/oauth-protected-resource/{*resource_path}",
+            get(mcp::oauth_protected_resource_metadata),
+        )
+        .route(
+            "/.well-known/oauth-protected-resource",
+            get(mcp::oauth_protected_resource_metadata_root),
+        );
 
     // Auth routes (no authentication required)
     let auth_routes = Router::new()
@@ -904,6 +988,7 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/eval_jobs/{job_id}/pause", post(eval_jobs::pause_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/resume", post(eval_jobs::resume_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}/archive", post(eval_jobs::archive_eval_job))
+                .route("/{org_id}/eval_jobs/{job_id}/manual_eval", post(eval_jobs::manual_eval_job))
                 .route("/{org_id}/eval_jobs/{job_id}", get(eval_jobs::get_eval_job).put(eval_jobs::update_eval_job).delete(eval_jobs::delete_eval_job));
         }
     }
@@ -1027,7 +1112,8 @@ pub fn service_routes() -> Router {
                 // Synthetics — CRUD + locations
                 .route("/{org_id}/synthetics", get(synthetics::list_synthetics).post(synthetics::create_synthetic).delete(synthetics::delete_synthetics_bulk))
                 .route("/{org_id}/synthetics/locations", get(synthetics::list_locations).post(synthetics::create_location))
-                .route("/{org_id}/synthetics/locations/{id}", put(synthetics::update_location).delete(synthetics::delete_location))
+                .route("/{org_id}/synthetics/agent-setup", get(synthetics::agent_setup))
+                .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
                 .route("/{org_id}/synthetics/{id}", get(synthetics::get_synthetic).put(synthetics::update_synthetic).delete(synthetics::delete_synthetic))
                 .route("/{org_id}/synthetics/{id}/run", post(synthetics::run_synthetic_now))
                 .route("/{org_id}/synthetics/{id}/enable", put(synthetics::set_synthetic_enabled))
@@ -1037,22 +1123,23 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/synthetics/{id}/runs/{run_id}", get(synthetics::get_run_detail))
                 // Synthetics — folder move (v2 prefix to match the shared MoveAcrossFolders utility)
                 .route("/v2/{org_id}/synthetics/move", patch(synthetics::move_synthetics))
-                // Synthetics — job API (no org prefix; authenticated via o2syn_ token)
-                .route("/synthetics/jobs/resolve", post(synthetics::job_resolve))
-                .route("/synthetics/jobs/lease", post(synthetics::job_lease))
-                .route("/synthetics/jobs/ack", post(synthetics::job_ack))
+                // Synthetics — job API (org-scoped path; authenticated via the
+                // o2syn_ token, whose org must match {org_id} in the path)
+                .route("/{org_id}/synthetics/jobs/resolve", post(synthetics::job_resolve))
+                .route("/{org_id}/synthetics/jobs/lease", post(synthetics::job_lease))
+                .route("/{org_id}/synthetics/jobs/ack", post(synthetics::job_ack))
                 .route(
-                    "/synthetics/jobs/artifact-urls",
+                    "/{org_id}/synthetics/jobs/artifact-urls",
                     post(synthetics::job_artifact_urls),
                 )
-                .route("/synthetics/jobs/upload", post(synthetics::job_upload))
-                // Synthetics — agent liveness API (no org prefix; o2syn_ token)
+                .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload))
+                // Synthetics — agent liveness API (org-scoped; o2syn_ token)
                 .route(
-                    "/synthetics/agent/register",
+                    "/{org_id}/synthetics/agent/register",
                     post(synthetics::agent_register),
                 )
                 .route(
-                    "/synthetics/agent/heartbeat",
+                    "/{org_id}/synthetics/agent/heartbeat",
                     post(synthetics::agent_heartbeat),
                 );
         }
@@ -1240,7 +1327,7 @@ pub fn other_service_routes() -> Router {
 }
 
 /// Create the full application router
-pub fn create_app_router() -> Router {
+pub fn create_app_router(ui_routes: fn() -> Router) -> Router {
     let cfg = get_config();
 
     let mut app = if config::cluster::LOCAL_NODE.is_router() {
@@ -1285,7 +1372,7 @@ pub fn create_app_router() -> Router {
                 "/",
                 get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
-            .nest_service("/web", ui::ui_routes());
+            .nest_service("/web", ui_routes());
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)
@@ -1442,5 +1529,82 @@ mod tests {
     fn test_cors_empty_web_url_allows_all() {
         // Empty web_url is permissive (dev mode)
         assert!(is_origin_allowed(b"https://any.origin.com", ""));
+    }
+
+    #[test]
+    fn mcp_www_authenticate_skips_non_401() {
+        let uri: Uri = "/default/mcp".parse().unwrap();
+        let resp = (StatusCode::OK, "ok").into_response();
+        let out = maybe_add_mcp_www_authenticate(&uri, resp);
+        assert!(!out.headers().contains_key(header::WWW_AUTHENTICATE));
+    }
+
+    #[test]
+    fn mcp_www_authenticate_skips_non_mcp_routes() {
+        // A stream literally named "mcp" must NOT get the MCP challenge.
+        for p in [
+            "/default/streams/mcp",
+            "/default/streams/foo",
+            "/default/dashboards/mcp",
+        ] {
+            let uri: Uri = p.parse().unwrap();
+            let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+            let out = maybe_add_mcp_www_authenticate(&uri, resp);
+            assert!(
+                !out.headers().contains_key(header::WWW_AUTHENTICATE),
+                "non-mcp path {p} must not carry an MCP WWW-Authenticate challenge"
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_www_authenticate_rejects_header_injection_in_org_id() {
+        // A `"` in the org segment previously closed the quoted-string parameter
+        // and let the caller append a second challenge (e.g. `Basic realm="…"`,
+        // which browsers render as a credential prompt on our own origin).
+        // Such an org id is not valid, so no challenge must be emitted at all.
+        for org in [
+            r#"x",Basic,realm="phish"#,
+            r#"a"b"#,
+            r"back\slash",
+            "sp ace",
+            "",
+        ] {
+            let uri: Uri = format!("/{org}/mcp").parse().unwrap_or_else(|_| {
+                // Unparseable URIs can never reach the middleware; use a benign
+                // stand-in so the loop still asserts the no-header outcome.
+                "//mcp".parse().unwrap()
+            });
+            let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+            let out = maybe_add_mcp_www_authenticate(&uri, resp);
+            if let Some(v) = out.headers().get(header::WWW_AUTHENTICATE) {
+                let v = v.to_str().unwrap();
+                assert!(
+                    !v.contains(r#"","#) && !v.contains("Basic"),
+                    "injected challenge for org {org:?}: {v}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn mcp_www_authenticate_targets_mcp_endpoint() {
+        let uri: Uri = "/default/mcp".parse().unwrap();
+        let resp = (StatusCode::UNAUTHORIZED, "no").into_response();
+        let out = maybe_add_mcp_www_authenticate(&uri, resp);
+        // Enterprise adds the RFC 9728 challenge (when dex is enabled); OSS never does.
+        // Assert only that the path classification did not panic and that any header
+        // present is the expected RFC 9728 shape.
+        if let Some(v) = out.headers().get(header::WWW_AUTHENTICATE) {
+            let v = v.to_str().unwrap();
+            assert!(
+                v.contains("resource_metadata="),
+                "unexpected challenge: {v}"
+            );
+            assert!(
+                v.contains("/.well-known/oauth-protected-resource/api/default/mcp"),
+                "unexpected challenge: {v}"
+            );
+        }
     }
 }

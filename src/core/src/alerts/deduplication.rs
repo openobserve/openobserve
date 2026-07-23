@@ -170,7 +170,7 @@ pub async fn apply_deduplication(
 
     // Get semantic groups from system_settings — the single source of truth
     let semantic_groups =
-        crate::service::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+        crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
 
     // Get org-level dedup config for cross-alert settings (alert_dedup_enabled, fingerprint_groups)
     let org_config = match super::org_config::get_deduplication_config(&alert.org_id).await {
