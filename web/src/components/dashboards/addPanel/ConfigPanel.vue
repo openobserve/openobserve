@@ -28,25 +28,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
   </div>
   <div v-else class="pb-8">
-    <!-- Search bar -->
+    <!-- Search bar (sticky; h-11 matches the config section headers' sticky top) -->
     <div
-      class="sticky p-1 top-0 z-20 bg-card-glass-solid"
+      class="sticky top-0 z-30 flex h-11 items-center gap-1 px-2 bg-card-glass-solid"
       data-test="dashboard-config-search-wrapper"
     >
-      <div class="flex flex-nowrap items-center gap-1">
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click="toggleAllSections"
-          data-test="dashboard-config-toggle-all-sections-btn"
-        >
-          <template #icon-left><OIcon
-              :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
-              size="sm"
-          /></template>
-        </OButton>
-        <ConfigPanelSearch v-model="searchQuery" />
-      </div>
+      <ConfigPanelSearch v-model="searchQuery" class="flex-1 min-w-0" />
+      <OButton
+        variant="ghost"
+        size="icon"
+        @click="toggleAllSections"
+        data-test="dashboard-config-toggle-all-sections-btn"
+        :data-test-all-expanded="String(allSectionsExpanded)"
+        :aria-label="
+          allSectionsExpanded
+            ? t('dashboard.collapseAllSections')
+            : t('dashboard.expandAllSections')
+        "
+      >
+        <template #icon-left><OIcon
+            :name="allSectionsExpanded ? 'unfold-less' : 'unfold-more'"
+            size="sm"
+        /></template>
+        <OTooltip
+          :content="
+            allSectionsExpanded
+              ? t('dashboard.collapseAllSections')
+              : t('dashboard.expandAllSections')
+          "
+        />
+      </OButton>
     </div>
 
     <!-- No results empty state -->
@@ -63,9 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: General -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('general')"
       :model-value="isExpanded('general')"
+      :icon="SECTION_ICONS.general"
       @update:modelValue="
         (v) => {
           expandedSections.general = v;
@@ -195,10 +207,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: PromQL Table Configuration -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="promqlMode && dashboardPanelData.data.type === 'table'"
       v-show="isSectionVisible('promqlTable')"
       :model-value="isExpanded('promqlTable')"
+      :icon="SECTION_ICONS.promqlTable"
       @update:modelValue="
         (v) => {
           expandedSections.promqlTable = v;
@@ -217,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Geographic Configuration -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="
         promqlMode &&
         (dashboardPanelData.data.type === 'geomap' ||
@@ -225,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="isSectionVisible('geographic')"
       :model-value="isExpanded('geographic')"
+      :icon="SECTION_ICONS.geographic"
       @update:modelValue="
         (v) => {
           expandedSections.geographic = v;
@@ -240,9 +254,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Legend -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('legend')"
       :model-value="isExpanded('legend')"
+      :icon="SECTION_ICONS.legend"
       @update:modelValue="
         (v) => {
           expandedSections.legend = v;
@@ -261,27 +276,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="lg"
         />
 
-        <OSelect
+        <OToggleGroup
           v-if="shouldShowLegendPosition(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-position')"
-          v-model="dashboardPanelDataModel.data.config.legends_position"
-          :options="legendsPositionOptions"
+          type="single"
+          label-position="top"
           :label="t('dashboard.legendsPositionLabel')"
-          :valueKey="'value'"
-          :labelKey="'label'"
+          v-model="legendsPositionModel"
           data-test="dashboard-config-legend-position"
-        />
+          :data-test-selected-value="
+            String(dashboardPanelDataModel.data.config.legends_position)
+          "
+        >
+          <OToggleGroupItem
+            v-for="opt in legendsPositionOptions"
+            :key="String(opt.value)"
+            :value="toggleItemValue(opt.value)"
+            size="sm"
+            data-test="dashboard-config-legend-position-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
 
-        <OSelect
+        <OToggleGroup
           v-if="shouldShowLegendType(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'legend-type')"
-          v-model="dashboardPanelDataModel.data.config.legends_type"
-          :options="legendTypeOptions"
+          type="single"
+          label-position="top"
           :label="t('dashboard.legendsType')"
-          :valueKey="'value'"
-          :labelKey="'label'"
+          v-model="legendsTypeModel"
           data-test="dashboard-config-legends-scrollable"
-        />
+          :data-test-selected-value="
+            String(dashboardPanelDataModel.data.config.legends_type)
+          "
+        >
+          <OToggleGroupItem
+            v-for="opt in legendTypeOptions"
+            :key="String(opt.value)"
+            :value="toggleItemValue(opt.value)"
+            size="sm"
+            data-test="dashboard-config-legends-scrollable-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
 
         <div class="flex gap-2 flex-wrap"
           v-show="isConfigOptionVisible('legend', 'legend-size')"
@@ -391,16 +430,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <OSelect
+        <OToggleGroup
           v-if="shouldApplyChartAlign(dashboardPanelData)"
           v-show="isConfigOptionVisible('legend', 'chart-align')"
-          v-model="dashboardPanelDataModel.data.config.chart_align"
-          :options="chartAlignOptions"
+          type="single"
+          label-position="top"
           :label="t('dashboard.chartAlign')"
-          :valueKey="'value'"
-          :labelKey="'label'"
+          v-model="chartAlignModel"
           data-test="dashboard-config-chart-align"
-        />
+          :data-test-selected-value="
+            String(dashboardPanelDataModel.data.config.chart_align)
+          "
+        >
+          <OToggleGroupItem
+            v-for="opt in chartAlignOptions"
+            :key="String(opt.value)"
+            :value="toggleItemValue(opt.value)"
+            size="sm"
+            data-test="dashboard-config-chart-align-option"
+            :data-test-label="opt.label"
+            >{{ opt.label }}</OToggleGroupItem
+          >
+        </OToggleGroup>
 
         <div
           v-if="
@@ -467,9 +518,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Data -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('data')"
       :model-value="isExpanded('data')"
+      :icon="SECTION_ICONS.data"
       @update:modelValue="
         (v) => {
           expandedSections.data = v;
@@ -711,9 +763,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Axis -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('axis')"
       :model-value="isExpanded('axis')"
+      :icon="SECTION_ICONS.axis"
       @update:modelValue="
         (v) => {
           expandedSections.axis = v;
@@ -813,9 +866,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Labels -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('labels')"
       :model-value="isExpanded('labels')"
+      :icon="SECTION_ICONS.labels"
       @update:modelValue="
         (v) => {
           expandedSections.labels = v;
@@ -925,9 +979,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Line Style -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('lineStyle')"
       :model-value="isExpanded('lineStyle')"
+      :icon="SECTION_ICONS.lineStyle"
       @update:modelValue="
         (v) => {
           expandedSections.lineStyle = v;
@@ -985,10 +1040,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Table -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('table')"
       :model-value="isExpanded('table')"
+      :icon="SECTION_ICONS.table"
       @update:modelValue="
         (v) => {
           expandedSections.table = v;
@@ -1066,9 +1122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Pivot Table -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-show="isSectionVisible('pivotTable')"
       :model-value="isExpanded('pivotTable')"
+      :icon="SECTION_ICONS.pivotTable"
       @update:modelValue="
         (v) => {
           expandedSections.pivotTable = v;
@@ -1186,10 +1243,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Value Transformations -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('valueTransformations')"
       :model-value="isExpanded('valueTransformations')"
+      :icon="SECTION_ICONS.valueTransformations"
       @update:modelValue="
         (v) => {
           expandedSections.valueTransformations = v;
@@ -1198,7 +1256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.configSectionValueTransformations")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1214,10 +1272,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Field Overrides -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'table'"
       v-show="isSectionVisible('fieldOverrides')"
       :model-value="isExpanded('fieldOverrides')"
+      :icon="SECTION_ICONS.fieldOverrides"
       @update:modelValue="
         (v) => {
           expandedSections.fieldOverrides = v;
@@ -1226,7 +1285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.configSectionFieldOverrides")
         }}</span>
         <OIcon name="info-outline" size="sm" />
@@ -1245,13 +1304,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Map -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="
         dashboardPanelData.data.type == 'geomap' ||
         dashboardPanelData.data.type == 'maps'
       "
       v-show="isSectionVisible('map')"
       :model-value="isExpanded('map')"
+      :icon="SECTION_ICONS.map"
       @update:modelValue="
         (v) => {
           expandedSections.map = v;
@@ -1437,10 +1497,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Gauge -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type === 'gauge'"
       v-show="isSectionVisible('gauge')"
       :model-value="isExpanded('gauge')"
+      :icon="SECTION_ICONS.gauge"
       @update:modelValue="
         (v) => {
           expandedSections.gauge = v;
@@ -1502,10 +1563,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Layout -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="showTrellisConfig"
       v-show="isSectionVisible('layout')"
       :model-value="isExpanded('layout')"
+      :icon="SECTION_ICONS.layout"
       @update:modelValue="
         (v) => {
           expandedSections.layout = v;
@@ -1631,10 +1693,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Colors -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="showColorPalette"
       v-show="isSectionVisible('colors')"
       :model-value="isExpanded('colors')"
+      :icon="SECTION_ICONS.colors"
       @update:modelValue="
         (v) => {
           expandedSections.colors = v;
@@ -1651,10 +1714,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Drilldown -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="shouldShowDrilldown(dashboardPanelData, dashboardPanelDataPageKey)"
       v-show="isSectionVisible('drilldown')"
       :model-value="isExpanded('drilldown')"
+      :icon="SECTION_ICONS.drilldown"
       @update:modelValue="
         (v) => {
           expandedSections.drilldown = v;
@@ -1663,7 +1727,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.drilldown")
         }}</span>
         <OIcon
@@ -1683,7 +1747,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Comparison -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="
         shouldShowTimeShift(
           dashboardPanelData,
@@ -1693,6 +1757,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       v-show="isSectionVisible('comparison')"
       :model-value="isExpanded('comparison')"
+      :icon="SECTION_ICONS.comparison"
       @update:modelValue="
         (v) => {
           expandedSections.comparison = v;
@@ -1701,7 +1766,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.comparisonAgainst")
         }}</span>
         <OIcon
@@ -1755,10 +1820,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Mark Lines -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="shouldShowCartesianAxisConfig(dashboardPanelData)"
       v-show="isSectionVisible('markLines')"
       :model-value="isExpanded('markLines')"
+      :icon="SECTION_ICONS.markLines"
       @update:modelValue="
         (v) => {
           expandedSections.markLines = v;
@@ -1767,7 +1833,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="border-t border-solid border-card-glass-border"
     >
       <template #trigger>
-        <span class="text-sm font-medium">{{
+        <span class="text-compact font-medium text-collapsible-label group-data-[state=open]:text-collapsible-icon-open">{{
           t("dashboard.markLines")
         }}</span>
         <OIcon
@@ -1787,10 +1853,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Section: Background -->
     <OCollapsible
-      variant="sidebar"
+      variant="config"
       v-if="dashboardPanelData.data.type == 'metric'"
       v-show="isSectionVisible('background')"
       :model-value="isExpanded('background')"
+      :icon="SECTION_ICONS.background"
       @update:modelValue="
         (v) => {
           expandedSections.background = v;
@@ -1812,11 +1879,21 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import { type SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
-import { computed, defineComponent, inject, onBeforeMount, ref } from "vue";
+import {
+  computed,
+  defineComponent,
+  inject,
+  nextTick,
+  onBeforeMount,
+  onMounted,
+  ref,
+} from "vue";
 import { useI18n } from "vue-i18n";
 import Drilldown from "./Drilldown.vue";
 import ValueMapping from "./ValueMapping.vue";
@@ -1868,6 +1945,7 @@ import {
   shouldShowDrilldown,
   shouldShowTimeShift,
 } from "@/utils/dashboard/configUtils";
+import { SECTION_ICONS } from "@/utils/dashboard/searchLabelsConfig";
 
 export default defineComponent({
   components: {
@@ -1876,6 +1954,8 @@ export default defineComponent({
     OInput,
     OTextarea,
     OSelect,
+    OToggleGroup,
+    OToggleGroupItem,
     OSwitch,
     ConfigPanelSearch,
     Drilldown,
@@ -1905,6 +1985,27 @@ export default defineComponent({
 
     // Alias for template v-model mutation sites; same reference, no behavior change.
     const dashboardPanelDataModel = computed(() => dashboardPanelData);
+
+    // Segmented toggle (OToggleGroup) proxies for few-option config selects.
+    // OToggleGroup drops null/empty values (its single-select deselect guard),
+    // so we bridge the stored `null` ("Auto"/"None") to a sentinel string and
+    // back. Options iterate the same arrays used by the old OSelect.
+    const TOGGLE_AUTO = "__auto__";
+    const toggleModel = (key: string) =>
+      computed({
+        get: () =>
+          (dashboardPanelData.data.config as Record<string, unknown>)[key] ??
+          TOGGLE_AUTO,
+        set: (v: unknown) => {
+          (dashboardPanelData.data.config as Record<string, unknown>)[key] =
+            v === TOGGLE_AUTO ? null : v;
+        },
+      });
+    const legendsPositionModel = toggleModel("legends_position");
+    const legendsTypeModel = toggleModel("legends_type");
+    const chartAlignModel = toggleModel("chart_align");
+    const toggleItemValue = (value: unknown) =>
+      value === null || value === undefined ? TOGGLE_AUTO : value;
 
     const { t } = useI18n();
     const store = useStore();
@@ -2612,6 +2713,17 @@ export default defineComponent({
       isPivotMode,
     );
 
+    // Focus the search box when the config panel opens so users can start
+    // filtering settings right away.
+    onMounted(() => {
+      nextTick(() => {
+        const searchInput = document.getElementById(
+          "dashboard-config-panel-search-input",
+        ) as HTMLInputElement | null;
+        searchInput?.focus();
+      });
+    });
+
     // Clear legend width when switching away from plain type or when position is not right
     watchEffect(() => {
       if (
@@ -2642,6 +2754,10 @@ export default defineComponent({
     const decimalsTouched = ref(false);
 
     return {
+      legendsPositionModel,
+      legendsTypeModel,
+      chartAlignModel,
+      toggleItemValue,
       t,
       dashboardPanelData,
       dashboardPanelDataModel,
@@ -2711,6 +2827,7 @@ export default defineComponent({
       toggleAllSections,
       isPivotMode,
       decimalsTouched,
+      SECTION_ICONS,
     };
   },
 });

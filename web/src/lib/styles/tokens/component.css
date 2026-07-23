@@ -189,6 +189,10 @@
   --color-collapsible-trigger-hover-bg: var(--color-primary-100);
   --color-collapsible-trigger-active-bg: var(--color-surface-accent-active);
   --color-collapsible-trigger-focus-ring: var(--color-primary-400);
+  /* Open-state accent (sidebar variant): highlighted header when expanded */
+  --color-collapsible-trigger-open-bg: var(--color-primary-50);
+  --color-collapsible-open-accent: var(--color-primary-600);
+  --color-collapsible-icon-open: var(--color-primary-600);
 
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-primary-100);
@@ -1121,6 +1125,9 @@
   --color-collapsible-trigger-hover-bg: var(--color-collapsible-trigger-hover-bg);
   --color-collapsible-trigger-active-bg: var(--color-collapsible-trigger-active-bg);
   --color-collapsible-trigger-focus-ring: var(--color-collapsible-trigger-focus-ring);
+  --color-collapsible-trigger-open-bg: var(--color-collapsible-trigger-open-bg);
+  --color-collapsible-open-accent: var(--color-collapsible-open-accent);
+  --color-collapsible-icon-open: var(--color-collapsible-icon-open);
 
   /* OFieldList / OFieldRow / OFieldLabel */
   --color-field-list-row-hover-bg:     var(--color-field-list-row-hover-bg);

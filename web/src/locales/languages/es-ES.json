@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Añadir un paso",
       "search": "Buscar pasos…",
       "noMatch": "No hay pasos coincidentes"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Vinculado a {ok} alerta(s), {failed} fallaron",
       "linkError": "No se pueden vincular las alertas."
     },
-    "canvasEmpty": "Agregue un disparador para comenzar a construir su flujo de trabajo",
     "node": {
       "kindTrigger": "Disparador",
       "kindLogic": "Lógica",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Aún no configurado",
       "configComingSoon": "La configuración de {node} llegará en un paso posterior",
       "addNext": "Agregar siguiente paso",
-      "stepDialogTitle": "Agregar un paso",
-      "paletteTitle": "Nodos",
       "sectionTransform": "Transformar",
       "sectionDestination": "Destino",
       "paletteCollapse": "Colapsar",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Eliminar nodo",
     "deleteNodeLlmEvalConfirm": "¿Está seguro de que desea eliminar este nodo de evaluación de LLM?",
     "cancel": "Cancelar",
-    "dragDropNodesHere": "Arrastra y suelta los nodos aquí",
     "promqlOnlyForMetrics": "PromQL solo está disponible para el tipo de flujo de métricas",
     "invalidCronExpression": "Expresión cron no válida",
     "cronRequired": "La expresión cron es obligatoria",

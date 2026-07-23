@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Schritt hinzufügen",
       "search": "Schritte suchen…",
       "noMatch": "Keine passenden Schritte"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Mit {ok} Alarm(en) verknüpft, {failed} fehlgeschlagen",
       "linkError": "Alarme konnten nicht verknüpft werden."
     },
-    "canvasEmpty": "Fügen Sie einen Auslöser hinzu, um Ihren Workflow zu erstellen",
     "node": {
       "kindTrigger": "Auslöser",
       "kindLogic": "Logik",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Noch nicht konfiguriert",
       "configComingSoon": "Die Konfiguration von {node} erfolgt in einem späteren Schritt",
       "addNext": "Nächsten Schritt hinzufügen",
-      "stepDialogTitle": "Schritt hinzufügen",
-      "paletteTitle": "Knoten",
       "sectionTransform": "Transformieren",
       "sectionDestination": "Ziel",
       "paletteCollapse": "Einklappen",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Knoten löschen",
     "deleteNodeLlmEvalConfirm": "Möchten Sie diesen LLM-Evaluierungsknoten wirklich löschen?",
     "cancel": "Stornieren",
-    "dragDropNodesHere": "Ziehen Sie Knoten hierher und legen Sie sie dort ab",
     "promqlOnlyForMetrics": "PromQL ist nur für den Metrik-Stream-Typ verfügbar",
     "invalidCronExpression": "Ungültiger Cron-Ausdruck",
     "cronRequired": "Cron-Ausdruck ist erforderlich",

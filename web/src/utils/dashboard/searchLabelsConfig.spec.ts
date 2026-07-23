@@ -70,9 +70,9 @@ describe("searchLabelsConfig", () => {
       }
     });
 
-    it("defaults every section to true", () => {
+    it("defaults every section to false (collapsed)", () => {
       for (const id of ORDERED_SECTION_IDS) {
-        expect(DEFAULT_EXPANDED_SECTIONS[id]).toBe(true);
+        expect(DEFAULT_EXPANDED_SECTIONS[id]).toBe(false);
       }
     });
 
@@ -80,11 +80,11 @@ describe("searchLabelsConfig", () => {
       expect(Object.keys(DEFAULT_EXPANDED_SECTIONS)).toHaveLength(20);
     });
 
-    it("has no section set to false", () => {
-      const falseEntries = Object.entries(DEFAULT_EXPANDED_SECTIONS).filter(
-        ([, v]) => v === false,
+    it("has no section set to true", () => {
+      const trueEntries = Object.entries(DEFAULT_EXPANDED_SECTIONS).filter(
+        ([, v]) => v === true,
       );
-      expect(falseEntries).toHaveLength(0);
+      expect(trueEntries).toHaveLength(0);
     });
   });
 });

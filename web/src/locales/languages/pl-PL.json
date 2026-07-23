@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Dodaj krok",
       "search": "Szukaj kroków…",
       "noMatch": "Brak pasujących kroków"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Połączono z {ok} alertami, {failed} nie udało się",
       "linkError": "Nie udało się połączyć alertów."
     },
-    "canvasEmpty": "Dodaj wyzwalacz, aby rozpocząć budowanie przepływu pracy",
     "node": {
       "kindTrigger": "Wyzwalacz",
       "kindLogic": "Logika",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Nie skonfigurowano jeszcze",
       "configComingSoon": "Konfiguracja {node} pojawi się w późniejszym kroku",
       "addNext": "Dodaj następny krok",
-      "stepDialogTitle": "Dodaj krok",
-      "paletteTitle": "Węzły",
       "sectionTransform": "Transformacja",
       "sectionDestination": "Miejsce docelowe",
       "paletteCollapse": "Zwiń",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Usuń węzeł",
     "deleteNodeLlmEvalConfirm": "Czy na pewno chcesz usunąć ten węzeł oceny LLM?",
     "cancel": "Anuluj",
-    "dragDropNodesHere": "Przeciągnij i upuść węzły tutaj",
     "promqlOnlyForMetrics": "PromQL jest dostępny tylko dla typu strumienia metryk",
     "invalidCronExpression": "Nieprawidłowe wyrażenie cron",
     "cronRequired": "Wyrażenie cron jest wymagane",
