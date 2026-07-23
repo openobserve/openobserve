@@ -29,6 +29,7 @@ enterprise = [
     "openobserve-jobs/enterprise",
     "super_cluster_queue/enterprise",
     "search_service/enterprise",
+    "enrichment-data/enterprise",
 ]
 vectorscan = [
     "openobserve-api/vectorscan",
@@ -93,11 +94,24 @@ ignored = ["prettytable-rs", "tikv-jemalloc-sys"]
 
 [dependencies]
 axum.workspace = true
+axum-extra.workspace = true
 axum-server.workspace = true
+axum-client-ip.workspace = true
+tower.workspace = true
 tower-http.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+mime_guess.workspace = true
+ahash.workspace = true
 anyhow.workspace = true
+argon2.workspace = true
 async-trait.workspace = true
 async-recursion.workspace = true
+aws-sdk-sns.workspace = true
+base64.workspace = true
+bitflags.workspace = true
+bytes.workspace = true
+byteorder.workspace = true
 chrono.workspace = true
 clap = { version = "4.5", default-features = false, features = [
     "std",
@@ -106,22 +120,66 @@ clap = { version = "4.5", default-features = false, features = [
     "suggestions",
     "cargo",
 ] }
+cron.workspace = true
+csv.workspace = true
+dashmap.workspace = true
+datafusion.workspace = true
+datafusion-proto.workspace = true
+datafusion-functions-json.workspace = true
+arrow.workspace = true
 arrow-flight.workspace = true
+arrow-json.workspace = true
+arrow-schema.workspace = true
+parquet.workspace = true
+object_store.workspace = true
 env_logger.workspace = true
+faststr.workspace = true
+flate2.workspace = true
+futures.workspace = true
+hashlink.workspace = true
 hashbrown.workspace = true
+hex.workspace = true
+http-auth-basic.workspace = true
+itertools.workspace = true
+jsonwebtoken.workspace = true
 log.workspace = true
+maxminddb.workspace = true
+md5.workspace = true
+memchr.workspace = true
 mimalloc = { version = "0.1.48", features = ["v3"], optional = true }
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry-proto.workspace = true
+parking_lot.workspace = true
+prometheus.workspace = true
+promql-parser.workspace = true
+prost.workspace = true
+prost-wkt-types.workspace = true
 proto.workspace = true
 prettytable-rs = "0.10.0"
+rand.workspace = true
+rayon.workspace = true
+regex.workspace = true
+regex-syntax.workspace = true
 reqwest.workspace = true
+rust-embed-for-web.workspace = true
 rustls.workspace = true
+rustls-native-certs.workspace = true
+webpki-roots.workspace = true
+sea-orm.workspace = true
+segment.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha256.workspace = true
+snafu.workspace = true
+snap.workspace = true
+sqlparser.workspace = true
 sqlx.workspace = true
+strum.workspace = true
+svix-ksuid.workspace = true
+thiserror.workspace = true
+time.workspace = true
 tikv-jemallocator = { version = "0.6", optional = true, features = [
     "profiling",
     "stats",
@@ -131,26 +189,50 @@ tikv-jemalloc-ctl = { workspace = true, optional = true }
 tikv-jemalloc-sys = { workspace = true, optional = true }
 jemalloc_pprof = { workspace = true, optional = true }
 pprof = { workspace = true, optional = true }
+tempfile.workspace = true
+tiktoken-rs.workspace = true
 tokio.workspace = true
 console-subscriber = { version = "0.5", optional = true }
 tonic.workspace = true
+tonic-prost.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
+uaparser.workspace = true
+url.workspace = true
 utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+version-compare.workspace = true
+x509-parser.workspace = true
+zstd.workspace = true
 config.workspace = true
 infra.workspace = true
 ingester.workspace = true
+wal.workspace = true
+report_server.workspace = true
+chromiumoxide.workspace = true
+lettre.workspace = true
+tantivy.workspace = true
+tantivy-fst.workspace = true
 tantivy_utils.workspace = true
+zip.workspace = true
+futures-util.workspace = true
+tokio-stream.workspace = true
+mime.workspace = true
+pin-project-lite.workspace = true
 flight.workspace = true
+async-stream.workspace = true
+sourcemap.workspace = true
 openobserve-api.workspace = true
 openobserve-api-management.workspace = true
 openobserve-core.workspace = true
 ingestion-common.workspace = true
 compaction.workspace = true
+enrichment-data.workspace = true
 common.workspace = true
 db.workspace = true
+search.workspace = true
 search_service.workspace = true
 super_cluster_queue.workspace = true
 openobserve-jobs.workspace = true
@@ -160,7 +242,12 @@ openobserve-mcp.workspace = true
 arrow.workspace = true
 bytes.workspace = true
 enrichment-data.workspace = true
+expect-test.workspace = true
+base64.workspace = true
+float-cmp.workspace = true
+multer.workspace = true
 prost.workspace = true
+rcgen.workspace = true
 schema.workspace = true
 snap.workspace = true
 tower.workspace = true

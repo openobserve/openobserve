@@ -47,6 +47,7 @@ vectorscan = [
     "stream/vectorscan",
 ]
 vortex = [
+    "dep:vortex",
     "config/vortex",
     "tantivy_utils/vortex",
     "o2_enterprise?/vortex",
@@ -85,30 +86,36 @@ base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 cron.workspace = true
+csv.workspace = true
 dashmap.workspace = true
 datafusion.workspace = true
 arrow.workspace = true
+arrow-json.workspace = true
 arrow-schema.workspace = true
 parquet.workspace = true
 object_store.workspace = true
+vortex = { workspace = true, optional = true }
 flate2.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 itertools.workspace = true
 jsonwebtoken.workspace = true
 log.workspace = true
+maxminddb.workspace = true
 md5.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
 opentelemetry.workspace = true
 opentelemetry-proto.workspace = true
+parking_lot.workspace = true
 prometheus.workspace = true
 promql-parser.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
 proto.workspace = true
 rand.workspace = true
+rayon.workspace = true
 regex.workspace = true
 reqwest.workspace = true
 rustls.workspace = true
@@ -136,9 +143,12 @@ ingester.workspace = true
 wal.workspace = true
 chromiumoxide.workspace = true
 lettre.workspace = true
+tantivy.workspace = true
 tantivy_utils.workspace = true
 zip.workspace = true
+futures-util.workspace = true
 sourcemap.workspace = true
 
 [dev-dependencies]
+multer.workspace = true
 rcgen.workspace = true
