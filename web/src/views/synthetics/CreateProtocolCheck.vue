@@ -4,7 +4,7 @@
 // Create/edit view for protocol checks (http/tcp/tls/ssh) — single configure
 // page, no journey step. Mirrors CreateBrowserTest's data fetching and save
 // flow; the per-type request card is slotted into CheckConfigure.
-import { computed, onMounted, ref, watch, type Component } from 'vue'
+import { computed, onMounted, ref, type Component } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
@@ -154,7 +154,16 @@ async function loadForEdit(id: string) {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.get(org, id, String(route.query.folder ?? ''))
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>)
-  } catch (err) {
+  } catch (err: any) {
+    // If the check doesn't exist in this org (e.g. user switched orgs while editing),
+    // redirect to the synthetics list with a message.
+    if (err?.response?.status === 404) {
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isLoadingEdit.value = false
+      return
+    }
     // Surface it — a silent catch here leaves a blank form that saves a
     // fresh check over the existing one.
     console.error('[synthetics] failed to load check for edit', err)
@@ -210,19 +219,6 @@ function onConfirmLeave() {
   }
 }
 
-// When the user switches organizations while editing a check, silently redirect
-// to the synthetics list of the new org — the check ID belongs to the previous
-// org and shouldn't be resolved against the new one.
-watch(
-  () => store.state.selectedOrganization.identifier,
-  (newOrg, oldOrg) => {
-    if (oldOrg && newOrg !== oldOrg && props.editId) {
-      forceLeave = true
-      router.push({ name: 'synthetics' })
-    }
-  },
-)
-
 async function saveCheck() {
   isSaving.value = true
   const dismiss = toast({ variant: 'loading', message: t('synthetics.newCheck.saving'), timeout: 0 })
@@ -242,6 +238,13 @@ async function saveCheck() {
     router.push({ name: 'synthetics', query: { folder: check.value.folder } })
   } catch (err: any) {
     dismiss()
+    if (err?.response?.status === 404) {
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isSaving.value = false
+      return
+    }
     toast({
       variant: 'error',
       message: err?.response?.data?.message || err?.response?.data?.error || t('synthetics.newCheck.saveFailed'),

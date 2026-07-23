@@ -163,6 +163,12 @@ async function loadForEdit(id: string) {
     journeyStepDone.value = true
   } catch (err) {
     console.error('[synthetics] failed to load check for edit', err)
+    if ((err as any)?.response?.status === 404) {
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isLoadingEdit.value = false
+      return
+    }
     loadError.value = true
     toast({
       variant: 'error',
@@ -364,20 +370,6 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
   e.preventDefault()
 }
 
-// When the user switches organizations while editing a check, silently redirect
-// to the synthetics list of the new org — the check ID belongs to the previous
-// org and shouldn't be resolved against the new one.
-watch(
-  () => store.state.selectedOrganization.identifier,
-  (newOrg, oldOrg) => {
-    if (oldOrg && newOrg !== oldOrg && props.editId) {
-      stopActiveExtension()
-      forceLeave = true
-      router.push({ name: 'synthetics' })
-    }
-  },
-)
-
 async function saveCheck() {
   // ── Pre-save validation ───────────────────────────────────────────
   validationErrors.value = {}
@@ -433,6 +425,13 @@ async function saveCheck() {
     }
   } catch (err: any) {
     dismiss()
+    if (err?.response?.status === 404) {
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isSaving.value = false
+      return
+    }
     toast({
       variant: 'error',
       message: err?.response?.data?.message || t('synthetics.newCheck.saveFailed'),
