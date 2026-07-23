@@ -403,12 +403,23 @@ pub async fn list_synthetics(
 )]
 pub async fn create_synthetic(
     Path(org_id): Path<String>,
-    Query(_folder_query): Query<FolderQuery>,
+    Query(folder_query): Query<FolderQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<config::meta::synthetics::Synthetic>,
+    Json(mut body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // The permission gate for POST /synthetics checks the `?folder=` query
+        // param, so the destination folder MUST come from the same place —
+        // otherwise a crafted body.folder_id could create a check in a folder
+        // the user can't access (gate checks query, write used body). Make the
+        // query authoritative and ignore any folder in the body, exactly like
+        // regular alerts' create_alert (get_folder(query)). Default when absent.
+        body.folder_id = folder_query
+            .folder
+            .filter(|f| !f.is_empty())
+            .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
+
         let created_by = user_email.user_id.as_str();
         match o2_enterprise::enterprise::synthetics::service::create_synthetic(
             &org_id, body, created_by,
@@ -429,7 +440,7 @@ pub async fn create_synthetic(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, body);
+        let _ = (org_id, body, folder_query);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
