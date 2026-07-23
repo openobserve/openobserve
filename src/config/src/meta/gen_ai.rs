@@ -41,6 +41,14 @@ pub struct GenAiAgentMappingConfig {
     /// Incoming telemetry attribute names to use as fallbacks for `gen_ai.agent.id`.
     #[serde(default)]
     pub agent_id_fields: Vec<String>,
+
+    /// Incoming telemetry attribute names to use as fallbacks for the agent's environment.
+    #[serde(default)]
+    pub env_fields: Vec<String>,
+
+    /// Incoming telemetry attribute names to use as fallbacks for the agent's version.
+    #[serde(default)]
+    pub version_fields: Vec<String>,
 }
 
 impl GenAiAgentMappingConfig {
@@ -55,6 +63,16 @@ impl GenAiAgentMappingConfig {
             "gen_ai.agent.name",
         )?;
         validate_fields("agent_id_fields", &self.agent_id_fields, "gen_ai.agent.id")?;
+
+        self.env_fields = normalize_fields(self.env_fields);
+        self.version_fields = normalize_fields(self.version_fields);
+
+        validate_fields(
+            "env_fields",
+            &self.env_fields,
+            "deployment.environment.name",
+        )?;
+        validate_fields("version_fields", &self.version_fields, "gen_ai.agent.version")?;
 
         Ok(self)
     }
@@ -124,10 +142,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_agent_mapping_normalizes_env_and_version_fields() {
+        let config = GenAiAgentMappingConfig {
+            agent_name_fields: vec![],
+            agent_id_fields: vec![],
+            env_fields: vec!["  custom.env  ".to_string()],
+            version_fields: vec!["app.build\t".to_string()],
+        }
+        .normalize_and_validate()
+        .unwrap();
+
+        assert_eq!(config.env_fields, vec!["custom.env"]);
+        assert_eq!(config.version_fields, vec!["app.build"]);
+    }
+
+    #[test]
+    fn test_agent_mapping_rejects_redundant_env_version_targets() {
+        let err = GenAiAgentMappingConfig {
+            env_fields: vec!["deployment.environment.name".to_string()],
+            ..Default::default()
+        }
+        .normalize_and_validate()
+        .unwrap_err();
+        assert!(err.contains("redundant target"));
+    }
+
+    #[test]
     fn test_agent_mapping_normalizes_field_names() {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["  agent.name  ".to_string()],
             agent_id_fields: vec!["agent.id\t".to_string()],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap();
@@ -141,6 +186,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["agent".to_string(), "agent".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -153,6 +199,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["   ".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -165,6 +212,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["agent.name;DROP".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -177,6 +225,7 @@ mod tests {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["agent".to_string()],
             agent_id_fields: vec!["agent".to_string()],
+            ..Default::default()
         };
 
         assert!(config.normalize_and_validate().is_ok());
@@ -187,6 +236,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["gen_ai.agent.name".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -200,6 +250,7 @@ mod tests {
             let err = GenAiAgentMappingConfig {
                 agent_name_fields: vec![field.to_string()],
                 agent_id_fields: vec![],
+                ..Default::default()
             }
             .normalize_and_validate()
             .unwrap_err();
