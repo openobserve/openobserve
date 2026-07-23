@@ -125,6 +125,16 @@ const FALLBACKS: Record<string, string> = {
   "--color-chart-metric-text": "#000000",
 };
 
+/**
+ * Count of `--color-trace-span-*` palette tokens, derived from FALLBACKS so it stays
+ * in sync automatically: FALLBACKS mirrors base/dark.css, so adding or removing a
+ * trace-span token updates this without a hand-edited magic number. Used by
+ * utils/traces/traceColors.ts for index wrapping and getAllSpanColors().
+ */
+export const TRACE_SPAN_COLOR_COUNT = Object.keys(FALLBACKS).filter((token) =>
+  token.startsWith("--color-trace-span-"),
+).length;
+
 /** Resolve a `--color-*` (or `--text-*`) design token to its computed value. */
 export function chartColor(token: `--${string}`): string {
   const cached = cache.get(token);
