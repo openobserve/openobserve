@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="rowsPerPageOptions"
             class="select-pagination mr-1 mt-0! ml-1"
             size="sm"
+            :searchable="false"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />

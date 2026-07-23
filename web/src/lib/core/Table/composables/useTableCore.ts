@@ -278,7 +278,12 @@ export function useTableCore<TData>(
           isAction: col.isAction,
           sortable: col.sortable,
           hideable: col.hideable,
-          closable: col.hideable,
+          // Closable (the hover "x" that emits close-column, G4) is OPT-IN per
+          // column via `meta.closable`. It must NOT default to `hideable`:
+          // that put a non-functional "x" on every hideable column of every
+          // table that never wired up @close-column (QA #2239.1 — the
+          // dashboards list showed a dead "x" in its headers).
+          closable: false,
           showWrap: false,
           // Width is independent of sibling columns; OTableHeader/BodyCell pin
           // min+max to the column's CSS size var.
