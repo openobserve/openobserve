@@ -967,6 +967,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -1019,7 +1020,11 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
+const route = useRoute();
 const orgIdentifier = computed(() => (store.state as any).selectedOrganization?.identifier ?? "");
+// The check's folder (name), carried on the results-page route as ?folder=.
+// Passed to per-check API calls so RBAC can resolve folder-scoped grants.
+const folderName = computed(() => String(route.query.folder ?? ""));
 
 // id -> "Name (region)" — run records carry the raw location id (KSUID for
 // private, "aws-us-east-1" for public); resolve to a human label wherever
@@ -1101,7 +1106,7 @@ let monitorTypeResolved = false;
 
 async function resolveMonitorType() {
   try {
-    const res = await syntheticsService.get(orgIdentifier.value, props.monitorId);
+    const res = await syntheticsService.get(orgIdentifier.value, props.monitorId, folderName.value);
     const type = (res.data as any)?.type ?? "browser";
     isBrowser.value = type === "browser";
     monitorTypeResolved = true;
@@ -1196,7 +1201,7 @@ async function handleEmptyStateAction(id: string) {
       timeout: 0,
     });
     try {
-      await syntheticsService.run(orgIdentifier.value, props.monitorId, {});
+      await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderName.value);
       dismiss();
       toast({ variant: "success", message: t('synthetics.toast.triggerSuccessSingle', { name: props.monitorName }) });
       // Emit refresh so parent reloads data

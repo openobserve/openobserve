@@ -6,6 +6,7 @@
 // (those are browser-run concepts).
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { useStore } from 'vuex'
 import OPageHeader from '@/lib/core/PageHeader/OPageHeader.vue'
 import OPageLayout from '@/lib/core/PageLayout/OPageLayout.vue'
@@ -36,6 +37,9 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const store = useStore()
+const route = useRoute()
+// The check's folder (name), carried on the results-page route as ?folder=.
+const folderName = computed(() => String(route.query.folder ?? ''))
 const synthetics = useSyntheticResults()
 
 const run = computed(() => synthetics.protocolRunDetail.value)
@@ -61,7 +65,7 @@ async function loadRun() {
 async function loadAssertionDefs() {
   try {
     const org = store.state.selectedOrganization.identifier
-    const res = await syntheticsService.get(org, props.monitorId)
+    const res = await syntheticsService.get(org, props.monitorId, folderName.value)
     assertionDefs.value = ((res.data as any)?.config?.assertions ?? []) as HttpAssertion[]
   } catch {
     assertionDefs.value = []

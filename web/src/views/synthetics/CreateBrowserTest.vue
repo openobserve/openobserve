@@ -155,7 +155,7 @@ async function loadForEdit(id: string) {
     if (!org) {
       throw new Error('Organization not available')
     }
-    const res = await syntheticsService.get(org, id)
+    const res = await syntheticsService.get(org, id, String(route.query.folder ?? ''))
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>)
     check.value = mapped
     checkName.value = mapped.name

@@ -31,11 +31,15 @@ const syntheticsService = {
 
   update: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
     const params = folderId ? `?folder=${folderId}` : ''
-    return http().put(`/api/${orgIdentifier}/synthetics/${id}`, payload)
+    return http().put(`/api/${orgIdentifier}/synthetics/${id}${params}`, payload)
   },
 
-  get: (orgIdentifier: string, id: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}`),
+  // folderId is the check's folder (name), passed as ?folder= so RBAC can
+  // resolve folder-scoped grants — mirrors alerts' per-item routes.
+  get: (orgIdentifier: string, id: string, folderId?: string) => {
+    const params = folderId ? `?folder=${folderId}` : ''
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}${params}`)
+  },
 
   list: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics`),
@@ -55,31 +59,42 @@ const syntheticsService = {
     return http().delete(`/api/${orgIdentifier}/synthetics${params}`, { data: payload })
   },
 
-  enable: (orgIdentifier: string, id: string, payload: unknown) =>
-    http().put(`/api/${orgIdentifier}/synthetics/${id}/enable`, payload),
+  enable: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
+    const params = folderId ? `?folder=${folderId}` : ''
+    return http().put(`/api/${orgIdentifier}/synthetics/${id}/enable${params}`, payload)
+  },
 
-  run: (orgIdentifier: string, id: string, payload: unknown) =>
-    http().post(`/api/${orgIdentifier}/synthetics/${id}/run`, payload),
+  run: (orgIdentifier: string, id: string, payload: unknown, folderId?: string) => {
+    const params = folderId ? `?folder=${folderId}` : ''
+    return http().post(`/api/${orgIdentifier}/synthetics/${id}/run${params}`, payload)
+  },
 
-  getRuns: (orgIdentifier: string, id: string, params?: Record<string, string | number>) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/runs`, { params }),
+  getRuns: (orgIdentifier: string, id: string, params?: Record<string, string | number>, folderId?: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${id}/runs`, {
+      params: folderId ? { ...(params ?? {}), folder: folderId } : params,
+    }),
 
-  getRun: (orgIdentifier: string, id: string, runId: string) =>
-    http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}`),
+  getRun: (orgIdentifier: string, id: string, runId: string, folderId?: string) => {
+    const params = folderId ? `?folder=${folderId}` : ''
+    return http().get(`/api/${orgIdentifier}/synthetics/${id}/runs/${runId}${params}`)
+  },
 
-  artifactUrl: (orgIdentifier: string, key: string) => {
+  artifactUrl: (orgIdentifier: string, key: string, folderId?: string) => {
     // Fallback proxy URL. key format:
     // synthetics/{org}/{synthetics_id}/{yyyy}/{mm}/{dd}/{run_id}/{execution_id|job_id}/{filename}
     const parts = key.split('/')
     const synthetics_id = parts[2] ?? '_'
-    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}`
+    const folderParam = folderId ? `&folder=${folderId}` : ''
+    return `/api/${orgIdentifier}/synthetics/${synthetics_id}/artifact?key=${encodeURIComponent(key)}${folderParam}`
   },
 
   // Batch-sign artifact download URLs. Returns { mode: "presigned" | "proxy",
   // expires_in, urls: [{key, url}] }. mode is decided by the backend from its
   // storage config (local disk → proxy, S3/MinIO/Azure → presigned).
-  presignArtifacts: (orgIdentifier: string, syntheticsId: string, keys: string[]) =>
-    http().post(`/api/${orgIdentifier}/synthetics/${syntheticsId}/artifacts/presign`, { keys }),
+  presignArtifacts: (orgIdentifier: string, syntheticsId: string, keys: string[], folderId?: string) => {
+    const params = folderId ? `?folder=${folderId}` : ''
+    return http().post(`/api/${orgIdentifier}/synthetics/${syntheticsId}/artifacts/presign${params}`, { keys })
+  },
 
   getLocations: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/locations`),
