@@ -206,11 +206,10 @@ export default class DashboardPanelConfigs {
     await this.toggleAllSectionsBtn.waitFor({ state: "visible" });
     await this.toggleAllSectionsBtn.click();
   }
-  // Select legend position
+  // Select legend position. This is now a segmented toggle (OToggleGroup): the
+  // option items are always visible, so click the matching item directly — no
+  // dropdown trigger to open.
   async legendPosition(position) {
-    const trigger = this.page.locator('[data-test="dashboard-config-legend-position-trigger"]');
-    await trigger.waitFor({ state: "visible" });
-    await trigger.click();
     await this._clickVirtualOption("dashboard-config-legend-position", position);
   }
 

@@ -283,12 +283,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.legendsPositionLabel')"
           v-model="legendsPositionModel"
           data-test="dashboard-config-legend-position"
+          :data-test-selected-value="
+            String(dashboardPanelDataModel.data.config.legends_position)
+          "
         >
           <OToggleGroupItem
             v-for="opt in legendsPositionOptions"
             :key="String(opt.value)"
             :value="toggleItemValue(opt.value)"
             size="sm"
+            data-test="dashboard-config-legend-position-option"
+            :data-test-label="opt.label"
             >{{ opt.label }}</OToggleGroupItem
           >
         </OToggleGroup>
@@ -301,12 +306,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.legendsType')"
           v-model="legendsTypeModel"
           data-test="dashboard-config-legends-scrollable"
+          :data-test-selected-value="
+            String(dashboardPanelDataModel.data.config.legends_type)
+          "
         >
           <OToggleGroupItem
             v-for="opt in legendTypeOptions"
             :key="String(opt.value)"
             :value="toggleItemValue(opt.value)"
             size="sm"
+            data-test="dashboard-config-legends-scrollable-option"
+            :data-test-label="opt.label"
             >{{ opt.label }}</OToggleGroupItem
           >
         </OToggleGroup>
@@ -427,12 +437,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('dashboard.chartAlign')"
           v-model="chartAlignModel"
           data-test="dashboard-config-chart-align"
+          :data-test-selected-value="
+            String(dashboardPanelDataModel.data.config.chart_align)
+          "
         >
           <OToggleGroupItem
             v-for="opt in chartAlignOptions"
             :key="String(opt.value)"
             :value="toggleItemValue(opt.value)"
             size="sm"
+            data-test="dashboard-config-chart-align-option"
+            :data-test-label="opt.label"
             >{{ opt.label }}</OToggleGroupItem
           >
         </OToggleGroup>
