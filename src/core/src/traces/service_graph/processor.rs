@@ -193,14 +193,25 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Build the `COALESCE(child.agent, p1.agent, …, pN.agent, service_name)`
+/// Build the
+/// `COALESCE(child.agent, p1.agent, …, pN.agent, [trace_agent,] service_name)`
 /// nearest-ancestor-agent expression for the tool/model edge `from`. `depth` is
 /// the number of ancestor levels to climb (N). When `has_agent_id`, each level
 /// prefers `agent_id` then `agent_name`. This is what lets a tool/LLM span whose
 /// agent name lives several levels up the parent chain (real Google ADK:
 /// generate_content→chat→execute_tool) still attribute to the owning agent.
+///
+/// When `with_trace_agent`, a per-trace agent level (`ta.agent_name`, joined by
+/// `trace_id`) is inserted just before the `service_name` fallback. This is the
+/// last resort for a span whose direct parent chain is BROKEN — e.g. the
+/// intermediate `generate_content` span was dropped/sampled and never ingested,
+/// so climbing `reference_parent_span_id` hits a missing row and finds no agent
+/// within `depth` hops. Without it those spans mis-attribute to the host
+/// service, drawing a spurious `service → model`/`service → tool` edge instead
+/// of `agent → model`/`agent → tool`. Real agentic traces are single-agent (the
+/// CTE takes MAX per trace_id), so this cannot merge two agents' calls.
 #[cfg(feature = "enterprise")]
-fn build_agent_or_service(has_agent_id: bool, depth: usize) -> String {
+fn build_agent_or_service(has_agent_id: bool, depth: usize, with_trace_agent: bool) -> String {
     let level = |alias: &str| -> String {
         if has_agent_id {
             format!("{alias}.gen_ai_agent_id, {alias}.gen_ai_agent_name")
@@ -212,8 +223,41 @@ fn build_agent_or_service(has_agent_id: bool, depth: usize) -> String {
     for k in 1..=depth {
         parts.push(level(&format!("p{k}")));
     }
+    if with_trace_agent {
+        // The per-trace CTE only carries agent name/id columns (aliased `ta`).
+        parts.push(if has_agent_id {
+            "ta.gen_ai_agent_id, ta.gen_ai_agent_name".to_string()
+        } else {
+            "ta.gen_ai_agent_name".to_string()
+        });
+    }
     parts.push("c.service_name".to_string());
     format!("COALESCE({})", parts.join(", "))
+}
+
+/// The per-trace agent CTE + its `LEFT JOIN`, used as the broken-parent-chain
+/// fallback in `build_agent_or_service` (see there). Returns the `WITH …` CTE
+/// clause (empty string if no agent-id column) and the join clause to splice
+/// into the tool/model queries. One agent per trace is assumed (single-agent
+/// agentic traces); `MAX` gives a deterministic pick if that ever fails to hold.
+#[cfg(feature = "enterprise")]
+fn build_trace_agent_cte(stream_name: &str, has_agent_id: bool, start_time: i64, end_time: i64) -> (String, String) {
+    let id_col = if has_agent_id {
+        ", MAX(gen_ai_agent_id) AS gen_ai_agent_id"
+    } else {
+        ""
+    };
+    let cte = format!(
+        r#"WITH trace_agent AS (
+            SELECT trace_id, MAX(gen_ai_agent_name) AS gen_ai_agent_name{id_col}
+            FROM "{stream_name}"
+            WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != ''
+            GROUP BY trace_id
+        )"#,
+    );
+    let join = "LEFT JOIN trace_agent AS ta ON c.trace_id = ta.trace_id".to_string();
+    (cte, join)
 }
 
 /// Build the chained ancestor `LEFT JOIN`s (p1 on child `c`, p2 on p1, …, pN on
@@ -458,19 +502,29 @@ async fn compute_stream_edges(
             .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
             .unwrap_or(false);
         // The nearest-ancestor-agent-or-service `from` for tool/model. With the
-        // parent-link column present, COALESCE walks child → p1 → … → pN → service;
-        // otherwise it is the flat child-or-service form (no join possible).
+        // parent-link column present, COALESCE walks child → p1 → … → pN →
+        // per-trace agent → service; otherwise it is the flat child-or-service
+        // form (no join possible). The per-trace agent level recovers the owning
+        // agent when the direct parent chain is broken (a dropped intermediate
+        // span), which otherwise mis-attributes the span to the host service.
         let agent_or_service = if has_parent_link {
-            build_agent_or_service(has_agent_id, AGENT_INHERIT_DEPTH)
+            build_agent_or_service(has_agent_id, AGENT_INHERIT_DEPTH, true)
         } else {
             format!("COALESCE({agent_ident}, service_name)")
         };
-        // The chained ancestor LEFT JOINs (p1 on child, p2 on p1, …), shared by
-        // the tool and model queries. Empty when the stream has no parent link.
-        let ancestor_joins = if has_parent_link {
-            build_ancestor_joins(stream_name, AGENT_INHERIT_DEPTH)
+        // The chained ancestor LEFT JOINs (p1 on child, p2 on p1, …) plus the
+        // per-trace agent join, shared by the tool and model queries. Empty when
+        // the stream has no parent link.
+        let (trace_agent_cte, ancestor_joins) = if has_parent_link {
+            let (cte, ta_join) =
+                build_trace_agent_cte(stream_name, has_agent_id, start_time, end_time);
+            let joins = format!(
+                "{}\n                    {ta_join}",
+                build_ancestor_joins(stream_name, AGENT_INHERIT_DEPTH),
+            );
+            (cte, joins)
         } else {
-            String::new()
+            (String::new(), String::new())
         };
 
         // Model identity: prefer request.model, fall back to response.model. Some
@@ -535,7 +589,8 @@ async fn compute_stream_edges(
         let (tool_sql, model_sql) = if has_parent_link {
             (
                 format!(
-                    r#"SELECT {tool_from} AS client, c.gen_ai_tool_name AS server,
+                    r#"{trace_agent_cte}
+                    SELECT {tool_from} AS client, c.gen_ai_tool_name AS server,
                         'tool' AS connection_type, {mc}
                     FROM "{stream_name}" AS c
                     {ancestor_joins}
@@ -546,7 +601,8 @@ async fn compute_stream_edges(
                     GROUP BY {tool_from}, c.gen_ai_tool_name"#,
                 ),
                 format!(
-                    r#"SELECT {model_from} AS client, {model_expr_c} AS server,
+                    r#"{trace_agent_cte}
+                    SELECT {model_from} AS client, {model_expr_c} AS server,
                         'model' AS connection_type, {mc}
                     FROM "{stream_name}" AS c
                     {ancestor_joins}
@@ -710,7 +766,7 @@ mod test {
     // silently collapsing back to a single parent level.
     #[test]
     fn test_agent_or_service_climbs_all_levels() {
-        let expr = super::build_agent_or_service(false, 4);
+        let expr = super::build_agent_or_service(false, 4, false);
         assert_eq!(
             expr,
             "COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name, \
@@ -726,13 +782,65 @@ mod test {
 
     #[test]
     fn test_agent_or_service_prefers_agent_id_when_present() {
-        let expr = super::build_agent_or_service(true, 2);
+        let expr = super::build_agent_or_service(true, 2, false);
         assert_eq!(
             expr,
             "COALESCE(c.gen_ai_agent_id, c.gen_ai_agent_name, \
              p1.gen_ai_agent_id, p1.gen_ai_agent_name, \
              p2.gen_ai_agent_id, p2.gen_ai_agent_name, c.service_name)"
         );
+    }
+
+    // Broken-parent-chain fallback: when a tool/model span's intermediate parent
+    // span was dropped/never ingested, climbing p1..pN finds no agent, so a
+    // per-trace agent level (`ta.*`) must sit just before the service_name
+    // fallback — attributing the span to the trace's agent instead of the host
+    // service. Regression guard for the `service → model`/`service → tool` bug.
+    #[test]
+    fn test_agent_or_service_includes_trace_agent_before_service() {
+        let expr = super::build_agent_or_service(false, 2, true);
+        assert_eq!(
+            expr,
+            "COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name, \
+             p2.gen_ai_agent_name, ta.gen_ai_agent_name, c.service_name)"
+        );
+        // trace-agent sits AFTER the last ancestor and BEFORE service.
+        let ta = expr.find("ta.gen_ai_agent_name").unwrap();
+        let p2 = expr.find("p2.gen_ai_agent_name").unwrap();
+        let svc = expr.find("c.service_name").unwrap();
+        assert!(p2 < ta && ta < svc);
+    }
+
+    #[test]
+    fn test_agent_or_service_trace_agent_with_agent_id() {
+        let expr = super::build_agent_or_service(true, 1, true);
+        assert_eq!(
+            expr,
+            "COALESCE(c.gen_ai_agent_id, c.gen_ai_agent_name, \
+             p1.gen_ai_agent_id, p1.gen_ai_agent_name, \
+             ta.gen_ai_agent_id, ta.gen_ai_agent_name, c.service_name)"
+        );
+    }
+
+    #[test]
+    fn test_trace_agent_cte_groups_by_trace() {
+        let (cte, join) = super::build_trace_agent_cte("mystream", false, 100, 200);
+        // CTE picks one agent per trace within the window.
+        assert!(cte.contains("WITH trace_agent AS"));
+        assert!(cte.contains("MAX(gen_ai_agent_name) AS gen_ai_agent_name"));
+        assert!(cte.contains("GROUP BY trace_id"));
+        assert!(cte.contains("_timestamp >= 100 AND _timestamp < 200"));
+        // No agent-id column requested → not selected.
+        assert!(!cte.contains("gen_ai_agent_id"));
+        // Join is by trace_id onto the child alias `c`.
+        assert_eq!(
+            join,
+            "LEFT JOIN trace_agent AS ta ON c.trace_id = ta.trace_id"
+        );
+
+        // With agent-id, the CTE also carries it.
+        let (cte_id, _) = super::build_trace_agent_cte("mystream", true, 100, 200);
+        assert!(cte_id.contains("MAX(gen_ai_agent_id) AS gen_ai_agent_id"));
     }
 
     #[test]
