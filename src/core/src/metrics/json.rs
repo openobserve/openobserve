@@ -41,6 +41,8 @@ use config::{
 use datafusion::arrow::datatypes::Schema;
 use db;
 use infra::schema::{SchemaCache, get_partition_time_level};
+use ingestion_common::{IngestionResponse, StreamStatus};
+use schema::check_for_schema;
 
 use super::get_exclude_labels;
 use crate::{
@@ -50,9 +52,7 @@ use crate::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
         get_write_partition_key, write_file,
     },
-    ingestion_common::{IngestionResponse, StreamStatus},
     pipeline::batch_execution::ExecutablePipeline,
-    schema::check_for_schema,
 };
 
 const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary"];
@@ -88,7 +88,7 @@ pub async fn ingest(
     org_id: &str,
     stream_name: Option<&str>,
     body: Bytes,
-    user: crate::ingestion_common::IngestUser,
+    user: ingestion_common::IngestUser,
 ) -> Result<IngestionResponse> {
     // check system resource
     if let Err(e) = check_ingestion_allowed(org_id, StreamType::Metrics, stream_name).await {

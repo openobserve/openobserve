@@ -36,12 +36,14 @@ use config::{
     },
 };
 use infra::{errors::Result, schema::get_flatten_level};
+use ingestion_common::{IngestionStatus, StreamStatus};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
 };
 use prost::Message;
+use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
@@ -51,8 +53,6 @@ use crate::{
         check_ingestion_allowed,
         grpc::{get_val, get_val_with_type_retained},
     },
-    ingestion_common::{IngestionStatus, StreamStatus},
-    schema::{get_future_discard_error, get_upto_discard_error},
 };
 
 pub async fn handle_request(

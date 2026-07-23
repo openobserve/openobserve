@@ -47,9 +47,11 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use ingestion_common::IngestUser;
 use promql_parser::{label::MatchOp, parser};
 use prost::Message;
 use proto::prometheus_rpc;
+use schema::{check_for_schema, stream_schema_exists};
 use search_service;
 
 use super::native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram};
@@ -62,9 +64,7 @@ use crate::{
     ingestion::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, write_file,
     },
-    ingestion_common::IngestUser,
     pipeline::batch_execution::ExecutablePipeline,
-    schema::{check_for_schema, stream_schema_exists},
 };
 
 pub async fn remote_write(

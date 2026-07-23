@@ -35,6 +35,7 @@ use infra::{
     errors::{Error, Result},
     schema::{SchemaCache, get_partition_time_level},
 };
+use schema::get_schema_changes;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tokio::sync::{RwLock, mpsc};
@@ -43,7 +44,6 @@ use crate::{
     common::meta::stream::SchemaRecords,
     ingestion::{self, get_thread_id},
     metadata::{Metadata, MetadataItem},
-    schema::get_schema_changes,
 };
 
 const CHANNEL_SIZE: usize = 10240;

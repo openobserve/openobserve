@@ -32,15 +32,15 @@ use config::{
     },
 };
 use infra::errors::Result;
+use ingestion_common::{
+    BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
+};
+use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
 use crate::{
     ingestion::check_ingestion_allowed,
-    ingestion_common::{
-        BulkResponse, BulkResponseError, BulkResponseItem, IngestionRequest, IngestionValueType,
-    },
     logs::{ingestion_log_enabled, log_failed_record},
-    schema::{get_future_discard_error, get_upto_discard_error},
 };
 pub const TS_PARSE_FAILED: &str = "timestamp_parsing_failed";
 pub const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
@@ -50,7 +50,7 @@ pub async fn ingest(
     thread_id: usize,
     org_id: &str,
     body: Bytes,
-    user: crate::ingestion_common::IngestUser,
+    user: ingestion_common::IngestUser,
 ) -> Result<BulkResponse> {
     let start = std::time::Instant::now();
 
@@ -403,8 +403,9 @@ pub fn add_record_status(
 
 #[cfg(test)]
 mod tests {
+    use ingestion_common::IngestUser;
+
     use super::*;
-    use crate::ingestion_common::IngestUser;
 
     #[test]
     fn test_add_record_status() {

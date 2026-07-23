@@ -316,7 +316,7 @@ async fn step_delete_stream(org_id: &str, type_and_name: &str) -> Result<(), any
     // file_list scan. It removes local-disk files, file_list rows, and dump files
     // over the canonical (BASE_TIME, now) range — avoiding the invalid/overflowing
     // (0, i64::MAX) range that query_for_dump rejects.
-    crate::compaction::retention::delete_all(org_id, stream_type, stream_name).await?;
+    compaction::retention::delete_all(org_id, stream_type, stream_name).await?;
 
     // Delete the schema entry (delete_all removes data, not the stream definition).
     crate::db::schema::delete(org_id, stream_name, Some(stream_type)).await?;

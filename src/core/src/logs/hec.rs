@@ -18,12 +18,10 @@ use axum::body::Bytes;
 use config::{get_config, meta::stream::StreamType, utils::json};
 use hashbrown::HashMap;
 use infra::errors::Result;
+use ingestion_common::{HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType};
 use serde::Deserialize;
 
-use crate::{
-    ingestion::check_ingestion_allowed,
-    ingestion_common::{HecResponse, HecStatus, IngestUser, IngestionRequest, IngestionValueType},
-};
+use crate::ingestion::check_ingestion_allowed;
 
 #[derive(Deserialize, Clone)]
 struct HecEntry {

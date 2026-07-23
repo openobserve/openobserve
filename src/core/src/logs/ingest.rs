@@ -41,6 +41,11 @@ use infra::{
     errors::{Error, Result},
     schema::get_flatten_level,
 };
+use ingestion_common::{
+    AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
+    IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
+    IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
+};
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
 use opentelemetry_proto::tonic::{
@@ -49,20 +54,12 @@ use opentelemetry_proto::tonic::{
     metrics::v1::metric::Data,
 };
 use prost::Message;
+use schema::{get_future_discard_error, get_upto_discard_error};
 use serde_json::json;
 use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
-use crate::{
-    ingestion::check_ingestion_allowed,
-    ingestion_common::{
-        AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
-        IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
-        IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
-    },
-    schema::{get_future_discard_error, get_upto_discard_error},
-    service::get_formatted_stream_name,
-};
+use crate::{ingestion::check_ingestion_allowed, service::get_formatted_stream_name};
 
 type LogDataByStream = HashMap<String, (Vec<(i64, json::Map<String, json::Value>)>, Option<usize>)>;
 

@@ -25,7 +25,6 @@ pub mod authz;
 pub mod bootstrap;
 pub mod cache;
 pub mod cluster_info;
-use compaction;
 pub mod dashboards;
 use ::common;
 use ::db;
@@ -38,7 +37,6 @@ pub mod grpc;
 pub mod http;
 pub mod ingestion;
 pub mod ingestion_tokens;
-use ingestion_common;
 pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
@@ -61,7 +59,6 @@ pub mod providers;
 #[cfg(feature = "enterprise")]
 pub mod ratelimit;
 pub mod runtime_metrics;
-use schema;
 pub mod schema_watcher;
 use search_service as search;
 pub mod self_reporting;

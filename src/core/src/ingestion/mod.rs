@@ -42,6 +42,7 @@ use infra::{
     errors::{Error, Result},
     schema::STREAM_RECORD_ID_GENERATOR,
 };
+use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
 use vrl::compiler::runtime::Runtime;
 
@@ -53,7 +54,6 @@ use super::{
 use crate::{
     alerts::alert::AlertExt,
     common::{infra::config::STREAM_ALERTS, meta::stream::SchemaRecords},
-    ingestion_common::IngestionRequest,
 };
 
 pub mod grpc;
