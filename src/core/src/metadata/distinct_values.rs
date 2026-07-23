@@ -235,8 +235,7 @@ impl Metadata for DistinctValues {
                 };
 
                 if let Some(ret) =
-                    super::super::stream::get_stream_retention(&org_id, stream_type, &stream_name)
-                        .await
+                    stream::get_stream_retention(&org_id, stream_type, &stream_name).await
                 {
                     let mut new_settings = infra::schema::get_settings(
                         &org_id,
@@ -246,7 +245,7 @@ impl Metadata for DistinctValues {
                     .await
                     .unwrap_or_default();
                     new_settings.data_retention = ret;
-                    if let Err(e) = super::super::stream::save_stream_settings(
+                    if let Err(e) = stream::save_stream_settings(
                         &org_id,
                         &distinct_stream_name,
                         StreamType::Metadata,

@@ -175,6 +175,7 @@ members = [
     "src/ingestion_common",
     "src/schema",
     "src/compaction",
+    "src/stream",
     "src/enrichment_data",
     "src/common",
     "src/core",
@@ -219,6 +220,7 @@ tantivy_utils = { path = "src/tantivy_utils" }
 ingestion-common = { path = "src/ingestion_common" }
 schema = { path = "src/schema" }
 compaction = { path = "src/compaction" }
+stream = { path = "src/stream" }
 enrichment-data = { path = "src/enrichment_data" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }

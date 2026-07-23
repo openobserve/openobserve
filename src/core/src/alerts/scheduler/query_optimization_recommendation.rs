@@ -21,8 +21,9 @@ use o2_enterprise::enterprise::recommendations::{
     service::{QueryRecommendationEngine, QueryRecommendationService},
 };
 use proto::cluster_rpc::{IngestionData, IngestionRequest, IngestionResponse, IngestionType};
+use stream::get_streams;
 
-use crate::{db::organization, ingestion::ingestion_service, search::search, stream::get_streams};
+use crate::{db::organization, ingestion::ingestion_service, search::search};
 
 #[derive(Clone)]
 pub struct QueryOptimizerContext;

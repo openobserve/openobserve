@@ -19,12 +19,19 @@ enterprise = [
     "openobserve-core/enterprise",
     "promql-service/enterprise",
     "search_service/enterprise",
+    "stream/enterprise",
 ]
-cloud = ["enterprise", "o2_enterprise/cloud", "openobserve-core/cloud"]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-core/cloud",
+    "stream/cloud",
+]
 vectorscan = [
     "openobserve-core/vectorscan",
     "promql-service/vectorscan",
     "search_service/vectorscan",
+    "stream/vectorscan",
 ]
 vortex = [
     "compaction/vortex",
@@ -41,6 +48,7 @@ openobserve-core.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 compaction.workspace = true
+stream.workspace = true
 enrichment-data.workspace = true
 promql-service.workspace = true
 search.workspace = true

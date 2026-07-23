@@ -57,10 +57,10 @@ pub mod otel;
 pub mod service_graph;
 pub mod session;
 
+#[cfg(feature = "cloud")]
+use ::stream::get_stream;
 use config::utils::schema::format_stream_name;
 
-#[cfg(feature = "cloud")]
-use crate::stream::get_stream;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::{

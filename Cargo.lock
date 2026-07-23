@@ -6907,6 +6907,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snap",
+ "stream",
  "svix-ksuid",
  "tikv-jemalloc-ctl",
  "tikv-jemalloc-sys",
@@ -7098,6 +7099,7 @@ dependencies = [
  "serde_json",
  "snap",
  "sourcemap",
+ "stream",
  "svix-ksuid",
  "tantivy_utils",
  "thiserror 2.0.18",
@@ -7154,6 +7156,7 @@ dependencies = [
  "search",
  "search_service",
  "serde_json",
+ "stream",
  "tokio",
  "tonic",
  "transform",
@@ -10664,6 +10667,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9091b6114800a5f2141aee1d1b9d6ca3592ac062dc5decb3764ec5895a47b4eb"
 
 [[package]]
+name = "stream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow-schema",
+ "axum",
+ "chrono",
+ "common",
+ "config",
+ "db",
+ "enrichment-data",
+ "hashbrown 0.16.1",
+ "infra",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "schema",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "string_cache"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10787,6 +10813,7 @@ dependencies = [
  "openobserve-core",
  "serde",
  "serde_json",
+ "stream",
  "svix-ksuid",
  "tokio",
 ]

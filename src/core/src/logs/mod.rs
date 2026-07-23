@@ -19,6 +19,8 @@ use std::{
     time::Instant,
 };
 
+#[cfg(feature = "cloud")]
+use ::stream::get_stream;
 use arrow_schema::{DataType, Field};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use config::{
@@ -42,8 +44,6 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 
-#[cfg(feature = "cloud")]
-use crate::stream::get_stream;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,

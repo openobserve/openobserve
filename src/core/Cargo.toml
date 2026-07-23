@@ -26,6 +26,7 @@ enterprise = [
     "search/enterprise",
     "search_service/enterprise",
     "compaction/enterprise",
+    "stream/enterprise",
     "enrichment-data/enterprise",
     "usage_reporting/enterprise",
 ]
@@ -35,6 +36,7 @@ cloud = [
     "enterprise",
     "o2_enterprise/cloud",
     "common/cloud",
+    "stream/cloud",
 ]
 vectorscan = [
     "db/vectorscan",
@@ -42,6 +44,7 @@ vectorscan = [
     "search/vectorscan",
     "search_service/vectorscan",
     "promql-service/vectorscan",
+    "stream/vectorscan",
 ]
 vortex = [
     "config/vortex",
@@ -67,6 +70,7 @@ search_service.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 compaction.workspace = true
+stream.workspace = true
 enrichment-data.workspace = true
 usage_reporting.workspace = true
 axum.workspace = true
