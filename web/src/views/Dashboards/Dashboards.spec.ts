@@ -64,7 +64,6 @@ vi.mock("@/services/settings", () => ({
 
 import settingsService from "@/services/settings";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";
-import { markExplicitDashboardFolderNav } from "@/utils/dashboard/explicitFolderNav";
 
 // Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, 'removeAttribute', {
@@ -598,31 +597,14 @@ describe("Dashboards.vue", () => {
       expect(wrapper.vm.showFavoritesOnly).toBe(false);
     });
 
-    it("an app-stamped ?folder=default does NOT beat the favorites landing", async () => {
-      // The folder watcher writes ?folder=default into the URL on every
-      // ordinary visit, so a reload always carries it — it is not an explicit
-      // deep link and must not suppress favorites-first.
+    it("?folder=default in the URL wins over the favorites-first landing", async () => {
+      // getFoldersList always guarantees a "default" folder entry, so it is
+      // trusted the same way any other real folder id in the URL already is
+      // — e.g. after the dashboard-view back button pushes ?folder=default,
+      // or after a reload of that same URL.
       useFavoriteDashboards().favorites.value = [
         { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
       ];
-      await router.push({ path: "/dashboards", query: { folder: "default" } });
-      wrapper = shallowMount(Dashboards, {
-        global: buildGlobalConfig(storeWithTwo(), router, i18n),
-      });
-      await settle();
-
-      expect(wrapper.vm.activeFolderId).toBe("__favorites__");
-    });
-
-    it("an explicit back-navigation to folder=default lands on the default folder, not Favorites", async () => {
-      // Regression: the dashboard-view back button marks its target folder
-      // right before pushing ?folder=default. That marker must beat the
-      // favorites-first landing even though the URL alone looks identical to
-      // a plain reload of the stamped URL.
-      useFavoriteDashboards().favorites.value = [
-        { dashboardId: "dash1", folderId: "default", label: "Dashboard 1" },
-      ];
-      markExplicitDashboardFolderNav("default");
       await router.push({ path: "/dashboards", query: { folder: "default" } });
       wrapper = shallowMount(Dashboards, {
         global: buildGlobalConfig(storeWithTwo(), router, i18n),
