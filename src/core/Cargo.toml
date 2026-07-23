@@ -22,10 +22,11 @@ enterprise = [
     "config/enterprise",
     "tantivy_utils/enterprise",
     "promql/enterprise",
+    "promql-service/enterprise",
     "search/enterprise",
     "search_service/enterprise",
     "compaction/enterprise",
-    "enrichment-service/enterprise",
+    "enrichment-data/enterprise",
     "usage_reporting/enterprise",
 ]
 cloud = [
@@ -40,6 +41,7 @@ vectorscan = [
     "o2_enterprise/vectorscan",
     "search/vectorscan",
     "search_service/vectorscan",
+    "promql-service/vectorscan",
 ]
 vortex = [
     "dep:vortex",
@@ -49,6 +51,7 @@ vortex = [
     "search/vortex",
     "search_service/vortex",
     "compaction/vortex",
+    "promql-service/vortex",
 ]
 
 [dependencies]
@@ -59,12 +62,13 @@ transform.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
 promql.workspace = true
+promql-service.workspace = true
 search.workspace = true
 search_service.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 compaction.workspace = true
-enrichment-service.workspace = true
+enrichment-data.workspace = true
 usage_reporting.workspace = true
 axum.workspace = true
 http.workspace = true

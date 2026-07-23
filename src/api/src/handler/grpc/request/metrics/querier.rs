@@ -19,7 +19,7 @@ use config::{meta::stream::StreamType, metrics};
 use futures::Stream;
 use infra::errors;
 use opentelemetry::global;
-use promql::search as SearchService;
+use promql_service::search as SearchService;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -134,7 +134,7 @@ impl Metrics for MetricsQuerier {
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
-            if let Err(e) = promql::search::grpc::data(&req, tx).await {
+            if let Err(e) = promql_service::search::grpc::data(&req, tx).await {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
             #[cfg(feature = "enterprise")]

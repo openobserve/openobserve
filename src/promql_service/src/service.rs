@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Compatibility re-exports for call sites (alerts, HTTP handlers) that mix
-// these with `MetricsQueryRequest` and `search`. New code should depend on the
-// `promql` crate directly.
+//! Request types used by the OpenObserve PromQL query service.
 use config::meta::search::SearchEventType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

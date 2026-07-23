@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use ::promql;
 use alert::to_float;
 use arrow_schema::{DataType, Schema};
 use async_trait::async_trait;
@@ -166,7 +165,7 @@ impl QueryConditionExt for QueryCondition {
                 };
                 let end = end_time;
                 let condition = self.promql_condition.as_ref().unwrap();
-                let req = promql::MetricsQueryRequest {
+                let req = promql_service::MetricsQueryRequest {
                     query: format!(
                         "({}) {} {}",
                         v,
@@ -195,15 +194,21 @@ impl QueryConditionExt for QueryCondition {
                 let is_super_cluster = o2_enterprise::enterprise::common::config::get_config()
                     .super_cluster
                     .enabled;
-                let resp =
-                    match promql::search::search(&trace_id, org_id, &req, "", 0, is_super_cluster)
-                        .await
-                    {
-                        Ok(v) => v,
-                        Err(_) => {
-                            return Ok(eval_results);
-                        }
-                    };
+                let resp = match promql_service::search::search(
+                    &trace_id,
+                    org_id,
+                    &req,
+                    "",
+                    0,
+                    is_super_cluster,
+                )
+                .await
+                {
+                    Ok(v) => v,
+                    Err(_) => {
+                        return Ok(eval_results);
+                    }
+                };
                 let config::meta::promql::value::Value::Matrix(value) = resp else {
                     log::warn!(
                         "Alert evaluate: trace_id: {trace_id}, PromQL query {v} returned unexpected response: {resp:?}"

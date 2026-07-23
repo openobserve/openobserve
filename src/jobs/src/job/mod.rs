@@ -357,7 +357,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // This ensures the stale job recovery task starts even if this ingester
     // never receives a URL enrichment event. Critical for distributed deployments.
     if LOCAL_NODE.is_ingester() {
-        enrichment_service::enrichment_table::init_url_processor();
+        enrichment_data::enrichment_table::init_url_processor();
     }
 
     db::user::cache().await.expect("user cache failed");
@@ -527,7 +527,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         tokio::task::spawn(db::session::watch());
     }
     if LOCAL_NODE.is_ingester() || LOCAL_NODE.is_querier() || LOCAL_NODE.is_alert_manager() {
-        tokio::task::spawn(enrichment_service::enrichment_table::runtime::watch());
+        tokio::task::spawn(enrichment_data::enrichment_table::runtime::watch());
     }
 
     tokio::task::yield_now().await;
@@ -1056,7 +1056,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     // load metrics disk cache
-    tokio::task::spawn(::promql::search::init());
+    tokio::task::spawn(promql_service::search::init());
 
     // start pipeline data retention
     #[cfg(feature = "enterprise")]
@@ -1145,7 +1145,7 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .await
         .expect("Failed to clean up old JSON format enrichment tables");
 
-    enrichment_service::enrichment_table::cache::cache_enrichment_tables()
+    enrichment_data::enrichment_table::cache::cache_enrichment_tables()
         .await
         .expect("EnrichmentTables cache failed");
     // pipelines can potentially depend on enrichment tables, so cached afterwards

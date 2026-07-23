@@ -28,8 +28,8 @@ use futures::StreamExt;
 use infra::errors;
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{auth::UserEmail, ingestion_common::IngestUser, metrics};
-use promql as core_promql;
 use promql_parser::parser;
+use promql_service as core_promql;
 #[cfg(feature = "enterprise")]
 use {config::meta::stream::StreamType, o2_openfga::meta::mapping::OFGA_MODELS};
 

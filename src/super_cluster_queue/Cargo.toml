@@ -10,7 +10,7 @@ default = []
 enterprise = [
     "dep:o2_enterprise",
     "compaction/enterprise",
-    "enrichment-service/enterprise",
+    "enrichment-data/enterprise",
     "openobserve-core/enterprise",
 ]
 vectorscan = ["o2_enterprise/vectorscan"]
@@ -28,7 +28,7 @@ log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-core.workspace = true
 compaction.workspace = true
-enrichment-service.workspace = true
+enrichment-data.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 svix-ksuid.workspace = true

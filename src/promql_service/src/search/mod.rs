@@ -39,6 +39,7 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
+use promql::{DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end, micros};
 use proto::cluster_rpc;
 use search_service::server_internal_error;
 use tracing::{Instrument, info_span};
@@ -49,9 +50,7 @@ use {
     search_service::SEARCH_SERVER,
 };
 
-use crate::{
-    DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, MetricsQueryRequest, adjust_start_end, micros,
-};
+use crate::MetricsQueryRequest;
 
 mod cache;
 pub mod grpc;

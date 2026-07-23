@@ -22,7 +22,7 @@ use proto::cluster_rpc;
 
 #[cfg(test)]
 mod tests {
-    use promql::MetricsQueryRequest;
+    use promql_service::MetricsQueryRequest;
 
     use super::*;
 

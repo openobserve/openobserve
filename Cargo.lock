@@ -4092,7 +4092,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "enrichment-service"
+name = "enrichment-data"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -6814,7 +6814,7 @@ dependencies = [
  "datafusion-functions-json",
  "datafusion-proto",
  "db",
- "enrichment-service",
+ "enrichment-data",
  "env_logger",
  "expect-test",
  "faststr",
@@ -6941,7 +6941,7 @@ dependencies = [
  "config",
  "datafusion",
  "db",
- "enrichment-service",
+ "enrichment-data",
  "flate2",
  "flight",
  "futures",
@@ -6971,7 +6971,7 @@ dependencies = [
  "opentelemetry-proto",
  "parking_lot 0.12.5",
  "pprof",
- "promql",
+ "promql-service",
  "prost 0.14.3",
  "proto",
  "rand 0.10.1",
@@ -7079,6 +7079,7 @@ dependencies = [
  "openobserve-core",
  "promql",
  "promql-parser",
+ "promql-service",
  "proto",
  "search",
  "search_service",
@@ -7132,7 +7133,7 @@ dependencies = [
  "datafusion",
  "db",
  "enrichment",
- "enrichment-service",
+ "enrichment-data",
  "flate2",
  "futures",
  "futures-util",
@@ -7160,6 +7161,7 @@ dependencies = [
  "prometheus",
  "promql",
  "promql-parser",
+ "promql-service",
  "prost 0.14.3",
  "prost-wkt-types",
  "proto",
@@ -7215,7 +7217,7 @@ dependencies = [
  "compaction",
  "config",
  "db",
- "enrichment-service",
+ "enrichment-data",
  "futures",
  "hashbrown 0.16.1",
  "infra",
@@ -7226,7 +7228,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-core",
  "prometheus",
- "promql",
+ "promql-service",
  "proto",
  "regex",
  "report_server",
@@ -8026,13 +8028,11 @@ name = "promql"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
- "arrow",
  "async-recursion",
  "async-trait",
  "chrono",
  "config",
  "datafusion",
- "db",
  "expect-test",
  "futures",
  "hashbrown 0.16.1",
@@ -8041,20 +8041,11 @@ dependencies = [
  "log",
  "o2_enterprise",
  "promql-parser",
- "prost 0.14.3",
- "proto",
  "rayon",
  "regex",
- "search",
- "search_service",
- "serde",
  "strum 0.28.0",
  "tokio",
- "tonic",
  "tracing",
- "tracing-opentelemetry",
- "usage_reporting",
- "utoipa",
 ]
 
 [[package]]
@@ -8069,6 +8060,37 @@ dependencies = [
  "lrpar",
  "regex",
  "unescaper",
+]
+
+[[package]]
+name = "promql-service"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "async-trait",
+ "config",
+ "datafusion",
+ "db",
+ "futures",
+ "hashbrown 0.16.1",
+ "infra",
+ "itertools 0.14.0",
+ "log",
+ "o2_enterprise",
+ "promql",
+ "promql-parser",
+ "prost 0.14.3",
+ "proto",
+ "rayon",
+ "search",
+ "search_service",
+ "serde",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-opentelemetry",
+ "usage_reporting",
+ "utoipa",
 ]
 
 [[package]]
@@ -10840,7 +10862,7 @@ dependencies = [
  "compaction",
  "config",
  "db",
- "enrichment-service",
+ "enrichment-data",
  "infra",
  "log",
  "o2_enterprise",

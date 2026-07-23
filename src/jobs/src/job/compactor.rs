@@ -260,6 +260,6 @@ async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     if let Err(e) = infra::dist_lock::unlock(&locker).await {
         log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
     }
-    enrichment_service::enrichment::storage::remote::run_merge_job().await;
+    enrichment_data::enrichment::storage::remote::run_merge_job().await;
     Ok(())
 }

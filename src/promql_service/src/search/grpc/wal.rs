@@ -29,6 +29,7 @@ use datafusion::{
 };
 use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
+use promql::utils::{apply_label_selector, apply_matchers};
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
 use search::{
@@ -44,10 +45,7 @@ use search::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::{
-    search::grpc::Context,
-    utils::{apply_label_selector, apply_matchers},
-};
+use crate::search::grpc::Context;
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(

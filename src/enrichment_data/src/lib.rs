@@ -15,5 +15,7 @@
 
 #![recursion_limit = "256"]
 
+//! Enrichment table persistence, caching, and data loading.
+
 pub mod enrichment;
 pub mod enrichment_table;
