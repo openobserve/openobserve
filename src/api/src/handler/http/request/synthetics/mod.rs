@@ -405,7 +405,7 @@ pub async fn create_synthetic(
     Path(org_id): Path<String>,
     Query(folder_query): Query<FolderQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(mut body): Json<config::meta::synthetics::Synthetic>,
+    Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
@@ -415,6 +415,9 @@ pub async fn create_synthetic(
         // the user can't access (gate checks query, write used body). Make the
         // query authoritative and ignore any folder in the body, exactly like
         // regular alerts' create_alert (get_folder(query)). Default when absent.
+        // (`mut` re-bind here, not in the signature, so the OSS build — where
+        // this block is cfg'd out — doesn't warn about an unused `mut`.)
+        let mut body = body;
         body.folder_id = folder_query
             .folder
             .filter(|f| !f.is_empty())
