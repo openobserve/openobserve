@@ -9393,6 +9393,8 @@
     "dialog": {
       "bulkDeleteBody": "Are you sure you want to delete {count} check(s)? This action cannot be undone.",
       "bulkDeleteTitle": "Delete Checks",
+      "deleteSingleBody": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+      "deleteSingleTitle": "Delete Check",
       "duplicateTitle": "Duplicate Check"
     },
     "empty": {

@@ -89,6 +89,7 @@
           @duplicate="duplicateMonitor"
           @run="runMonitor"
           @delete="deleteMonitor"
+          @move="moveSingleMonitor"
           @update:selected-ids="selectedMonitorIds = $event"
           @delete-selected="openBulkDeleteConfirm"
           @move-selected="moveMultipleMonitors"
@@ -304,12 +305,14 @@ import syntheticsService from '@/services/synthetics'
 import { locationDisplayLabel } from '@/utils/synthetics/format'
 import { getFoldersListByType } from '@/utils/commons'
 import { toast } from '@/lib/feedback/Toast/useToast'
+import { useConfirmDialog } from '@/composables/useConfirmDialog'
 
 
 const router  = useRouter();
 const route   = useRoute();
 const store   = useStore();
 const { t }   = useI18n();
+const { confirm } = useConfirmDialog();
 
 // ── API types ──────────────────────────────────────────────────────────
 interface ApiMonitorFrequency {
@@ -557,6 +560,11 @@ const bulkDeleteMonitors = async () => {
 
 const moveMultipleMonitors = () => {
   monitorsToMove.value = [...selectedMonitorIds.value]
+  showMoveDialog.value = true
+}
+
+const moveSingleMonitor = (row: any) => {
+  monitorsToMove.value = [String(row.id)]
   showMoveDialog.value = true
 }
 
@@ -943,6 +951,12 @@ async function runMonitor(m: any) {
 }
 
 async function deleteMonitor(m: any) {
+  const ok = await confirm({
+    title: t('synthetics.dialog.deleteSingleTitle'),
+    message: t('synthetics.dialog.deleteSingleBody', { name: m.name }),
+  })
+  if (!ok) return
+
   const org = orgIdentifier.value
   const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.deletingSingle'), timeout: 0 })
   try {
