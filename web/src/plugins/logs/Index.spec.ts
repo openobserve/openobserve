@@ -796,8 +796,8 @@ describe("Logs Index", async () => {
   });
 
   it("fullSQLMode true -> must NOT overwrite the restored query while a URL/share-link restore is in progress (shouldIgnoreWatcher guard)", async () => {
-    const setQuerySpy = vi.spyOn(wrapper.vm, 'setQuery');
-    const updateSpy = vi.spyOn(wrapper.vm, 'updateUrlQueryParams');
+    const setQuerySpy = vi.spyOn(wrapper.vm, "setQuery");
+    const updateSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
 
     // Simulate restoreUrlQueryParams(): it raises shouldIgnoreWatcher and sets the
     // SQL query itself, then flips SQL mode ON. The watcher must stand down so it
