@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           'bg-badge-success-solid-bg':
                             group.status === 'all-pass',
                           'bg-color-badge-orange-solid-bg':
-                            group.status === 'mixed',
+                            group.status === 'mixed' || group.status === 'all-warning',
                           'bg-color-badge-error-solid-bg':
                             group.status === 'all-fail',
                         }"
@@ -128,11 +128,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <span
                         class="w-2 h-2 rounded-full shrink-0"
-                        :class="
-                          exec.status === 'pass'
-                            ? 'bg-[var(--color-badge-success-solid-bg)]'
-                            : 'bg-[var(--color-badge-error-solid-bg)]'
-                        "
+                        :class="{
+                          'bg-[var(--color-badge-success-solid-bg)]':
+                            exec.status === 'pass',
+                          'bg-[var(--color-badge-warning-solid-bg)]':
+                            exec.status === 'warning',
+                          'bg-[var(--color-badge-error-solid-bg)]':
+                            exec.status === 'fail' || exec.status === 'error',
+                        }"
                       />
                       <img
                         v-if="browserIconUrl(exec.browserEngine)"
@@ -199,13 +202,13 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "fail";
+  status: "pass" | "warning" | "fail" | "error";
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   color: string;
   title: string;
   /** Epoch ms of the first execution in this logical run. */
@@ -238,12 +241,12 @@ const browserIconUrl = (name: string): string => {
 
 interface ExecGroup {
   location: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   executions: TimelineExecution[];
 }
 
 function passCountLocal(execs: TimelineExecution[]): number {
-  return execs.filter((e) => e.status === "pass").length;
+  return execs.filter((e) => e.status === "pass" || e.status === "warning").length;
 }
 function failCountLocal(execs: TimelineExecution[]): number {
   return execs.filter((e) => e.status === "fail").length;

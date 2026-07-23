@@ -24,13 +24,13 @@ interface TimelineExecution {
   location: string;
   browserEngine: string;
   device: string;
-  status: "pass" | "fail";
+  status: "pass" | "warning" | "fail" | "error";
   errorSnippet: string | null;
 }
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "mixed" | "all-fail";
+  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
   color: string;
   title: string;
   timestampMs: number;
