@@ -230,16 +230,6 @@ const columns = computed<OTableColumnDef[]>(() => [
     hideable: true,
   },
   {
-    id: "checksPerMin",
-    header: t("synthetics.privateLocations.table.checksPerMin"),
-    accessorKey: "checks_per_min",
-    size: 90,
-    minSize: 70,
-    sortable: true,
-    meta: { align: "right" },
-    hideable: true,
-  },
-  {
     id: "lastSeen",
     header: t("synthetics.privateLocations.table.lastSeen"),
     accessorKey: "last_seen_at",
