@@ -524,7 +524,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OContextMenuItem
             data-test="log-context-menu-include-term"
             @select="
-              addSearchTerm(contextCell.columnId, contextCell.value, 'include')
+              addSearchTerm(
+                contextCell.columnId,
+                toSearchTermValue(contextCell.value),
+                'include',
+              )
             "
           >
             <!-- size="sm" matches the registry icons on the other items so the
@@ -541,7 +545,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OContextMenuItem
             data-test="log-context-menu-exclude-term"
             @select="
-              addSearchTerm(contextCell.columnId, contextCell.value, 'exclude')
+              addSearchTerm(
+                contextCell.columnId,
+                toSearchTermValue(contextCell.value),
+                'exclude',
+              )
             "
           >
             <template #icon-left>
@@ -1100,6 +1108,29 @@ const addSearchTerm = (
   action: string,
 ) => {
   emits("addSearchTerm", field, field_value, action);
+};
+
+/**
+ * A log row is arbitrary JSON, so a right-clicked cell holds an unknown value,
+ * while the filter builder downstream (getFilterExpressionByFieldType) takes a
+ * primitive and interpolates it into the query expression.
+ *
+ * Primitives pass through untouched — the builder needs the real type to emit
+ * the unquoted form for int64/float64/boolean schema fields. null/undefined
+ * collapse to the "null" sentinel the builder already special-cases into
+ * `is null` / `is not null`. Objects and arrays are serialised, so a nested
+ * value reaches the query as its JSON rather than "[object Object]".
+ */
+const toSearchTermValue = (value: unknown): string | number | boolean => {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+  if (value === null || value === undefined) return "null";
+  return JSON.stringify(value);
 };
 const addFieldToTable = (value: string) => {
   emits("addFieldToTable", value);
