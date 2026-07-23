@@ -509,6 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             virtual-scroll
             :fill-height="false"
             :scroll-el="scrollContainerRef"
+            :horizontal-scroll="!searchObj.meta.toggleSourceWrap"
             :scroll-margin="0"
             :default-columns="false"
             :show-global-filter="false"
