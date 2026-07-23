@@ -29,7 +29,6 @@ const i18n = createI18n({
       pipeline: {
         unsavedChanges: 'You have unsaved changes',
         emptyCanvas: 'Drag and drop nodes from the sidebar to start building your pipeline',
-        dragDropNodesHere: 'Drag and drop nodes here',
         dropHere: 'Drop here'
       }
     }
@@ -59,9 +58,15 @@ vi.mock("@vue-flow/core", () => ({
       "connect", "dragover", "dragleave"
     ]
   },
+  // The empty-canvas start node renders the shared FlowNodeCard, which imports
+  // Handle + Position from this module.
+  Handle: { name: "Handle", props: ["id", "type", "position"], template: "<div class='mock-handle' />" },
+  Position: { Top: "top", Right: "right", Bottom: "bottom", Left: "left" },
   useVueFlow: () => ({
     onInit: vi.fn(),
     setViewport: vi.fn().mockImplementation((params) => mockSetViewport(params)),
+    // The start node scales itself by the live viewport zoom.
+    viewport: { value: { x: 0, y: 0, zoom: 1 } },
   }),
 }));
 
@@ -264,11 +269,11 @@ describe("PipelineFlow.vue", () => {
   });
 
   // Test 8: Empty canvas text is shown when no nodes
-  it("should show empty canvas text when no nodes exist", () => {
+  it("should show the start node when no nodes exist", () => {
     wrapper = mountComponent();
-    const emptyTextEl = wrapper.find('[data-test="pipeline-flow-empty-text"]');
-    expect(emptyTextEl.exists()).toBe(true);
-    expect(emptyTextEl.text()).toBe('Drag and drop nodes here');
+    const startNode = wrapper.find('[data-test="pipeline-flow-start-node"]');
+    expect(startNode.exists()).toBe(true);
+    expect(startNode.text()).toBe('pipeline.chooseSource');
   });
 
   // Test 9: Empty canvas text is hidden when nodes exist

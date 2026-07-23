@@ -26,9 +26,12 @@ export interface OCollapsibleProps {
   /**
    * Visual layout variant.
    * - `'default'` — chevron on the right, rounded trigger (general content sections)
-   * - `'sidebar'` — chevron on the left, flush trigger (sidebar/config panel sections)
+   * - `'sidebar'` — chevron on the left, flush trigger (generic sidebar sections)
+   * - `'config'`  — dashboard panel config: leading icon, right chevron, an
+   *   open-state accent (tinted header + left accent bar + accent icon) and a
+   *   sticky header. Scoped to the panel config sidebar; do not reuse elsewhere.
    */
-  variant?: "default" | "sidebar";
+  variant?: "default" | "sidebar" | "config";
   /** Extra classes applied directly to the trigger button element. */
   triggerClass?: string;
 }

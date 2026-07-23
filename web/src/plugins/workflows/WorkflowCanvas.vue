@@ -29,7 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:edges="workflowObj.currentSelectedWorkflow.edges"
     class="workflow-flow o2vf_node"
     :class="{ 'workflow-flow--readonly': readOnly }"
-    :default-viewport="{ zoom: 0.9 }"
+    :connect-on-click="false"
+    :default-viewport="{ zoom: 0.8 }"
     :min-zoom="0.2"
     :max-zoom="4"
     :nodes-draggable="!readOnly"
@@ -74,15 +75,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
 
-    <Controls :show-interactive="false" class="controls-grp" position="top-left" />
+    <Controls :show-interactive="false" class="controls-grp" position="top-left">
+      <!-- Node-rail toggle, same as the pipeline canvas: `#top` puts it ABOVE
+           zoom-in / zoom-out / fit-view, and the glyph is a bare 32x32
+           currentColor <svg> so it matches Vue Flow's own control icons. -->
+      <template #top>
+        <ControlButton
+          data-test="workflow-palette-collapse-btn"
+          :title="workflowObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')"
+          @click="workflowObj.showNodePalette = !workflowObj.showNodePalette"
+        >
+          <!-- » chevrons; mirrored in place to « once the rail is open. -->
+          <svg viewBox="0 0 32 32">
+            <path
+              :transform="workflowObj.showNodePalette ? 'translate(32,0) scale(-1,1)' : undefined"
+              d="M2 5.5 5.5 2 19.5 16 5.5 30 2 26.5 12.5 16ZM14.5 5.5 18 2 32 16 18 30 14.5 26.5 25 16Z"
+            />
+          </svg>
+        </ControlButton>
+      </template>
+    </Controls>
   </VueFlow>
 
+  <!-- Empty-canvas start node (replaces the old "add a trigger" hint text). An
+       OVERLAY, not a Vue Flow node: a real node would land in
+       `currentSelectedWorkflow.nodes` and show up in save, validation and the
+       dirty flag. It borrows `vue-flow__node-input` so it is chrome-for-chrome
+       the same card a trigger renders as — picking one swaps the icon and
+       label, and the frame never moves. Read-only Runs canvases show nothing.
+
+       The wrapper carries `o2vf_node` because every shared node rule is scoped
+       under it, and on THIS canvas that class sits on the VueFlow element the
+       placeholder is a sibling of — without it the card gets no chrome at all
+       (the pipeline canvas has it on the container, so it inherits it there). -->
   <div
-    v-if="isCanvasEmpty"
-    data-test="workflow-flow-empty-text"
-    class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--color-text-secondary)] text-[1.3em] text-center pointer-events-none z-10"
+    v-if="isCanvasEmpty && !readOnly"
+    class="o2vf_node absolute top-32 left-1/2 -translate-x-1/2 z-10"
   >
-    {{ t("workflow.canvasEmpty") }}
+    <!-- Scaled by the LIVE viewport zoom: real nodes are drawn inside
+         `.vue-flow__viewport`, which carries the canvas transform, so an
+         unscaled overlay renders larger than the node it stands in for.
+
+         `relative!` / `origin-top!` undo two things `.vue-flow__node` sets for
+         nodes VUE FLOW positions: `position:absolute` (which took this card out
+         of flow, collapsing the centring wrapper to zero width) and
+         `transform-origin:0 0` (which scaled it toward the top-left). -->
+    <div
+      data-test="workflow-flow-start-node"
+      class="vue-flow__node vue-flow__node-input relative! origin-top! w-max whitespace-nowrap scale-[var(--ghost-zoom,1)] cursor-pointer!"
+      :style="{ '--ghost-zoom': viewport.zoom }"
+      @click="openTriggerPicker($event)"
+    >
+      <FlowNodeCard
+        icon="add"
+        io-type="input"
+        :has-input="false"
+        :has-output="false"
+      >
+        <template #body>{{ t("workflow.chooseTrigger") }}</template>
+      </FlowNodeCard>
+    </div>
   </div>
 </template>
 
@@ -94,10 +146,11 @@ import "@/components/flow/flow-canvas.css";
 import { ref, computed } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
-import { Controls } from "@vue-flow/controls";
+import { Controls, ControlButton } from "@vue-flow/controls";
 import { useI18n } from "vue-i18n";
 import WorkflowNode from "./WorkflowNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
+import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import useWorkflowCanvas from "./useWorkflowCanvas";
 
 import "@vue-flow/core/dist/style.css";
@@ -113,6 +166,7 @@ const {
   onConnect,
   onDrop,
   onDragOver,
+  openTriggerPicker,
 } = useWorkflowCanvas();
 
 const { onNodesInitialized, setViewport, viewport, dimensions, findNode } =
