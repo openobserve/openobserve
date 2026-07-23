@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                collide. -->
             <div
               v-for="row in virtualizer.getVirtualItems()"
-              :key="row.key"
+              :key="row.key as PropertyKey"
               class="absolute top-0 left-0 w-full pb-3"
               :class="isGrid ? 'grid gap-3' : 'flex flex-col gap-3'"
               :style="{
