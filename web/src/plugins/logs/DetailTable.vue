@@ -56,6 +56,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div class="flex items-center gap-2 pr-3 shrink-0">
         <O2AIContextAddBtn
+          size="icon-xs-circle"
+          image-height="14px"
+          image-width="14px"
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
         />
