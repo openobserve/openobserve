@@ -4,6 +4,12 @@ name: E2E Council Caller (openobserve)
 # auto-on-merge), DISPATCH the E2E Council engine that lives in the PRIVATE o2-enterprise repo,
 # authenticated with the org-admin PAT. This mirrors docgen-caller.yml.
 #
+# SEE ALSO: `e2e-council-batch.yml` — scheduled/manual BATCH orchestrator that fires the same
+# engine across every CLOSED issue labelled `Needs-Automation` and aggregates into ONE regression
+# PR. Kept as a separate file because it has a different trigger surface (workflow_dispatch +
+# schedule, no comment door), different failure semantics (partial success is normal), and a
+# different auth model (no per-commenter gate). Both callers dispatch the same `e2e-council.yml`.
+#
 # WHY DISPATCH (not `workflow_call`/`uses:`): a cross-repo reusable-workflow call would require the
 # private repo to grant this repo an Actions *access policy*. A PAT with `Actions: R/W` on
 # o2-enterprise can trigger its `workflow_dispatch` with no such org/repo setting. The engine then
