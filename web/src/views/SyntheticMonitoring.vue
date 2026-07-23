@@ -579,6 +579,8 @@ const onMoveUpdated = async () => {
 const openDetail = (monitor: any) => {
   const query: Record<string, string> = { name: monitor.name, folder: monitor.folder_name }
   if (monitor.lastTriggeredAt > 0) query.last_triggered_at = String(monitor.lastTriggeredAt)
+  const orgIdentifier = route.query.org_identifier
+  if (typeof orgIdentifier === "string" && orgIdentifier) query.org_identifier = orgIdentifier
   router.push({
     name: 'synthetic-monitor-results',
     params: { id: String(monitor.id) },
@@ -700,8 +702,19 @@ const enrichedMonitors = computed(() => {
   }))
 })
 
+// Monitors filtered by type, search, and location — used for status counts
+// so they reflect the currently visible subset. Status is excluded so selecting
+// "Failed" doesn't zero out all other status counts.
+const filteredStatusMonitors = computed(() =>
+  enrichedMonitors.value.filter(m =>
+    (typeFilter.value === 'all'   || m.type === typeFilter.value) &&
+    (locationFilter.value === 'all' || m.locations.includes(locationFilter.value)) &&
+    (!search.value || m.name.toLowerCase().includes(search.value.toLowerCase()) || m.url.toLowerCase().includes(search.value.toLowerCase()))
+  )
+)
+
 const statusTabs = computed(() => {
-  const ms = enrichedMonitors.value
+  const ms = filteredStatusMonitors.value
   const tabs = [
     { filter: 'all',      label: t('synthetics.filters.allStatuses'),      count: ms.length },
     { filter: 'passed',   label: t('synthetics.filters.passed'),   count: ms.filter(m => m.status === 'passed').length },
