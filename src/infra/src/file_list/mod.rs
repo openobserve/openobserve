@@ -26,7 +26,10 @@ use config::{
     utils::time::second_micros,
 };
 
-use crate::errors::{Error, Result};
+use crate::{
+    errors::{Error, Result},
+    storage,
+};
 
 pub mod pending_delete;
 pub mod postgres;
@@ -351,6 +354,23 @@ pub async fn bloom_ver_referenced(
 #[tracing::instrument(name = "infra:file_list:db:update_compressed_size")]
 pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
     CLIENT.update_compressed_size(file, size).await
+}
+
+/// Remove a parquet file from the metastore and optionally from object storage.
+pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool) -> Result<()> {
+    batch_process(&[FileKey::new(
+        0,
+        account.to_string(),
+        key.to_string(),
+        Default::default(),
+        true,
+    )])
+    .await?;
+
+    if !file_list_only {
+        _ = storage::del(vec![(account, key)]).await;
+    }
+    Ok(())
 }
 
 #[inline]

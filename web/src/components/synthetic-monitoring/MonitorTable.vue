@@ -218,6 +218,32 @@
           </template>
 
           <ODropdownItem
+            :data-test="`${dataTest}-move-item`"
+            @select="emit('move', row)"
+          >
+            <template #icon-left>
+              <OIcon name="drive-file-move" size="sm" />
+            </template>
+            {{ t('synthetics.table.move') }}
+          </ODropdownItem>
+
+          <ODropdownSeparator />
+
+          <ODropdownItem
+            variant="destructive"
+            shortcut-id="alertsRowDelete"
+            :data-test="`${dataTest}-delete-item`"
+            @select="emit('delete', row)"
+          >
+            <template #icon-left>
+              <OIcon name="delete" size="sm" />
+            </template>
+            {{ t('synthetics.table.delete') }}
+          </ODropdownItem>
+
+          <ODropdownSeparator />
+
+          <ODropdownItem
             :data-test="`${dataTest}-run-item`"
             :disabled="!!props.triggerLoadingMap[(row as any).id]"
             @select="emit('run', row)"
@@ -226,19 +252,6 @@
               <OIcon name="sound-sampler" size="sm" />
             </template>
             {{ t('synthetics.table.trigger') }}
-          </ODropdownItem>
-
-          <ODropdownSeparator />
-
-          <ODropdownItem
-            variant="destructive"
-            :data-test="`${dataTest}-delete-item`"
-            @select="emit('delete', row)"
-          >
-            <template #icon-left>
-              <OIcon name="delete" size="sm" />
-            </template>
-            {{ t('synthetics.table.delete') }}
           </ODropdownItem>
         </ODropdown>
       </div>
@@ -409,6 +422,7 @@ const emit = defineEmits<{
   'duplicate': [row: any]
   'run': [row: any]
   'delete': [row: any]
+  'move': [row: any]
   'update:selectedIds': [ids: string[]]
   'delete-selected': []
   'move-selected': []

@@ -49,7 +49,7 @@ use {
     db::search_job::{search_job_partitions::*, search_jobs::*},
     hashbrown::HashMap,
     infra::table::entity::search_jobs::Model as JobModel,
-    openobserve_core::search_jobs::{get_result, merge_response},
+    search_service::search_jobs::{get_result, merge_response},
     tracing::Span,
 };
 

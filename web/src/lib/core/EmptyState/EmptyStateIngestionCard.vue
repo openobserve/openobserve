@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="es-ing-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 hover:shadow-md hover:border-primary-400 hover:bg-tabs-hover-bg focus-visible:ring-2 focus-visible:ring-primary-500/40"
+    class="es-ing-card group relative flex items-center gap-3 flex-1 basis-56 min-w-0 max-w-72 min-h-16 py-2.5 pr-3.5 pl-3 rounded-default border border-border-default bg-surface-base text-left cursor-pointer outline-none transition-[color,background-color,border-color,box-shadow] duration-150 hover:shadow-md hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-2 focus-visible:ring-accent/40"
     @click="emit('click')"
   >
     <span class="es-ing-card__icon inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-default bg-tabs-active-bg text-tabs-active-text transition-[background-color,color] duration-150" :class="iconClass">
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-compact font-semibold text-text-heading truncate">{{ label }}</span>
       <span v-if="sublabel" class="text-xs text-text-secondary leading-[1.4]">{{ sublabel }}</span>
     </span>
-    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-primary-600" />
+    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron shrink-0 text-text-disabled transition-[transform,color] duration-150 group-hover:translate-x-0.5 group-hover:text-accent" />
   </button>
 </template>
 

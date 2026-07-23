@@ -406,7 +406,9 @@ async function saveCheck() {
       dismiss()
       toast({ variant: 'success', message: t('synthetics.newCheck.updated') })
       isDirty.value = false
-      router.push({ name: 'synthetics', query: { folder: check.value.folder } })
+      if (currentStep.value !== 1) {
+        router.push({ name: 'synthetics', query: { folder: check.value.folder } })
+      }
     } else {
       const res = await syntheticsService.create(org, apiPayload.value, check.value.folder)
       const savedId = res.data?.id ?? crypto.randomUUID()

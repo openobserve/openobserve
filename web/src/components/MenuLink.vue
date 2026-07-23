@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="icon-wrapper relative inline-flex items-center justify-center rounded-default p-0.5 transition-colors duration-250"
         :class="isActive
           ? activeIconClass
-          : 'text-tabs-inactive-text group-hover:text-primary-600'"
+          : 'text-tabs-inactive-text group-hover:text-accent'"
       >
         <!-- Rail icons are a hair smaller than the md (24px) default. -->
         <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="nav-menu-item-label text-xs tracking-[0.01em] transition-colors duration-250 w-full text-center leading-tight line-clamp-2 wrap-normal break-normal [hyphens:none]"
         :class="isActive
           ? activeLabelClass
-          : 'font-medium text-tabs-inactive-text group-hover:text-primary-600'"
+          : 'font-medium text-tabs-inactive-text group-hover:text-accent'"
       >{{ title }}</div>
     </div>
 
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="asTrigger || submenu"
       class="absolute right-1 top-3 transition-opacity duration-150"
       :class="isActive || expanded
-        ? 'opacity-100 text-primary-600'
+        ? 'opacity-100 text-accent'
         : 'opacity-70 group-hover:opacity-100 text-tabs-inactive-text'"
       aria-hidden="true"
     >
@@ -196,19 +196,19 @@ export default defineComponent({
       if (slideActive.value) {
         return isDark.value
           ? "text-tabs-active-text border-l-2 border-transparent"
-          : "text-primary-700 border-l-2 border-transparent";
+          : "text-accent border-l-2 border-transparent";
       }
       return isDark.value
-        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-primary-400"
-        : "text-primary-700 bg-surface-base border-l-2 border-primary-600";
+        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-accent"
+        : "text-accent bg-surface-base border-l-2 border-accent";
     });
     const activeIconClass = computed(() =>
-      isDark.value ? "text-tabs-active-text!" : "text-primary-700!",
+      isDark.value ? "text-tabs-active-text!" : "text-accent!",
     );
     const activeLabelClass = computed(() =>
       isDark.value
         ? "font-semibold text-tabs-active-text!"
-        : "font-semibold text-primary-600!",
+        : "font-semibold text-accent!",
     );
 
     // Compute ARIA label with fallback
@@ -271,7 +271,7 @@ export default defineComponent({
 
     const rootClass = computed(() => [
       "nav-menu-item",
-      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
       // Sit above the rail's sliding pill so icon/label stay readable.
       slideActive.value ? "z-10" : "",
       isActive.value

@@ -198,7 +198,7 @@ const ImportSyntheticsLocationsStub = {
 
 interface TestLocation {
   id: string;
-  name: string;
+  label: string;
   provider: string;
   region: string;
   enabled: boolean;
@@ -208,7 +208,7 @@ interface TestLocation {
 
 const createLocation = (overrides: Partial<TestLocation> = {}): TestLocation => ({
   id: "loc-1",
-  name: "AWS US East",
+  label: "AWS US East",
   provider: "aws",
   region: "us-east-1",
   enabled: true,
@@ -411,25 +411,25 @@ describe("SyntheticsLocationsList", () => {
 
     it("populates locations ref with the fetched data", async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "AWS US East" }),
-        createLocation({ id: "loc-2", name: "GCP Europe", provider: "gcp" }),
+        createLocation({ id: "loc-1", label: "AWS US East" }),
+        createLocation({ id: "loc-2", label: "GCP Europe", provider: "gcp" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
       await flushPromises();
 
       expect(wrapper.vm.locations).toHaveLength(2);
-      expect(wrapper.vm.locations[0].name).toBe("AWS US East");
-      expect(wrapper.vm.locations[1].name).toBe("GCP Europe");
+      expect(wrapper.vm.locations[0].label).toBe("AWS US East");
+      expect(wrapper.vm.locations[1].label).toBe("GCP Europe");
       expect(wrapper.vm.resultTotal).toBe(2);
     });
 
     it("filters out private locations, keeping only public ones", async () => {
       const locs = [
-        createLocation({ id: "pub-1", name: "Public 1", kind: "public" }),
-        createLocation({ id: "priv-1", name: "Private 1", kind: "private" }),
-        createLocation({ id: "pub-2", name: "Public 2", kind: "public" }),
-        createLocation({ id: "priv-2", name: "Private 2", kind: "private" }),
+        createLocation({ id: "pub-1", label: "Public 1", kind: "public" }),
+        createLocation({ id: "priv-1", label: "Private 1", kind: "private" }),
+        createLocation({ id: "pub-2", label: "Public 2", kind: "public" }),
+        createLocation({ id: "priv-2", label: "Private 2", kind: "private" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -506,9 +506,9 @@ describe("SyntheticsLocationsList", () => {
   describe("filtering", () => {
     beforeEach(async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "AWS US East", provider: "aws", region: "us-east-1" }),
-        createLocation({ id: "loc-2", name: "GCP Europe", provider: "gcp", region: "europe-west1" }),
-        createLocation({ id: "loc-3", name: "Azure West US", provider: "azure", region: "westus" }),
+        createLocation({ id: "loc-1", label: "AWS US East", provider: "aws", region: "us-east-1" }),
+        createLocation({ id: "loc-2", label: "GCP Europe", provider: "gcp", region: "europe-west1" }),
+        createLocation({ id: "loc-3", label: "Azure West US", provider: "azure", region: "westus" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -519,7 +519,7 @@ describe("SyntheticsLocationsList", () => {
       wrapper.vm.filterQuery = "azure";
       await nextTick();
       expect(wrapper.vm.visibleRows).toHaveLength(1);
-      expect(wrapper.vm.visibleRows[0].name).toBe("Azure West US");
+      expect(wrapper.vm.visibleRows[0].label).toBe("Azure West US");
     });
 
     it("filters visible rows by id", async () => {
@@ -638,8 +638,8 @@ describe("SyntheticsLocationsList", () => {
   describe("toggleLocationEnabled", () => {
     beforeEach(async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "AWS US East", enabled: true }),
-        createLocation({ id: "loc-2", name: "GCP Europe", enabled: false }),
+        createLocation({ id: "loc-1", label: "AWS US East", enabled: true }),
+        createLocation({ id: "loc-2", label: "GCP Europe", enabled: false }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -772,9 +772,9 @@ describe("SyntheticsLocationsList", () => {
   describe("bulkToggleEnabled", () => {
     beforeEach(async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "Loc 1", enabled: true }),
-        createLocation({ id: "loc-2", name: "Loc 2", enabled: true }),
-        createLocation({ id: "loc-3", name: "Loc 3", enabled: false }),
+        createLocation({ id: "loc-1", label: "Loc 1", enabled: true }),
+        createLocation({ id: "loc-2", label: "Loc 2", enabled: true }),
+        createLocation({ id: "loc-3", label: "Loc 3", enabled: false }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -911,8 +911,8 @@ describe("SyntheticsLocationsList", () => {
   describe("confirmDelete", () => {
     beforeEach(async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "AWS US East" }),
-        createLocation({ id: "loc-2", name: "GCP Europe" }),
+        createLocation({ id: "loc-1", label: "AWS US East" }),
+        createLocation({ id: "loc-2", label: "GCP Europe" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -998,9 +998,9 @@ describe("SyntheticsLocationsList", () => {
   describe("bulkDeleteLocations", () => {
     beforeEach(async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "Loc 1" }),
-        createLocation({ id: "loc-2", name: "Loc 2" }),
-        createLocation({ id: "loc-3", name: "Loc 3" }),
+        createLocation({ id: "loc-1", label: "Loc 1" }),
+        createLocation({ id: "loc-2", label: "Loc 2" }),
+        createLocation({ id: "loc-3", label: "Loc 3" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -1098,14 +1098,14 @@ describe("SyntheticsLocationsList", () => {
       const locs = [
         createLocation({
           id: "loc-1",
-          name: "AWS US East",
+          label: "AWS US East",
           provider: "aws",
           region: "us-east-1",
           enabled: true,
         }),
         createLocation({
           id: "loc-2",
-          name: "GCP Europe",
+          label: "GCP Europe",
           provider: "gcp",
           region: "europe-west1",
           enabled: false,
@@ -1195,9 +1195,9 @@ describe("SyntheticsLocationsList", () => {
   describe("handleSelectedIdsUpdate", () => {
     beforeEach(async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "Loc 1" }),
-        createLocation({ id: "loc-2", name: "Loc 2" }),
-        createLocation({ id: "loc-3", name: "Loc 3" }),
+        createLocation({ id: "loc-1", label: "Loc 1" }),
+        createLocation({ id: "loc-2", label: "Loc 2" }),
+        createLocation({ id: "loc-3", label: "Loc 3" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -1244,8 +1244,8 @@ describe("SyntheticsLocationsList", () => {
   describe("bulk action buttons template", () => {
     beforeEach(async () => {
       const locs = [
-        createLocation({ id: "loc-1", name: "Loc 1" }),
-        createLocation({ id: "loc-2", name: "Loc 2" }),
+        createLocation({ id: "loc-1", label: "Loc 1" }),
+        createLocation({ id: "loc-2", label: "Loc 2" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
       wrapper = mountComponent();
@@ -1307,7 +1307,7 @@ describe("SyntheticsLocationsList", () => {
 
       // Manually push a location with null fields to verify filterData handles it
       wrapper.vm.locations = [
-        { id: "null-loc", name: null, provider: null, region: null, enabled: false, kind: "public" },
+        { id: "null-loc", label: null, provider: null, region: null, enabled: false, kind: "public" },
       ];
       wrapper.vm.filterQuery = "test";
       await nextTick();

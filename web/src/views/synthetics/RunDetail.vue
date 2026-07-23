@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :run-id="runIdParam"
     :execution-id="executionIdParam"
     :drawer-mode="drawerMode"
+    :location-names="locationNames"
     @update-status="emit('update-status', $event)"
   />
   <OPageLayout
@@ -274,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="smart_display"
                     size="sm"
-                    class="text-primary-700"
+                    class="text-accent"
                   />
                   <span class="font-bold text-sm text-text-heading"
                     >{{ t('synthetics.runDetail.sessionReplay') }}</span
@@ -637,9 +638,9 @@ function locationLabel(id: string): string {
 syntheticsService
   .getLocations(store.state.selectedOrganization.identifier)
   .then((res) => {
-    const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
+    const locations: { id: string; label: string; region: string }[] = (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
   })
   .catch((err) => console.error("[synthetics] failed to load locations", err));

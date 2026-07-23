@@ -232,7 +232,7 @@ const wrapperClasses = computed(() => [
      while the field is focused. */
   hasError.value
     ? "border-input-border-error focus-within:ring-[0.125rem] focus-within:ring-input-border-error/30"
-    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-primary-500/25",
+    : "border-input-border hover:border-input-border-hover focus-within:border-input-border-focus focus-within:ring-[0.125rem] focus-within:ring-accent/25",
   /* Disabled inputs get a muted bg + dashed border so they read as obviously
      inactive at a glance. */
   props.disabled

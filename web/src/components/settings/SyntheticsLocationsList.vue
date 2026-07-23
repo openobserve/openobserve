@@ -248,7 +248,7 @@ export default defineComponent({
       {
         id: "name",
         header: t("synthetics.locations.label"),
-        accessorKey: "name",
+        accessorKey: "label",
         sortable: true,
         resizable: true,
         hideable: true,
@@ -332,7 +332,7 @@ export default defineComponent({
       const q = query.toLowerCase();
       const filtered = rows.filter(
         (row) =>
-          row.name?.toLowerCase().includes(q) ||
+          row.label?.toLowerCase().includes(q) ||
           row.id?.toLowerCase().includes(q) ||
           row.provider?.toLowerCase().includes(q) ||
           row.region?.toLowerCase().includes(q),
@@ -389,7 +389,7 @@ export default defineComponent({
         await syntheticsService.updateLocation(
           store.state.selectedOrganization.identifier,
           row.id,
-          { label: row.name, enabled: newEnabled },
+          { label: row.label, enabled: newEnabled },
         );
         // Update the local row in-place instead of re-fetching.
         const idx = locations.value.findIndex((l) => l.id === row.id);
@@ -419,7 +419,7 @@ export default defineComponent({
     const bulkToggleEnabled = async (enabled: boolean) => {
       bulkActionLoading.value = true;
       const ids = selectedLocations.value.map((l) => l.id);
-      const labels = selectedLocations.value.map((l) => l.name);
+      const labels = selectedLocations.value.map((l) => l.label);
       let successCount = 0;
       const successIds = new Set<string>();
       try {
@@ -571,7 +571,7 @@ export default defineComponent({
         const exportData = locations.value.map((loc) => ({
           provider: loc.provider,
           region: loc.region,
-          label: loc.name,
+          label: loc.label,
           enabled: loc.enabled,
         }));
         const json = JSON.stringify(exportData, null, 2);

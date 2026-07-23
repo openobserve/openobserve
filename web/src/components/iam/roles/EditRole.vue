@@ -70,8 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-show="permissionsUiType === 'table'"
               data-test="edit-role-permissions-filters"
-              class="flex items-start px-3 py-2 justify-start gap-3 sticky"
-              style="top: 0px; z-index: 2"
+              class="flex items-start px-3 py-2 justify-start gap-3 sticky top-0 z-2"
             >
               <div
                 data-test="edit-role-permissions-show-toggle"
@@ -237,8 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <div
-        class="flex justify-end w-full flex-shrink-0 mt-2.5"
-        style="z-index: 2"
+        class="flex justify-end w-full flex-shrink-0 mt-2.5 z-2"
       >
       <div class="bg-card-glass-bg w-full py-2 px-3 justify-end flex gap-2 border-t border-border-default">
         <OButton

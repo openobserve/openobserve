@@ -372,7 +372,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
-                    <OIcon name="language" size="sm" class="text-primary-700" />
+                    <OIcon name="language" size="sm" class="text-accent" />
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.runs.passRateByBrowser') }}
                     </span>
@@ -421,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="location-on"
                       size="sm"
-                      class="text-primary-700"
+                      class="text-accent"
                     />
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.runs.passRateByLocation') }}
@@ -468,7 +468,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     class="flex items-center gap-2 px-2 pt-2.5 pb-2"
                   >
-                    <OIcon name="devices" size="sm" class="text-primary-700" />
+                    <OIcon name="devices" size="sm" class="text-accent" />
                     <span class="font-bold text-sm text-text-heading">
                       {{ t('synthetics.runs.passRateByDevice') }}
                     </span>
@@ -1037,9 +1037,9 @@ function locationLabel(id: string): string {
 onMounted(async () => {
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
-    const locations: { id: string; name: string; region: string }[] = (res.data as any).locations ?? [];
+    const locations: { id: string; label: string; region: string }[] = (res.data as any).locations ?? [];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
   } catch (err) {
     console.error("[synthetics] failed to load locations", err);

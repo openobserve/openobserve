@@ -20,9 +20,14 @@ enterprise = [
     "dep:o2_openfga",
     "common/enterprise",
     "config/enterprise",
+    "tantivy_utils/enterprise",
     "promql/enterprise",
+    "promql-service/enterprise",
     "search/enterprise",
     "search_service/enterprise",
+    "compaction/enterprise",
+    "stream/enterprise",
+    "enrichment-data/enterprise",
     "usage_reporting/enterprise",
 ]
 cloud = [
@@ -31,19 +36,25 @@ cloud = [
     "enterprise",
     "o2_enterprise/cloud",
     "common/cloud",
+    "stream/cloud",
 ]
 vectorscan = [
     "db/vectorscan",
     "o2_enterprise/vectorscan",
     "search/vectorscan",
     "search_service/vectorscan",
+    "promql-service/vectorscan",
+    "stream/vectorscan",
 ]
 vortex = [
     "dep:vortex",
     "config/vortex",
+    "tantivy_utils/vortex",
     "o2_enterprise?/vortex",
     "search/vortex",
     "search_service/vortex",
+    "compaction/vortex",
+    "promql-service/vortex",
 ]
 
 [dependencies]
@@ -54,8 +65,14 @@ transform.workspace = true
 vector-enrichment.workspace = true
 vrl.workspace = true
 promql.workspace = true
+promql-service.workspace = true
 search.workspace = true
 search_service.workspace = true
+ingestion-common.workspace = true
+schema.workspace = true
+compaction.workspace = true
+stream.workspace = true
+enrichment-data.workspace = true
 usage_reporting.workspace = true
 axum.workspace = true
 http.workspace = true
