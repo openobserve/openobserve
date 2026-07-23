@@ -57,14 +57,10 @@
         </div>
       </template>
 
-      <!-- Agents: live/total + agent name(s) -->
+      <!-- Agents: name(s), live if any are online else the last known one.
+           Pool health (live/total) is on the detail page, not repeated here. -->
       <template #cell-agents="{ row }">
-        <div class="flex flex-col min-w-0">
-          <span>{{ (row as any).live_agents }}/{{ (row as any).agents_total }}</span>
-          <span v-if="agentSubtext(row as any)" class="truncate text-xs text-text-muted">
-            {{ agentSubtext(row as any) }}
-          </span>
-        </div>
+        <span class="truncate">{{ agentSubtext(row as any) || "—" }}</span>
       </template>
 
       <!-- Capability type chips -->
@@ -209,7 +205,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "agents",
     header: t("synthetics.privateLocations.table.agents"),
-    accessorKey: "live_agents",
+    accessorKey: "last_agent_name",
     size: 100,
     minSize: 80,
     sortable: true,

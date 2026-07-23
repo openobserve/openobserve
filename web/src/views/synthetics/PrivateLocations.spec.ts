@@ -218,14 +218,35 @@ describe("PrivateLocations", () => {
       expect(nameCell.text()).toContain("prod");
     });
 
-    it("renders agents count and version in the agents cell", () => {
+    it("renders live agent names in the agents cell", () => {
       wrapper = makeWrapper({
-        locations: [makeLocation({ live_agents: 3, agents_total: 5, version: "2.0.0" })],
+        locations: [makeLocation({ agent_names: ["agent-a", "agent-b"] })],
       });
 
       const agentsCell = wrapper.find(".otable-cell-agents");
-      expect(agentsCell.text()).toContain("3/5");
-      expect(agentsCell.text()).toContain("v2.0.0");
+      expect(agentsCell.text()).toContain("agent-a, agent-b");
+    });
+
+    it("falls back to the last known agent's name when none are live", () => {
+      wrapper = makeWrapper({
+        locations: [
+          makeLocation({ live_agents: 0, agent_names: [], last_agent_name: "agent-dead" }),
+        ],
+      });
+
+      const agentsCell = wrapper.find(".otable-cell-agents");
+      expect(agentsCell.text()).toContain("agent-dead");
+    });
+
+    it("shows a dash when no agent has ever registered", () => {
+      wrapper = makeWrapper({
+        locations: [
+          makeLocation({ live_agents: 0, agents_total: 0, agent_names: [], last_agent_name: undefined }),
+        ],
+      });
+
+      const agentsCell = wrapper.find(".otable-cell-agents");
+      expect(agentsCell.text()).toContain("—");
     });
 
     it("renders type chips for each type", () => {
