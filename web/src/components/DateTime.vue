@@ -971,11 +971,14 @@ export default defineComponent({
      * What the trigger button renders.
      *
      * With `autoApply` the pending selection IS the applied one, so show it live.
-     * Without it, show the range that is in force; see `appliedDisplayValue`.
+     * Without it, show the live selection while the panel is open (so switching
+     * Relative/Absolute updates the label immediately, like the logs picker), and
+     * fall back to the range in force once closed — so closing without Apply snaps
+     * back to what's actually applied; see `appliedDisplayValue`.
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
     const triggerLabel = computed(() =>
-      props.autoApply
+      props.autoApply || menuOpen.value
         ? getDisplayValue.value
         : appliedDisplayValue.value || getDisplayValue.value,
     );
