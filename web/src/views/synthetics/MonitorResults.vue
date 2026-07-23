@@ -141,6 +141,7 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
 
 defineOptions({ name: "SyntheticMonitorResults" });
