@@ -32,7 +32,18 @@ export function buildScoresAgentFilterWhere(
   const field = agent.id ? "agent_id" : "agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return null;
-  return `${field} = '${escapeSqlString(String(value))}'`;
+  // env/version are denormalized onto every _llm_scores row (agent_env /
+  // agent_version), so a selected (agent, env, version) variant filters by exact
+  // match — same as agent_id. Rows written before this change have NULL columns
+  // and won't match a version filter until the target is re-evaluated.
+  const clauses = [`${field} = '${escapeSqlString(String(value))}'`];
+  if (agent.version) {
+    clauses.push(`agent_version = '${escapeSqlString(String(agent.version))}'`);
+  }
+  if (agent.env) {
+    clauses.push(`agent_env = '${escapeSqlString(String(agent.env))}'`);
+  }
+  return clauses.join(" AND ");
 }
 
 export function buildEvaluatorAgentFilterWhere(
