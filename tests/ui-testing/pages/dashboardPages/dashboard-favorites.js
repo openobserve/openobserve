@@ -69,9 +69,12 @@ export default class DashboardFavorites {
 
   // The row checkbox is keyed by row id (the dashboard id, per row-key="id"),
   // which tests don't know — resolve it by prefix inside the row instead.
+  // Must be scoped to the <label> (OTableSelectCheckbox), not the enclosing
+  // <td data-test="o2-table-select-cell">, whose own data-test also matches
+  // the "o2-table-select-" prefix and would trip strict mode.
   getRowCheckbox(dashboardName) {
     return this.getRow(dashboardName).locator(
-      '[data-test^="o2-table-select-"]'
+      'label[data-test^="o2-table-select-"]'
     );
   }
 
@@ -115,7 +118,19 @@ export default class DashboardFavorites {
     const toggle = this.getFavoriteToggle(dashboardName);
     await toggle.waitFor({ state: "visible", timeout: 15000 });
     await toggle.click();
-    await this.verifyIsNotFavorite(dashboardName);
+    // Unfavoriting drops the row entirely when viewed from the Favorites
+    // pseudo-folder, but only flips the icon class when viewed from the
+    // dashboard's real folder — the toggle element itself disappears in
+    // the former case, so assert whichever the row actually did. Callers
+    // assert the specific outcome right after.
+    await expect(async () => {
+      // count() checks the DOM once with no actionability wait, unlike
+      // getAttribute() — which blocks retrying for the element to attach
+      // and would hang past toPass's own budget once the row is gone.
+      if ((await toggle.count()) === 0) return;
+      const classAttr = (await toggle.getAttribute("class")) ?? "";
+      expect(classAttr).not.toMatch(/text-favorite/);
+    }).toPass({ timeout: 15000 });
   }
 
   // Favorited rows render the filled `favorite` icon and carry the rose

@@ -1,7 +1,6 @@
 import { test as base, expect } from "../baseFixtures.js";
 import logData from "../../fixtures/log.json";
 import { login } from "./utils/dashLogin.js";
-import { ingestion } from "./utils/dashIngestion.js";
 import { waitForDashboardPage } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
 const testLogger = require("../utils/test-logger.js");
@@ -29,10 +28,8 @@ test.describe("dashboard favorites testcases", () => {
     testLogger.debug("Test setup - beforeEach hook executing");
     await login(page);
     await page.waitForTimeout(1000);
-    // Favorites tests never query the ingested stream (no panels/search
-    // involved), so there's no need to wait out log-indexing lag here —
-    // ingestion() itself already awaits the POST response.
-    await ingestion(page);
+    // No ingestion here: favorites tests never touch the ingested stream
+    // (no panels/search involved), so seeding one is pure setup cost.
 
     await page.goto(
       `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
