@@ -929,7 +929,16 @@ defineExpose({
 <template>
   <div
     data-test="o2-table-root"
-    :class="['flex flex-col overflow-hidden', props.fillHeight ? 'h-full' : 'h-auto']"
+    :class="[
+      'flex flex-col',
+      // Delegated-scroll tables (logs/traces grids) flow into an EXTERNAL scroll
+      // container, so the root must not clip: `overflow-hidden` here swallowed the
+      // horizontally-overflowing table, so a wide many-column grid had no bottom
+      // scrollbar (QA #2239: logs/traces horizontal scrollbar missing). Own-scroll
+      // tables keep overflow-hidden so their internal scroll container contains them.
+      isDelegatedScroll ? 'overflow-visible' : 'overflow-hidden',
+      props.fillHeight ? 'h-full' : 'h-auto',
+    ]"
   >
     <!-- ── Top slot (search bar, title, actions) ─────────────── -->
     <slot name="top" />
