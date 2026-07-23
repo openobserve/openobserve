@@ -248,6 +248,9 @@ members = [
     "src/api_management",
     "src/api_query",
     "src/api_common",
+    "src/ingestion_types",
+    "src/schema_service",
+    "src/compaction",
     "src/common",
     "src/core",
     "src/transform",
@@ -287,6 +290,9 @@ proto = { path = "src/proto" }
 report_server = { path = "src/report_server" }
 flight = { path = "src/flight" }
 tantivy_utils = { path = "src/tantivy_utils" }
+openobserve-ingestion-types = { path = "src/ingestion_types" }
+schema-service = { path = "src/schema_service" }
+openobserve-compaction = { path = "src/compaction" }
 web = { path = "src/web" }
 openobserve-core = { path = "src/core" }
 common = { path = "src/common" }

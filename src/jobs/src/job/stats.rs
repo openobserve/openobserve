@@ -15,7 +15,7 @@
 
 use config::{cluster::LOCAL_NODE, deverbatim, get_config, spawn_pausable_job};
 use db;
-use openobserve_core::compact::stats::update_stats_from_file_list;
+use openobserve_compaction::stats::update_stats_from_file_list;
 use tokio::time;
 
 pub async fn run() -> Result<(), anyhow::Error> {

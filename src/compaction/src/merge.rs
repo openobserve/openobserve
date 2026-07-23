@@ -47,19 +47,19 @@ use infra::{
 };
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_largest_downsampling_rule;
+use schema_service::generate_schema_for_defined_schema_fields;
 use search::datafusion::{
     exec::TableBuilder,
     merge::{self, MergeParquetResult},
 };
+use search_service::file_list;
+use tantivy_utils::index_builder::create_tantivy_index;
 use tokio::{
     sync::{Semaphore, mpsc},
     task::JoinHandle,
 };
 
 use super::worker::{MergeBatch, MergeSender};
-use crate::{
-    db, file_list, schema::generate_schema_for_defined_schema_fields, tantivy::create_tantivy_index,
-};
 
 /// Generate merging job by stream
 /// 1. get offset from db
@@ -1148,7 +1148,8 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
                         // delete file from file list
                         log::error!("[COMPACT] found invalid file: {file_name}, will delete it");
                         if let Err(e) =
-                            file_list::delete_parquet_file(&file_account, &file_name, true).await
+                            infra_file_list::delete_parquet_file(&file_account, &file_name, true)
+                                .await
                         {
                             log::error!("[COMPACT] delete from file_list err: {e}");
                         }

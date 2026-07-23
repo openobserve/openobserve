@@ -19,7 +19,7 @@ use std::{
 };
 
 use ::common::meta::stream::SchemaRecords;
-use axum::body::Bytes;
+use bytes::Bytes;
 use config::utils::json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

@@ -28,14 +28,14 @@ use config::{
     },
     utils::time::{BASE_TIME, HourFormat, day_micros, get_ymdh_from_micros, hour_micros},
 };
+use db;
 use infra::{
     cluster::{get_node_by_uuid, get_node_from_consistent_hash},
     file_list as infra_file_list,
     table::compactor_manual_jobs::Status as CompactorManualJobStatus,
 };
 use itertools::Itertools;
-
-use crate::{db, file_list, file_list_dump::generate_dump_stream_name};
+use search_service::{file_list, file_list_dump::generate_dump_stream_name};
 
 pub(crate) async fn generate_jobs() -> Result<(), anyhow::Error> {
     let cfg = get_config();

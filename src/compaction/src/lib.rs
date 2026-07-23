@@ -23,6 +23,7 @@ use config::{
         stream::{ALL_STREAM_TYPES, PartitionTimeLevel, StreamType},
     },
 };
+use db;
 use infra::{
     cluster::get_node_from_consistent_hash,
     file_list as infra_file_list,
@@ -31,8 +32,6 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::downsampling::get_matching_downsampling_rules;
 use tokio::sync::mpsc;
-
-use crate::db;
 
 pub mod deleted;
 pub mod dump;

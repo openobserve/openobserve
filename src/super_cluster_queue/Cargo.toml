@@ -9,6 +9,7 @@ publish = false
 default = []
 enterprise = [
     "dep:o2_enterprise",
+    "openobserve-compaction/enterprise",
     "openobserve-core/enterprise",
 ]
 vectorscan = ["o2_enterprise/vectorscan"]
@@ -25,6 +26,7 @@ infra.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 openobserve-core.workspace = true
+openobserve-compaction.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 svix-ksuid.workspace = true

@@ -1,0 +1,19 @@
+[package]
+name = "openobserve-ingestion-types"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+bytes.workspace = true
+common.workspace = true
+config.workspace = true
+serde.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

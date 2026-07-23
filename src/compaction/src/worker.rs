@@ -135,7 +135,7 @@ impl JobScheduler {
                                 job.stream_type.as_str(),
                                 job.stream_name
                             );
-                            crate::db::compact::stream::clear_running(&key);
+                            db::compact::stream::clear_running(&key);
                         }
                     }
                 }

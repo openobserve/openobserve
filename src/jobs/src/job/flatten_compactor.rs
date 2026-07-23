@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use config::{cluster::LOCAL_NODE, get_config, meta::stream::FileKey, spawn_pausable_job};
-use openobserve_core::compact;
+use openobserve_compaction as compact;
 use tokio::sync::{Mutex, mpsc};
 
 pub async fn run() -> Result<(), anyhow::Error> {

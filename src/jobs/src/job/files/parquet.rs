@@ -564,7 +564,7 @@ async fn move_files(
         };
 
         // trigger an incremental merge of the current hour once enough files have piled up
-        openobserve_core::compact::incremental::incr_pending_file(
+        openobserve_compaction::incremental::incr_pending_file(
             &org_id,
             stream_type,
             &stream_name,

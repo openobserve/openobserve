@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Record readers used by the Tantivy index builder.
+
 mod parquet;
 #[cfg(all(feature = "vortex", feature = "enterprise"))]
 mod vortex;

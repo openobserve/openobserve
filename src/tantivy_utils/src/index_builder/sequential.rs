@@ -24,7 +24,7 @@ use futures::TryStreamExt;
 use tokio::task::JoinHandle;
 
 use super::{TantivyIndexSchema, convert_batch_to_docs_sync};
-use crate::tantivy::reader::file_stream;
+use crate::index_builder::reader::file_stream;
 
 /// Create a tantivy index in the given directory for the input file bytes.
 pub(super) async fn build_index<D: tantivy::Directory>(
@@ -116,7 +116,9 @@ mod tests {
     use tantivy::directory::RamDirectory;
 
     use super::*;
-    use crate::tantivy::tests::{create_test_batch, create_test_parquet_bytes, make_index_schema};
+    use crate::index_builder::tests::{
+        create_test_batch, create_test_parquet_bytes, make_index_schema,
+    };
 
     #[tokio::test]
     async fn test_generate_tantivy_index_empty_data() {

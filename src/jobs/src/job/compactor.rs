@@ -22,7 +22,7 @@ use config::{
 use infra::cluster::get_node_by_uuid;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-use openobserve_core::compact;
+use openobserve_compaction as compact;
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
 pub async fn run() -> Result<(), anyhow::Error> {

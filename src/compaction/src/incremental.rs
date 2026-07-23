@@ -39,6 +39,8 @@
 //! - Disabled by default (`ZO_COMPACT_PENDING_FILES_TRIGGER = 0`); when disabled this does nothing
 //!   and behavior is identical to the scheduled-only path.
 
+//! Incremental compaction scheduling state.
+
 use std::sync::LazyLock;
 
 use config::{RwAHashMap, get_config, meta::stream::StreamType, utils::time::hour_micros};

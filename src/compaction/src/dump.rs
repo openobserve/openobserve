@@ -34,6 +34,7 @@ use config::{
         time::{BASE_TIME, HourFormat, get_ymdh_from_micros, hour_micros, now, now_micros},
     },
 };
+use db;
 use futures::StreamExt;
 use infra::{
     cluster::get_node_from_consistent_hash,
@@ -43,9 +44,8 @@ use infra::{
 };
 use itertools::Itertools;
 use parquet::{arrow::AsyncArrowWriter, file::properties::WriterProperties};
+use search_service::file_list_dump::*;
 use tokio::sync::mpsc;
-
-use crate::{db, file_list_dump::*};
 
 #[derive(Clone)]
 pub struct DumpJob {
@@ -271,7 +271,7 @@ pub async fn dump(job: &DumpJob) -> Result<(), anyhow::Error> {
         .as_ref()
         .is_none_or(|s| s.fields_map().len() != FILE_LIST_SCHEMA.fields().len())
     {
-        if let Err(e) = super::db::schema::merge(
+        if let Err(e) = db::schema::merge(
             &job.org_id,
             &dump_stream_name,
             StreamType::Filelist,
@@ -1501,7 +1501,7 @@ mod tests {
         };
 
         let batch = create_record_batch(vec![original.clone()]).unwrap();
-        let recovered = crate::file_list_dump::record_batch_to_file_record(batch);
+        let recovered = search_service::file_list_dump::record_batch_to_file_record(batch);
 
         assert_eq!(recovered.len(), 1);
         let r = &recovered[0];
@@ -1547,7 +1547,7 @@ mod tests {
 
         let count = files.len();
         let batch = create_record_batch(files).unwrap();
-        let recovered = crate::file_list_dump::record_batch_to_file_record(batch);
+        let recovered = search_service::file_list_dump::record_batch_to_file_record(batch);
 
         assert_eq!(recovered.len(), count);
         // Verify sorting: record_batch_to_file_record sorts by id
@@ -1559,7 +1559,7 @@ mod tests {
     #[test]
     fn test_roundtrip_empty_batch() {
         let batch = create_record_batch(vec![]).unwrap();
-        let recovered = crate::file_list_dump::record_batch_to_file_record(batch);
+        let recovered = search_service::file_list_dump::record_batch_to_file_record(batch);
         assert_eq!(recovered.len(), 0);
     }
 

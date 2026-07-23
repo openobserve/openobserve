@@ -30,7 +30,8 @@ use config::{
 };
 use hashbrown::HashSet;
 use infra::storage;
-use tantivy_utils::puffin_directory::{PROP_ROW_GROUP_SIZE, writer::PuffinDirWriter};
+
+use crate::puffin_directory::{PROP_ROW_GROUP_SIZE, writer::PuffinDirWriter};
 
 pub async fn create_tantivy_index(
     caller: &str,
@@ -281,7 +282,7 @@ pub(super) mod tests {
 
     /// Helper function to create test record batches.
     /// Shared with [`super::sequential`] and [`super::parallel`] test modules.
-    pub(in crate::tantivy) fn create_test_batch(
+    pub(in crate::index_builder) fn create_test_batch(
         num_rows: usize,
         include_timestamp: bool,
         include_fts_field: bool,
@@ -325,7 +326,7 @@ pub(super) mod tests {
     /// Helper: serializes `batches` to an in-memory parquet file and returns
     /// the raw bytes. Shared by both the stream-based and the new
     /// row_group-direct parallel tests.
-    pub(in crate::tantivy) async fn create_test_parquet_bytes(
+    pub(in crate::index_builder) async fn create_test_parquet_bytes(
         batches: Vec<RecordBatch>,
     ) -> bytes::Bytes {
         let schema = batches[0].schema();
@@ -353,7 +354,7 @@ pub(super) mod tests {
     }
 
     /// Test helper: build the per-index schema struct or panic on `None`.
-    pub(in crate::tantivy) fn make_index_schema(
+    pub(in crate::index_builder) fn make_index_schema(
         fts: &[String],
         index: &[String],
         arrow_schema: &Schema,

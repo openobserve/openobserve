@@ -19,6 +19,8 @@ use std::{
 };
 
 use anyhow::Result;
+use arrow_schema::{Field, Schema};
+use common::meta::{authz::Authz, stream::SchemaEvolution};
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, SQL_FULL_TEXT_SEARCH_FIELDS,
     SQL_SECONDARY_INDEX_SEARCH_FIELDS, TIMESTAMP_COL_NAME,
@@ -41,39 +43,32 @@ use config::{
         time::now_micros,
     },
 };
-use datafusion::arrow::datatypes::{Field, Schema};
 use db;
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
     unwrap_stream_settings,
 };
+use openobserve_ingestion_types::StreamSchemaChk;
 use serde_json::{Map, Value};
 
-use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
-use crate::{
-    common::meta::{authz::Authz, stream::SchemaEvolution},
-    ingestion_types::StreamSchemaChk,
-};
+const SCHEMA_CONFORMANCE_FAILED: &str = "schema_conformance_failed";
 
-pub(crate) fn get_upto_discard_error() -> anyhow::Error {
+pub fn get_upto_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
         "Too old data, only last {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_UPTO=<max_hours>",
         get_config().limit.ingest_allowed_upto
     )
 }
 
-pub(crate) fn get_future_discard_error() -> anyhow::Error {
+pub fn get_future_discard_error() -> anyhow::Error {
     anyhow::anyhow!(
         "Too far data, only future {} hours data can be ingested. Data discarded. You can adjust ingestion max time by setting the environment variable ZO_INGEST_ALLOWED_IN_FUTURE=<max_hours>",
         get_config().limit.ingest_allowed_in_future
     )
 }
 
-pub(crate) fn get_request_columns_limit_error(
-    stream_name: &str,
-    num_fields: usize,
-) -> anyhow::Error {
+pub fn get_request_columns_limit_error(stream_name: &str, num_fields: usize) -> anyhow::Error {
     anyhow::anyhow!(
         "Got {num_fields} columns for stream {stream_name}, only {} columns accept. Data discarded. You can adjust ingestion columns limit by setting the environment variable ZO_COLS_PER_RECORD_LIMIT=<max_columns>",
         get_config().limit.req_cols_per_record_limit
@@ -241,7 +236,7 @@ pub async fn get_merged_schema(
 // 3. if db_schema is identical to inferred_schema, return (means another thread has updated schema)
 // 4. if db_schema is not identical to inferred_schema, merge schema and update db
 #[allow(clippy::too_many_arguments)]
-pub(crate) async fn handle_diff_schema(
+pub async fn handle_diff_schema(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
@@ -420,16 +415,25 @@ pub(crate) async fn handle_diff_schema(
             json::to_string(&stream_setting).unwrap(),
         );
 
-        // save the new settings
-        if let Err(e) = super::stream::save_stream_settings(
+        // Persist the automatically enabled UDS settings at the schema layer. This deliberately
+        // bypasses the HTTP-facing stream service so schema evolution does not depend on a
+        // higher-level service crate.
+        if !final_schema.metadata.contains_key("created_at") {
+            final_schema
+                .metadata
+                .insert("created_at".to_string(), now_micros().to_string());
+        }
+        if let Err(e) = db::schema::update_setting(
             org_id,
             stream_name,
             stream_type,
-            stream_setting.clone(),
+            final_schema.metadata.clone(),
         )
         .await
         {
-            log::error!("save_stream_settings [{org_id}/{stream_type}/{stream_name}] error: {e}");
+            log::error!(
+                "persist auto UDS settings [{org_id}/{stream_type}/{stream_name}] error: {e}"
+            );
         }
     }
 
@@ -654,7 +658,7 @@ pub async fn stream_schema_exists(
 mod tests {
     use std::str::FromStr;
 
-    use datafusion::arrow::datatypes::DataType;
+    use arrow_schema::DataType;
 
     use super::*;
 
