@@ -37,7 +37,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     class="monitor-runs h-full flex flex-col"
     data-test="synthetics-monitor-runs"
   >
+    <!-- Full-page empty state — replaces the entire content area when no
+         runs exist in the current time window. The parent (MonitorResults)
+         passes lastTriggeredAt to distinguish "never triggered" from "no
+         runs in this window." -->
+    <template v-if="kpiHasLoadedOnce && synthetics.kpi.value.totalRuns === 0">
+      <div class="flex-1 flex items-center justify-center">
+        <OEmptyState
+          size="hero"
+          :illustration="lastTriggeredAt > 0 ? 'no-results' : 'browser-check'"
+          :title="lastTriggeredAt > 0 ? t('synthetics.results.noRunsInWindow') : t('synthetics.results.noRunsYet')"
+          :description="lastTriggeredAt > 0 ? t('synthetics.results.noRunsInWindowDesc') : t('synthetics.results.noRunsYetDesc')"
+          data-test="monitor-runs-page-empty"
+        >
+          <template #actions>
+            <EmptyStateActionCard
+              v-if="lastTriggeredAt > 0"
+              icon="schedule"
+              :label="t('synthetics.results.jumpToLatestData')"
+              :sublabel="lastTriggeredAtSublabel"
+              data-test="monitor-runs-empty-jump-latest"
+              @click="handleJumpToLatestData"
+            />
+            <EmptyStateActionCard
+              v-else
+              icon="play-arrow"
+              :label="t('synthetics.results.triggerRunNow')"
+              :sublabel="t('synthetics.results.triggerRunNowDesc')"
+              data-test="monitor-runs-empty-trigger-run"
+              @click="handleEmptyStateAction('trigger-run')"
+            />
+            <EmptyStateActionCard
+              v-if="hasActiveFilters"
+              icon="filter-list"
+              :label="t('synthetics.results.clearFilters')"
+              :sublabel="t('synthetics.results.clearFiltersDesc')"
+              data-test="monitor-runs-empty-clear-filters"
+              @click="handleEmptyStateAction('clear-filters')"
+            />
+          </template>
+        </OEmptyState>
+      </div>
+    </template>
+
     <!-- ── Tabs ──────────────────────────────────────────────────────── -->
+    <template v-else>
     <OTabs
       v-model="activeTab"
       class="shrink-0 px-page-edge border-b border-border-default"
@@ -962,6 +1006,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OTabPanel>
       </OTabPanels>
     </div>
+    </template>
   </div>
 </template>
 
@@ -1051,9 +1096,14 @@ interface Props {
   monitorId: string;
   monitorName: string;
   monitorStatus?: "healthy" | "degraded" | "critical";
+  /** Microsecond timestamp of the check's most recent trigger (0 = never triggered).
+   * Used by the page-level empty state to distinguish "never run" vs "no runs in
+   * this time window" and compute the jump-to-latest-data target. */
+  lastTriggeredAt?: number;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
+  lastTriggeredAt: 0,
 });
 
 // ── Synthetic results composable ──────────────────────────────────────────
@@ -1169,6 +1219,15 @@ const hasActiveFilters = computed(
     errorFilter.value !== null,
 );
 
+// Sublabel for the "Jump to latest data" action card in the page-level
+// empty state — formats the last_triggered_at timestamp for display.
+// lastTriggeredAt is in microseconds; convert to ms for Date().
+const lastTriggeredAtSublabel = computed(() => {
+  const ts = props.lastTriggeredAt;
+  if (!ts || ts <= 0) return "";
+  return new Date(ts / 1000).toLocaleString();
+});
+
 const lastRunLabel = computed(() => {
   const ts = synthetics.kpi.value.lastRunAt;
   if (!ts) return "";
@@ -1176,6 +1235,17 @@ const lastRunLabel = computed(() => {
 });
 
 const runTriggerLoading = ref(false);
+
+// Page-level "Jump to latest data" — builds a 1-hour window (±30 min)
+// centered on lastTriggeredAt (microseconds) and emits it to the parent.
+function handleJumpToLatestData() {
+  const ts = props.lastTriggeredAt;
+  if (!ts || ts <= 0) return;
+  const HALF_HOUR_US = 30 * 60 * 1000 * 1000;
+  const startTime = ts - HALF_HOUR_US;
+  const endTime = ts + HALF_HOUR_US;
+  emit("jump-to-window", startTime, endTime);
+}
 
 async function handleEmptyStateAction(id: string) {
   if (id === "jump-to-last-run") {

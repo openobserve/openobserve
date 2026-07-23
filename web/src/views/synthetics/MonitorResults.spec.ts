@@ -41,6 +41,7 @@ vi.mock("vue-router", () => ({
     replace: mockRouterReplace,
   }),
   RouterLink: { name: "RouterLinkStub", template: "<a><slot /></a>" },
+  onBeforeRouteUpdate: vi.fn(),
 }));
 
 vi.mock("vuex", async (importOriginal) => {
@@ -63,6 +64,17 @@ vi.mock("@/utils/date", () => ({
     }
     return null;
   }),
+}));
+
+// Mock syntheticsService.get — called on mount to fetch fresh check data
+const mockSyntheticsServiceGet = vi.fn().mockResolvedValue({
+  data: { name: "Test Monitor", status: "healthy", last_triggered_at: 0 },
+});
+vi.mock("@/services/synthetics", () => ({
+  default: {
+    get: (...args: any[]) => mockSyntheticsServiceGet(...args),
+    run: vi.fn().mockResolvedValue({}),
+  },
 }));
 
 import MonitorResults from "./MonitorResults.vue";

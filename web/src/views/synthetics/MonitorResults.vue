@@ -75,6 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :monitor-id="monitorId"
         :monitor-name="monitorName"
         :monitor-status="monitorStatus"
+        :last-triggered-at="lastTriggeredAt"
         @edit="editMonitor"
         @open-run="openRunDetail"
         @refresh="refresh"
@@ -128,7 +129,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter, onBeforeRouteUpdate } from "vue-router";
+import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -138,12 +140,21 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import syntheticsService from "@/services/synthetics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
 const { t } = useI18n();
 const route = useRoute();
 const router = useRouter();
+const store = useStore();
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier ?? "");
+
+// Fresh last_triggered_at from the API — distinguishes "never triggered"
+// from "no runs in this window" in the child MonitorRuns empty state.
+// Query-param value is stale (may be minutes old). 0 = never triggered.
+const lastTriggeredAt = ref(0);
 
 const DEFAULT_RELATIVE = "15m";
 
@@ -353,33 +364,49 @@ function openRunDetail(runId: string, executionId: string) {
     .catch(() => {});
 }
 
-onMounted(() => {
-  // Anchor the initial time window around last_triggered_at (±15 min)
-  // when arriving from the synthetics list page (fresh navigation with no
-  // explicit time range in the URL). Falls back to readFromUrl / default
-  // relative period for direct page loads, refreshes, or never-run monitors.
-  const lastTriggeredAtRaw = route.query.last_triggered_at
-  const lastTriggeredAt = typeof lastTriggeredAtRaw === 'string' ? Number(lastTriggeredAtRaw) : 0
-  const hasExplicitRange = route.query.from || route.query.to || route.query.period
+onMounted(async () => {
+  await bootstrap()
+  nextTick(() => {
+    runsRef.value?.refresh?.(
+      timeRange.value.startTime,
+      timeRange.value.endTime,
+    );
+  });
+});
 
-  if (lastTriggeredAt > 0 && !hasExplicitRange) {
-    // Convert microseconds → milliseconds
-    const tsMs = Math.floor(lastTriggeredAt / 1000)
-    const anchor = new Date(tsMs)
-    const PAD_US = 15 * 60 * 1000 * 1000
-    const startTime = Math.max(0, (anchor.getTime() - 15 * 60 * 1000) * 1000)
-    const endTime = Math.min(Date.now() * 1000, anchor.getTime() * 1000 + PAD_US)
-    timeState.value = {
-      valueType: 'absolute',
-      startTime,
-      endTime,
-      relativeTimePeriod: null,
+// Re-verify the check exists when the route updates (e.g. org switch pushes
+// the same path with a new org_identifier query param).
+onBeforeRouteUpdate(async (_to, _from, next) => {
+  await bootstrap()
+  next()
+})
+
+async function bootstrap() {
+  // Fetch fresh check data so the empty state can distinguish "never
+  // triggered" from "no runs in this time window." The query-param
+  // last_triggered_at is stale — the user may have been on the list
+  // page for a while before clicking into the check detail.
+  try {
+    const res = await syntheticsService.get(orgIdentifier.value, monitorId.value)
+    if (res?.data) {
+      lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0
     }
-    timeRange.value = { startTime, endTime }
-  } else if (!readFromUrl()) {
-    applyRelative(DEFAULT_RELATIVE);
+  } catch (err: any) {
+    // If the check doesn't exist in this org (e.g. user switched orgs),
+    // redirect to the synthetics list with a message.
+    if (err?.response?.status === 404) {
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      return
+    }
+    // Fall back to lastTriggeredAt = 0 (treat as never triggered)
   }
-  writeToUrl();
+
+  // Always default to last 15 minutes; respect explicit URL params
+  if (!readFromUrl()) {
+    applyRelative(DEFAULT_RELATIVE)
+  }
+  writeToUrl()
 
   // Auto-open drawer if query params present
   const runQ = route.query.run;
@@ -389,12 +416,5 @@ onMounted(() => {
     selectedExecutionId.value = execQ;
     drawerOpen.value = true;
   }
-
-  nextTick(() => {
-    runsRef.value?.refresh?.(
-      timeRange.value.startTime,
-      timeRange.value.endTime,
-    );
-  });
-});
+}
 </script>
