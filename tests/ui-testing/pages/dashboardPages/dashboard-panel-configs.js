@@ -7,6 +7,9 @@ export default class DashboardPanelConfigs {
   constructor(page) {
     this.page = page;
     this.configBtn = page.locator('[data-test="panel-sidebar-header-collapsed"]');
+    this.toggleAllSectionsBtn = page.locator(
+      '[data-test="dashboard-config-toggle-all-sections-btn"]'
+    );
     this.legend = page.locator(
       '[data-test="dashboard-config-legend-position"]'
     );
@@ -190,6 +193,18 @@ export default class DashboardPanelConfigs {
   async openConfigPanel() {
     await this.configBtn.waitFor({ state: "visible" });
     await this.configBtn.click();
+    await this.expandAllConfigSections();
+  }
+
+  /**
+   * Config sections start collapsed after the config-panel redesign. Expand them
+   * all (via the unfold-all button) so section options — legend, axis, pivot,
+   * table, etc. — render and are interactable. Clicking once from the default
+   * all-collapsed state expands every section.
+   */
+  async expandAllConfigSections() {
+    await this.toggleAllSectionsBtn.waitFor({ state: "visible" });
+    await this.toggleAllSectionsBtn.click();
   }
   // Select legend position
   async legendPosition(position) {
