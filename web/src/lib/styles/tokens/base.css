@@ -296,6 +296,18 @@
      own knob so it holds independent of --radius-default. */
   --radius-checkbox: 0.25rem;  /* 4px  — checkbox tick box only */
 
+  /* --- Stacking scale ---
+     Portaled floating surfaces need a shared knob, not a number typed at each
+     call site. The app stack, for context: header 2000, drawer/dialog scrim
+     5999, drawer/dialog content 6000 (+1000 per nesting level, computed in
+     ODialog/ODrawer).
+     --z-menu sits at the base overlay layer: a menu opened from the page must
+     clear the header, and one opened from a dialog is portaled after that
+     dialog's content, so equal z + later DOM order puts it on top.
+     Consumed as the `z-menu` utility (registered in styles/tailwind.css) —
+     never as an arbitrary z-index at the call site. */
+  --z-menu: 6000;    /* dropdown / context menu surfaces */
+
   /* --- Shadow scale — hairline-border philosophy ---
      Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
      1px border, not a drop shadow — a flat surface needs NO shadow class. */

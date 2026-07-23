@@ -94,6 +94,7 @@ import UnflattenedPage from "./logsPages/unflattened.js";
 // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
 import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
+import { SDRTracesIngestionPage } from "./sdrPages/sdrTracesIngestionPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationPage.js";
 
@@ -205,6 +206,7 @@ class PageManager {
     // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
     this.sdrPatternsPage = new SDRPatternsPage(page);
     this.sdrVerificationPage = new SDRVerificationPage(page);
+    this.sdrTracesPage = new SDRTracesIngestionPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
     this.streamsFormValidation = new StreamsFormValidationPage(page);
 

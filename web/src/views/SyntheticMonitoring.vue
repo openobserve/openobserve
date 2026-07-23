@@ -235,7 +235,7 @@
       @click:secondary="showDeleteLocation = false"
     >
       <p class="py-2">
-        {{ t('synthetics.privateLocations.deleteBody', { name: locationToDelete?.name ?? '' }) }}
+        {{ t('synthetics.privateLocations.deleteBody', { name: locationToDelete?.label ?? '' }) }}
       </p>
     </ODialog>
 
@@ -403,6 +403,20 @@ const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? ''
 )
 
+/** Resolves once orgIdentifier is populated — on browser back-navigation the
+ *  store may not be hydrated synchronously yet. */
+function waitForOrgIdentifier(): Promise<void> {
+  if (orgIdentifier.value) return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const stop = watch(orgIdentifier, (val) => {
+      if (val) {
+        stop()
+        resolve()
+      }
+    })
+  })
+}
+
 async function loadMonitors(folderId?: string) {
   if (!orgIdentifier.value) return
   loading.value = true
@@ -424,20 +438,9 @@ async function initPage() {
   }
 
   // Wait for the organisation identifier to be resolved before making API
-  // calls.  On browser back-navigation the store may not be ready
-  // synchronously, and loadMonitors silently returns when orgIdentifier is
-  // empty — the table skeleton stays forever because loading is never
-  // cleared.
-  if (!orgIdentifier.value) {
-    await new Promise<void>((resolve) => {
-      const stop = watch(orgIdentifier, (val) => {
-        if (val) {
-          stop()
-          resolve()
-        }
-      })
-    })
-  }
+  // calls — loadMonitors silently returns when orgIdentifier is empty, and
+  // the table skeleton would stay forever because loading is never cleared.
+  await waitForOrgIdentifier()
 
   await loadMonitors(activeFolderId.value)
 
@@ -449,7 +452,24 @@ onMounted(() => {
   initPage()
 })
 
-const activeSection   = ref<'checks' | 'private'>('checks');
+// Defaults to 'checks', but honors ?section=private so links back from the
+// private-location detail page (its own back button, deep links) land on
+// the tab the user actually came from instead of always resetting to Checks.
+const activeSection   = ref<'checks' | 'private'>(route.query.section === 'private' ? 'private' : 'checks');
+// Private Locations data is never fetched on initial render (only on manual
+// refresh or after a delete) — load it the first time the tab is actually
+// opened, so switching to it isn't silently empty.
+let privateLocationsLoaded = false;
+watch(activeSection, async (val) => {
+  if (val === 'private' && !privateLocationsLoaded) {
+    privateLocationsLoaded = true;
+    // On browser back-navigation the org identifier may not be hydrated yet
+    // at this point — wait for it, otherwise the fetch fires against an
+    // empty org and the tab is stuck showing 0 rows forever.
+    await waitForOrgIdentifier();
+    loadPrivateLocations();
+  }
+}, { immediate: true });
 const activeTab      = ref("all");
 const monitorTableMode = computed(() => activeTab.value === 'browser' ? 'browser' : 'all');
 const statusFilter   = ref("all");
@@ -602,7 +622,7 @@ async function loadPrivateLocations() {
  *  register). With a row: pinned to that location via --location-id. */
 async function openSetupDrawer(row?: SyntheticLocation) {
   setupInstall.value = null;
-  setupLocationName.value = row?.name ?? null;
+  setupLocationName.value = row?.label ?? null;
   setupLocationId.value = row?.id ?? null;
   showSetupDrawer.value = true;
   try {
@@ -647,14 +667,14 @@ const locationNames = ref<Record<string, string>>({});
 async function loadLocations() {
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
-    const locations: { id: string; name: string; region: string; provider: string }[] =
+    const locations: { id: string; label: string; region: string; provider: string }[] =
       (res.data as any).locations ?? [];
     locationOpts.value = [
       { label: t('synthetics.filters.allLocations'), value: 'all' },
-      ...locations.map((loc) => ({ label: locationDisplayLabel(loc.name, loc.region), value: loc.id })),
+      ...locations.map((loc) => ({ label: locationDisplayLabel(loc.label, loc.region), value: loc.id })),
     ];
     locationNames.value = Object.fromEntries(
-      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
     );
   } catch (err) {
     console.error('[synthetics] failed to load locations', err);

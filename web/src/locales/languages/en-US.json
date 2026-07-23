@@ -8987,7 +8987,9 @@
     "cellActions": {
       "copy": "Copy",
       "includeTerm": "Include Term",
-      "excludeTerm": "Exclude Term"
+      "excludeTerm": "Exclude Term",
+      "sendValueToAi": "Send Value to AI",
+      "sendRowToAi": "Send Row to AI"
     },
     "indexList": {
       "noMatchingFields": "No matching fields found",
@@ -10065,7 +10067,6 @@
         "step3Title": "Assign to checks",
         "step3Body": "Select this location when creating or editing any check. Checks will run from your own infrastructure.",
         "noToken": "Could not load the setup command — check your permissions and retry.",
-        "imagePlaceholderNote": "The agent image name is a placeholder until the published image is available.",
         "browserNote": "Browser tests cannot run from private locations yet — protocol checks only (HTTP, TCP, TLS, SSH).",
         "locationNameLabel": "Location name",
         "locationNamePlaceholder": "Corp HQ",
@@ -10073,7 +10074,6 @@
         "tabK8s": "Kubernetes",
         "tabLinux": "Linux",
         "tabWindows": "Windows",
-        "windowsSoon": "Coming soon",
         "agentNameLabel": "Agent name (optional)",
         "agentNamePlaceholder": "auto-generated from hostname",
         "agentNameHint": "Leave blank to let the agent name itself from its hostname — useful when running multiple agents at one location."
@@ -10086,6 +10086,7 @@
         "agentsTitle": "Agents",
         "agentsSubtitle": "Agents self-register from your infrastructure and are read-only here.",
         "agentName": "Agent",
+        "recoverAgent": "Recover this agent — copy a setup command pre-filled with its name",
         "noAgents": "No agents have registered for this location yet.",
         "checksTitle": "Checks running from this location",
         "checkName": "Name",

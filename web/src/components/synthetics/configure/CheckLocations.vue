@@ -35,15 +35,15 @@ function locationIcon(provider: string): string {
   return 'location-on'
 }
 
-/** "Name · Region", omitting the region when it's blank or a mechanical
- *  duplicate of the name (private locations without a set region default to
- *  a slug of their own name server-side, which reads as pointless noise). */
+/** "Label · Region", omitting the region when it's blank or a mechanical
+ *  duplicate of the label (private locations without a set region default to
+ *  a slug of their own label server-side, which reads as pointless noise). */
 function locationDisplayName(location: SyntheticsLocation): string {
   const region = location.region?.trim()
-  if (!region || region.toLowerCase() === location.name.trim().toLowerCase()) {
-    return location.name
+  if (!region || region.toLowerCase() === location.label.trim().toLowerCase()) {
+    return location.label
   }
-  return `${location.name} · ${region}`
+  return `${location.label} · ${region}`
 }
 
 const publicLocations = computed(() => props.locations.filter((l) => l.kind !== 'private'))

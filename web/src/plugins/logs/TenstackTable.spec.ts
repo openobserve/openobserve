@@ -99,8 +99,6 @@ vi.mock("@/utils/logs/statusParser", () => ({
 // ── Stubs ──────────────────────────────────────────────────────────────────────
 const globalStubs = {
   JsonPreview: { template: "<div />" },
-  CellActions: { template: "<div />" },
-  O2AIContextAddBtn: { template: "<div />" },
   FlexRender: { template: "<span />" },
 };
 
@@ -147,9 +145,9 @@ describe("TenstackTable", () => {
       expect(wrapper.vm.isFunctionErrorOpen).toBe(false);
     });
 
-    it("initializes activeCellActionId as empty string", () => {
+    it("initializes contextCell as null", () => {
       const wrapper = mountComponent();
-      expect(wrapper.vm.activeCellActionId).toBe("");
+      expect(wrapper.vm.contextCell).toBeNull();
     });
 
     it("initializes expandedRowIndices as empty Set", () => {

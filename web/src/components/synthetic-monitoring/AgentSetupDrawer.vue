@@ -52,12 +52,7 @@
             <OTab name="docker" :label="t('synthetics.privateLocations.setup.tabDocker')" />
             <OTab name="k8s" :label="t('synthetics.privateLocations.setup.tabK8s')" />
             <OTab name="linux" :label="t('synthetics.privateLocations.setup.tabLinux')" />
-            <OTab
-              name="windows"
-              :label="t('synthetics.privateLocations.setup.tabWindows')"
-              disable
-              :tooltip="t('synthetics.privateLocations.setup.windowsSoon')"
-            />
+            <OTab name="windows" :label="t('synthetics.privateLocations.setup.tabWindows')" />
           </OTabs>
 
           <div class="relative">
@@ -97,9 +92,6 @@
         </div>
         <p v-else class="text-sm text-text-muted">
           {{ t("synthetics.privateLocations.setup.noToken") }}
-        </p>
-        <p class="text-xs text-text-muted">
-          {{ t("synthetics.privateLocations.setup.imagePlaceholderNote") }}
         </p>
       </div>
 
@@ -159,6 +151,8 @@ const props = defineProps<{
   org?: string | null;
   o2Url?: string | null;
   scriptUrl?: string | null;
+  /** Pre-fills the agent name — used when recovering a specific known agent. */
+  agentName?: string | null;
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
@@ -182,15 +176,40 @@ watch(
   (open) => {
     if (!open) return;
     draftLocation.value = props.locationName || (props.locationId ? "" : generateDefaultLocationName());
-    draftAgentName.value = "";
+    draftAgentName.value = props.agentName || "";
   },
 );
 
 const canCompose = computed(() => !!props.scriptUrl && !!props.o2Url);
 
-/** One public script, parameterized — the platform flag picks the branch
- *  (docker run / k8s manifest apply / docker-under-systemd). */
+/** One public script per platform-family, parameterized — the bash branch
+ *  picks docker/k8s/linux via --platform; Windows is a wholly separate
+ *  script (install.ps1, bash can't run there) with PowerShell-idiomatic
+ *  params, not a --platform=windows flag (install.sh explicitly rejects
+ *  that — see its own header comment). */
 const composedCommand = computed(() => {
+  if (platform.value === "windows") {
+    // install.ps1 always lives next to install.sh (o2-datasource/synthetics/),
+    // same mirroring convention — no separate backend field needed for this.
+    const psScriptUrl = (props.scriptUrl || "").replace(/install\.sh$/, "install.ps1");
+    const lines = [
+      `& ([scriptblock]::Create((irm ${psScriptUrl}))) \``,
+      `  -O2Url "${props.o2Url}" \``,
+      `  -Org "${props.org || "<org>"}" \``,
+      `  -Token "${props.token || "<o2syn-token>"}" \``,
+    ];
+    if (props.locationId) {
+      lines.push(`  -LocationId "${props.locationId}" \``);
+    } else {
+      lines.push(`  -Location "${draftLocation.value || "<location-name>"}" \``);
+    }
+    if (draftAgentName.value) lines.push(`  -AgentName "${draftAgentName.value}"`);
+    // Join continuation lines; the last line carries no trailing backtick.
+    return lines
+      .map((l, i) => (i === lines.length - 1 ? l.replace(/ `$/, "") : l))
+      .join("\n");
+  }
+
   const lines = [
     `curl -sSL ${props.scriptUrl} | bash -s -- \\`,
     `  --platform=${platform.value} \\`,
