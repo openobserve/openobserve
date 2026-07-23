@@ -102,6 +102,10 @@ pub struct LlmScoreRecord {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_env: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub job_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub job_version: Option<i32>,
@@ -145,6 +149,8 @@ impl LlmScoreRecord {
             source_stream_type: Some(String::new()),
             agent_name: None,
             agent_id: None,
+            agent_env: Some(String::new()),
+            agent_version: Some(String::new()),
             job_id: Some(String::new()),
             job_version: Some(0),
             reasoning: Some(String::new()),
@@ -222,6 +228,8 @@ mod tests {
             source_stream_type: Some("traces".to_string()),
             agent_name: None,
             agent_id: None,
+            agent_env: None,
+            agent_version: None,
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
             reasoning: None,
@@ -262,6 +270,8 @@ mod tests {
             source_stream_type: Some("traces".to_string()),
             agent_name: Some("agent-a".to_string()),
             agent_id: Some("agent-1".to_string()),
+            agent_env: Some("prod".to_string()),
+            agent_version: Some("1.2.0".to_string()),
             job_id: Some("job-1".to_string()),
             job_version: Some(1),
             reasoning: None,
@@ -356,6 +366,8 @@ mod tests {
             source_stream_type: None,
             agent_name: None,
             agent_id: None,
+            agent_env: None,
+            agent_version: None,
             job_id: None,
             job_version: None,
             reasoning: None,
