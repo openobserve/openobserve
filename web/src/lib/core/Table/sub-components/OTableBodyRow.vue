@@ -444,11 +444,26 @@ function onRowBlur() {
 </template>
 
 <style scoped>
-/* keep(complex-state): per-row status spine, painted as an inset box-shadow on
-   the row's first cell (a `> td:first-child` child-combinator target) — an extra
-   <td> would add a phantom column and misalign cells under table-fixed. */
+/* keep(complex-state): per-row status spine on the row's first cell (a
+   `> td:first-child` child-combinator target — an extra <td> would add a
+   phantom column and misalign cells under table-fixed). Drawn as a stacked
+   ::before rather than an inset box-shadow so the expand button — which is
+   `size-6` inside a `w-4` cell, so it overflows the spine and paints a hover/
+   active background — can no longer cover it (QA issue 2239 item 7: "clicking
+   the arrow hides the blue line"). pointer-events:none keeps it click-through. */
 .o2-table-row-with-status > td:first-child {
-  box-shadow: inset 0.25rem 0 0 0 var(--row-status-color, transparent);
+  position: relative;
+}
+.o2-table-row-with-status > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.25rem;
+  background: var(--row-status-color, transparent);
+  z-index: 2;
+  pointer-events: none;
 }
 
 /* keep(generated-content): continuation of the tree connector vertical line

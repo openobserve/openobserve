@@ -1403,6 +1403,40 @@ describe("OTable", () => {
     });
   });
 
+  // ── Column close "x" gating (#2239.1) ────────────────────────
+  describe("column close (x) affordance", () => {
+    it("does NOT show the close x on a hideable column by default", async () => {
+      const columns: OTableColumnDef<TestRow>[] = makeColumns().map((c) =>
+        c.id === "name" ? { ...c, hideable: true } : c,
+      );
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns, pagination: "none", sorting: "none" },
+      });
+      await nextTick();
+      // hideable must not imply closable — otherwise every table's headers show
+      // a dead "x" (QA #2239.1, seen on the dashboards list).
+      expect(
+        wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists(),
+      ).toBe(false);
+    });
+
+    it("shows the close x only when a column opts in via meta.closable", async () => {
+      const columns: OTableColumnDef<TestRow>[] = makeColumns().map((c) =>
+        c.id === "name" ? { ...c, hideable: true, meta: { closable: true } } : c,
+      );
+      wrapper = mount(OTable, {
+        props: { data: makeRows(3), columns, pagination: "none", sorting: "none" },
+      });
+      await nextTick();
+      expect(
+        wrapper.find('[data-test="o2-table-th-remove-name-btn"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="o2-table-th-remove-email-btn"]').exists(),
+      ).toBe(false);
+    });
+  });
+
   // ── Column reorder (#2239.11) ────────────────────────────────
   describe("column reorder", () => {
     it("re-emits column-order-change when the header updates the order", async () => {
