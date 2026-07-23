@@ -361,6 +361,55 @@ describe("useManagementRoutes", () => {
       expect(pipelineRoute.meta).toEqual({ title: "Pipeline Destinations" });
     });
 
+    it("should have syntheticsLocations route when enterprise", () => {
+      const routes = useManagementRoutes();
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
+      expect(synthRoute).toBeDefined();
+      expect(synthRoute.path).toBe("synthetics_locations");
+      expect(synthRoute.meta).toEqual({ keepAlive: true, title: "Synthetics Locations" });
+    });
+
+    it("should NOT have syntheticsLocations route when enterprise is disabled", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const routes = useManagementRoutes();
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
+      expect(synthRoute).toBeUndefined();
+    });
+
+    it("should have beforeEnter hook for syntheticsLocations route", () => {
+      const routes = useManagementRoutes();
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
+      expect(typeof synthRoute.beforeEnter).toBe("function");
+    });
+
+    it("should call routeGuard in syntheticsLocations beforeEnter hook", () => {
+      const routes = useManagementRoutes();
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
+      const mockTo = { path: "/settings/synthetics_locations" };
+      const mockFrom = { path: "/settings" };
+      const mockNext = vi.fn();
+
+      synthRoute.beforeEnter(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+    });
+
+    it("should have component defined for syntheticsLocations route", () => {
+      const routes = useManagementRoutes();
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
+      expect(synthRoute.component).toBeDefined();
+    });
+
     it("should have beforeEnter hooks for all enterprise routes", () => {
       const routes = useManagementRoutes();
       const enterpriseRoutes = [
@@ -371,6 +420,7 @@ describe("useManagementRoutes", () => {
         "nodes",
         "domainManagement",
         "regexPatterns",
+        "syntheticsLocations",
       ];
 
       enterpriseRoutes.forEach((routeName) => {
@@ -402,6 +452,7 @@ describe("useManagementRoutes", () => {
         "nodes",
         "domainManagement",
         "regexPatterns",
+        "syntheticsLocations",
       ];
 
       enterpriseRoutes.forEach((routeName) => {
@@ -410,9 +461,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 18 children routes when enterprise is enabled", () => {
+    it("should have exactly 19 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(18); // 6 base + llmProviders + genAiAgentMapping + 10 enterprise
+      expect(routes[0].children).toHaveLength(19); // 6 base + llmProviders + genAiAgentMapping + 11 enterprise
     });
   });
 
@@ -490,9 +541,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 19 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 20 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(19); // 6 base + llmProviders + genAiAgentMapping + 10 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(20); // 6 base + llmProviders + genAiAgentMapping + 11 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -505,6 +556,7 @@ describe("useManagementRoutes", () => {
         "nodes",
         "domainManagement",
         "regexPatterns",
+        "syntheticsLocations",
       ];
 
       enterpriseRoutes.forEach((routeName) => {
