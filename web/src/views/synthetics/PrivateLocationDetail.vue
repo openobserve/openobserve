@@ -18,7 +18,7 @@
           icon-left="content-copy"
           :disabled="!detail"
           data-test="synthetics-private-location-detail-setup-btn"
-          @click="openSetup"
+          @click="openSetup()"
         >
           {{ t("synthetics.privateLocations.copySetupCmd") }}
         </OButton>
