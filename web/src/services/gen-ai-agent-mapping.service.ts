@@ -13,6 +13,8 @@ export const GEN_AI_AGENT_MAPPING_DEFAULTS_URL =
 export interface GenAiAgentMappingConfig {
   agent_name_fields: string[];
   agent_id_fields: string[];
+  env_fields: string[];
+  version_fields: string[];
 }
 
 export interface GenAiAgentListItem {
@@ -20,6 +22,8 @@ export interface GenAiAgentListItem {
   id?: string | null;
   source_stream: string;
   source_stream_type: string;
+  env?: string | null;
+  version?: string | null;
 }
 
 export interface GenAiAgentListResponse {
@@ -36,6 +40,8 @@ export interface ClearGenAiAgentRegistryResponse {
 const emptyConfig = (): GenAiAgentMappingConfig => ({
   agent_name_fields: [],
   agent_id_fields: [],
+  env_fields: [],
+  version_fields: [],
 });
 
 const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
@@ -44,6 +50,12 @@ const normalizeConfig = (value: any): GenAiAgentMappingConfig => ({
     : [],
   agent_id_fields: Array.isArray(value?.agent_id_fields)
     ? value.agent_id_fields.filter((field: any) => typeof field === "string")
+    : [],
+  env_fields: Array.isArray(value?.env_fields)
+    ? value.env_fields.filter((field: any) => typeof field === "string")
+    : [],
+  version_fields: Array.isArray(value?.version_fields)
+    ? value.version_fields.filter((field: any) => typeof field === "string")
     : [],
 });
 
@@ -86,6 +98,8 @@ const genAiAgentMappingService = {
           id: typeof agent.id === "string" ? agent.id : null,
           source_stream: agent.source_stream,
           source_stream_type: agent.source_stream_type,
+          env: typeof agent.env === "string" ? agent.env : null,
+          version: typeof agent.version === "string" ? agent.version : null,
         })),
     };
   },
