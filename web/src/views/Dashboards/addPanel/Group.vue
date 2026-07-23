@@ -2,7 +2,7 @@
   <div
     data-test="dashboard-group"
     :style="`--group-index: ${groupNestedIndex};`"
-    class="flex p-0 rounded-default bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(12%*var(--group-index)),transparent)]"
+    class="flex p-0 rounded-default bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(5%*var(--group-index)),transparent)]"
     :class="groupNestedIndex > 0 ? 'pl-1.25' : 'pl-0'"
   >
     <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
@@ -41,8 +41,8 @@
       <ODropdown v-model:open="showAddMenu">
         <template #trigger>
           <OButton
-            variant="primary"
-            size="icon-xs-circle"
+            variant="dashed"
+            size="icon-chip"
             data-test="dashboard-add-condition-add"
             icon-left="add"
           />
@@ -61,14 +61,18 @@
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="border-l border-border-default flex justify-between items-center">
+    <div
+      v-if="groupNestedIndex !== 0"
+      class="border-l border-border-default flex justify-between items-center ms-2 ps-1.5"
+    >
       <OButton
         variant="ghost"
-        size="icon"
+        size="icon-chip"
+        class="!w-4"
         @click="$emit('remove-group')"
         data-test="dashboard-add-group-remove"
-        icon-left="close"
       >
+        <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
       </OButton>
     </div>
   </div>
@@ -77,6 +81,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useI18n } from "vue-i18n";
@@ -84,7 +89,7 @@ import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "Group",
-  components: { AddCondition, OButton, ODropdown, ODropdownItem },
+  components: { AddCondition, OButton, OIcon, ODropdown, ODropdownItem },
   props: {
     group: {
       type: Object,

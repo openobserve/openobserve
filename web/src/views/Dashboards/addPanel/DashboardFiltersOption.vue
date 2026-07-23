@@ -10,10 +10,20 @@
       "
       class="pl-3 flex flex-row"
     >
-      <div class="text-sm whitespace-nowrap min-w-32.5 flex items-center" data-test="dashboard-filter-layout-label">{{ t("panel.filters") }}</div>
+      <div
+        class="text-sm whitespace-nowrap flex items-center"
+        :class="labelWidthClass"
+        data-test="dashboard-filter-layout-label"
+      >
+        <span
+          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-text-body"
+          aria-hidden="true"
+        ></span>
+        {{ t("panel.filters") }}
+      </div>
       <span class="flex items-center mx-0.5" data-test="dashboard-filter-layout-separator">:</span>
       <div
-        class="m-1.25 flex-wrap droppable scroll flex"
+        class="m-1.25 flex-wrap droppable scroll flex items-center min-h-10"
         data-test="dashboard-filter-layout"
         :data-condition-count="conditionCount"
       >
@@ -50,7 +60,13 @@ export default defineComponent({
   components: {
     Group,
   },
-  props: ["dashboardData"],
+  // labelWidthClass keeps the ":" separator aligned with the parent chart's
+  // axis labels (e.g. geomap's wider "Longitude"). Defaults to the main
+  // builder's width.
+  props: {
+    dashboardData: { type: Object, default: undefined },
+    labelWidthClass: { type: String, default: "min-w-20" },
+  },
 
   setup(props) {
     const route = useRoute();

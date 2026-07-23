@@ -4,22 +4,53 @@
       v-if="conditionIndex !== 0"
       v-model="conditionModel.logicalOperator"
       :options="filterOptions"
+      size="sm"
       @update:model-value="emitLogicalOperatorChange"
       class="condition-logical-operator w-fit max-w-32"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
-    <OButtonGroup class="axis-field shrink-0" radius="sm">
+    <OButtonGroup
+      class="axis-field shrink-0 border border-border-default border-s-2 border-s-text-body bg-surface-panel"
+      radius="sm"
+      :divided="false"
+    >
       <ODropdown
         @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
       >
         <template #trigger>
           <OButton
-            variant="primary"
+            variant="ghost"
             size="chip-12"
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
-            {{ computedLabel(condition) }}
+            <span class="whitespace-nowrap font-normal"
+              ><span class="text-text-body">{{
+                labelParts(condition).prefix
+              }}</span
+              ><span class="text-text-body">{{
+                labelParts(condition).field
+              }}</span
+              ><span
+                v-if="labelParts(condition).op"
+                class="text-text-secondary"
+                >{{ labelParts(condition).op }}</span
+              ><template v-if="labelParts(condition).value"
+                ><span class="text-badge-blue-ol-text">{{
+                  labelParts(condition).valueOpen
+                }}</span
+                ><span
+                  :class="
+                    labelParts(condition).valueIsNumber
+                      ? 'text-badge-success-ol-text'
+                      : 'text-badge-error-ol-text'
+                  "
+                  >{{ labelParts(condition).valueInner }}</span
+                ><span class="text-badge-blue-ol-text">{{
+                  labelParts(condition).valueClose
+                }}</span></template
+              ></span
+            >
           </OButton>
         </template>
         <div class="p-4 w-72">
@@ -103,13 +134,13 @@
         </div>
       </ODropdown>
       <OButton
-        variant="outline"
+        variant="ghost"
         size="icon-chip"
-        class="shrink-0"
+        class="shrink-0 !w-4"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
-        icon-left="close"
       >
+        <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
       </OButton>
     </OButtonGroup>
   </div>
@@ -118,6 +149,7 @@
 <script lang="ts">
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -141,6 +173,7 @@ export default defineComponent({
     OSeparator,
     OButtonGroup,
     OButton,
+    OIcon,
     ODropdown,
     OTabs,
     OTab,
@@ -239,6 +272,50 @@ export default defineComponent({
           : builtCondition;
     };
 
+    /**
+     * Split a condition label like "stream.field IN ('x')" into styled parts:
+     * muted stream prefix + bold field, muted operator, and the parenthesised
+     * value highlighted separately. Labels without an operator/value collapse
+     * to just prefix + field.
+     */
+    const labelParts = (condition: any) => {
+      const label = String(computedLabel(condition) ?? "");
+      const spaceIdx = label.indexOf(" ");
+      const column = spaceIdx === -1 ? label : label.slice(0, spaceIdx);
+      let rest = spaceIdx === -1 ? "" : label.slice(spaceIdx + 1);
+      let value = "";
+      const parens = rest.match(/^(.*?)\s*(\(.*\)?)\s*$/);
+      if (parens) {
+        rest = parens[1];
+        value = parens[2];
+      }
+      const dotIdx = column.lastIndexOf(".");
+      // Peel the outer parentheses off the value so they can render blue like
+      // the query editor's brackets, leaving the inner literal(s) to colour.
+      const valueOpen = value.startsWith("(") ? "(" : "";
+      const valueClose = value.endsWith(")") ? ")" : "";
+      const valueInner = value.slice(
+        valueOpen.length,
+        value.length - valueClose.length,
+      );
+      // A value is numeric when its inner content (no quotes/commas) is all
+      // numbers → green like a number in the query; otherwise red (string).
+      const bare = valueInner.replace(/['"]/g, "").trim();
+      const valueIsNumber = bare !== "" && /^-?[\d.\s,]+$/.test(bare);
+      return {
+        prefix: dotIdx === -1 ? "" : column.slice(0, dotIdx + 1),
+        field: dotIdx === -1 ? column : column.slice(dotIdx + 1),
+        // Pre-padded — Vue's whitespace condensing strips spaces between the
+        // adjacent label spans, so the operator carries its own.
+        op: rest ? ` ${rest} ` : "",
+        value,
+        valueOpen,
+        valueInner,
+        valueClose,
+        valueIsNumber,
+      };
+    };
+
     const emitLogicalOperatorChange = (newOperator: SelectModelValue) => {
       emit("logical-operator-change", newOperator);
     };
@@ -270,6 +347,7 @@ export default defineComponent({
     return {
       operators,
       computedLabel,
+      labelParts,
       t,
       filterStreamFn,
       filterOptions,
