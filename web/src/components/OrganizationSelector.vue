@@ -91,8 +91,6 @@ const totalSize = computed(() => virtualizer.value.getTotalSize());
 
 const rows = computed(() =>
   virtualizer.value.getVirtualItems().map((v) => ({
-    // TanStack's Key includes bigint, which Vue's :key type doesn't accept
-    key: v.key as string | number,
     index: v.index,
     start: v.start,
     size: v.size,
@@ -180,12 +178,15 @@ watch(open, async (isOpen) => {
 // Keep the virtual window in sync, re-aim the highlight at the first match so
 // Enter selects the obvious result, and snap the scroll back to the top —
 // otherwise a prior scroll offset would hide the first results after a search.
+//
+// Reset and re-measure synchronously rather than in nextTick: the scroll
+// element already exists here (unlike on open), and deferring means rows paint
+// at stale offsets for one tick, then shift. A click landing in that window
+// hits a row that is about to move out from under the pointer.
 watch(filtered, (list) => {
   highlightedIndex.value = list.length ? 0 : -1;
-  nextTick(() => {
-    if (scrollRef.value) scrollRef.value.scrollTop = 0;
-    virtualizer.value.measure();
-  });
+  if (scrollRef.value) scrollRef.value.scrollTop = 0;
+  virtualizer.value.measure();
 });
 
 const isSelected = (org: OrgOption) =>
@@ -287,7 +288,7 @@ const rowStateClass = (row: { org: OrgOption; index: number }) => {
           <div class="relative w-full" :style="{ height: `${totalSize}px` }">
             <div
               v-for="row in rows"
-              :key="row.key"
+              :key="row.org.identifier"
               data-test="organization-menu-item-label-item-label"
               :data-test-org-identifier="row.org.identifier"
               class="group absolute left-0 right-0 top-0 box-border flex items-center gap-2 px-3 rounded-default cursor-pointer transition-colors"
