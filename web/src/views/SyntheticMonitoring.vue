@@ -759,7 +759,7 @@ async function bulkPauseMonitors() {
   bulkActionLoading.value = true
   const dismiss = toast({ variant: 'loading', message: t('synthetics.table.bulkPauseToast', { count: toPause.length }), timeout: 0 })
   const results = await Promise.allSettled(
-    toPause.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }))
+    toPause.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: false }, m.folder_name))
   )
   dismiss()
   const failed = results.filter(r => r.status === 'rejected').length
@@ -782,7 +782,7 @@ async function bulkEnableMonitors() {
   bulkActionLoading.value = true
   const dismiss = toast({ variant: 'loading', message: t('synthetics.table.bulkEnableToast', { count: toEnable.length }), timeout: 0 })
   const results = await Promise.allSettled(
-    toEnable.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }))
+    toEnable.map(m => syntheticsService.enable(orgIdentifier.value, String(m.id), { enabled: true }, m.folder_name))
   )
   dismiss()
   const failed = results.filter(r => r.status === 'rejected').length
@@ -805,7 +805,7 @@ async function bulkTriggerMonitors() {
   bulkActionLoading.value = true
   const dismiss = toast({ variant: 'loading', message: t('synthetics.table.bulkTriggerToast', { count: toTrigger.length }), timeout: 0 })
   const results = await Promise.allSettled(
-    toTrigger.map(m => syntheticsService.run(orgIdentifier.value, String(m.id), {}))
+    toTrigger.map(m => syntheticsService.run(orgIdentifier.value, String(m.id), {}, m.folder_name))
   )
   dismiss()
   const failed = results.filter(r => r.status === 'rejected').length
@@ -854,7 +854,7 @@ async function toggleEnabled(m: any) {
   toggleLoadingMap.value[id] = true
   const dismiss = toast({ variant: 'loading', message: newEnabled ? t('synthetics.toast.enablingSingle') : t('synthetics.toast.pausingSingle'), timeout: 0 })
   try {
-    await syntheticsService.enable(org, id, { enabled: newEnabled })
+    await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folder_name)
     const found = monitors.value.find((mon) => String(mon.id) === id)
     if (found) found.enabled = newEnabled
     dismiss()
@@ -884,7 +884,7 @@ async function saveDuplicate() {
   const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.duplicating'), timeout: 0 })
   try {
     const org = orgIdentifier.value
-    const res = await syntheticsService.get(org, String(duplicateTarget.value.id))
+    const res = await syntheticsService.get(org, String(duplicateTarget.value.id), activeFolderId.value)
     const check = mapResponseToBrowserCheck(res.data as Record<string, unknown>)
     check.name = duplicateName.value
     check.folder = duplicateFolder.value
@@ -927,7 +927,7 @@ async function runMonitor(m: any) {
   triggerLoadingMap.value[id] = true
   const dismiss = toast({ variant: 'loading', message: t('synthetics.toast.triggeringSingle', { name }), timeout: 0 })
   try {
-    await syntheticsService.run(org, id, {})
+    await syntheticsService.run(org, id, {}, m.folder_name)
     dismiss()
     toast({ variant: 'success', message: t('synthetics.toast.triggerSuccessSingle', { name }) })
   } catch (err: any) {

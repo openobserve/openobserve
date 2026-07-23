@@ -403,12 +403,26 @@ pub async fn list_synthetics(
 )]
 pub async fn create_synthetic(
     Path(org_id): Path<String>,
-    Query(_folder_query): Query<FolderQuery>,
+    Query(folder_query): Query<FolderQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // The permission gate for POST /synthetics checks the `?folder=` query
+        // param, so the destination folder MUST come from the same place —
+        // otherwise a crafted body.folder_id could create a check in a folder
+        // the user can't access (gate checks query, write used body). Make the
+        // query authoritative and ignore any folder in the body, exactly like
+        // regular alerts' create_alert (get_folder(query)). Default when absent.
+        // (`mut` re-bind here, not in the signature, so the OSS build — where
+        // this block is cfg'd out — doesn't warn about an unused `mut`.)
+        let mut body = body;
+        body.folder_id = folder_query
+            .folder
+            .filter(|f| !f.is_empty())
+            .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
+
         let created_by = user_email.user_id.as_str();
         match o2_enterprise::enterprise::synthetics::service::create_synthetic(
             &org_id, body, created_by,
@@ -429,7 +443,7 @@ pub async fn create_synthetic(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, body);
+        let _ = (org_id, body, folder_query);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }
@@ -685,10 +699,33 @@ pub async fn delete_synthetics_bulk(
 pub async fn move_synthetics(
     Path(org_id): Path<String>,
     Query(_folder_query): Query<FolderQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
     Json(body): Json<MoveSyntheticsRequestBody>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        // RBAC: moving a check is a write — require PUT on each check being
+        // moved (same shape get_synthetic/update use). Mirrors alerts'
+        // move_to_folder check; without it a List+Delete-only role could move
+        // checks between folders. The move route is bypass:true, so this
+        // in-handler check is the only gate.
+        for id in &body.synthetic_ids {
+            if !check_permissions(
+                id,
+                &org_id,
+                &user_email.user_id,
+                "synthetics",
+                "PUT",
+                None,
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Forbidden");
+            }
+        }
         match o2_enterprise::enterprise::synthetics::service::move_synthetics(
             &org_id,
             &body.synthetic_ids,

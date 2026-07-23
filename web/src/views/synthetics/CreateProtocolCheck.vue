@@ -152,7 +152,7 @@ async function loadForEdit(id: string) {
   isLoadingEdit.value = true
   try {
     const org = store.state.selectedOrganization.identifier
-    const res = await syntheticsService.get(org, id)
+    const res = await syntheticsService.get(org, id, String(route.query.folder ?? ''))
     check.value = mapResponseToProtocolCheck(res.data as Record<string, unknown>)
   } catch (err) {
     // Surface it — a silent catch here leaves a blank form that saves a

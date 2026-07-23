@@ -223,7 +223,7 @@ describe("CreateCheck", () => {
         wrapper.find('[data-test="protocol-edit-id"]').text(),
       ).toBe("mon-tcp-1");
       // Service was called with correct args
-      expect(mockedService.get).toHaveBeenCalledWith("org-1", "mon-tcp-1");
+      expect(mockedService.get).toHaveBeenCalledWith("org-1", "mon-tcp-1", "");
     });
 
     it("should default to CreateBrowserTest when edit monitor has an unknown type", async () => {

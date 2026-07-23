@@ -656,6 +656,9 @@ const executionIdParam = computed(() =>
     ? props.overrideExecutionId
     : String(route.params.executionId ?? ""),
 );
+// The check's folder (name), carried on the results-page route as ?folder=.
+// Passed to per-check API calls so RBAC can resolve folder-scoped grants.
+const folderName = computed(() => String(route.query.folder ?? ""));
 
 // ── Composable ─────────────────────────────────────────────────────────────
 const synthetics = useSyntheticResults();
@@ -668,7 +671,7 @@ const monitorType = ref<string | null>(null);
 async function resolveMonitorType() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.get(org, monitorId.value);
+    const res = await syntheticsService.get(org, monitorId.value, folderName.value);
     monitorType.value = (res.data as any)?.type ?? "browser";
   } catch {
     monitorType.value = "browser";
@@ -812,6 +815,7 @@ async function presignRunArtifacts() {
       orgId,
       monitorId.value,
       keys,
+      folderName.value,
     );
     const map: Record<string, string> = {};
     for (const entry of data.urls ?? []) {
@@ -838,7 +842,7 @@ function screenshotUrl(key: string | null): string {
   const signed = artifactUrls.value[key];
   if (signed) return signed;
   const orgId = store.state.selectedOrganization.identifier;
-  return syntheticsService.artifactUrl(orgId, key);
+  return syntheticsService.artifactUrl(orgId, key, folderName.value);
 }
 
 // ── Display model for the current run (mapped from SyntheticRunDetail) ─────
