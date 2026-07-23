@@ -1328,7 +1328,7 @@ const fieldWidthClass = computed(() => {
                   :class="[
                     'relative flex items-center w-full gap-2 shrink-0',
                     'ps-3 pe-3 py-1.5 text-sm',
-                    'text-select-item-text rounded-default',
+                    'text-select-item-text',
                     'cursor-pointer select-none outline-none',
                     'hover:bg-select-item-hover-bg',
                     'focus-visible:bg-select-item-hover-bg',
@@ -1459,7 +1459,7 @@ const fieldWidthClass = computed(() => {
                         :class="[
                           'relative flex w-full h-full gap-2',
                           'ps-3 pe-3 text-sm',
-                          'text-select-item-text rounded-default',
+                          'text-select-item-text',
                           'cursor-pointer select-none outline-none',
                           'transition-colors duration-100',
                           // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
