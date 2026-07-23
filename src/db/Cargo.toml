@@ -50,3 +50,4 @@ tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
 transform.workspace = true
+vrl.workspace = true

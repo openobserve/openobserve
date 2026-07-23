@@ -37,7 +37,7 @@ struct RecentIngestedTraceStream {
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     // get last offset
-    let (mut last_updated_at, node) = crate::service::db::service_graph::get_offset().await;
+    let (mut last_updated_at, node) = crate::db::service_graph::get_offset().await;
     // other node is processing
     if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
         return Ok(());
@@ -45,11 +45,8 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
 
     // before starting, set current node to lock the job
     if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
-        crate::service::db::service_graph::set_offset(
-            last_updated_at,
-            Some(&LOCAL_NODE.uuid.clone()),
-        )
-        .await?;
+        crate::db::service_graph::set_offset(last_updated_at, Some(&LOCAL_NODE.uuid.clone()))
+            .await?;
     }
 
     let now = now_micros();
@@ -74,7 +71,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         GROUP BY org_id, stream_name"#
         .to_string();
 
-    let usage_results = match crate::service::self_reporting::search::get_usage(
+    let usage_results = match crate::self_reporting::search::get_usage(
         sql,
         last_updated_at,
         next_updated_at,
@@ -129,14 +126,12 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         .iter()
         .map(|s| (s.org_id.clone(), s.stream_name.clone()))
         .collect();
-    match crate::service::organization::list_all_orgs(None).await {
+    match crate::organization::list_all_orgs(None).await {
         Ok(orgs) => {
             for org in orgs {
-                for stream_name in crate::service::db::schema::list_streams_from_cache(
-                    &org.identifier,
-                    StreamType::Traces,
-                )
-                .await
+                for stream_name in
+                    crate::db::schema::list_streams_from_cache(&org.identifier, StreamType::Traces)
+                        .await
                 {
                     if seen.insert((org.identifier.clone(), stream_name.clone())) {
                         discovered.push(RecentIngestedTraceStream {
@@ -173,7 +168,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         }
 
         // Agent-signals rollup: co-located, same window, same node. Self-guards on config.
-        if let Err(e) = crate::service::traces::agent_signals::process_agent_signals_stream(
+        if let Err(e) = crate::traces::agent_signals::process_agent_signals_stream(
             &org_id,
             &stream_name,
             last_updated_at,
@@ -187,8 +182,7 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     }
 
     // update last updated at
-    crate::service::db::service_graph::set_offset(next_updated_at, Some(&LOCAL_NODE.uuid.clone()))
-        .await?;
+    crate::db::service_graph::set_offset(next_updated_at, Some(&LOCAL_NODE.uuid.clone())).await?;
 
     Ok(())
 }
@@ -315,7 +309,7 @@ async fn compute_stream_edges(
     let has_infer = infra::schema::get(org_id, stream_name, StreamType::Traces)
         .await
         .map(|s| {
-            s.field_with_name(crate::service::traces::inferred::INFER_SERVICE_NAME)
+            s.field_with_name(crate::traces::inferred::INFER_SERVICE_NAME)
                 .is_ok()
         })
         .unwrap_or(false);
@@ -624,8 +618,7 @@ async fn process_stream(
         return Ok(());
     }
     // SQL already aggregated everything - just write directly to _o2_service_graph stream
-    crate::service::traces::service_graph::write_sql_aggregated_edges(org_id, stream_name, hits)
-        .await?;
+    crate::traces::service_graph::write_sql_aggregated_edges(org_id, stream_name, hits).await?;
     Ok(())
 }
 
@@ -673,8 +666,7 @@ pub(crate) async fn run_graph_search(
     };
 
     let trace_id = config::ider::generate();
-    let resp =
-        crate::service::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
+    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
     Ok(resp.hits)
 }
 

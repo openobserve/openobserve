@@ -19,14 +19,14 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use common::meta::http::HttpResponse as MetaHttpResponse;
 use serde::Deserialize;
 
-use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 // Used only inside #[cfg(feature = "enterprise")] handler bodies.
 #[cfg(feature = "enterprise")]
 use crate::{
-    common::utils::auth::{UserEmail, check_permissions},
     handler::http::extractors::Headers,
+    service::auth::{UserEmail, check_permissions},
 };
 
 // ── Local query / body types ──────────────────────────────────────────────────
@@ -1054,7 +1054,7 @@ async fn process_ack(
     let resp = o2_enterprise::enterprise::synthetics::job_api::ack(req, token_org).await?;
 
     // Emit trigger usage record for synthetics telemetry.
-    crate::service::self_reporting::publish_triggers_usage(
+    openobserve_core::self_reporting::publish_triggers_usage(
         config::meta::self_reporting::usage::TriggerData {
             _timestamp: checked_at,
             org: resp.org_id.clone(),
@@ -1072,7 +1072,7 @@ async fn process_ack(
 
     // Notify once per run, not once per job ack.
     if resp.run_complete && !resp.destinations.is_empty() {
-        let notification = crate::service::synthetics::CheckNotification {
+        let notification = openobserve_core::synthetics::CheckNotification {
             org_id: resp.org_id.clone(),
             monitor_name: resp.synthetics_name.clone(),
             monitor_id: resp.synthetics_id.clone(),
@@ -1086,7 +1086,7 @@ async fn process_ack(
             checked_at,
         };
         tokio::spawn(async move {
-            crate::service::synthetics::notify_check_result(notification).await;
+            openobserve_core::synthetics::notify_check_result(notification).await;
         });
     }
     Ok(resp)
@@ -1277,7 +1277,7 @@ pub async fn create_location(
             CreateLocationRequest, create_location,
         };
 
-        let is_root = crate::common::utils::auth::is_root_user(&user_email.user_id);
+        let is_root = db::user::is_root_user(&user_email.user_id);
 
         // Batch shape: {"locations": [{...}, ...]} → per-item results, same
         // pattern as batch acks. Single-object shape stays unchanged.
@@ -1420,7 +1420,7 @@ pub async fn update_location(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let is_root = crate::common::utils::auth::is_root_user(&user_email.user_id);
+        let is_root = db::user::is_root_user(&user_email.user_id);
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::service::UpdateLocationRequest,
         >(body)
@@ -1469,7 +1469,7 @@ pub async fn delete_location(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let is_root = crate::common::utils::auth::is_root_user(&user_email.user_id);
+        let is_root = db::user::is_root_user(&user_email.user_id);
         match o2_enterprise::enterprise::synthetics::service::delete_location(&org_id, is_root, &id)
             .await
         {

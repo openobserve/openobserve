@@ -17,8 +17,9 @@
 
 #![recursion_limit = "256"]
 
-pub use openobserve_api_common::extractors;
-pub use openobserve_core::{common, service};
+#[allow(clippy::single_component_path_imports)]
+use common;
+use openobserve_core as service;
 
 pub mod promql;
 pub mod search;

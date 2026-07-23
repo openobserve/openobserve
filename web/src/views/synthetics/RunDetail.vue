@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :subtitle="currentRun.timestamp"
       :back="{
         label: t('synthetics.results.monitors'),
-        to: { name: 'synthetics-monitor-results', params: { id: monitorId } },
+        to: { name: 'synthetic-monitor-results', params: { id: monitorId } },
         dataTest: 'synthetics-run-detail-back-btn',
       }"
     >

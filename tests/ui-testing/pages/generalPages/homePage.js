@@ -197,16 +197,29 @@ export class HomePage {
         await this.orgMenuList.waitFor({ state: 'visible', timeout: 5000 });
     }
 
+    /**
+     * Click a row in the org dropdown, tolerating the list settling underneath.
+     *
+     * The menu is virtualized and the popper animates in, so a row can be
+     * visible-and-stable yet still get re-positioned or briefly intercepted a
+     * tick later. One long click spends its entire budget on a single such
+     * attempt; short retries ride the relayout out instead.
+     */
+    async clickOrgRow(row, { timeout = 20000 } = {}) {
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(async () => {
+            await row.click({ timeout: 5000 });
+        }).toPass({ timeout });
+    }
+
     async selectOrganization(orgName) {
         await this.openOrgSelector();
 
         // Search for the organization
         await this.orgSearchInput.fill(orgName);
-        // Wait for the result row to render before clicking.
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 5000 });
 
         // Click the first matching organization
-        await this.orgMenuItemLabel.first().click();
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -215,8 +228,7 @@ export class HomePage {
         await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
         // Find the "default" row by its label cell text using a data-test scoped lookup.
         await this.orgSearchInput.fill('default');
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 10000 });
-        await this.orgMenuItemLabel.first().click();
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
     }
 
     async homePageURLValidationDefaultOrg() {
@@ -229,8 +241,7 @@ export class HomePage {
         await this.orgSelector.click();
         await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
         await this.orgSearchInput.fill('defaulttestmulti');
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 10000 });
-        await this.orgMenuItemLabel.first().click();
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
     }
 
     async homePageURLValidation() {
@@ -250,9 +261,7 @@ export class HomePage {
         // we don't race against the OInput debounce / OTable filter and end up
         // clicking the previously-first row (often "default").
         if (orgIdentifier) {
-            const targetRow = this.getOrgMenuItemByIdentifier(orgIdentifier);
-            await targetRow.waitFor({ state: 'visible', timeout: 10000 });
-            await targetRow.click();
+            await this.clickOrgRow(this.getOrgMenuItemByIdentifier(orgIdentifier));
             // Wait for the router push to land — the URL should now carry the
             // new org identifier.
             await this.page.waitForURL(new RegExp(`org_identifier=${orgIdentifier}`), {
@@ -261,10 +270,8 @@ export class HomePage {
             return;
         }
 
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 10000 });
-
         // Click the organization from search results
-        await this.orgMenuItemLabel.first().click();
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
     }
 
     async homeURLContains(orgNameIdentifier) {

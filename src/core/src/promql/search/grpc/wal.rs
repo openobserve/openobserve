@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use ::promql::{apply_label_selector, apply_matchers};
+use ::promql::utils::{apply_label_selector, apply_matchers};
 use arrow::record_batch::RecordBatch;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
@@ -32,22 +32,20 @@ use hashbrown::HashSet;
 use infra::cluster::get_cached_online_ingester_nodes;
 use promql_parser::label::Matchers;
 use proto::cluster_rpc::{self, IndexInfo, QueryIdentifier};
+use search::{
+    datafusion::{
+        distributed_plan::{
+            node::{RemoteScanNode, SearchInfos},
+            remote_scan_exec::RemoteScanExec,
+        },
+        exec::DataFusionContextBuilder,
+        table_provider::empty_table::NewEmptyTable,
+    },
+    utils::ScanStatsVisitor,
+};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::service::{
-    promql::search::grpc::Context,
-    search::{
-        datafusion::{
-            distributed_plan::{
-                node::{RemoteScanNode, SearchInfos},
-                remote_scan_exec::RemoteScanExec,
-            },
-            exec::DataFusionContextBuilder,
-            table_provider::empty_table::NewEmptyTable,
-        },
-        utils::ScanStatsVisitor,
-    },
-};
+use crate::promql::search::grpc::Context;
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(

@@ -56,9 +56,3 @@ pub mod instance {
         db::put("/instance/", data, db::NO_NEED_WATCH, None).await
     }
 }
-
-pub mod tantivy_index {
-    pub use infra::db::tantivy_index::{
-        get_ttv_secondary_index_updated_at, get_ttv_timestamp_updated_at,
-    };
-}

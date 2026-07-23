@@ -27,8 +27,9 @@ use axum::{
 use config::meta::system_settings::{
     SettingScope, SystemSetting, SystemSettingPayload, SystemSettingQuery,
 };
+use db::system_settings;
 
-use crate::{common::meta::http::HttpResponse as MetaHttpResponse, service::db::system_settings};
+use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
 /// Get a specific system setting with resolution (user -> org -> system)
 #[utoipa::path(
