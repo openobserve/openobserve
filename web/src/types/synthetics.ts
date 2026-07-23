@@ -306,13 +306,13 @@ export interface AgentSetup {
 
 // Full location record for admin/settings panel (GET /api/{org}/synthetics/locations)
 export interface SyntheticsLocationRecord {
-  id: string
-  name: string
-  region: string
-  provider: string
-  enabled: boolean
-  kind: string
-  pool: string
+  id: string;
+  name: string;
+  region: string;
+  provider: string;
+  enabled: boolean;
+  kind: string;
+  pool: string;
 }
 
 export interface SyntheticsDevice {

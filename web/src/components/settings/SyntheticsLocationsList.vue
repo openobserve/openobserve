@@ -29,19 +29,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             @click="openImportDialog"
             data-test="synthetics-locations-import-btn"
-          >{{ t('synthetics.locations.importTitle') }}</OButton>
+            >{{ t("synthetics.locations.importTitle") }}</OButton
+          >
           <OButton
             variant="outline"
             size="sm"
             @click="exportLocations"
             data-test="synthetics-locations-export-btn"
-          >{{ t('synthetics.locations.exportTitle') }}</OButton>
+            >{{ t("synthetics.locations.exportTitle") }}</OButton
+          >
           <OButton
             data-test="synthetics-locations-add-btn"
             variant="primary"
             size="sm"
             @click="openCreateDialog"
-          >{{ t('synthetics.locations.addLocation') }}</OButton>
+            >{{ t("synthetics.locations.addLocation") }}</OButton
+          >
         </template>
 
         <div class="bg-card-glass-bg flex-1 min-h-0 overflow-hidden">
@@ -92,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="hero"
                 :preset="filterQuery !== '' ? 'no-search-results' : 'no-data'"
                 :filtered="filterQuery !== ''"
-                @action="(id?: string) => id === 'clear-filters' ? (filterQuery = '') : undefined"
+                @action="(id?: string) => (id === 'clear-filters' ? (filterQuery = '') : undefined)"
               />
             </template>
             <template #cell-actions="{ row }">
@@ -104,7 +107,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`synthetics-locations-${row.id}-toggle-spinner`"
                 >
                   <OSpinner size="xs" />
-                  <OTooltip side="bottom" :content="row.enabled ? t('synthetics.locations.disabling') : t('synthetics.locations.enabling')" />
+                  <OTooltip
+                    side="bottom"
+                    :content="
+                      row.enabled
+                        ? t('synthetics.locations.disabling')
+                        : t('synthetics.locations.enabling')
+                    "
+                  />
                 </div>
                 <OButton
                   v-else
@@ -114,7 +124,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :data-test="`synthetics-locations-${row.id}-${row.enabled ? 'disable' : 'enable'}-btn`"
                   @click.stop="toggleLocationEnabled(row)"
                 >
-                  <OTooltip side="bottom" :content="row.enabled ? t('synthetics.locations.disable') : t('synthetics.locations.enable')" />
+                  <OTooltip
+                    side="bottom"
+                    :content="
+                      row.enabled
+                        ? t('synthetics.locations.disable')
+                        : t('synthetics.locations.enable')
+                    "
+                  />
                 </OButton>
 
                 <!-- Edit -->
@@ -148,10 +165,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex w-full justify-between items-center h-12 gap-1">
                 <span class="text-xs text-secondary min-w-25">
                   <template v-if="selectedLocations.length > 0">
-                    {{ t('synthetics.locations.selectedCount', { selected: selectedLocations.length, total: resultTotal }) }}
+                    {{
+                      t("synthetics.locations.selectedCount", {
+                        selected: selectedLocations.length,
+                        total: resultTotal,
+                      })
+                    }}
                   </template>
                   <template v-else>
-                    {{ resultTotal }} {{ t('synthetics.locations.bottomHeader') }}
+                    {{ resultTotal }} {{ t("synthetics.locations.bottomHeader") }}
                   </template>
                 </span>
                 <template v-if="selectedLocations.length > 0">
@@ -162,7 +184,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="synthetics-locations-enable-selected-btn"
                     :disabled="!!bulkActionLoading"
                     @click="bulkToggleEnabled(true)"
-                  >{{ t('synthetics.locations.enable') }}</OButton>
+                    >{{ t("synthetics.locations.enable") }}</OButton
+                  >
                   <OButton
                     variant="outline"
                     size="sm"
@@ -170,7 +193,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="synthetics-locations-disable-selected-btn"
                     :disabled="!!bulkActionLoading"
                     @click="bulkToggleEnabled(false)"
-                  >{{ t('synthetics.locations.disable') }}</OButton>
+                    >{{ t("synthetics.locations.disable") }}</OButton
+                  >
                   <OButton
                     variant="outline-destructive"
                     size="sm"
@@ -178,7 +202,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="synthetics-locations-delete-selected-btn"
                     :loading="!!bulkActionLoading"
                     @click="openBulkDeleteConfirm"
-                  >{{ t('common.delete') }}</OButton>
+                    >{{ t("common.delete") }}</OButton
+                  >
                 </template>
               </div>
             </template>
@@ -315,13 +340,13 @@ export default defineComponent({
       isEdit: false,
     });
 
-    const selectedLocationIds = computed(() =>
-      selectedLocations.value.map((l) => l.id),
-    );
+    const selectedLocationIds = computed(() => selectedLocations.value.map((l) => l.id));
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
       const map = new Map(locations.value.map((l) => [l.id, l]));
-      selectedLocations.value = ids.map((id) => map.get(id)).filter(Boolean) as SyntheticsLocationRecord[];
+      selectedLocations.value = ids
+        .map((id) => map.get(id))
+        .filter(Boolean) as SyntheticsLocationRecord[];
     };
 
     onMounted(() => {
@@ -359,9 +384,7 @@ export default defineComponent({
         resultTotal.value = locations.value.length;
       } catch (error: any) {
         toast({
-          message:
-            error?.response?.data?.message ||
-            t("synthetics.locations.fetchFailed"),
+          message: error?.response?.data?.message || t("synthetics.locations.fetchFailed"),
           variant: "error",
         });
       } finally {
@@ -405,9 +428,7 @@ export default defineComponent({
         selectedLocations.value = [];
       } catch (error: any) {
         toast({
-          message:
-            error?.response?.data?.message ||
-            t("synthetics.locations.toggleFailed"),
+          message: error?.response?.data?.message || t("synthetics.locations.toggleFailed"),
           variant: "error",
         });
       } finally {
@@ -452,8 +473,14 @@ export default defineComponent({
         } else if (successCount > 0) {
           toast({
             message: enabled
-              ? t("synthetics.locations.bulkEnabledPartial", { success: successCount, total: ids.length })
-              : t("synthetics.locations.bulkDisabledPartial", { success: successCount, total: ids.length }),
+              ? t("synthetics.locations.bulkEnabledPartial", {
+                  success: successCount,
+                  total: ids.length,
+                })
+              : t("synthetics.locations.bulkDisabledPartial", {
+                  success: successCount,
+                  total: ids.length,
+                }),
             variant: "warning",
           });
         } else {
@@ -483,10 +510,7 @@ export default defineComponent({
 
     const deleteLocation = async (id: string) => {
       try {
-        await syntheticsService.deleteLocation(
-          store.state.selectedOrganization.identifier,
-          id,
-        );
+        await syntheticsService.deleteLocation(store.state.selectedOrganization.identifier, id);
         // Remove the local row in-place instead of re-fetching.
         const idx = locations.value.findIndex((l) => l.id === id);
         if (idx !== -1) locations.value.splice(idx, 1);
@@ -497,9 +521,7 @@ export default defineComponent({
         });
       } catch (error: any) {
         toast({
-          message:
-            error?.response?.data?.message ||
-            t("synthetics.locations.deleteFailed"),
+          message: error?.response?.data?.message || t("synthetics.locations.deleteFailed"),
           variant: "error",
         });
       }
@@ -524,10 +546,7 @@ export default defineComponent({
       try {
         for (const id of ids) {
           try {
-            await syntheticsService.deleteLocation(
-              store.state.selectedOrganization.identifier,
-              id,
-            );
+            await syntheticsService.deleteLocation(store.state.selectedOrganization.identifier, id);
             successCount++;
             successIds.add(id);
           } catch {

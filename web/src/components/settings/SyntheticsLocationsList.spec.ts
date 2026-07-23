@@ -22,19 +22,14 @@ import SyntheticsLocationsList from "./SyntheticsLocationsList.vue";
 
 // ── Hoisted mock references (accessible inside vi.mock factories) ──────────────
 
-const {
-  mockToast,
-  mockConfirm,
-  mockGetLocations,
-  mockUpdateLocation,
-  mockDeleteLocation,
-} = vi.hoisted(() => ({
-  mockToast: vi.fn(),
-  mockConfirm: vi.fn().mockResolvedValue(true),
-  mockGetLocations: vi.fn(),
-  mockUpdateLocation: vi.fn(),
-  mockDeleteLocation: vi.fn(),
-}));
+const { mockToast, mockConfirm, mockGetLocations, mockUpdateLocation, mockDeleteLocation } =
+  vi.hoisted(() => ({
+    mockToast: vi.fn(),
+    mockConfirm: vi.fn().mockResolvedValue(true),
+    mockGetLocations: vi.fn(),
+    mockUpdateLocation: vi.fn(),
+    mockDeleteLocation: vi.fn(),
+  }));
 
 // ── Mock external modules ──────────────────────────────────────────────────────
 
@@ -271,8 +266,7 @@ const createMockI18n = () =>
             bulkEnableFailed: "Failed to enable locations",
             bulkDisableFailed: "Failed to disable locations",
             bulkDeleteConfirmTitle: "Delete Locations",
-            bulkDeleteConfirmMessage:
-              "Are you sure you want to delete {count} locations?",
+            bulkDeleteConfirmMessage: "Are you sure you want to delete {count} locations?",
             bulkDeleteSuccess: "{count} locations deleted",
             bulkDeletePartial: "{success} of {total} locations deleted",
             bulkDeleteFailed: "Failed to delete locations",
@@ -352,15 +346,9 @@ describe("SyntheticsLocationsList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-locations-add-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-locations-import-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="synthetics-locations-export-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-locations-add-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-locations-import-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-locations-export-btn"]').exists()).toBe(true);
     });
 
     it("defines expected columns: name, id, provider, region, actions", async () => {
@@ -381,9 +369,7 @@ describe("SyntheticsLocationsList", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="synthetics-locations-list-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="synthetics-locations-list-table"]').exists()).toBe(true);
     });
 
     it("renders the search input in the toolbar slot", async () => {
@@ -507,7 +493,12 @@ describe("SyntheticsLocationsList", () => {
     beforeEach(async () => {
       const locs = [
         createLocation({ id: "loc-1", name: "AWS US East", provider: "aws", region: "us-east-1" }),
-        createLocation({ id: "loc-2", name: "GCP Europe", provider: "gcp", region: "europe-west1" }),
+        createLocation({
+          id: "loc-2",
+          name: "GCP Europe",
+          provider: "gcp",
+          region: "europe-west1",
+        }),
         createLocation({ id: "loc-3", name: "Azure West US", provider: "azure", region: "westus" }),
       ];
       mockGetLocations.mockResolvedValue(mockLocationsResponse(locs));
@@ -624,9 +615,7 @@ describe("SyntheticsLocationsList", () => {
     });
 
     it("opens import dialog when import button is clicked", async () => {
-      const importBtn = wrapper.find(
-        '[data-test="synthetics-locations-import-btn"]',
-      );
+      const importBtn = wrapper.find('[data-test="synthetics-locations-import-btn"]');
       await importBtn.trigger("click");
 
       expect(wrapper.vm.showImportDialog).toBe(true);
@@ -653,11 +642,10 @@ describe("SyntheticsLocationsList", () => {
       await wrapper.vm.toggleLocationEnabled(row);
       await flushPromises();
 
-      expect(mockUpdateLocation).toHaveBeenCalledWith(
-        "test-org",
-        "loc-1",
-        { label: "AWS US East", enabled: false },
-      );
+      expect(mockUpdateLocation).toHaveBeenCalledWith("test-org", "loc-1", {
+        label: "AWS US East",
+        enabled: false,
+      });
     });
 
     it("updates the local row enabled state in-place after successful toggle", async () => {
@@ -678,11 +666,10 @@ describe("SyntheticsLocationsList", () => {
       await wrapper.vm.toggleLocationEnabled(row);
       await flushPromises();
 
-      expect(mockUpdateLocation).toHaveBeenCalledWith(
-        "test-org",
-        "loc-2",
-        { label: "GCP Europe", enabled: true },
-      );
+      expect(mockUpdateLocation).toHaveBeenCalledWith("test-org", "loc-2", {
+        label: "GCP Europe",
+        enabled: true,
+      });
       expect(wrapper.vm.locations[1].enabled).toBe(true);
     });
 
@@ -783,33 +770,25 @@ describe("SyntheticsLocationsList", () => {
 
     it("calls updateLocation for each selected location", async () => {
       mockUpdateLocation.mockResolvedValue({ data: {} });
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.bulkToggleEnabled(false);
       await flushPromises();
 
       expect(mockUpdateLocation).toHaveBeenCalledTimes(2);
-      expect(mockUpdateLocation).toHaveBeenCalledWith(
-        "test-org",
-        "loc-1",
-        { label: "Loc 1", enabled: false },
-      );
-      expect(mockUpdateLocation).toHaveBeenCalledWith(
-        "test-org",
-        "loc-2",
-        { label: "Loc 2", enabled: false },
-      );
+      expect(mockUpdateLocation).toHaveBeenCalledWith("test-org", "loc-1", {
+        label: "Loc 1",
+        enabled: false,
+      });
+      expect(mockUpdateLocation).toHaveBeenCalledWith("test-org", "loc-2", {
+        label: "Loc 2",
+        enabled: false,
+      });
     });
 
     it("updates local rows in-place after successful bulk operation", async () => {
       mockUpdateLocation.mockResolvedValue({ data: {} });
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.bulkToggleEnabled(false);
       await flushPromises();
@@ -837,10 +816,7 @@ describe("SyntheticsLocationsList", () => {
       mockUpdateLocation
         .mockResolvedValueOnce({ data: {} })
         .mockRejectedValueOnce(new Error("fail"));
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.bulkToggleEnabled(false);
       await flushPromises();
@@ -859,10 +835,7 @@ describe("SyntheticsLocationsList", () => {
 
     it("shows error toast when all bulk operations fail", async () => {
       mockUpdateLocation.mockRejectedValue(new Error("fail"));
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.bulkToggleEnabled(true);
       await flushPromises();
@@ -1009,10 +982,7 @@ describe("SyntheticsLocationsList", () => {
 
     it("calls deleteLocation for each selected location", async () => {
       mockDeleteLocation.mockResolvedValue({ data: {} });
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.bulkDeleteLocations();
       await flushPromises();
@@ -1024,10 +994,7 @@ describe("SyntheticsLocationsList", () => {
 
     it("removes deleted locations from the local array", async () => {
       mockDeleteLocation.mockResolvedValue({ data: {} });
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.bulkDeleteLocations();
       await flushPromises();
@@ -1041,10 +1008,7 @@ describe("SyntheticsLocationsList", () => {
       mockDeleteLocation
         .mockResolvedValueOnce({ data: {} })
         .mockRejectedValueOnce(new Error("fail"));
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.bulkDeleteLocations();
       await flushPromises();
@@ -1066,10 +1030,7 @@ describe("SyntheticsLocationsList", () => {
     it("shows confirm dialog before bulk delete", async () => {
       mockConfirm.mockResolvedValue(true);
       mockDeleteLocation.mockResolvedValue({ data: {} });
-      wrapper.vm.selectedLocations = [
-        wrapper.vm.locations[0],
-        wrapper.vm.locations[1],
-      ];
+      wrapper.vm.selectedLocations = [wrapper.vm.locations[0], wrapper.vm.locations[1]];
 
       await wrapper.vm.openBulkDeleteConfirm();
       await flushPromises();
@@ -1177,9 +1138,7 @@ describe("SyntheticsLocationsList", () => {
     });
 
     it("triggers export on export button click", async () => {
-      const exportBtn = wrapper.find(
-        '[data-test="synthetics-locations-export-btn"]',
-      );
+      const exportBtn = wrapper.find('[data-test="synthetics-locations-export-btn"]');
       expect(exportBtn.exists()).toBe(true);
 
       await exportBtn.trigger("click");
@@ -1255,18 +1214,15 @@ describe("SyntheticsLocationsList", () => {
     it("renders no bulk action buttons when no rows are selected", () => {
       wrapper.vm.selectedLocations = [];
       // No bulk buttons should be visible since selectedLocations is empty
-      expect(
-        wrapper.find('[data-test="synthetics-locations-enable-selected-btn"]')
-          .exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="synthetics-locations-disable-selected-btn"]')
-          .exists(),
-      ).toBe(false);
-      expect(
-        wrapper.find('[data-test="synthetics-locations-delete-selected-btn"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-locations-enable-selected-btn"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="synthetics-locations-disable-selected-btn"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="synthetics-locations-delete-selected-btn"]').exists()).toBe(
+        false,
+      );
     });
 
     it("shows count text with total when no rows selected", () => {
@@ -1287,9 +1243,7 @@ describe("SyntheticsLocationsList", () => {
       mockGetLocations.mockClear();
       mockGetLocations.mockResolvedValue(mockLocationsResponse([]));
 
-      const refreshBtn = wrapper.find(
-        '[data-test="synthetics-locations-refresh-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="synthetics-locations-refresh-btn"]');
       await refreshBtn.trigger("click");
       await flushPromises();
 
@@ -1307,7 +1261,14 @@ describe("SyntheticsLocationsList", () => {
 
       // Manually push a location with null fields to verify filterData handles it
       wrapper.vm.locations = [
-        { id: "null-loc", name: null, provider: null, region: null, enabled: false, kind: "public" },
+        {
+          id: "null-loc",
+          name: null,
+          provider: null,
+          region: null,
+          enabled: false,
+          kind: "public",
+        },
       ];
       wrapper.vm.filterQuery = "test";
       await nextTick();
