@@ -45,9 +45,6 @@ export interface TimeEmits {
   (_e: "clear"): void;
   (_e: "blur", _event: FocusEvent): void;
   (_e: "focus", _event: FocusEvent): void;
-  /** Fired once am/pm is picked via the dropdown cascade — lets a paired
-   *  field (e.g. "End time") pick up the guided flow via openHourPicker(). */
-  (_e: "complete"): void;
 }
 
 export interface TimeSlots {

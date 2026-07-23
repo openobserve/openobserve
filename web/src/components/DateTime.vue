@@ -219,7 +219,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         v-model="selectedTime.startTime"
                         with-seconds
                         data-test="datetime-start-time"
-                        @complete="endTimeRef?.openHourPicker()"
                         @blur="
                           resetTime(
                             selectedTime.startTime,
@@ -230,7 +229,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </td>
                     <td class="pl-1.5 w-1/2">
                       <OTime
-                        ref="endTimeRef"
                         class="w-full"
                         v-model="selectedTime.endTime"
                         :with-seconds="true"
@@ -1342,11 +1340,6 @@ export default defineComponent({
       emit("show");
     };
 
-    // Lets the "Start time" field's am/pm selection advance focus into
-    // "End time"'s hour dropdown, so the whole start→end flow is one
-    // continuous guided sequence.
-    const endTimeRef = ref<InstanceType<typeof OTime> | null>(null);
-
     const menuOpen = ref(false);
     const onMenuOpenChange = (open: boolean) => {
       if (open) {
@@ -1361,7 +1354,6 @@ export default defineComponent({
     return {
       t,
       menuOpen,
-      endTimeRef,
       onMenuOpenChange,
       datetimeBtn,
       getImageURL,

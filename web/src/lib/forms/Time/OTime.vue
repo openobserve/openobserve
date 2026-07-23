@@ -51,7 +51,6 @@ const isAM = computed(() => internalHour.value < 12);
 watch(popoverOpen, (open) => {
   if (!open) return;
   clockMode.value = "hour";
-  dropdownOpen.value = null;
   if (!props.modelValue) {
     internalHour.value = 0;
     internalMinute.value = 0;
@@ -74,16 +73,6 @@ watch(
     internalSecond.value = parts[2] ?? 0;
   },
 );
-
-// Opens the picker with the hour dropdown showing — called on the paired
-// field (e.g. "End time") once this one's am/pm is picked, so the whole
-// start→end flow reads as one continuous guided sequence.
-function openHourPicker() {
-  popoverOpen.value = true;
-  clockMode.value = "hour";
-  dropdownOpen.value = "hour";
-}
-defineExpose({ openHourPicker });
 
 // ── SVG clock geometry ─────────────────────────────────────────
 const SVG_CX = 110;
@@ -203,56 +192,6 @@ const displayMinute = computed(() =>
 const displaySecond = computed(() =>
   String(internalSecond.value).padStart(2, "0"),
 );
-
-// ── Dropdown cascade (an additional quick-select alongside the clock; both
-// write the same internal state, so either can be used interchangeably). ──
-type Segment = "hour" | "minute" | "second" | "ampm";
-const dropdownOpen = ref<Segment | null>(null);
-const HOUR_LIST = Array.from({ length: 12 }, (_, i) => i + 1); // 1-12
-const MINSEC_LIST = Array.from({ length: 60 }, (_, i) => i);
-
-function toggleDropdown(seg: Segment) {
-  dropdownOpen.value = dropdownOpen.value === seg ? null : seg;
-}
-
-function pickHour(h12: number) {
-  if (props.disabled || props.readonly) return;
-  const h24 = isAM.value
-    ? h12 === 12 ? 0 : h12
-    : h12 === 12 ? 12 : h12 + 12;
-  internalHour.value = h24;
-  emitCurrentValue();
-  clockMode.value = "minute";
-  dropdownOpen.value = "minute";
-}
-
-function pickMinute(m: number) {
-  if (props.disabled || props.readonly) return;
-  internalMinute.value = m;
-  emitCurrentValue();
-  if (props.withSeconds) {
-    clockMode.value = "second";
-    dropdownOpen.value = "second";
-  } else {
-    dropdownOpen.value = "ampm";
-  }
-}
-
-function pickSecond(s: number) {
-  if (props.disabled || props.readonly) return;
-  internalSecond.value = s;
-  emitCurrentValue();
-  dropdownOpen.value = "ampm";
-}
-
-function pickAmPm(pickedAM: boolean) {
-  if (props.disabled || props.readonly) return;
-  if (pickedAM) setAM();
-  else setPM();
-  dropdownOpen.value = null;
-  popoverOpen.value = false;
-  emit("complete");
-}
 
 // ── Clear ──────────────────────────────────────────────────────
 function handleClear(e: Event) {
@@ -384,7 +323,7 @@ const fieldClasses = computed(() => [
       >
         <!-- Time display + AM/PM pill (no heavy header band) -->
         <div class="flex items-center justify-between px-4 pt-4 pb-2">
-          <!-- Segmented time display — each digit toggles its own dropdown -->
+          <!-- Segmented time display -->
           <div class="flex items-end gap-0.5">
             <button
               type="button"
@@ -395,7 +334,7 @@ const fieldClasses = computed(() => [
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
               ]"
               :aria-label="`Hour: ${displayHour}`"
-              @click="clockMode = 'hour'; toggleDropdown('hour')"
+              @click="clockMode = 'hour'"
             >{{ displayHour }}</button>
             <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none">:</span>
             <button
@@ -407,7 +346,7 @@ const fieldClasses = computed(() => [
                   : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
               ]"
               :aria-label="`Minute: ${displayMinute}`"
-              @click="clockMode = 'minute'; toggleDropdown('minute')"
+              @click="clockMode = 'minute'"
             >{{ displayMinute }}</button>
             <template v-if="withSeconds">
               <span class="text-2xl font-semibold text-datepicker-weekday-text pb-0.5 select-none">:</span>
@@ -420,12 +359,12 @@ const fieldClasses = computed(() => [
                     : 'text-datepicker-heading-text border-transparent hover:text-datepicker-day-selected-bg',
                 ]"
                 :aria-label="`Second: ${displaySecond}`"
-                @click="clockMode = 'second'; toggleDropdown('second')"
+                @click="clockMode = 'second'"
               >{{ displaySecond }}</button>
             </template>
           </div>
 
-          <!-- AM / PM horizontal pill — also a dropdown toggle -->
+          <!-- AM / PM horizontal pill -->
           <div
             class="flex rounded-default border border-datepicker-border overflow-hidden ms-3 shrink-0"
           >
@@ -438,7 +377,7 @@ const fieldClasses = computed(() => [
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
               ]"
               aria-label="AM"
-              @click="setAM(); toggleDropdown('ampm')"
+              @click="setAM"
             >AM</button>
             <div class="w-px bg-datepicker-border shrink-0" aria-hidden="true" />
             <button
@@ -450,69 +389,8 @@ const fieldClasses = computed(() => [
                   : 'text-datepicker-weekday-text hover:bg-datepicker-clock-hover-bg',
               ]"
               aria-label="PM"
-              @click="setPM(); toggleDropdown('ampm')"
+              @click="setPM"
             >PM</button>
-          </div>
-        </div>
-
-        <!-- Dropdown quick-select — an alternative to clicking the clock face
-             below. Selecting a value cascades to the next segment's dropdown
-             (hour → minute → second → am/pm), and picking am/pm on this field
-             opens the paired field's hour dropdown (see openHourPicker). -->
-        <div
-          v-if="dropdownOpen"
-          class="px-2 pb-2 max-h-40 overflow-y-auto border-b border-datepicker-popup-border"
-          data-test="otime-dropdown"
-        >
-          <div v-if="dropdownOpen === 'hour'" class="grid grid-cols-4 gap-1 pt-2">
-            <button
-              v-for="h in HOUR_LIST"
-              :key="h"
-              type="button"
-              :class="[
-                'py-1.5 rounded-default text-sm tabular-nums outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-colors duration-150',
-                (internalHour % 12 || 12) === h
-                  ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
-                  : 'text-datepicker-day-text hover:bg-datepicker-clock-hover-bg',
-              ]"
-              @click="pickHour(h)"
-            >{{ String(h).padStart(2, "0") }}</button>
-          </div>
-          <div v-else-if="dropdownOpen === 'ampm'" class="grid grid-cols-2 gap-1 pt-2">
-            <button
-              type="button"
-              :class="[
-                'py-1.5 rounded-default text-sm outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-colors duration-150',
-                isAM
-                  ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
-                  : 'text-datepicker-day-text hover:bg-datepicker-clock-hover-bg',
-              ]"
-              @click="pickAmPm(true)"
-            >AM</button>
-            <button
-              type="button"
-              :class="[
-                'py-1.5 rounded-default text-sm outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-colors duration-150',
-                !isAM
-                  ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
-                  : 'text-datepicker-day-text hover:bg-datepicker-clock-hover-bg',
-              ]"
-              @click="pickAmPm(false)"
-            >PM</button>
-          </div>
-          <div v-else class="grid grid-cols-6 gap-1 pt-2">
-            <button
-              v-for="n in MINSEC_LIST"
-              :key="n"
-              type="button"
-              :class="[
-                'py-1.5 rounded-default text-sm tabular-nums outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring transition-colors duration-150',
-                n === (dropdownOpen === 'minute' ? internalMinute : internalSecond)
-                  ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
-                  : 'text-datepicker-day-text hover:bg-datepicker-clock-hover-bg',
-              ]"
-              @click="dropdownOpen === 'minute' ? pickMinute(n) : pickSecond(n)"
-            >{{ String(n).padStart(2, "0") }}</button>
           </div>
         </div>
 
