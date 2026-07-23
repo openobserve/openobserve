@@ -637,6 +637,51 @@ describe("TableRenderer", () => {
       const paginationDiv = wrapper.find('[data-test="dashboard-table-pagination"]');
       expect(paginationDiv.exists()).toBe(true);
     });
+
+    it("re-slices the rows when the footer page size changes (#2239.3)", async () => {
+      const rows = Array.from({ length: 15 }, (_, i) => ({
+        timestamp: `t${i}`,
+        level: "INFO",
+        count: i,
+      }));
+      wrapper = createWrapper({
+        showPagination: true,
+        rowsPerPage: 5,
+        data: { columns: mockTableData.columns, rows },
+      });
+      await flushPromises();
+
+      const table = wrapper.findComponent({ name: "OTable" }).vm.table;
+      expect(table.getRowModel().rows.length).toBe(5);
+
+      wrapper
+        .findComponent({ name: "TablePaginationControls" })
+        .vm.$emit("update:rowsPerPage", 10);
+      await flushPromises();
+
+      expect(table.getRowModel().rows.length).toBe(10);
+    });
+
+    it("re-slices when the rows-per-page config prop changes (#2239.3)", async () => {
+      const rows = Array.from({ length: 15 }, (_, i) => ({
+        timestamp: `t${i}`,
+        level: "INFO",
+        count: i,
+      }));
+      wrapper = createWrapper({
+        showPagination: true,
+        rowsPerPage: 5,
+        data: { columns: mockTableData.columns, rows },
+      });
+      await flushPromises();
+      const table = wrapper.findComponent({ name: "OTable" }).vm.table;
+      expect(table.getRowModel().rows.length).toBe(5);
+
+      // Simulates changing the "Records per page" field in the panel config.
+      await wrapper.setProps({ rowsPerPage: 10 });
+      await flushPromises();
+      expect(table.getRowModel().rows.length).toBe(10);
+    });
   });
 
   // ── Reactivity ────────────────────────────────────────────────────────────
