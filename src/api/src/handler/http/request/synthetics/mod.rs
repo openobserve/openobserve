@@ -405,7 +405,7 @@ pub async fn create_synthetic(
     Path(org_id): Path<String>,
     Query(folder_query): Query<FolderQuery>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<config::meta::synthetics::Synthetic>,
+    Json(mut body): Json<config::meta::synthetics::Synthetic>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
