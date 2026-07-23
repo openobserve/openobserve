@@ -1037,9 +1037,9 @@ class APICleanup {
      * Fetch all log streams
      * @returns {Promise<Array>} Array of stream objects
      */
-    async fetchStreams() {
+    async fetchStreams(streamType = 'logs') {
         try {
-            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=logs`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=${streamType}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1065,9 +1065,9 @@ class APICleanup {
      * @param {string} streamName - The stream name
      * @returns {Promise<Object>} Deletion result
      */
-    async deleteStream(streamName) {
+    async deleteStream(streamName, streamType = 'logs') {
         try {
-            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=logs&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1096,11 +1096,11 @@ class APICleanup {
      * @param {string} streamName - The stream name to check
      * @returns {Promise<boolean>} True if stream still exists or is being deleted
      */
-    async isStreamStillDeleting(streamName) {
+    async isStreamStillDeleting(streamName, streamType = 'logs') {
         try {
             // Phase 1: Check if stream schema exists via GET
             const getResponse = await this._fetch(
-                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=${streamType}`,
                 {
                     method: 'GET',
                     headers: {
@@ -1126,7 +1126,7 @@ class APICleanup {
             // Phase 2: Schema is gone (404), but deletion marker might still be active
             // Try PUT settings - this triggers is_deleting_stream check without creating data
             const putResponse = await this._fetch(
-                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=${streamType}`,
                 {
                     method: 'PUT',
                     headers: {
@@ -1162,13 +1162,13 @@ class APICleanup {
      * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 3000 = 3 seconds)
      * @returns {Promise<boolean>} True if deletion completed, false if timed out
      */
-    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000) {
+    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000, streamType = 'logs') {
         const startTime = Date.now();
         let attempts = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
             attempts++;
-            const stillDeleting = await this.isStreamStillDeleting(streamName);
+            const stillDeleting = await this.isStreamStillDeleting(streamName, streamType);
 
             if (!stillDeleting) {
                 testLogger.debug('Stream deletion confirmed complete', {
@@ -1373,17 +1373,18 @@ class APICleanup {
      * @param {number} options.maxWaitPerStreamMs - Max wait time per stream in ms (default: 120000)
      */
     async cleanupStreams(patterns = [], protectedStreams = [], options = {}) {
-        const { waitForDeletion = true, maxWaitPerStreamMs = 120000 } = options;
+        const { waitForDeletion = true, maxWaitPerStreamMs = 120000, streamType = 'logs' } = options;
 
         testLogger.info('Starting streams cleanup', {
             patterns: patterns.map(p => p.source),
             protectedStreams,
-            waitForDeletion
+            waitForDeletion,
+            streamType
         });
 
         try {
-            // Fetch all log streams
-            const streams = await this.fetchStreams();
+            // Fetch all streams of the requested type (logs by default; e.g. traces for SDR trace streams)
+            const streams = await this.fetchStreams(streamType);
             testLogger.info('Fetched streams', { total: streams.length });
 
             // Filter streams matching patterns but excluding protected streams
@@ -1404,7 +1405,7 @@ class APICleanup {
             const streamsToWaitFor = [];
 
             for (const stream of matchingStreams) {
-                const result = await this.deleteStream(stream.name);
+                const result = await this.deleteStream(stream.name, streamType);
 
                 if (result.code === 200) {
                     deletedCount++;
@@ -1437,7 +1438,7 @@ class APICleanup {
                 for (let i = 0; i < streamsToWaitFor.length; i += batchSize) {
                     const batch = streamsToWaitFor.slice(i, i + batchSize);
                     const results = await Promise.all(
-                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs))
+                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs, 3000, streamType))
                     );
 
                     results.forEach((completed, index) => {
@@ -1855,7 +1856,8 @@ class APICleanup {
                 'email_format_',        // SDR tests
                 'us_phone_',            // SDR tests
                 'credit_card_',         // SDR tests
-                'ssn_'                  // SDR tests
+                'ssn_',                 // SDR tests
+                'traces_'               // Traces SDR tests (traces_<field>_<action>_<runId> patterns)
             ];
 
             // Filter patterns that match test data names (using prefix matching to catch patterns with unique suffixes)
