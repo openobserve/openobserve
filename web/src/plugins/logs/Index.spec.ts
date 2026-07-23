@@ -777,6 +777,7 @@ describe("Logs Index", async () => {
     const updateSpy = vi.spyOn(wrapper.vm, "updateUrlQueryParams");
 
     // Trigger true branch
+    wrapper.vm.searchObj.shouldIgnoreWatcher = false;
     wrapper.vm.searchObj.meta.sqlModeManualTrigger = false;
     wrapper.vm.searchObj.meta.sqlMode = true;
     await flushPromises();
@@ -792,6 +793,28 @@ describe("Logs Index", async () => {
 
     expect(wrapper.vm.searchObj.data.query).toBe("");
     expect(wrapper.vm.searchObj.data.editorValue).toBe("");
+  });
+
+  it("fullSQLMode true -> must NOT overwrite the restored query while a URL/share-link restore is in progress (shouldIgnoreWatcher guard)", async () => {
+    const setQuerySpy = vi.spyOn(wrapper.vm, 'setQuery');
+    const updateSpy = vi.spyOn(wrapper.vm, 'updateUrlQueryParams');
+
+    // Simulate restoreUrlQueryParams(): it raises shouldIgnoreWatcher and sets the
+    // SQL query itself, then flips SQL mode ON. The watcher must stand down so it
+    // does not rebuild a default query / rewrite the URL over the restored value —
+    // the intermittent "shared SQL link opens an empty editor" race.
+    wrapper.vm.searchObj.shouldIgnoreWatcher = true;
+    wrapper.vm.searchObj.meta.sqlModeManualTrigger = false;
+    wrapper.vm.searchObj.data.query = 'SELECT * FROM "e2e_automate"';
+    wrapper.vm.searchObj.data.editorValue = 'SELECT * FROM "e2e_automate"';
+
+    wrapper.vm.searchObj.meta.sqlMode = true;
+    await flushPromises();
+
+    expect(setQuerySpy).not.toHaveBeenCalled();
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(wrapper.vm.searchObj.data.query).toBe('SELECT * FROM "e2e_automate"');
+    expect(wrapper.vm.searchObj.data.editorValue).toBe('SELECT * FROM "e2e_automate"');
   });
 
   it("Should set loading & runQuery, and track analytics on cloud in searchData", async () => {

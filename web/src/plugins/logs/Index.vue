@@ -3284,6 +3284,18 @@ export default defineComponent({
 
       if (newVal) {
         await nextTick();
+        // Symmetry with the `else` branch below, which already honours
+        // shouldIgnoreWatcher. During a URL / shared-link restore,
+        // restoreUrlQueryParams() raises shouldIgnoreWatcher and sets the SQL
+        // query itself. This "switch ON" path previously ignored that guard and
+        // called setQuery(), overwriting the just-restored query with a default —
+        // and once the editor momentarily empties, SQL mode auto-detects back off
+        // and clears it entirely. That race is the intermittent "shared SQL link
+        // opens an empty editor" bug. Stand down while a restore is in progress
+        // and let it have the last word.
+        if (this.searchObj.shouldIgnoreWatcher) {
+          return;
+        }
         if (this.searchObj.meta.sqlModeManualTrigger) {
           this.searchObj.meta.sqlModeManualTrigger = false;
         } else {
