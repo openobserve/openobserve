@@ -697,6 +697,7 @@ const statusTabs = computed(() => {
   const tabs = [
     { filter: 'all',      label: t('synthetics.filters.allStatuses'),      count: ms.length },
     { filter: 'passed',   label: t('synthetics.filters.passed'),   count: ms.filter(m => m.status === 'passed').length },
+    { filter: 'warning',  label: t('synthetics.filters.warning'),  count: ms.filter(m => m.status === 'warning').length },
     { filter: 'failed',   label: t('synthetics.filters.failed'),   count: ms.filter(m => m.status === 'failed').length },
   ]
   const unknownCount = ms.filter(m => m.status === 'unknown').length
