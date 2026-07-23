@@ -151,6 +151,8 @@ const props = defineProps<{
   org?: string | null;
   o2Url?: string | null;
   scriptUrl?: string | null;
+  /** Pre-fills the agent name — used when recovering a specific known agent. */
+  agentName?: string | null;
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
@@ -174,7 +176,7 @@ watch(
   (open) => {
     if (!open) return;
     draftLocation.value = props.locationName || (props.locationId ? "" : generateDefaultLocationName());
-    draftAgentName.value = "";
+    draftAgentName.value = props.agentName || "";
   },
 );
 

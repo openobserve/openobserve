@@ -49,7 +49,7 @@ import PrivateLocations from "./PrivateLocations.vue";
 function makeLocation(overrides: Partial<SyntheticLocation> = {}): SyntheticLocation {
   return {
     id: "loc-1",
-    name: "US East",
+    label: "US East",
     region: "us-east-1",
     provider: "aws",
     kind: "private",
@@ -199,8 +199,8 @@ describe("PrivateLocations", () => {
 
     it("renders location rows in the table", () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East" }),
-        makeLocation({ id: "loc-2", name: "EU West" }),
+        makeLocation({ id: "loc-1", label: "US East" }),
+        makeLocation({ id: "loc-2", label: "EU West" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -210,7 +210,7 @@ describe("PrivateLocations", () => {
 
     it("renders the location name and pool in the name cell", () => {
       wrapper = makeWrapper({
-        locations: [makeLocation({ name: "US East", pool: "prod" })],
+        locations: [makeLocation({ label: "US East", pool: "prod" })],
       });
 
       const nameCell = wrapper.find(".otable-cell-name");
@@ -319,9 +319,9 @@ describe("PrivateLocations", () => {
   describe("search/filter", () => {
     it("shows all locations when search is empty", () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East" }),
-        makeLocation({ id: "loc-2", name: "EU West" }),
-        makeLocation({ id: "loc-3", name: "Asia Pacific" }),
+        makeLocation({ id: "loc-1", label: "US East" }),
+        makeLocation({ id: "loc-2", label: "EU West" }),
+        makeLocation({ id: "loc-3", label: "Asia Pacific" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -332,9 +332,9 @@ describe("PrivateLocations", () => {
     it("filters locations by name (case-insensitive)", async () => {
       // Use regions that don't contain "east" so only name matches drive the result.
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East", region: "r-1", pool: "p-1" }),
-        makeLocation({ id: "loc-2", name: "EU West", region: "r-2", pool: "p-2" }),
-        makeLocation({ id: "loc-3", name: "Asia Pacific", region: "r-3", pool: "p-3" }),
+        makeLocation({ id: "loc-1", label: "US East", region: "r-1", pool: "p-1" }),
+        makeLocation({ id: "loc-2", label: "EU West", region: "r-2", pool: "p-2" }),
+        makeLocation({ id: "loc-3", label: "Asia Pacific", region: "r-3", pool: "p-3" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -349,8 +349,8 @@ describe("PrivateLocations", () => {
 
     it("filters locations by region (case-insensitive)", async () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "Prod", region: "us-east-1" }),
-        makeLocation({ id: "loc-2", name: "Staging", region: "eu-west-1" }),
+        makeLocation({ id: "loc-1", label: "Prod", region: "us-east-1" }),
+        makeLocation({ id: "loc-2", label: "Staging", region: "eu-west-1" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -365,9 +365,9 @@ describe("PrivateLocations", () => {
 
     it("filters locations by pool (case-insensitive)", async () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "A", pool: "alpha" }),
-        makeLocation({ id: "loc-2", name: "B", pool: "beta" }),
-        makeLocation({ id: "loc-3", name: "C", pool: "alpha-backup" }),
+        makeLocation({ id: "loc-1", label: "A", pool: "alpha" }),
+        makeLocation({ id: "loc-2", label: "B", pool: "beta" }),
+        makeLocation({ id: "loc-3", label: "C", pool: "alpha-backup" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -380,7 +380,7 @@ describe("PrivateLocations", () => {
 
     it("shows no rows when search matches nothing", async () => {
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East" }),
+        makeLocation({ id: "loc-1", label: "US East" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -394,8 +394,8 @@ describe("PrivateLocations", () => {
     it("restores all rows when search is cleared", async () => {
       // Use unique regions/pools so "east" only matches the name field.
       const locations = [
-        makeLocation({ id: "loc-1", name: "US East", region: "r-a", pool: "p-a" }),
-        makeLocation({ id: "loc-2", name: "EU West", region: "r-b", pool: "p-b" }),
+        makeLocation({ id: "loc-1", label: "US East", region: "r-a", pool: "p-a" }),
+        makeLocation({ id: "loc-2", label: "EU West", region: "r-b", pool: "p-b" }),
       ];
       wrapper = makeWrapper({ locations });
 
@@ -422,7 +422,7 @@ describe("PrivateLocations", () => {
     });
 
     it('emits "copy-setup" with row data when copy button is clicked', async () => {
-      const loc = makeLocation({ id: "loc-abc", name: "Test Location" });
+      const loc = makeLocation({ id: "loc-abc", label: "Test Location" });
       wrapper = makeWrapper({ locations: [loc] });
 
       const copyBtn = wrapper.find(

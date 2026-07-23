@@ -10010,6 +10010,7 @@
         "agentsTitle": "Agents",
         "agentsSubtitle": "Agents self-register from your infrastructure and are read-only here.",
         "agentName": "Agent",
+        "recoverAgent": "Recover this agent — copy a setup command pre-filled with its name",
         "noAgents": "No agents have registered for this location yet.",
         "checksTitle": "Checks running from this location",
         "checkName": "Name",

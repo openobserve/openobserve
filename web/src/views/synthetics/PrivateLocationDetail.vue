@@ -1,9 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 <template>
   <OPageLayout
-    :title="detail?.name || t('synthetics.privateLocations.detail.title')"
+    :title="detail?.label || t('synthetics.privateLocations.detail.title')"
     icon="location-on"
-    :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetic' } }"
+    :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetics', query: { section: 'private' } } }"
     bleed
   >
       <template #title-trail>
@@ -106,6 +106,18 @@
             <template #cell-lastSeen="{ row }">
               {{ formatTimeAgoUs((row as any).last_seen_at) }}
             </template>
+            <template #cell-actions="{ row }">
+              <div class="flex items-center gap-1" @click.stop>
+                <OButton
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="content-copy"
+                  :title="t('synthetics.privateLocations.detail.recoverAgent')"
+                  :data-test="`synthetics-private-location-agent-recover-btn-${(row as any).id}`"
+                  @click="openSetup((row as any).name)"
+                />
+              </div>
+            </template>
           </OTable>
         </div>
 
@@ -158,8 +170,9 @@
     <AgentSetupDrawer
       v-model:open="showSetup"
       :install="detail?.install"
-      :location-name="detail?.name"
+      :location-name="detail?.label"
       :location-id="detail?.id"
+      :agent-name="setupAgentName"
       :token="agentSetup?.token"
       :org="agentSetup?.org"
       :o2-url="agentSetup?.o2_url"
@@ -195,8 +208,13 @@ const detail = ref<SyntheticLocationDetail | null>(null);
 const loading = ref(false);
 const showSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const setupAgentName = ref<string | null>(null);
 
-async function openSetup() {
+/** Opens the setup drawer. With an agentName (from a specific Agents-table
+ *  row's "Recover" action), the drawer pre-fills --agent-name so recovering
+ *  a known — possibly offline — agent is a straight copy-paste. */
+async function openSetup(agentName?: string) {
+  setupAgentName.value = agentName ?? null;
   showSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -279,6 +297,15 @@ const agentColumns = computed<OTableColumnDef[]>(() => [
     size: 110,
     minSize: 90,
     sortable: true,
+  },
+  {
+    id: "actions",
+    header: "",
+    accessorKey: "id",
+    size: 60,
+    minSize: 60,
+    sortable: false,
+    isAction: true,
   },
 ]);
 

@@ -49,20 +49,20 @@
         </OBadge>
       </template>
 
-      <!-- Name + pool subtext -->
+      <!-- Label + pool subtext -->
       <template #cell-name="{ row }">
         <div class="flex flex-col min-w-0">
-          <span class="truncate font-medium">{{ (row as any).name }}</span>
+          <span class="truncate font-medium">{{ (row as any).label }}</span>
           <span class="truncate text-xs text-text-muted">{{ (row as any).pool }}</span>
         </div>
       </template>
 
-      <!-- Agents: live/total + version -->
+      <!-- Agents: live/total + agent name(s) -->
       <template #cell-agents="{ row }">
-        <div class="flex flex-col">
+        <div class="flex flex-col min-w-0">
           <span>{{ (row as any).live_agents }}/{{ (row as any).agents_total }}</span>
-          <span v-if="(row as any).version" class="text-xs text-text-muted">
-            v{{ (row as any).version }}
+          <span v-if="agentSubtext(row as any)" class="truncate text-xs text-text-muted">
+            {{ agentSubtext(row as any) }}
           </span>
         </div>
       </template>
@@ -164,7 +164,7 @@ const filteredLocations = computed(() => {
   if (!q) return props.locations;
   return props.locations.filter(
     (l) =>
-      l.name.toLowerCase().includes(q) ||
+      l.label.toLowerCase().includes(q) ||
       l.region.toLowerCase().includes(q) ||
       l.pool.toLowerCase().includes(q),
   );
@@ -172,6 +172,12 @@ const filteredLocations = computed(() => {
 
 const statusVariant = (status: string) =>
   status === "online" ? "success" : status === "offline" ? "error" : "default";
+
+/** Live agent name(s) when any are online; otherwise the last known agent's
+ *  name (still visible offline) so a dead location doesn't hide who to
+ *  recover, without opening the detail page. */
+const agentSubtext = (row: SyntheticLocation) =>
+  row.agent_names?.length ? row.agent_names.join(", ") : row.last_agent_name || null;
 
 const columns = computed<OTableColumnDef[]>(() => [
   {
@@ -185,7 +191,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "name",
     header: t("synthetics.privateLocations.table.name"),
-    accessorKey: "name",
+    accessorKey: "label",
     size: 220,
     minSize: 140,
     sortable: true,
