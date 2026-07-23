@@ -209,6 +209,7 @@ jobs:
               [
                 "enrichment-regression.spec.js",
                 "pipeline-regression.spec.js",
+                "pipelines-preview-popup-overflow.spec.js",
               ]
           - testfolder: "Traces-Regression"
             run_files:

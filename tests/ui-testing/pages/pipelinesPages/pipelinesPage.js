@@ -352,6 +352,18 @@ export class PipelinesPage {
         // Bug #11498 - Run Query button (in scheduled pipeline dialog)
         // Use text filter to distinguish from the SearchBar's identical data-test selector
         this.runQueryButton = page.locator('[data-test="logs-search-bar-refresh-btn"]').filter({ hasText: 'Run Query' });
+
+        // ========== Preview Popup Locators (Bug: preview popup overflow) ==========
+        this.previewTooltip = page.locator('.pipeline-view-tooltip');
+        // VueFlow component renders a div.vue-flow inside the tooltip (no data-test on it)
+        this.previewVueFlow = page.locator('.pipeline-view-tooltip .vue-flow');
+        // Custom nodes use data-test^="pipeline-node-" (e.g. pipeline-node-input-stream-node)
+        this.previewCustomNodes = page.locator('.pipeline-view-tooltip [data-test^="pipeline-node-"]');
+        // The VueFlow pane (inner scrollable area with transforms) — used for overflow checks
+        this.previewVueFlowPane = page.locator('.pipeline-view-tooltip .vue-flow__pane');
+        this.previewNodeActionButtons = page.locator('.pipeline-view-tooltip .node-action-buttons');
+        this.pipelineListPage = page.locator('[data-test="pipeline-list-page"]');
+        this.pipelineListTable = page.locator('[data-test="pipeline-list-table"]');
     }
 
     // Methods from original PipelinesPage
@@ -1920,8 +1932,27 @@ export class PipelinesPage {
             "Content-Type": "application/json",
         };
 
-        // Clean conditions to remove UI-only fields
-        const cleanedConditions = this.cleanConditionsForAPI(conditions);
+        // Clean conditions to remove UI-only fields, then wrap in v2 group format
+        // The v2 condition API requires: { filterType: "group", logicalOperator: "AND",
+        //   conditions: [{ filterType: "condition", column, operator, value, logicalOperator }] }
+        const cleaned = this.cleanConditionsForAPI(conditions);
+        let cleanedConditions = cleaned;
+        if (cleaned.filterType === 'condition') {
+            // Single flat condition → wrap in v2 group
+            cleanedConditions = {
+                filterType: 'group',
+                logicalOperator: 'AND',
+                conditions: [
+                    {
+                        filterType: 'condition',
+                        column: cleaned.column,
+                        operator: cleaned.operator,
+                        value: cleaned.value,
+                        logicalOperator: 'AND',
+                    },
+                ],
+            };
+        }
         testLogger.info('Cleaned conditions', { cleaned: JSON.stringify(cleanedConditions, null, 2) });
 
         // Generate unique node IDs
@@ -4099,6 +4130,393 @@ export class PipelinesPage {
         await this.runQueryButton.waitFor({ state: 'visible', timeout: 5000 });
         await expect(this.runQueryButton).toBeEnabled({ timeout: 3000 });
         testLogger.info('✅ Run Query button is enabled as expected');
+    }
+
+    // ============================================================================
+    // PREVIEW POPUP METHODS — Bug: pipeline preview popup viewport overflow
+    // ============================================================================
+
+    /**
+     * Return a locator for the per-row view (preview/eye) button.
+     * @param {string} pipelineName
+     * @returns {import('@playwright/test').Locator}
+     */
+    getViewButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-view-pipeline"]`);
+    }
+
+    /**
+     * Hover the view (preview/eye) button for a specific pipeline row.
+     * @param {string} pipelineName
+     */
+    async hoverViewButton(pipelineName) {
+        const btn = this.getViewButton(pipelineName);
+        await btn.waitFor({ state: 'visible', timeout: 15000 });
+        await btn.hover();
+        testLogger.info(`Hovered view button for pipeline: ${pipelineName}`);
+    }
+
+    /**
+     * Wait for the preview tooltip (.pipeline-view-tooltip) to be visible.
+     */
+    async waitForPreviewPopup() {
+        await this.previewTooltip.waitFor({ state: 'visible', timeout: 10000 });
+        testLogger.info('Preview popup is visible');
+    }
+
+    /**
+     * Assert the preview tooltip is visible.
+     */
+    async expectPreviewPopupVisible() {
+        await expect(this.previewTooltip).toBeVisible({ timeout: 10000 });
+    }
+
+    /**
+     * Assert the preview tooltip is NOT visible.
+     */
+    async expectPreviewPopupNotVisible() {
+        await expect(this.previewTooltip).not.toBeVisible({ timeout: 5000 });
+    }
+
+    /**
+     * Get the bounding box of the preview tooltip.
+     * @returns {Promise<{x: number, y: number, width: number, height: number} | null>}
+     */
+    async getPreviewPopupBoundingBox() {
+        if (await this.previewTooltip.isVisible().catch(() => false)) {
+            const box = await this.previewTooltip.boundingBox();
+            testLogger.info('Preview popup bounding box', { box });
+            return box;
+        }
+        return null;
+    }
+
+    /**
+     * Get the current viewport dimensions.
+     * @returns {Promise<{width: number, height: number}>}
+     */
+    async getViewportSize() {
+        const vp = this.page.viewportSize();
+        testLogger.info('Viewport size', { vp });
+        return vp;
+    }
+
+    /**
+     * Assert the preview popup bounding box is entirely within the viewport.
+     * Popup must satisfy: x >= 0, y >= 0, x + width <= vp.width, y + height <= vp.height.
+     */
+    async expectPreviewWithinViewport() {
+        const box = await this.getPreviewPopupBoundingBox();
+        expect(box, 'Preview popup bounding box should be available').not.toBeNull();
+        const vp = await this.getViewportSize();
+        testLogger.info('Checking preview within viewport', { box, vp });
+        expect(box.x, 'Preview popup left edge should not be negative').toBeGreaterThanOrEqual(0);
+        expect(box.y, 'Preview popup top edge should not be negative').toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, 'Preview popup right edge should not exceed viewport width').toBeLessThanOrEqual(vp.width + 1); // allow 1px tolerance
+        expect(box.y + box.height, 'Preview popup bottom edge should not exceed viewport height').toBeLessThanOrEqual(vp.height + 1);
+        testLogger.info('Preview popup is fully within viewport');
+    }
+
+    /**
+     * Assert the VueFlow canvas is visible inside the preview popup.
+     */
+    async expectVueFlowVisibleInPreview() {
+        await expect(this.previewVueFlow).toBeVisible({ timeout: 5000 });
+        testLogger.info('VueFlow canvas is visible in preview popup');
+    }
+
+    /**
+     * Assert at least one custom-node is rendered inside the preview popup.
+     */
+    async expectCustomNodesVisibleInPreview() {
+        await expect(this.previewCustomNodes.first()).toBeVisible({ timeout: 5000 });
+        testLogger.info('Custom nodes are visible in preview popup');
+    }
+
+    /**
+     * Assert no custom-node elements are rendered inside the preview popup.
+     */
+    async expectCustomNodesNotVisibleInPreview() {
+        await expect(this.previewCustomNodes).not.toBeVisible({ timeout: 3000 });
+        testLogger.info('No custom nodes visible in preview popup');
+    }
+
+    /**
+     * Assert that node action buttons are NOT visible inside the preview popup
+     * (read-only mode: CSS `display: none !important` hides them).
+     */
+    async expectActionButtonsHiddenInPreview() {
+        // Assert action buttons are NOT visible inside the preview popup.
+        // Playwright's not.toBeVisible() passes when the locator resolves to 0
+        // elements, so this correctly handles both "absent from DOM" and
+        // "present but hidden via display:none !important".
+        await expect(this.previewNodeActionButtons).not.toBeVisible({ timeout: 3000 });
+        testLogger.info('Action buttons are hidden in preview popup (read-only mode confirmed)');
+    }
+
+    /**
+     * Get the overflow state of the preview popup container.
+     * @returns {Promise<{overflowX: string, overflowY: string, scrollWidth: number, clientWidth: number, scrollHeight: number, clientHeight: number}>}
+     */
+    async getPreviewOverflowState() {
+        const state = await this.previewTooltip.evaluate((el) => {
+            const style = window.getComputedStyle(el);
+            return {
+                overflowX: style.overflowX,
+                overflowY: style.overflowY,
+                scrollWidth: el.scrollWidth,
+                clientWidth: el.clientWidth,
+                scrollHeight: el.scrollHeight,
+                clientHeight: el.clientHeight,
+            };
+        });
+        testLogger.info('Preview overflow state', { state });
+        return state;
+    }
+
+    /**
+     * Assert the preview popup container has overflow: auto styling
+     * and can scroll (scrollWidth > clientWidth or scrollHeight > clientHeight).
+     */
+    async expectPreviewHasOverflowAuto() {
+        const state = await this.getPreviewOverflowState();
+        expect(state.overflowX, 'overflow-x should be auto').toBe('auto');
+        expect(state.overflowY, 'overflow-y should be auto').toBe('auto');
+        testLogger.info('Preview popup has overflow: auto');
+    }
+
+    // ============================================================================
+    // PIPELINE CREATION HELPERS (API-based) — for preview popup tests
+    // ============================================================================
+
+    /**
+     * Create a simple 2-node pipeline (input → output) via API.
+     * @param {string} pipelineName
+     * @param {string} sourceStream — pre-seeded stream name
+     * @param {string} destStream — pre-seeded stream name for destination
+     * @returns {Promise<object>} API response
+     */
+    async createSimplePipelineViaAPI(pipelineName, sourceStream, destStream) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const inputNodeId = `input-${Date.now()}`;
+        const outputNodeId = `output-${Date.now()}`;
+
+        const payload = {
+            pipeline_id: "",
+            version: 0,
+            enabled: true,
+            org: orgId,
+            name: pipelineName,
+            description: `Simple input→output pipeline for ${pipelineName}`,
+            source: { source_type: "realtime" },
+            paused_at: null,
+            nodes: [
+                {
+                    id: inputNodeId,
+                    position: { x: 100, y: 100 },
+                    data: { node_type: "stream", stream_type: "logs", stream_name: sourceStream, org_id: orgId },
+                    io_type: "input"
+                },
+                {
+                    id: outputNodeId,
+                    position: { x: 400, y: 100 },
+                    data: { node_type: "stream", stream_type: "logs", stream_name: destStream, org_id: orgId },
+                    io_type: "output"
+                }
+            ],
+            edges: [
+                { id: `${inputNodeId}-${outputNodeId}`, source: inputNodeId, target: outputNodeId, sourceHandle: "success" }
+            ]
+        };
+
+        testLogger.info('Creating simple pipeline via API', { pipelineName, sourceStream, destStream });
+
+        try {
+            const response = await fetch(`${process.env.ZO_BASE_URL}/api/${orgId}/pipelines`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (response.status === 200 && data.code === 200) {
+                testLogger.info('Simple pipeline created', { pipelineName });
+            } else {
+                testLogger.warn('Simple pipeline creation returned non-200', { pipelineName, status: response.status, data });
+            }
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create simple pipeline', { pipelineName, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Create a large pipeline with many intermediate nodes (8+ nodes) via API,
+     * positioned to overflow the 500px × 300px preview container.
+     * @param {string} pipelineName
+     * @param {string} sourceStream
+     * @param {string} destStream
+     * @param {number} intermediateNodeCount — number of extra condition nodes (default 12)
+     * @returns {Promise<object>} API response
+     */
+    async createLargePipelineViaAPI(pipelineName, sourceStream, destStream, intermediateNodeCount = 12) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const inputNodeId = `input-${Date.now()}`;
+        const outputNodeId = `output-${Date.now()}`;
+
+        const nodes = [
+            {
+                id: inputNodeId,
+                position: { x: 50, y: 50 },
+                data: { node_type: "stream", stream_type: "logs", stream_name: sourceStream, org_id: orgId },
+                io_type: "input"
+            }
+        ];
+
+        // Create intermediate condition nodes spread across and beyond the 500x300 container
+        const intermediateIds = [];
+        // v2 condition API requires group-wrapped format with logicalOperator
+        const conditionTemplate = {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+                {
+                    filterType: "condition",
+                    column: "kubernetes_container_name",
+                    operator: "Contains",
+                    value: "test",
+                    logicalOperator: "AND",
+                },
+            ],
+        };
+        for (let i = 0; i < intermediateNodeCount; i++) {
+            const nodeId = `cond-${Date.now()}-${i}`;
+            intermediateIds.push(nodeId);
+            nodes.push({
+                id: nodeId,
+                position: { x: 150 + (i % 5) * 200, y: 80 + Math.floor(i / 5) * 150 },
+                data: { node_type: "condition", version: 2, conditions: conditionTemplate },
+                io_type: "intermediate"
+            });
+        }
+
+        nodes.push({
+            id: outputNodeId,
+            position: { x: 150 + (intermediateNodeCount % 5) * 200 + 200, y: 80 + Math.floor(intermediateNodeCount / 5) * 150 },
+            data: { node_type: "stream", stream_type: "logs", stream_name: destStream, org_id: orgId },
+            io_type: "output"
+        });
+
+        // Chain edges: input → cond0 → cond1 → ... → output
+        const edges = [];
+        let prevId = inputNodeId;
+        for (const fnId of intermediateIds) {
+            edges.push({ id: `${prevId}-${fnId}`, source: prevId, target: fnId, sourceHandle: "success" });
+            prevId = fnId;
+        }
+        edges.push({ id: `${prevId}-${outputNodeId}`, source: prevId, target: outputNodeId, sourceHandle: "success" });
+
+        const payload = {
+            pipeline_id: "",
+            version: 0,
+            enabled: true,
+            org: orgId,
+            name: pipelineName,
+            description: `Large pipeline (overflow test) for ${pipelineName}`,
+            source: { source_type: "realtime" },
+            paused_at: null,
+            nodes,
+            edges
+        };
+
+        testLogger.info('Creating large pipeline via API', { pipelineName, nodeCount: nodes.length });
+
+        try {
+            const response = await fetch(`${process.env.ZO_BASE_URL}/api/${orgId}/pipelines`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (response.status === 200 && data.code === 200) {
+                testLogger.info('Large pipeline created', { pipelineName });
+            } else {
+                testLogger.warn('Large pipeline creation returned non-200', { pipelineName, status: response.status, data });
+            }
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create large pipeline', { pipelineName, error: error.message });
+            return { status: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Create an empty pipeline (zero nodes) via API.
+     * Tests that the preview popup renders without crashing even for pipelines with no nodes.
+     * @param {string} pipelineName
+     * @returns {Promise<object>} API response
+     */
+    async createEmptyPipelineViaAPI(pipelineName) {
+        const orgId = process.env["ORGNAME"];
+        const basicAuthCredentials = Buffer.from(
+            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
+        ).toString('base64');
+
+        const headers = {
+            "Authorization": `Basic ${basicAuthCredentials}`,
+            "Content-Type": "application/json",
+        };
+
+        const payload = {
+            pipeline_id: "",
+            version: 0,
+            enabled: true,
+            org: orgId,
+            name: pipelineName,
+            description: `Empty pipeline for ${pipelineName}`,
+            source: { source_type: "realtime" },
+            paused_at: null,
+            nodes: [],
+            edges: []
+        };
+
+        testLogger.info('Creating empty pipeline via API', { pipelineName });
+
+        try {
+            const response = await fetch(`${process.env.ZO_BASE_URL}/api/${orgId}/pipelines`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            if (response.status === 200 && data.code === 200) {
+                testLogger.info('Empty pipeline created', { pipelineName });
+            } else {
+                testLogger.warn('Empty pipeline creation returned non-200', { pipelineName, status: response.status, data });
+            }
+            return { status: response.status, data };
+        } catch (error) {
+            testLogger.error('Failed to create empty pipeline', { pipelineName, error: error.message });
+            return { status: 500, error: error.message };
+        }
     }
 
 }
