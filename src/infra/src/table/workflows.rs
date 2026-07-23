@@ -474,6 +474,21 @@ pub async fn get_all_associations_for_entity(
     Ok(res)
 }
 
+pub async fn get_all_associations_for_trigger_type(
+    org_id: &str,
+    trigger: &str,
+) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    let ret = workflow_associations::Entity::find()
+        .filter(workflow_associations::Column::OrgId.eq(org_id))
+        .filter(workflow_associations::Column::TriggerType.eq(trigger))
+        .all(client)
+        .await?;
+    let res = ret.into_iter().map(Into::into).collect();
+    Ok(res)
+}
+
 pub async fn add_workflow_association(entry: WorkflowAssociation) -> Result<(), anyhow::Error> {
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     let _lock = get_lock().await;

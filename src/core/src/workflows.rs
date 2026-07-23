@@ -38,13 +38,24 @@ use crate::{
 pub enum WorkflowTriggerType {
     #[default]
     AlertFired,
+    IncidentEvent,
 }
 
 impl From<&str> for WorkflowTriggerType {
     fn from(value: &str) -> Self {
         match value {
             "AlertFired" => Self::AlertFired,
+            "IncidentEvent" => Self::IncidentEvent,
             _ => Self::AlertFired,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkflowTriggerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlertFired => write!(f, "AlertFired"),
+            Self::IncidentEvent => write!(f, "IncidentEvent"),
         }
     }
 }

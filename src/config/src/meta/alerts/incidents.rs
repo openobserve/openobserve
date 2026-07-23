@@ -517,6 +517,17 @@ pub enum AnalysisTriggerType {
     AutomaticReopened,
 }
 
+impl std::fmt::Display for AnalysisTriggerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AutomaticNewIncident => write!(f, "automatic_new_incident"),
+            Self::AutomaticReanalysis => write!(f, "automatic_reanalysis"),
+            Self::Manual => write!(f, "manual"),
+            Self::AutomaticReopened => write!(f, "automatic_reopened"),
+        }
+    }
+}
+
 /// A single event in an incident's lifecycle timeline
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct IncidentEvent {
