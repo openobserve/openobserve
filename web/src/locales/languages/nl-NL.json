@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Stap toevoegen",
       "search": "Stappen doorzoeken…",
       "noMatch": "Geen overeenkomende stappen"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Gekoppeld aan {ok} melding(en), {failed} mislukt",
       "linkError": "Kan meldingen niet koppelen."
     },
-    "canvasEmpty": "Voeg een trigger toe om te beginnen met het bouwen van uw workflow",
     "node": {
       "kindTrigger": "Trigger",
       "kindLogic": "Logica",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Nog niet geconfigureerd",
       "configComingSoon": "Configuratie van {node} komt in een latere stap",
       "addNext": "Volgende stap toevoegen",
-      "stepDialogTitle": "Een stap toevoegen",
-      "paletteTitle": "Knooppunten",
       "sectionTransform": "Transformeren",
       "sectionDestination": "Bestemming",
       "paletteCollapse": "Inklappen",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Knooppunt verwijderen",
     "deleteNodeLlmEvalConfirm": "Weet u zeker dat u dit LLM-evaluatieknooppunt wilt verwijderen?",
     "cancel": "Annuleer",
-    "dragDropNodesHere": "Knooppunten hierheen slepen en neerzetten",
     "promqlOnlyForMetrics": "ProMQL is alleen beschikbaar voor het streamtype voor statistieken",
     "invalidCronExpression": "Ongeldige cron-expressie",
     "cronRequired": "Cron-expressie is verplicht",

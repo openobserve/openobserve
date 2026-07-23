@@ -13,6 +13,7 @@ const validForm = {
   fields: [],
   maximumSpans: 5,
   filterReady: true,
+  filterGroup: { filterType: "group", logicalOperator: "AND", conditions: [] },
 };
 
 describe("makeSpanSelectorSchema", () => {

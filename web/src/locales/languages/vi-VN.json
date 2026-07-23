@@ -512,7 +512,6 @@
   },
   "flow": {
     "stepPicker": {
-      "title": "Thêm bước",
       "search": "Tìm kiếm bước…",
       "noMatch": "Không có bước phù hợp"
     },
@@ -2217,7 +2216,6 @@
       "linkPartial": "Đã liên kết với {ok} cảnh báo, {failed} thất bại",
       "linkError": "Không thể liên kết cảnh báo."
     },
-    "canvasEmpty": "Thêm trình kích hoạt để bắt đầu xây dựng quy trình của bạn",
     "node": {
       "kindTrigger": "Trình kích hoạt",
       "kindLogic": "Logic",
@@ -2229,8 +2227,6 @@
       "notConfigured": "Chưa được cấu hình",
       "configComingSoon": "Cấu hình {node} sẽ có ở bước sau",
       "addNext": "Thêm bước tiếp theo",
-      "stepDialogTitle": "Thêm một bước",
-      "paletteTitle": "Nút",
       "sectionTransform": "Biến đổi",
       "sectionDestination": "Đích",
       "paletteCollapse": "Thu gọn",
@@ -2376,7 +2372,6 @@
     "deleteNodeTitle": "Xóa nút",
     "deleteNodeLlmEvalConfirm": "Bạn có chắc chắn muốn xóa nút đánh giá LLM này?",
     "cancel": "Hủy",
-    "dragDropNodesHere": "Kéo và thả các nút vào đây",
     "promqlOnlyForMetrics": "PromQL chỉ khả dụng cho loại luồng số liệu",
     "invalidCronExpression": "Biểu thức cron không hợp lệ",
     "cronRequired": "Yêu cầu biểu thức cron",

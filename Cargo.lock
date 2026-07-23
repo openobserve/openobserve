@@ -6760,7 +6760,6 @@ dependencies = [
  "memchr",
  "mimalloc",
  "mime",
- "mime_guess",
  "multer",
  "object_store",
  "openobserve-api",
@@ -6789,7 +6788,6 @@ dependencies = [
  "regex-syntax",
  "report_server",
  "reqwest 0.13.2",
- "rust-embed-for-web",
  "rustls",
  "rustls-native-certs",
  "sea-orm",
@@ -6834,6 +6832,7 @@ dependencies = [
  "utoipa-swagger-ui",
  "version-compare",
  "wal",
+ "web",
  "webpki-roots 1.0.6",
  "x509-parser",
  "zip 8.2.0",
@@ -6874,7 +6873,6 @@ dependencies = [
  "jemalloc_pprof",
  "log",
  "mime",
- "mime_guess",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
@@ -6894,7 +6892,6 @@ dependencies = [
  "rand 0.10.1",
  "regex",
  "reqwest 0.13.2",
- "rust-embed-for-web",
  "search",
  "search_service",
  "serde",
@@ -6915,7 +6912,6 @@ dependencies = [
  "url",
  "utoipa",
  "utoipa-swagger-ui",
- "web",
  "zip 8.2.0",
 ]
 
@@ -12384,7 +12380,12 @@ dependencies = [
 name = "web"
 version = "0.1.0"
 dependencies = [
+ "axum",
+ "config",
+ "mime_guess",
  "rust-embed-for-web",
+ "tokio",
+ "tower",
 ]
 
 [[package]]

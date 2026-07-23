@@ -1,8 +1,8 @@
 {
   "totals": {
-    "rawVarInComponent": 559,
+    "rawVarInComponent": 539,
     "darkMechanism": 2,
-    "unscopedStyle": 2,
+    "unscopedStyle": 1,
     "stylePxUnit": 84
   },
   "files": {
@@ -80,10 +80,6 @@
     },
     "components/logstream/schema.vue": {
       "rawVarInComponent": 2
-    },
-    "components/pipeline/PipelineEditor.vue": {
-      "unscopedStyle": 1,
-      "rawVarInComponent": 20
     },
     "components/pipeline/PipelineView.vue": {
       "rawVarInComponent": 15
