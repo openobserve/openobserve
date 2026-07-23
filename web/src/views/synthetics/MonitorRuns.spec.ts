@@ -252,7 +252,7 @@ const baseStubs = {
   },
   MonitorStatusTimeline: {
     template: '<div data-test="monitor-status-timeline" />',
-    props: ["segments", "failCount", "passCount", "mixedCount", "startLabel", "endLabel"],
+    props: ["segments", "failCount", "passCount", "mixedCount", "startLabel", "endLabel", "isBrowser"],
   },
   ChartRenderer: {
     template: '<div data-test="chart-renderer" />',

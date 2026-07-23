@@ -117,6 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="px-page-edge">
               <MonitorStatusTimeline
                 :segments="timelineSegments"
+                :is-browser="isBrowser"
                 :fail-count="timelineFailCount"
                 :pass-count="timelinePassCount"
                 :mixed-count="timelineMixedCount"
@@ -1583,13 +1584,15 @@ const timelineFailCount = computed(() =>
 );
 const timelinePassCount = computed(() =>
   String(
-    timelineSegments.value.filter(
-      (s) => s.status === "all-pass" || s.status === "all-warning",
-    ).length,
+    timelineSegments.value.filter((s) => s.status === "all-pass").length,
   ),
 );
 const timelineMixedCount = computed(() =>
-  String(timelineSegments.value.filter((s) => s.status === "mixed").length),
+  String(
+    timelineSegments.value.filter(
+      (s) => s.status === "mixed" || s.status === "all-warning",
+    ).length,
+  ),
 );
 
 function formatTimelineDate(ms: number): string {
