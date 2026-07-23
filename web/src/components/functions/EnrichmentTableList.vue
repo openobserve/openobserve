@@ -297,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline-destructive"
                   size="sm"
                   icon-left="delete"
+                  :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
                 >
                   Delete
@@ -460,6 +461,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref<boolean>(false);
     const selectedEnrichmentTables = ref<any[]>([]);
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
@@ -822,6 +824,7 @@ export default defineComponent({
     };
 
     const bulkDeleteEnrichmentTables = () => {
+      bulkDeleteLoading.value = true;
       const selectedItems = selectedEnrichmentTables.value;
       const promises: Promise<any>[] = [];
 
@@ -835,50 +838,54 @@ export default defineComponent({
         );
       });
 
-      Promise.allSettled(promises).then((results) => {
-        let successfulDeletions = 0;
-        let failedDeletions = 0;
+      Promise.allSettled(promises)
+        .then((results) => {
+          let successfulDeletions = 0;
+          let failedDeletions = 0;
 
-        results.forEach((result) => {
-          if (result.status === "fulfilled") {
-            // Check if the response indicates success
-            if (result.value?.data?.code === 200) {
-              successfulDeletions++;
+          results.forEach((result) => {
+            if (result.status === "fulfilled") {
+              // Check if the response indicates success
+              if (result.value?.data?.code === 200) {
+                successfulDeletions++;
+              } else {
+                failedDeletions++;
+              }
             } else {
-              failedDeletions++;
+              // Handle rejected promises (errors)
+              const error = result.reason;
+              // Don't count 403 errors as failures (silent)
+              if (error?.response?.status !== 403 && error?.status !== 403) {
+                failedDeletions++;
+              }
             }
-          } else {
-            // Handle rejected promises (errors)
-            const error = result.reason;
-            // Don't count 403 errors as failures (silent)
-            if (error?.response?.status !== 403 && error?.status !== 403) {
-              failedDeletions++;
-            }
+          });
+
+          if (successfulDeletions > 0 && failedDeletions === 0) {
+            toast({
+              message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
+              variant: "success",
+            });
+          } else if (successfulDeletions > 0 && failedDeletions > 0) {
+            toast({
+              message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
+              variant: "warning",
+            });
+          } else if (failedDeletions > 0) {
+            toast({
+              message: `Failed to delete ${failedDeletions} enrichment table(s).`,
+              variant: "error",
+            });
           }
+
+          resetStreamType("enrichment_tables");
+          getLookupTables(true);
+          selectedEnrichmentTables.value = [];
+          confirmBulkDelete.value = false;
+        })
+        .finally(() => {
+          bulkDeleteLoading.value = false;
         });
-
-        if (successfulDeletions > 0 && failedDeletions === 0) {
-          toast({
-            message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
-            variant: "success",
-          });
-        } else if (successfulDeletions > 0 && failedDeletions > 0) {
-          toast({
-            message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
-            variant: "warning",
-          });
-        } else if (failedDeletions > 0) {
-          toast({
-            message: `Failed to delete ${failedDeletions} enrichment table(s).`,
-            variant: "error",
-          });
-        }
-
-        resetStreamType("enrichment_tables");
-        getLookupTables(true);
-        selectedEnrichmentTables.value = [];
-        confirmBulkDelete.value = false;
-      });
     };
 
     const showDeleteDialogFn = (row: any) => {
@@ -1046,6 +1053,7 @@ export default defineComponent({
       handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteEnrichmentTables,
+      bulkDeleteLoading,
       selectedFilter,
       showUrlJobsDialog,
       showUrlJobsDialogState,

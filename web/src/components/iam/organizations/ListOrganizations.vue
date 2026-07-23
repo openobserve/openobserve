@@ -370,6 +370,9 @@ export default defineComponent({
         : organizationsService.list(0, 1000000, "name", false, "");
       request
         .then((res) => {
+          // Sync Vuex so the header org selector updates without a page reload.
+          store.dispatch("setOrganizations", res.data.data);
+
           const billingPlans = {
             "0": "Free",
             "1": "Pay as you go",

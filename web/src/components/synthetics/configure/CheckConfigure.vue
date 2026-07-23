@@ -12,6 +12,7 @@ import type {
 import CheckDetails from "./CheckDetails.vue";
 import CheckAuthNetwork from "./CheckAuthNetwork.vue";
 import CheckSchedule from "./CheckSchedule.vue";
+import CheckRetries from "./CheckRetries.vue";
 import CheckAlerts from "./CheckAlerts.vue";
 import CheckLocations from "./CheckLocations.vue";
 import CheckBrowserDevices from "./CheckBrowserDevices.vue";
@@ -27,6 +28,8 @@ const props = defineProps<{
   destinations?: string[];
   folders?: SyntheticsFolder[];
   validationErrors?: Record<string, string>;
+  /** Protocol checks show the private-locations subsection + setup CTA. */
+  allowPrivateLocations?: boolean;
 }>();
 
 const { t } = useI18n();
@@ -54,6 +57,7 @@ const showAuthNetwork = computed(() =>
 const emit = defineEmits<{
   "update:check": [value: BrowserCheck];
   "refresh:destinations": [];
+  "setup-agent": [];
 }>();
 
 function handleUpdate(value: BrowserCheck) {
@@ -83,12 +87,20 @@ function handleUpdate(value: BrowserCheck) {
       />
       <CheckSchedule
         :check="check"
+        :validation-errors="props.validationErrors ?? {}"
         data-test="synthetics-check-configure-schedule"
+        @update:check="handleUpdate"
+      />
+      <CheckRetries
+        :check="check"
+        :validation-errors="props.validationErrors ?? {}"
+        data-test="synthetics-check-configure-retries"
         @update:check="handleUpdate"
       />
       <CheckAlerts
         :check="check"
         :destinations="destinations ?? []"
+        :validation-errors="props.validationErrors ?? {}"
         data-test="synthetics-check-configure-alerts"
         @update:check="handleUpdate"
         @refresh:destinations="emit('refresh:destinations')"
@@ -96,14 +108,18 @@ function handleUpdate(value: BrowserCheck) {
       <CheckLocations
         :check="check"
         :locations="locations ?? []"
+        :allow-private="allowPrivateLocations"
+        :validation-errors="props.validationErrors ?? {}"
         data-test="synthetics-check-configure-locations"
         @update:check="handleUpdate"
+        @setup-agent="emit('setup-agent')"
       />
       <CheckBrowserDevices
         v-if="(checkType ?? 'browser') === 'browser'"
         :check="check"
         :browsers="browsers"
         :devices="devices"
+        :validation-errors="props.validationErrors ?? {}"
         data-test="synthetics-check-configure-browser-devices"
         @update:check="handleUpdate"
       />

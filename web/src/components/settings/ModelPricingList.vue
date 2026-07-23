@@ -348,6 +348,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="model-pricing-delete-selected-btn"
                 variant="outline-destructive"
                 size="sm"
+                :loading="bulkDeleteLoading"
                 @click="confirmDeleteSelected"
                 icon-left="delete"
               >
@@ -529,6 +530,7 @@ const filterQuery = ref("");
 const showImportModelPricingPage = ref(false);
 const showTestMatchDialog = ref(false);
 const selectedIds = ref<string[]>([]);
+const bulkDeleteLoading = ref(false);
 const selectedTab = ref("all");
 
 const tabOptions = computed(() => [
@@ -881,26 +883,31 @@ function confirmDeleteSelected() {
     title: t("modelPricing.confirmDeleteSelectedTitle"),
     message: t("modelPricing.confirmDeleteSelectedMessage", { count }),
     onConfirm: async () => {
-      let successCount = 0;
-      for (const id of selectedIds.value) {
-        const modelEntry = allModels.value.find((m: any) => m.id === id);
-        const modelName = modelEntry?.name || id;
-        try {
-          await modelPricingService.delete(orgIdentifier.value, id);
-          successCount++;
-        } catch (e: any) {
-          notifyError(t("modelPricing.errDeleteNamed", { name: modelName }), e);
+      bulkDeleteLoading.value = true;
+      try {
+        let successCount = 0;
+        for (const id of selectedIds.value) {
+          const modelEntry = allModels.value.find((m: any) => m.id === id);
+          const modelName = modelEntry?.name || id;
+          try {
+            await modelPricingService.delete(orgIdentifier.value, id);
+            successCount++;
+          } catch (e: any) {
+            notifyError(t("modelPricing.errDeleteNamed", { name: modelName }), e);
+          }
         }
-      }
-      if (successCount > 0) {
-        toast({
-          variant: "success",
-          message: t("modelPricing.deletedModelsNotif", {
-            count: successCount,
-          }),
-        });
-        selectedIds.value = [];
-        await fetchModels();
+        if (successCount > 0) {
+          toast({
+            variant: "success",
+            message: t("modelPricing.deletedModelsNotif", {
+              count: successCount,
+            }),
+          });
+          selectedIds.value = [];
+          await fetchModels();
+        }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     },
   };

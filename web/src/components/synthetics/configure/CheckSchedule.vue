@@ -12,7 +12,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 
-const props = defineProps<{ check: BrowserCheck }>();
+const props = defineProps<{
+  check: BrowserCheck;
+  validationErrors?: Record<string, string>;
+}>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
 const { t } = useI18n();
@@ -285,6 +288,15 @@ const startTime = computed({
           data-test="synthetics-check-schedule-custom-interval-unit-select"
         />
       </div>
+
+      <!-- Validation error -->
+      <p
+        v-if="props.validationErrors?.schedule"
+        class="text-xs text-status-error-text"
+        data-test="synthetics-check-schedule-error"
+      >
+        {{ props.validationErrors.schedule }}
+      </p>
 
       <!-- Schedule Later date/time pickers -->
       <div

@@ -153,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline-destructive"
                   size="sm-action"
                   icon-left="delete"
+                  :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
                 >
                   {{ t("settings.regexPatternList.delete") }}
@@ -302,6 +303,7 @@ export default defineComponent({
     const regexPatterns = ref<any[]>([]);
     const selectedPatterns: Ref<any[]> = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
 
     const resultTotal = ref(0);
 
@@ -477,6 +479,7 @@ export default defineComponent({
     };
 
     const bulkDeleteRegexPatterns = async () => {
+      bulkDeleteLoading.value = true;
       const patternIds = selectedPatterns.value.map((pattern: any) => pattern.id);
 
       try {
@@ -520,6 +523,8 @@ export default defineComponent({
             variant: "error",
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     };
 
@@ -560,6 +565,7 @@ export default defineComponent({
       confirmBulkDelete,
       openBulkDeleteDialog,
       bulkDeleteRegexPatterns,
+      bulkDeleteLoading,
     };
   },
 });

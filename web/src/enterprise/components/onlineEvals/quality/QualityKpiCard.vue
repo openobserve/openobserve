@@ -31,6 +31,23 @@
           {{ t("onlineEvals.quality.kpis.noData") }}
         </span>
       </div>
+      <div
+        v-if="kpi.id === 'scoreResults' && kpi.scopeCounts"
+        class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs font-medium text-text-tertiary"
+        data-test="quality-kpi-scope-breakdown"
+      >
+        <span
+          v-for="scope in scopes"
+          :key="scope"
+          class="inline-flex items-center gap-1 [font-variant-numeric:tabular-nums]"
+          :data-test="`quality-kpi-scope-${scope}`"
+        >
+          <span>{{ t(`onlineEvals.quality.scopes.${scope}`) }}</span>
+          <span class="font-semibold text-text-secondary">
+            {{ compactCount(kpi.scopeCounts[scope]) }}
+          </span>
+        </span>
+      </div>
       <!-- Always render the delta row even when prev is missing — keeps
            every card the same height. The body switches to a neutral
            "no prior data" hint instead of hiding the row, so the user
@@ -47,11 +64,13 @@
       >
         <template v-if="delta != null">
           <span class="kpi-trend-arrow">{{ trendArrow }}</span>
-          <span>{{ deltaText }} vs prev</span>
+          <span>
+            {{ deltaText }} {{ t("onlineEvals.quality.kpis.vsPrev") }}
+          </span>
         </template>
         <template v-else>
           <span class="kpi-trend-arrow">–</span>
-          <span>no prior data</span>
+          <span>{{ t("onlineEvals.quality.kpis.noPriorData") }}</span>
         </template>
       </div>
     </div>
@@ -79,19 +98,23 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
-// Metric icon per KPI id — mirrors the LLM Insights / Session Detail cards so
-// every KPI card carries a corner icon. Falls back to a neutral chart icon.
-const ICONS: Record<string, string> = {
-  evaluated: "fact-check",
+const scopes = ["span", "trace", "session"] as const;
+
+const ICONS: Record<KpiCard["id"], string> = {
+  scoreResults: "fact-check",
   evaluationCost: "payments",
-  jobSuccess: "check-circle",
+  scorerSuccess: "check-circle",
   scorerFailures: "error",
   latencyP95: "schedule",
 };
-const cardIcon = computed(() => ICONS[props.kpi.id] ?? "insights");
+const cardIcon = computed(() => ICONS[props.kpi.id]);
 
 const trendSentiment = computed<"good" | "bad" | "neutral">(() => {
-  if (props.delta == null || props.kpi.healthyDirection === "neutral" || props.delta === 0) {
+  if (
+    props.delta == null ||
+    props.kpi.healthyDirection === "neutral" ||
+    props.delta === 0
+  ) {
     return "neutral";
   }
   const movedUp = props.delta > 0;
@@ -139,9 +162,17 @@ const unitLabel = computed(() => {
   return "";
 });
 
+function compactCount(value: number): string {
+  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
+  return String(Math.round(value));
+}
+
 const sparkColor = computed(() => {
-  if (trendSentiment.value === "good") return "#16a34a";
+  if (trendSentiment.value === "good") {
+    return "var(--color-status-success-text)";
+  }
   if (trendSentiment.value === "bad") return "var(--color-status-error-text)";
-  return "#3b82f6";
+  return "var(--color-primary-500)";
 });
 </script>

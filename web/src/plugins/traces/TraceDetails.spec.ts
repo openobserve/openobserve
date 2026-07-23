@@ -119,8 +119,14 @@ const ODrawerStub = {
 
 describe("TraceDetails", () => {
   let wrapper: any;
+  let mountOptions: any;
 
   beforeEach(async () => {
+    // The active tab and tab order persist to localStorage, so a test that
+    // switches tabs would otherwise leak its selection into every later test.
+    localStorage.removeItem("o2_trace_active_tab");
+    localStorage.removeItem("o2_trace_tab_order");
+
     // Mock router query params
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: {
@@ -199,7 +205,7 @@ describe("TraceDetails", () => {
       }),
     }));
 
-    wrapper = mount(TraceDetails, {
+    mountOptions = {
       attachTo: "#app",
       props: {
         traceId: "test-trace-id",
@@ -278,10 +284,23 @@ describe("TraceDetails", () => {
           },
         },
       },
-    });
+    };
+
+    wrapper = mount(TraceDetails, mountOptions);
 
     await flushPromises();
   });
+
+  /**
+   * Re-mounts with the same options. Needed by tests that assert on state read
+   * from localStorage during setup, which only runs at mount time.
+   */
+  async function remount() {
+    wrapper.unmount();
+    wrapper = mount(TraceDetails, mountOptions);
+    await flushPromises();
+    return wrapper;
+  }
 
   afterEach(() => {
     if (wrapper) {
@@ -326,6 +345,27 @@ describe("TraceDetails", () => {
       );
     });
 
+    // Regression: these were written as <OButton name="content-copy" /> but
+    // `name` is not an OButton prop (ButtonProps exposes iconLeft/iconRight).
+    // It fell through to the native <button name> attribute, so the buttons
+    // rendered EMPTY — and OButton defaults to variant="primary", so they
+    // showed as solid filled blocks. The old test below hid this because it
+    // only queried by data-test, which still resolved.
+    it("renders the copy buttons with their icon, not as empty buttons", () => {
+      const copyBtn = wrapper.find('[data-test="trace-details-copy-trace-id-btn"]');
+
+      expect(copyBtn.exists()).toBe(true);
+      // OIcon resolves to an SVG component, so the icon NAME never reaches the
+      // DOM — the observable difference is simply that a broken button renders
+      // no children at all.
+      expect(copyBtn.element.children.length).toBeGreaterThan(0);
+      // A stray `name` attribute means the icon prop was mis-spelled again and
+      // fell through $attrs onto the native <button>.
+      expect(copyBtn.attributes("name")).toBeUndefined();
+      // Icon-only buttons must not render as a filled primary block.
+      expect(copyBtn.attributes("data-o2-variant")).toBe("ghost");
+    });
+
     it("should copy trace ID when copy button is clicked", async () => {
       const copyBtn = wrapper.find('[data-test="trace-details-copy-trace-id-btn"]');
       if (copyBtn.exists()) {
@@ -363,6 +403,9 @@ describe("TraceDetails", () => {
     });
 
     it("should show search navigation buttons when there are results", async () => {
+      // Search is a waterfall-view affordance — it is hidden on the flame-graph
+      // (the default view), map and thread tabs.
+      wrapper.vm.activeTab = "waterfall";
       wrapper.vm.searchResults = 5;
       wrapper.vm.currentIndex = 2;
       await wrapper.vm.$nextTick();
@@ -436,6 +479,13 @@ describe("TraceDetails", () => {
   });
 
   describe("Span interaction", () => {
+    // The trace tree, header and span sidebar all live inside the waterfall
+    // view. The component defaults to the flame graph, so opt in explicitly.
+    beforeEach(async () => {
+      wrapper.vm.activeTab = "waterfall";
+      await wrapper.vm.$nextTick();
+    });
+
     it("should handle span selection", () => {
       const spanId = "test-span-id";
       wrapper.vm.updateSelectedSpan(spanId);
@@ -2333,6 +2383,56 @@ describe("TraceDetails", () => {
 
       localWrapper.unmount();
     });
+
+    it("opens Preview when a URL-selected span is an LLM evaluator span", async () => {
+      const response = JSON.parse(JSON.stringify(tracesMockData.tracesDetails.traceSpans));
+      response.hits[0].gen_ai_system = "openai";
+      const spanId = response.hits[0].span_id;
+
+      globalThis.server.use(
+        http.post(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+          async ({ request }) => {
+            const body = (await request.json()) as any;
+            if (body.query?.sql?.includes("_rumdata")) {
+              return HttpResponse.json({ hits: [], total: 0 });
+            }
+            return HttpResponse.json(response);
+          },
+        ),
+      );
+
+      const localWrapper = mountWithSpanQuery(spanId);
+      await flushPromises();
+
+      expect(localWrapper.vm.sidebarActiveTab).toBe("preview");
+      localWrapper.unmount();
+    });
+
+    it("opens Preview when a URL-selected remote evaluator has a response", async () => {
+      const response = JSON.parse(JSON.stringify(tracesMockData.tracesDetails.traceSpans));
+      response.hits[0].attributes_response = '{"code":"OK","value":0.9,"reason":"good"}';
+      const spanId = response.hits[0].span_id;
+
+      globalThis.server.use(
+        http.post(
+          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+          async ({ request }) => {
+            const body = (await request.json()) as any;
+            if (body.query?.sql?.includes("_rumdata")) {
+              return HttpResponse.json({ hits: [], total: 0 });
+            }
+            return HttpResponse.json(response);
+          },
+        ),
+      );
+
+      const localWrapper = mountWithSpanQuery(spanId);
+      await flushPromises();
+
+      expect(localWrapper.vm.sidebarActiveTab).toBe("preview");
+      localWrapper.unmount();
+    });
   });
 
   describe("Priority 3: Search Navigation", () => {
@@ -2629,6 +2729,8 @@ describe("TraceDetails", () => {
 
   describe("TraceTree hover integration", () => {
     it("should pass hoveredSpanId prop to TraceTree child component", async () => {
+      // TraceTree only renders inside the waterfall view.
+      wrapper.vm.activeTab = "waterfall";
       wrapper.vm.hoveredSpanId = "hovered-span-from-parent";
       await wrapper.vm.$nextTick();
 
@@ -2708,6 +2810,110 @@ describe("TraceDetails", () => {
     it("renders the CodeQueryEditor inside the drawer default slot", () => {
       const editor = wrapper.find('[data-test="trace-details-filters-code-editor"]');
       expect(editor.exists()).toBe(true);
+    });
+  });
+
+  describe("Tab order and active-tab persistence", () => {
+    const ORDER_KEY = "o2_trace_tab_order";
+    const ACTIVE_KEY = "o2_trace_active_tab";
+
+    const tabValues = () => wrapper.vm.traceTabs.map((tab: any) => tab.value);
+    const storedOrder = () => JSON.parse(localStorage.getItem(ORDER_KEY) as string);
+
+    // The fixture trace has no LLM spans, so the dag and thread tabs are
+    // filtered out of traceTabs regardless of the stored order.
+    it("defaults to the flame graph when nothing is persisted", () => {
+      expect(wrapper.vm.activeTab).toBe("flame-graph");
+    });
+
+    it("restores the persisted active tab on mount", async () => {
+      localStorage.setItem(ACTIVE_KEY, "map");
+      await remount();
+
+      expect(wrapper.vm.activeTab).toBe("map");
+    });
+
+    it("persists the active tab when it changes", async () => {
+      wrapper.vm.updateActiveTab("waterfall");
+      await wrapper.vm.$nextTick();
+
+      expect(localStorage.getItem(ACTIVE_KEY)).toBe("waterfall");
+    });
+
+    it("falls back to the default when the persisted tab is unavailable for this trace", async () => {
+      // "thread" only renders for traces with LLM spans; this fixture has none.
+      localStorage.setItem(ACTIVE_KEY, "thread");
+      await remount();
+
+      expect(tabValues()).not.toContain("thread");
+      expect(wrapper.vm.activeTab).toBe("flame-graph");
+    });
+
+    it("ignores a persisted tab that is no longer a known tab", async () => {
+      localStorage.setItem(ACTIVE_KEY, "some-removed-tab");
+      await remount();
+
+      expect(wrapper.vm.activeTab).toBe("flame-graph");
+    });
+
+    it("renders tabs in the persisted order", async () => {
+      localStorage.setItem(ORDER_KEY, JSON.stringify(["map", "waterfall", "flame-graph"]));
+      await remount();
+
+      expect(tabValues()).toEqual(["map", "waterfall", "flame-graph"]);
+    });
+
+    it("drops unknown values from a persisted order and appends newly shipped tabs", async () => {
+      // A stored order written before "map" shipped, containing a since-removed tab.
+      localStorage.setItem(ORDER_KEY, JSON.stringify(["waterfall", "retired-tab", "flame-graph"]));
+      await remount();
+
+      // "retired-tab" is discarded; "map" is appended rather than lost.
+      expect(tabValues()).toEqual(["waterfall", "flame-graph", "map"]);
+    });
+
+    it("survives a corrupt persisted order", async () => {
+      localStorage.setItem(ORDER_KEY, "{not json");
+      await remount();
+
+      expect(tabValues()).toEqual(["flame-graph", "waterfall", "map"]);
+    });
+
+    it("moves a tab before the drop target and persists the new order", async () => {
+      wrapper.vm.onTabReorder({ from: "map", to: "flame-graph", before: true });
+      await wrapper.vm.$nextTick();
+
+      expect(tabValues()).toEqual(["map", "flame-graph", "waterfall"]);
+      expect(storedOrder()).toEqual(["map", "flame-graph", "waterfall", "dag", "thread"]);
+    });
+
+    it("moves a tab after the drop target", async () => {
+      wrapper.vm.onTabReorder({
+        from: "flame-graph",
+        to: "map",
+        before: false,
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(tabValues()).toEqual(["waterfall", "map", "flame-graph"]);
+    });
+
+    it("keeps hidden tabs in the persisted order so the arrangement survives", async () => {
+      wrapper.vm.onTabReorder({ from: "map", to: "flame-graph", before: true });
+      await wrapper.vm.$nextTick();
+
+      // dag and thread are not rendered for this trace, but must not be dropped
+      // from storage — otherwise the order resets when opening an LLM trace.
+      expect(storedOrder()).toContain("dag");
+      expect(storedOrder()).toContain("thread");
+    });
+
+    it("ignores a reorder whose source tab is unknown", async () => {
+      const before = tabValues();
+      wrapper.vm.onTabReorder({ from: "ghost", to: "map", before: true });
+      await wrapper.vm.$nextTick();
+
+      expect(tabValues()).toEqual(before);
     });
   });
 });

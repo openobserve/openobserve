@@ -307,6 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="pipeline-list-delete-pipelines-btn"
                   variant="outline-destructive"
                   size="sm"
+                  :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
                   icon-left="delete"
                 >
@@ -524,6 +525,7 @@ const filteredPipelines: any = ref([]);
 const columns: any = ref([]);
 
 const selectedPipelineIds = ref<string[]>([]);
+const bulkDeleteLoading = ref(false);
 const selectedPipelines = computed(() =>
   filteredPipelines.value.filter((p: any) => selectedPipelineIds.value.includes(p.pipeline_id)),
 );
@@ -1045,6 +1047,7 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeletePipelines = async () => {
+  bulkDeleteLoading.value = true;
   const dismiss = toast({
     variant: "loading",
     message: "Deleting pipelines...",
@@ -1123,6 +1126,8 @@ const bulkDeletePipelines = async () => {
         message: errorMessage,
       });
     }
+  } finally {
+    bulkDeleteLoading.value = false;
   }
 
   resetConfirmDialog();

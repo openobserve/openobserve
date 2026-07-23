@@ -19,7 +19,7 @@ use config::meta::{
     stream::StreamParams,
 };
 
-use crate::service::self_reporting::publish_error;
+use crate::self_reporting::publish_error;
 
 /// Loads function records into the shared cache and reports invalid entries.
 pub async fn cache() -> Result<(), anyhow::Error> {

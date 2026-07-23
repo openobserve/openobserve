@@ -4,33 +4,34 @@
   >
     <section
       class="py-3.5 px-4 mb-3 border border-(--color-dialog-header-border,var(--color-border-default)) rounded-default"
+      data-test="job-preview-matched-targets"
     >
       <header
         class="flex items-center gap-1.5 mb-1.5 text-(--color-text-secondary,var(--color-text-secondary))"
       >
         <OIcon name="visibility" size="xs" />
         <span class="m-0 text-compact font-semibold text-(--color-text-heading,currentColor)">{{
-          t("onlineEvals.job.preview.title")
+          t(`onlineEvals.job.preview.scopes.${targetScope}.title`)
         }}</span>
       </header>
       <div v-if="!stream" class="m-0 text-text-secondary text-xs leading-normal">
-        {{ t("onlineEvals.job.preview.hint") }}
+        {{ t(`onlineEvals.job.preview.scopes.${targetScope}.hint`) }}
       </div>
       <div v-else-if="!filterReady" class="m-0 text-text-secondary text-xs leading-normal">
         {{ t("onlineEvals.job.preview.matchedIncomplete") }}
       </div>
       <div v-else-if="matchedLoading" class="m-0 text-text-secondary text-xs leading-normal">
-        {{ t("onlineEvals.job.preview.matchedLoading") }}
+        {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedLoading`) }}
       </div>
       <div v-else-if="matchedError" class="m-0 text-xs text-status-error-text">
         {{ t("onlineEvals.job.preview.matchedError") }}
       </div>
       <div v-else class="flex items-baseline gap-1.5">
-        <span class="text-2xl font-bold text-text-secondary [font-variant-numeric:tabular-nums]">{{
+        <span class="text-2xl font-bold text-text-heading [font-variant-numeric:tabular-nums]">{{
           formattedCount
         }}</span>
         <span class="text-xs text-(--color-text-secondary,var(--color-text-secondary))">
-          {{ t("onlineEvals.job.preview.matchedSuffix") }}
+          {{ t(`onlineEvals.job.preview.scopes.${targetScope}.matchedSuffix`) }}
         </span>
       </div>
     </section>
@@ -67,13 +68,15 @@ import { computed, toRef } from "vue";
 import { useI18n } from "vue-i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { useJobMatchedSpans } from "../../composables/useJobMatchedSpans";
+import type { EvalTargetScope } from "@/services/online-evals.service";
+import { useJobMatchedTargets } from "../../composables/useJobMatchedTargets";
 
 const props = defineProps<{
   name: string;
   streamType: string;
+  targetScope: EvalTargetScope;
   mode: "create" | "edit";
-  /** Selected input stream — when empty the Matched Spans card shows the hint. */
+  /** Selected input stream — when empty the matched-target card shows a hint. */
   stream: string;
   /** SQL WHERE body from the filter builder ("" for no filter). */
   filterWhere: string;
@@ -87,10 +90,11 @@ const {
   count: matchedCount,
   isLoading: matchedLoading,
   error: matchedError,
-} = useJobMatchedSpans(
+} = useJobMatchedTargets(
   toRef(props, "stream"),
   toRef(props, "filterWhere"),
   toRef(props, "filterReady"),
+  toRef(props, "targetScope"),
 );
 
 const formattedCount = computed(() =>

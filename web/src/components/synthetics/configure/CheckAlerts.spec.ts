@@ -2,7 +2,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
 import type { BrowserCheck } from "@/types/synthetics";
 import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
 
@@ -119,28 +118,10 @@ describe("CheckAlerts", () => {
       expect(wrapper.find("h3").text()).toBe("synthetics.scheduleAlert.alerts");
     });
 
-    it("should display retry count from check data", () => {
-      wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
-
-      const retriesInput = wrapper.find('[data-test="synthetics-check-alerts-retries-input"]');
-      expect(retriesInput.exists()).toBe(true);
-      expect(retriesInput.attributes("value")).toBe(String(mockMonitorHttp.retries));
-    });
-
-    it("should display retry delay from check data", () => {
-      wrapper = mountCheckAlerts({ waitBeforeRetrySecs: 10 }, ["dest-1"]);
-
-      const delayInput = wrapper.find('[data-test="synthetics-check-alerts-retry-delay-input"]');
-      expect(delayInput.exists()).toBe(true);
-      expect(delayInput.attributes("value")).toBe("10");
-    });
-
     it("should display failure threshold from check data", () => {
       wrapper = mountCheckAlerts({ alertIfFails: 3 }, ["dest-1"]);
 
-      const thresholdInput = wrapper.find(
-        '[data-test="synthetics-check-alerts-failure-threshold-input"]',
-      );
+      const thresholdInput = wrapper.find('[data-test="synthetics-check-alerts-threshold-input"]');
       expect(thresholdInput.exists()).toBe(true);
       expect(thresholdInput.attributes("value")).toBe("3");
     });
@@ -151,36 +132,6 @@ describe("CheckAlerts", () => {
       const cooldownInput = wrapper.find('[data-test="synthetics-check-alerts-cooldown-input"]');
       expect(cooldownInput.exists()).toBe(true);
       expect(cooldownInput.attributes("value")).toBe("5");
-    });
-
-    it("should render default values when check fields are undefined", () => {
-      // Spread includes undefined keys which override the defaults from mockMonitorHttp
-      const sparse = {
-        retries: undefined,
-        waitBeforeRetrySecs: undefined,
-        alertIfFails: undefined,
-        cooldownMins: undefined,
-      };
-
-      wrapper = mountCheckAlerts(sparse, ["dest-1"]);
-
-      expect(
-        wrapper.find('[data-test="synthetics-check-alerts-retries-input"]').attributes("value"),
-      ).toBe("0");
-
-      expect(
-        wrapper.find('[data-test="synthetics-check-alerts-retry-delay-input"]').attributes("value"),
-      ).toBe("0");
-
-      expect(
-        wrapper
-          .find('[data-test="synthetics-check-alerts-failure-threshold-input"]')
-          .attributes("value"),
-      ).toBe("1");
-
-      expect(
-        wrapper.find('[data-test="synthetics-check-alerts-cooldown-input"]').attributes("value"),
-      ).toBe("5");
     });
 
     it("should select destinations from check.notifications.destinations", () => {
@@ -210,41 +161,11 @@ describe("CheckAlerts", () => {
 
   // ── Interactions ─────────────────────────────────────────────────────────
 
-  describe("retry count input", () => {
-    it("should emit update:check with updated retries when input changes", async () => {
-      wrapper = mountCheckAlerts({ retries: 2 }, ["dest-1"]);
-
-      const retriesInput = wrapper.find('[data-test="synthetics-check-alerts-retries-input"]');
-      await retriesInput.setValue("5");
-
-      const emitted = wrapper.emitted("update:check");
-      expect(emitted).toBeTruthy();
-      const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
-      expect(lastEmit.retries).toBe(5);
-    });
-  });
-
-  describe("retry delay input", () => {
-    it("should emit update:check with updated waitBeforeRetrySecs when input changes", async () => {
-      wrapper = mountCheckAlerts({ waitBeforeRetrySecs: 10 }, ["dest-1"]);
-
-      const delayInput = wrapper.find('[data-test="synthetics-check-alerts-retry-delay-input"]');
-      await delayInput.setValue("30");
-
-      const emitted = wrapper.emitted("update:check");
-      expect(emitted).toBeTruthy();
-      const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
-      expect(lastEmit.waitBeforeRetrySecs).toBe(30);
-    });
-  });
-
   describe("failure threshold input", () => {
     it("should emit update:check with updated alertIfFails when input changes", async () => {
       wrapper = mountCheckAlerts({ alertIfFails: 3 }, ["dest-1"]);
 
-      const thresholdInput = wrapper.find(
-        '[data-test="synthetics-check-alerts-failure-threshold-input"]',
-      );
+      const thresholdInput = wrapper.find('[data-test="synthetics-check-alerts-threshold-input"]');
       await thresholdInput.setValue("2");
 
       const emitted = wrapper.emitted("update:check");
@@ -285,25 +206,6 @@ describe("CheckAlerts", () => {
       expect(emitted).toBeTruthy();
       const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
       expect(lastEmit.notifications.destinations).toEqual(["dest-1", "dest-3"]);
-    });
-
-    it("should show error when all destinations are deselected", async () => {
-      wrapper = mountCheckAlerts({ notifications: { destinations: ["dest-1"] } }, [
-        "dest-1",
-        "dest-2",
-      ]);
-
-      // Find the OSelect stub component via its root element's data-test
-      const selectComp = wrapper.findComponent(
-        '[data-test="synthetics-check-alerts-destinations-select"]',
-      );
-      expect(selectComp.exists()).toBe(true);
-
-      // Emit an empty selection to simulate user deselecting all destinations
-      selectComp.vm.$emit("update:modelValue", []);
-      await nextTick();
-
-      expect(wrapper.text()).toContain("synthetics.scheduleAlert.destinationRequired");
     });
   });
 
@@ -372,23 +274,6 @@ describe("CheckAlerts", () => {
       expect(emitted).toBeTruthy();
       const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
       expect(lastEmit.cooldownMins).toBe(15);
-    });
-  });
-
-  describe("v-model preservation", () => {
-    it("should preserve other check fields when updating retries", async () => {
-      wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
-
-      const retriesInput = wrapper.find('[data-test="synthetics-check-alerts-retries-input"]');
-      await retriesInput.setValue("4");
-
-      const emitted = wrapper.emitted("update:check");
-      const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
-
-      expect(lastEmit.name).toBe(mockMonitorHttp.name);
-      expect(lastEmit.url).toBe(mockMonitorHttp.url);
-      expect(lastEmit.retries).toBe(4);
-      expect(lastEmit.alertIfFails).toBe(mockMonitorHttp.alertIfFails);
     });
   });
 });

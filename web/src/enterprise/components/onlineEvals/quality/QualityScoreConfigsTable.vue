@@ -1,21 +1,5 @@
 <template>
-  <section class="flex flex-col gap-2.5 min-h-0 flex-1" data-test="quality-score-configs-overview">
-    <div
-      v-if="isLoading && rows.length === 0"
-      class="flex flex-col items-center gap-2 py-8 px-3 border border-dashed border-dialog-header-border rounded-default text-center text-text-secondary"
-    >
-      <OSpinner size="sm" />
-      <span>{{ t("onlineEvals.quality.loading") }}</span>
-    </div>
-
-    <div
-      v-if="rows.length === 0 && !isLoading"
-      class="flex-1 min-h-0 flex items-center justify-center"
-      data-test="quality-overview-empty"
-    >
-      <OEmptyState size="hero" preset="no-score-configs" @action="onEmptyAction" />
-    </div>
-
+  <section class="flex min-h-0 flex-1 flex-col gap-2.5" data-test="quality-score-configs-overview">
     <!-- The previous "waiting for scores" empty card (allZeroScores) is
          intentionally gone: as long as at least one score config exists,
          we render the table so the user sees the configured shapes. Each
@@ -23,7 +7,7 @@
          so a fresh setup reads as "configs are here, scores will fill in"
          rather than a blank screen. -->
 
-    <div v-else class="flex-1 min-h-0 flex flex-col">
+    <div class="flex min-h-0 flex-1 flex-col">
       <OTable
         data-test="quality-overview-table"
         :data="filteredRows"
@@ -37,7 +21,8 @@
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
-        table-id="quality-score-configs"
+        :column-visibility="defaultColumnVisibility"
+        table-id="quality-score-configs-v2"
         width="100%"
         class="w-full h-full"
         @row-click="(row: any) => $emit('select', row)"
@@ -45,29 +30,71 @@
         <!-- Filter moved into the table toolbar so OTable's column chooser
              ("Manage columns") renders next to it, matching the eval lists. -->
         <template #toolbar>
-          <OInput
+          <OSearchInput
             v-model="filter"
             :placeholder="t('onlineEvals.quality.overview.searchPlaceholder')"
             size="sm"
             class="flex-1 min-w-0"
             data-test="quality-overview-filter-input"
+          />
+        </template>
+
+        <template #toolbar-trailing>
+          <OButton
+            variant="outline"
+            size="icon-sm"
+            icon-left="refresh"
+            :loading="isLoading"
+            data-test="quality-overview-refresh-btn"
+            @click="emit('refresh')"
           >
-            <template #icon-left>
-              <OIcon name="search" size="xs" />
-            </template>
-          </OInput>
+            <OTooltip
+              side="bottom"
+              :content="t('common.refresh')"
+              shortcut-id="qualityOverviewRefresh"
+            />
+          </OButton>
+        </template>
+
+        <template #empty>
+          <div class="flex items-center justify-center py-8" data-test="quality-overview-empty">
+            <OEmptyState
+              size="hero"
+              preset="no-score-configs"
+              :filtered="Boolean(filter.trim())"
+              @action="onEmptyAction"
+            />
+          </div>
         </template>
 
         <template #cell-status="{ row }">
-          <OTag type="qualityStatus" :value="row.status" label="" :aria-label="row.status" />
+          <div
+            class="flex min-w-0 flex-col items-start gap-0.5 leading-tight"
+            data-test="quality-overview-health"
+          >
+            <OTag
+              type="qualityStatus"
+              :value="row.status"
+              :label="t(`onlineEvals.quality.overview.status.${row.status}`)"
+              :aria-label="t(`onlineEvals.quality.overview.status.${row.status}`)"
+            />
+            <span
+              class="max-w-full truncate text-3xs text-text-secondary"
+              :title="healthSummary(row)"
+            >
+              {{ healthSummary(row) }}
+            </span>
+          </div>
         </template>
 
         <template #cell-name="{ row }">
-          <div class="text-text-body">{{ row.name }}</div>
+          <div class="font-semibold text-text-heading">
+            {{ row.name }}
+          </div>
         </template>
 
         <template #cell-type="{ row }">
-          <OTag v-if="shortType(row.dataType) !== '—'" type="evalDataType" :value="row.dataType" />
+          <OTag v-if="row.dataType !== 'unknown'" type="evalDataType" :value="row.dataType" />
           <span v-else class="text-text-secondary">—</span>
         </template>
 
@@ -77,14 +104,45 @@
           }}</span>
         </template>
 
-        <template #cell-coverage="{ row }">
-          <span v-if="row.coveragePct != null" class="[font-variant-numeric:tabular-nums]">{{
-            formatPct(row.coveragePct)
-          }}</span>
+        <template #cell-quality="{ row }">
+          <div
+            v-if="row.qualityValue != null"
+            class="flex flex-col leading-tight"
+            data-test="quality-overview-quality"
+          >
+            <span class="font-semibold [font-variant-numeric:tabular-nums]">
+              {{ formatQuality(row) }}
+            </span>
+            <span
+              v-if="row.qualityLabel"
+              class="mt-0.5 whitespace-normal text-3xs font-normal leading-tight text-text-secondary"
+            >
+              {{ row.qualityLabel }}
+            </span>
+          </div>
           <span v-else class="text-text-secondary">—</span>
         </template>
 
-        <template #cell-trend="{ row }">
+        <template #cell-scopeMix="{ row }">
+          <div
+            v-if="scopeItems(row).length > 0"
+            class="flex flex-wrap gap-1"
+            data-test="quality-overview-scope-mix"
+          >
+            <span
+              v-for="scope in scopeItems(row)"
+              :key="scope.id"
+              class="inline-flex items-center gap-1 rounded-full border border-border-default bg-surface-base px-1.5 py-0.5 text-3xs leading-none text-text-secondary [font-variant-numeric:tabular-nums]"
+              :data-test="`quality-overview-scope-${scope.id}`"
+            >
+              <span>{{ t(`onlineEvals.quality.scopes.${scope.id}`) }}</span>
+              <span class="font-semibold text-text-heading">{{ formatCount(scope.count) }}</span>
+            </span>
+          </div>
+          <span v-else class="text-text-secondary">—</span>
+        </template>
+
+        <template #cell-volumeTrend="{ row }">
           <svg
             v-if="row.trendSparkline.length > 0"
             class="w-full h-5"
@@ -120,12 +178,12 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfigRow } from "../composables/useQualityScoreConfigs";
@@ -135,7 +193,7 @@ const props = defineProps<{
   isLoading: boolean;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "select", row: ScoreConfigRow): void;
   (e: "refresh"): void;
 }>();
@@ -150,6 +208,10 @@ const filter = ref("");
 // We hop tabs + set `action=add` so OnlineEvals's URL→state machine opens
 // the create form on landing.
 function onEmptyAction(id?: string) {
+  if (id === "clear-filters") {
+    filter.value = "";
+    return;
+  }
   if (id !== "create") return;
   const query: Record<string, any> = {
     ...route.query,
@@ -175,17 +237,26 @@ function sparkClass(status: string): string {
   return "text-text-secondary";
 }
 
+const defaultColumnVisibility = {
+  status: true,
+  name: true,
+  type: true,
+  quality: true,
+  totalScores: true,
+  scopeMix: true,
+  volumeTrend: true,
+  updated: true,
+};
+
 const columns = computed(() =>
   [
     {
       id: "status",
-      header: "",
-      accessorKey: "status",
-      sortable: false,
-      size: 40,
-      // Fixed-width status dot — no resize grip (OTable reads `resizable`).
-      resizable: false,
-      meta: { align: "center" },
+      header: t("onlineEvals.quality.overview.columns.health"),
+      accessorFn: (row: ScoreConfigRow) => row.statusPriority,
+      sortable: true,
+      size: 190,
+      meta: { align: "left" },
     },
     {
       id: "name",
@@ -205,6 +276,14 @@ const columns = computed(() =>
       meta: { align: "left" },
     },
     {
+      id: "quality",
+      header: t("onlineEvals.quality.overview.columns.quality"),
+      accessorKey: "qualityValue",
+      sortable: true,
+      size: 170,
+      meta: { align: "right" },
+    },
+    {
       id: "totalScores",
       header: t("onlineEvals.quality.overview.columns.totalScores"),
       accessorKey: "totalScores",
@@ -213,16 +292,15 @@ const columns = computed(() =>
       meta: { align: "right" },
     },
     {
-      id: "coverage",
-      header: t("onlineEvals.quality.overview.columns.coverage"),
-      accessorKey: "coveragePct",
-      sortable: true,
-      size: 110,
-      meta: { align: "right" },
+      id: "scopeMix",
+      header: t("onlineEvals.quality.overview.columns.scopeMix"),
+      sortable: false,
+      size: 240,
+      meta: { align: "left" },
     },
     {
-      id: "trend",
-      header: t("onlineEvals.quality.overview.columns.trend"),
+      id: "volumeTrend",
+      header: t("onlineEvals.quality.overview.columns.volumeTrend"),
       sortable: false,
       size: 120,
       meta: { align: "left" },
@@ -243,13 +321,6 @@ const columns = computed(() =>
   })),
 );
 
-function shortType(type: ScoreConfigRow["dataType"]): string {
-  if (type === "numeric") return "Num";
-  if (type === "categorical") return "Cat";
-  if (type === "boolean") return "Bool";
-  return "—";
-}
-
 function formatCount(n: number | null): string {
   if (n == null) return "—";
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -257,11 +328,33 @@ function formatCount(n: number | null): string {
   return String(Math.round(n));
 }
 
-function formatPct(n: number | null): string {
-  if (n == null) return "—";
-  if (n === 0) return "0%";
-  if (n < 0.1) return "<0.1%";
-  return `${n.toFixed(1)}%`;
+function formatQuality(row: ScoreConfigRow): string {
+  const value = row.qualityValue;
+  if (value == null) return "—";
+  if (row.qualityFormat === "text" || typeof value === "string") {
+    return String(value);
+  }
+  if (row.qualityFormat === "percent") return `${value.toFixed(1)}%`;
+  return value.toFixed(2);
+}
+
+function healthSummary(row: ScoreConfigRow): string {
+  if (row.status === "noData") {
+    return t("onlineEvals.quality.overview.health.noDataHint");
+  }
+  if (!row.hasThreshold) {
+    return t("onlineEvals.quality.overview.health.noThresholdHint");
+  }
+  return t("onlineEvals.quality.overview.health.thresholdSummary", {
+    percent: (row.unhealthyPercent ?? 0).toFixed(1),
+    threshold: row.thresholdLabel,
+  });
+}
+
+function scopeItems(row: ScoreConfigRow) {
+  return (["span", "trace", "session"] as const)
+    .map((id) => ({ id, count: row.scopeCounts[id] }))
+    .filter((scope) => scope.count > 0);
 }
 
 function sparkPoints(series: number[]): string {
@@ -281,16 +374,20 @@ function sparkPoints(series: number[]): string {
 
 function relativeTime(timestampMs: number): string {
   const diff = Date.now() - timestampMs;
-  if (diff < 0) return "just now";
+  if (diff < 0) return t("refreshButton.justNow");
   const sec = Math.floor(diff / 1000);
-  if (sec < 60) return `${sec}s ago`;
+  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
   const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
+  if (min < 60) return t("refreshButton.minutesAgo", { min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return t("refreshButton.hoursAgo", { h: hr });
   const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
+  if (day < 30) {
+    return t("onlineEvals.quality.overview.relativeTime.daysAgo", { day });
+  }
   const mo = Math.floor(day / 30);
-  return `${mo}mo ago`;
+  return t("onlineEvals.quality.overview.relativeTime.monthsAgo", {
+    month: mo,
+  });
 }
 </script>

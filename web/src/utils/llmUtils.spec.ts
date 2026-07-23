@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest";
 import {
   isLLMTrace,
+  hasTracePreview,
   parseUsageDetails,
   parseCostDetails,
   parseModelParameters,
@@ -92,6 +93,17 @@ describe("isLLMTrace", () => {
   });
 });
 
+describe("hasTracePreview", () => {
+  it("includes remote evaluator spans with stored prompt or response", () => {
+    expect(hasTracePreview({ attributes_prompt: "request body" })).toBe(true);
+    expect(hasTracePreview({ attributes_response: '{"score":0.9}' })).toBe(true);
+  });
+
+  it("does not classify an ordinary span as previewable", () => {
+    expect(hasTracePreview({ service_name: "api" })).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // parseUsageDetails
 // ---------------------------------------------------------------------------
@@ -124,7 +136,10 @@ describe("parseUsageDetails", () => {
 
   it("computes total from input + output when total is absent", () => {
     expect(
-      parseUsageDetails({ gen_ai_usage_input_tokens: 10, gen_ai_usage_output_tokens: 20 }),
+      parseUsageDetails({
+        gen_ai_usage_input_tokens: 10,
+        gen_ai_usage_output_tokens: 20,
+      }),
     ).toEqual({
       input: 10,
       output: 20,

@@ -100,6 +100,13 @@ describe("windowsCard builder", () => {
     const linuxQs = linuxCard(SUBS).extras!.troubleshooting!.map((r) => r.q);
     expect(questions).toEqual(expect.arrayContaining(linuxQs));
   });
+
+  it("offers the uninstall command in PowerShell", () => {
+    const uninstall = windowsCard(SUBS).extras?.uninstall;
+    expect(uninstall?.code.raw).toContain("/windows/uninstall.ps1");
+    expect(uninstall?.code.lang).toBe("powershell");
+    expect(uninstall?.code.raw).not.toContain("curl -O");
+  });
 });
 
 describe("WindowsConfig.vue", () => {

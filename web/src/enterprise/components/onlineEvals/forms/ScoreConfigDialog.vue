@@ -11,11 +11,7 @@
     :title="drawerTitle"
     form-id="score-config-form"
     :secondary-button-label="t('onlineEvals.buttons.cancel')"
-    :primary-button-label="
-      mode === 'create'
-        ? t('onlineEvals.scoreConfig.createButton')
-        : t('onlineEvals.scoreConfig.saveButton')
-    "
+    :primary-button-label="t('onlineEvals.buttons.save')"
     :primary-button-disabled="mode === 'edit' && !isDirty"
     @update:open="handleOpenChange"
     @click:secondary="$emit('cancel')"

@@ -164,6 +164,11 @@ test.describe("Trace Query Editor testcases", () => {
 
       await page.waitForTimeout(2000);
 
+      // All three checks below read the waterfall span tree, which only renders
+      // on the 'waterfall' tab. The view opens on the flame graph by default and
+      // the last active tab is persisted, so select waterfall explicitly.
+      await pm.tracesPage.openTraceDetailsTab('waterfall');
+
       // Look for ERROR status in the span details using page object
       const errorCellVisible = await pm.tracesPage.isErrorStatusVisible();
       if (errorCellVisible) {

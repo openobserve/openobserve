@@ -18,85 +18,43 @@ use axum::{
     http::{HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
+use db::alerts::{destinations::DestinationError, templates::TemplateError};
 use infra::errors;
 
+use crate::{
+    alerts::alert::AlertError,
+    common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
+    dashboards::{DashboardError, reports::ReportError},
+    pipeline::store::PipelineError,
+};
 #[cfg(feature = "enterprise")]
-use crate::service::{
+use crate::{
     llm_evaluations::eval_jobs::EvalJobError, providers::ProviderError,
     ratelimit::rule::RatelimitError,
 };
-use crate::{
-    common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-    service::{
-        alerts::alert::AlertError,
-        dashboards::{DashboardError, reports::ReportError},
-        db::alerts::{destinations::DestinationError, templates::TemplateError},
-        pipeline::PipelineError,
-    },
-};
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
+    // the status code mapping lives on `infra::errors::Error` so that other
+    // consumers (e.g. audit logging) stay consistent with the HTTP responses
+    let status =
+        StatusCode::from_u16(err.http_status()).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     match err {
-        errors::Error::ErrorCode(code) => match code {
-            errors::ErrorCodes::SearchCancelQuery(_) | errors::ErrorCodes::RatelimitExceeded(_) => {
-                (
-                    StatusCode::TOO_MANY_REQUESTS,
-                    [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                    Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-                )
-                    .into_response()
-            }
-            errors::ErrorCodes::SearchTimeout(_) => (
-                StatusCode::REQUEST_TIMEOUT,
+        errors::Error::ErrorCode(code) => {
+            let mut body = MetaHttpResponse::error_code_with_trace_id(code, trace_id);
+            // attach hint/did-you-mean suggestions where the code carries
+            // enough information (no-op for the rest)
+            crate::error_suggest::enrich(&mut body, code);
+            (
+                status,
                 [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
+                Json(body),
             )
-                .into_response(),
-            errors::ErrorCodes::InvalidParams(_)
-            | errors::ErrorCodes::SearchSQLExecuteError(_)
-            | errors::ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
-            | errors::ErrorCodes::SearchFunctionNotDefined(_)
-            | errors::ErrorCodes::FullTextSearchFieldNotFound
-            | errors::ErrorCodes::SearchFieldNotFound(_)
-            | errors::ErrorCodes::SearchSQLNotValid(_)
-            | errors::ErrorCodes::SearchStreamNotFound(_)
-            | errors::ErrorCodes::SearchHistogramNotAvailable(_) => (
-                StatusCode::BAD_REQUEST,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-            errors::ErrorCodes::ServerInternalError(_)
-            | errors::ErrorCodes::SearchParquetFileNotFound => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                [(ERROR_HEADER, HeaderValue::from(code.get_code()))],
-                Json(MetaHttpResponse::error_code_with_trace_id(code, trace_id)),
-            )
-                .into_response(),
-        },
+                .into_response()
+        }
         // These errors don't carry a structured error code, so we don't set the
         // `X-Error-Message` header (it should only carry error codes). The full
         // message is still returned in the JSON response body.
-        errors::Error::ResourceError(_) => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(MetaHttpResponse::error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                err,
-            )),
-        )
-            .into_response(),
-        // A JSON deserialization failure means the client sent a malformed
-        // request body, so surface it as 400 rather than a 500 server error.
-        errors::Error::SerdeJsonError(_) => (
-            StatusCode::BAD_REQUEST,
-            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
-        )
-            .into_response(),
-        _ => (
-            StatusCode::BAD_REQUEST,
-            Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, err)),
-        )
-            .into_response(),
+        _ => (status, Json(MetaHttpResponse::error(status, err))).into_response(),
     }
 }
 
@@ -270,9 +228,9 @@ impl From<EvalJobError> for Response {
                 log::error!("[EvalJob] reconciler error: {err}");
                 MetaHttpResponse::internal_error("Internal server error")
             }
-            EvalJobError::InvalidStatus(_) | EvalJobError::InvalidStatusTransition { .. } => {
-                MetaHttpResponse::bad_request(value)
-            }
+            EvalJobError::InvalidStatus(_)
+            | EvalJobError::InvalidStatusTransition { .. }
+            | EvalJobError::InvalidJob(_) => MetaHttpResponse::bad_request(value),
         }
     }
 }

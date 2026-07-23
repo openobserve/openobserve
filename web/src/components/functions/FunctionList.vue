@@ -156,6 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="function-list-delete-functions-btn"
                   variant="outline-destructive"
                   size="sm"
+                  :loading="bulkDeleteLoading"
                   @click="openBulkDeleteDialog"
                   icon-left="delete"
                 >
@@ -281,6 +282,7 @@ export default defineComponent({
     const confirmDelete = ref<boolean>(false);
     const confirmForceDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref<boolean>(false);
     const { searchObj } = searchState();
     const pipelineList = ref([]);
     const selectedPipeline = ref("");
@@ -595,6 +597,7 @@ export default defineComponent({
     };
 
     const bulkDeleteFunctions = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
         message: "Deleting functions...",
@@ -675,6 +678,8 @@ export default defineComponent({
             message: errorMessage,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
@@ -740,6 +745,7 @@ export default defineComponent({
       hasVisibleRows,
       openBulkDeleteDialog,
       bulkDeleteFunctions,
+      bulkDeleteLoading,
       confirmBulkDelete,
       selectedFunctions,
       selectedFunctionIds,

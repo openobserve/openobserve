@@ -13,12 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::Arc;
+
 use ::common::infra::wal;
 use config::{cache_instance_id, ider};
+use db::metas;
 
-use crate::service::db::metas;
+#[cfg(feature = "enterprise")]
+use crate::self_reporting::CoreAuditPublisher;
+use crate::self_reporting::persistence::CoreBatchPublisher;
 
 pub async fn init() -> Result<(), anyhow::Error> {
+    usage_reporting::set_batch_publisher(Arc::new(CoreBatchPublisher))
+        .map_err(|_| anyhow::anyhow!("usage batch publisher is already initialized"))?;
+    #[cfg(feature = "enterprise")]
+    audit::set_audit_publisher(Arc::new(CoreAuditPublisher))
+        .map_err(|_| anyhow::anyhow!("audit publisher is already initialized"))?;
+
     let instance_id = match metas::instance::get().await {
         Ok(Some(instance)) => instance,
         Ok(None) | Err(_) => {

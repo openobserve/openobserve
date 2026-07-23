@@ -101,14 +101,16 @@ describe("mapRecordedStep", () => {
     });
 
     it.each(["hover", "scroll", "wait", "screenshot"] as const)(
-      "should return null for unsupported action %s",
+      "should return a valid wire for action %s (previously null)",
       (action) => {
-        expect(buildWireFromStep(lean({ action }))).toBeNull();
+        const wire = buildWireFromStep(lean({ action }));
+        expect(wire).not.toBeNull();
+        expect(wire!.action).toBe(action);
       },
     );
   });
 
-  it("should prefer the recorded wire and reverse-map manual steps in journeyToWireSteps", () => {
+  it("should include all steps via journeyToWireSteps (including previously filtered actions)", () => {
     const recorded = mapWireStep({ id: "s1", action: "navigate", url: "https://x.test" });
     const manual: BrowserStep = {
       id: "m1",
@@ -117,11 +119,20 @@ describe("mapRecordedStep", () => {
       timeout: 30000,
       code: "",
     };
-    const unsupported: BrowserStep = { id: "m2", action: "wait", timeout: 30000, code: "" };
+    const waitStep: BrowserStep = { id: "m2", action: "wait", timeout: 30000, code: "" };
+    const hoverStep: BrowserStep = {
+      id: "m3",
+      action: "hover",
+      selector: ".el",
+      timeout: 30000,
+      code: "",
+    };
 
-    const wires = journeyToWireSteps([recorded, manual, unsupported]);
-    expect(wires).toHaveLength(2); // recorded + manual click; wait dropped
+    const wires = journeyToWireSteps([recorded, manual, waitStep, hoverStep]);
+    expect(wires).toHaveLength(4); // all steps included — no drop on buildWireFromStep
     expect(wires[0]).toBe(recorded.wire); // recorded preserved verbatim
+    expect(wires[2]).toMatchObject({ action: "wait" });
+    expect(wires[3]).toMatchObject({ action: "hover", selector: ".el" });
     expect(wires[1]).toMatchObject({ action: "click", selector: "#go" });
   });
 

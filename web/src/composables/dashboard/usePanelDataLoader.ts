@@ -56,6 +56,7 @@ export const usePanelDataLoader = (
   shouldRefreshWithoutCache?: any,
   regionClusterParams?: any,
   allowAnnotationsAPI?: any,
+  injectedPromqlData?: any,
 ) => {
   const PANEL_DATA_LOADER_DEBUG = false;
   const log = (...args: any[]) => {
@@ -345,6 +346,26 @@ export const usePanelDataLoader = (
         return;
       }
 
+      // Injected-data path: the caller already fetched the PromQL results and
+      // owns the fetch lifecycle (the metrics explorer's preview queue —
+      // concurrency-capped, viewport-gated, cancellable, cached). Render those
+      // results directly instead of firing our own query_range. Skips the
+      // debounce, cache restore, visibility and variable waits — the caller
+      // already gated all of that. See MetricCard.
+      if (injectedPromqlData?.value != null) {
+        log("loadData: rendering injected PromQL data");
+        state.loading = false;
+        state.isOperationCancelled = false;
+        state.isPartialData = false;
+        state.data = markRaw(injectedPromqlData.value.data ?? []);
+        state.metadata = injectedPromqlData.value.metadata ?? { queries: [] };
+        state.resultMetaData = injectedPromqlData.value.resultMetaData ?? [];
+        state.annotations = [];
+        state.errorDetail = { message: "", code: "" };
+        runCount++;
+        return;
+      }
+
       log("loadData: now waiting for the timeout to avoid frequent updates");
 
       await waitForTimeout(abortController.signal);
@@ -441,6 +462,18 @@ export const usePanelDataLoader = (
       loadData(); // Loading the data
     },
   );
+
+  // Re-render when the caller hands us a fresh set of injected results (the
+  // metrics explorer replaces the whole object on every refresh). No-op for
+  // panels that fetch their own data — the ref stays undefined for them.
+  if (injectedPromqlData) {
+    watch(
+      () => injectedPromqlData.value,
+      () => {
+        loadData();
+      },
+    );
+  }
 
   watch(
     () => [panelSchema?.value],

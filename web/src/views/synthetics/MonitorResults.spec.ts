@@ -196,7 +196,7 @@ describe("MonitorResults", () => {
       expect(editBtn.exists()).toBe(true);
     });
 
-    it("should navigate to synthetic-new with edit query on click", async () => {
+    it("should navigate to synthetics-edit with id param on click", async () => {
       wrapper = makeWrapper();
       await flushPromises();
 
@@ -204,8 +204,8 @@ describe("MonitorResults", () => {
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
-        query: { edit: "mon-1" },
+        name: "synthetics-edit",
+        params: { id: "mon-1" },
       });
     });
   });
@@ -295,8 +295,8 @@ describe("MonitorResults", () => {
       await editBtn.trigger("click");
 
       expect(mockRouterPush).toHaveBeenCalledWith({
-        name: "synthetic-new",
-        query: { edit: "mon-1" },
+        name: "synthetics-edit",
+        params: { id: "mon-1" },
       });
     });
 

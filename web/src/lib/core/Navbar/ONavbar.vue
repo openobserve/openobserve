@@ -177,6 +177,13 @@ watch(
   },
 );
 
+// … and re-measure (snap) when the rail's items change. The flex-constrained
+// list doesn't resize on insert/remove, so the ResizeObserver won't catch it.
+watch(railEntries, async () => {
+  await nextTick();
+  measure(false);
+});
+
 onMounted(async () => {
   await nextTick();
   measure(false);

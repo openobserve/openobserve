@@ -2651,6 +2651,7 @@
     "kubernetes": "Kubernetes",
     "windows": "Ramen",
     "linux": "Linux",
+    "macos": "macOS",
     "awsconfig": "Amazon-webservices (AWS)",
     "gcpconfig": "Google Cloud Platform (GCP)",
     "azure": "Microsoft Azure",
@@ -8525,7 +8526,7 @@
         "chipSampling": "Samplingbeheer"
       },
       "descriptionPlaceholder": "Wat bewaakt deze taak?",
-      "samplingValueHelp": "JSON: rate is een getal van 0-1, count is een positief geheel getal.",
+      "samplingValueHelp": "Voer een percentage tussen 0 en 1 in.",
       "samplingValueAllHelp": "Niet van toepassing wanneer de modus Alles is — elke overeenkomende gebeurtenis wordt geëvalueerd.",
       "samplingHelp": "Toepassen na Filter. Beheert de kosten — alleen overeenkomende spans tellen mee voor het percentage.",
       "presets": {
@@ -8544,6 +8545,7 @@
         "sampling": "Bemonstering"
       },
       "targetSection": "Doelwit",
+      "filteringSection": "Filteren",
       "scorersSection": "Scorers en kaarten",
       "nameLabel": "Naam",
       "namePlaceholder": "Monitor voor de getrouwheid van de productie",
@@ -8553,7 +8555,7 @@
       "streamTypePlaceholder": "sporen",
       "descriptionLabel": "Omschrijving",
       "samplingModeLabel": "Bemonsteringsmodus",
-      "samplingValueLabel": "Bemonsteringswaarde JSON",
+      "samplingValueLabel": "Bemonsteringspercentage",
       "samplingModes": {
         "rate": "Tarief",
         "all": "Alles",

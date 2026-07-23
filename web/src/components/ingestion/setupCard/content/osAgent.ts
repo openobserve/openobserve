@@ -68,19 +68,70 @@ export const hostMetricsDetect: RichCardDetect = {
   filter: "",
 };
 
-/** Troubleshooting rows common to both host agents. */
+// The agents repo ships a single uninstall script per OS — there is no EC2-specific
+// one — so an EC2 install is removed by the same command as a generic one.
+const unixUninstall = (dir: "linux" | "mac") =>
+  `curl -O ${AGENTS_REPO}/${dir}/uninstall.sh \\
+  && chmod +x uninstall.sh \\
+  && sudo ./uninstall.sh`;
+
+const winUninstall = `Invoke-WebRequest -Uri ${AGENTS_REPO}/windows/uninstall.ps1 -OutFile uninstall.ps1
+.\\uninstall.ps1`;
+
+/** What each OS's uninstall script actually removes, so the copy matches reality. */
+const UNINSTALL_DESC: Record<AgentOs, string> = {
+  linux:
+    "Run with `sudo`. Stops and disables the systemd service, then removes the unit file, the binary, the config and the `openobserve-agent` user.",
+  mac: "Run with `sudo`. Stops both launchd daemons — the agent and the unified log bridge — then removes their plists, the binary, the config and the agent's logs.",
+  windows:
+    "Run in **PowerShell as Administrator**. Stops the agent service and deletes its install directory.",
+};
+
+/** Host OS an agent card targets — picks the uninstall script and shell. */
+export type AgentOs = "linux" | "mac" | "windows";
+
+/**
+ * The "Uninstall the Agent" accordion, shared by the three host agent cards.
+ *
+ * The command takes no arguments, so unlike the install step there is no token to
+ * substitute or mask.
+ */
+export function agentUninstall(
+  os: AgentOs,
+): NonNullable<RichCardExtras["uninstall"]> {
+  return {
+    label: "Uninstall the Agent",
+    description: UNINSTALL_DESC[os],
+    code: {
+      lang: os === "windows" ? "powershell" : "bash",
+      raw: os === "windows" ? winUninstall : unixUninstall(os),
+    },
+  };
+}
+
+/**
+ * Troubleshooting rows common to the host agents.
+ *
+ * `includeEc2` drops the instance-id row for agents that ship no EC2 variant
+ * (macOS), where an EC2-only symptom would just be noise.
+ */
 export function sharedAgentTroubleshooting(
   serviceHint: string,
+  { includeEc2 = true }: { includeEc2?: boolean } = {},
 ): NonNullable<RichCardExtras["troubleshooting"]> {
   return [
     {
       q: "The install script runs but no data arrives",
       a: `Check the agent is running with ${serviceHint}. A 401 in its logs means the ingestion token is stale — re-copy the command from this page, which always carries this organization's current token.`,
     },
-    {
-      q: "Hosts show up under an instance id instead of a name",
-      a: `That is the EC2 variant without its IAM role. ${EC2_IAM_NOTE} Attach the role, then restart the agent.`,
-    },
+    ...(includeEc2
+      ? [
+          {
+            q: "Hosts show up under an instance id instead of a name",
+            a: `That is the EC2 variant without its IAM role. ${EC2_IAM_NOTE} Attach the role, then restart the agent.`,
+          },
+        ]
+      : []),
     {
       q: "The endpoint is unreachable from the host",
       a: "The agent needs outbound access to this OpenObserve endpoint. Confirm with `curl -v` from the host itself — a proxy or egress firewall is the usual cause.",

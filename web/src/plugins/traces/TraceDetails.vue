@@ -63,11 +63,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
 
               <!-- Copy Trace ID Button -->
-              <OIcon
+              <OButton
                 data-test="trace-details-copy-trace-id-btn"
-                name="content-copy"
-                size="xs"
-                class="cursor-pointer hover:text-text-body"
+                variant="ghost"
+                size="icon-xs"
+                icon-left="content-copy"
                 :title="t('traces.copyTraceId')"
                 @click="copyTraceId"
               />
@@ -85,11 +85,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ sessionId }}
                   </span>
                 </span>
-                <OIcon
+                <OButton
                   data-test="trace-details-copy-session-id-btn"
-                  name="content-copy"
-                  size="xs"
-                  class="cursor-pointer hover:text-text-body"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
                   :title="t('traces.traceDetails.copySessionId')"
                   @click="copySessionId"
                 />
@@ -224,11 +224,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </span>
 
                 <!-- Copy Trace ID Button -->
-                <OIcon
+                <OButton
                   data-test="trace-details-copy-trace-id-btn"
-                  name="content-copy"
-                  size="xs"
-                  class="cursor-pointer hover:text-text-body"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="content-copy"
                   :title="t('traces.copyTraceId')"
                   @click="copyTraceId"
                 />
@@ -246,23 +246,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ sessionId }}
                     </span>
                   </span>
-                  <OIcon
+                  <OButton
                     data-test="trace-details-copy-session-id-btn"
-                    name="content-copy"
-                    size="xs"
-                    class="cursor-pointer hover:text-text-body"
+                    variant="ghost"
+                    size="icon-xs"
+                    icon-left="content-copy"
                     :title="t('traces.traceDetails.copySessionId')"
                     @click="copySessionId"
                   />
                 </template>
 
                 <!-- Open in new icon (embedded mode only) -->
-                <OIcon
+                <OButton
                   v-if="mode === 'embedded' && showExpandButton"
                   data-test="trace-details-trace-id-open-btn"
-                  class="cursor-pointer hover:text-theme-accent"
-                  size="xs"
-                  name="open-in-new"
+                  variant="ghost"
+                  size="icon-xs"
+                  icon-left="open-in-new"
                   :title="t('traces.openInTraces')"
                   @click="handleExpandToFullView"
                 />
@@ -358,47 +358,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             class="flex items-center space-x-4 trace-details-view-tabs ml-[0.325rem] py-[0.325rem]"
           >
-            <OToggleGroup :model-value="activeTab" @update:model-value="updateActiveTab">
-              <OToggleGroupItem value="waterfall" size="sm">
-                <template #icon-left
-                  ><OIcon name="align-left" size="sm" class="shrink-0"
-                /></template>
-                {{ t("traces.waterfall") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="flame-graph" size="sm">
-                <template #icon-left>
-                  <OIcon name="flame" size="sm" />
-                </template>
-                {{ t("traces.flameGraph") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem value="map" size="sm">
-                <template #icon-left
-                  ><OIcon name="account-tree" size="sm" class="shrink-0"
-                /></template>
-                {{ t("traces.traceGraph") }}
-              </OToggleGroupItem>
-              <OToggleGroupItem v-if="hasLLMSpans" value="dag" size="sm">
-                <template #icon-left>
-                  <OIcon name="git-branch" size="sm" />
-                </template>
-                {{ t("traces.dag") }}
-              </OToggleGroupItem>
-              <!--
-                Thread tab gated on:
-                  1. `VITE_SHOW_LLM_UI` env flag is NOT explicitly set
-                     to `"false"`. Unset / any other value keeps the
-                     feature visible.
-                  2. The trace actually has LLM spans worth rendering
-                     as a chat (`hasLLMSpans`).
-              -->
+            <!--
+              Tabs are data-driven from `traceTabs` so they can be dragged to
+              reorder (same interaction as the Home page tab bar). Visibility
+              rules — including the Thread tab's `VITE_SHOW_LLM_UI` + LLM-span
+              gate — live in `isTraceTabVisible`.
+            -->
+            <OToggleGroup
+              :model-value="activeTab"
+              reorderable
+              @update:model-value="updateActiveTab"
+              @reorder="onTabReorder"
+            >
               <OToggleGroupItem
-                v-if="config.showLLMUI !== 'false' && hasLLMSpans"
-                value="thread"
+                v-for="tab in traceTabs"
+                :key="tab.value"
+                :value="tab.value"
                 size="sm"
-                data-test="trace-details-thread-tab"
+                :data-test="`trace-details-${tab.value}-tab`"
               >
-                <template #icon-left><OIcon name="chat" size="xs" class="shrink-0" /></template>
-                {{ t("traces.thread") }}
+                <template #icon-left>
+                  <OIcon :name="tab.icon" :size="tab.iconSize" class="shrink-0" />
+                </template>
+                {{ t(tab.labelKey) }}
               </OToggleGroupItem>
             </OToggleGroup>
           </div>
@@ -619,13 +601,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- DAG View - only for LLM traces -->
             <div v-if="hasLLMSpans && activeTab === 'dag'" class="flex flex-1 min-h-0">
               <div
-                class="h-[calc(100vh-200px)] p-4 min-w-0 overflow-hidden"
+                class="h-[calc(100vh-12.5rem)] min-w-[12.5rem] overflow-hidden p-4"
                 :style="{
                   width:
                     isSidebarOpen && (selectedSpanId || showTraceDetails)
                       ? `${dagLeftWidth}%`
                       : '100%',
-                  minWidth: '200px',
                 }"
               >
                 <TraceDAG
@@ -650,10 +631,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="h-[calc(100vh-200px)] overflow-y-auto overflow-x-hidden min-h-0"
+                class="h-[calc(100vh-12.5rem)] min-h-0 min-w-[18.75rem] overflow-x-hidden overflow-y-auto"
                 :style="{
                   width: `${100 - dagLeftWidth}%`,
-                  minWidth: '300px',
                 }"
               >
                 <trace-details-sidebar
@@ -713,12 +693,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full bg-card-glass-bg! flex flex-1 min-h-0"
             >
               <div
-                class="thread-left-panel"
+                class="thread-left-panel h-full min-w-[20rem] overflow-hidden"
                 :style="{
                   width: isSidebarOpen && (selectedSpanId || showTraceDetails) ? '60%' : '100%',
-                  minWidth: '320px',
-                  height: '100%',
-                  overflow: 'hidden',
                 }"
               >
                 <ThreadView
@@ -791,8 +768,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         (searchObj.data.traceDetails.isLoadingTraceDetails ||
           searchObj.data.traceDetails.isLoadingTraceMeta)
       "
-      class="flex flex-col items-center justify-center"
-      :style="{ height: '100%' }"
+      class="flex h-full flex-col items-center justify-center"
     >
       <OSpinner data-test="trace-details-loading-spinner" size="lg" />
       <div data-test="trace-details-loading-text" class="pt-2">
@@ -874,7 +850,7 @@ import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useNotifications from "@/composables/useNotifications";
-import { parseUsageDetails, parseCostDetails, isLLMTrace } from "@/utils/llmUtils";
+import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -901,6 +877,74 @@ const FlameGraphView = defineAsyncComponent(() => import("@/components/traces/Fl
 
 // Import ThreadView (LLM Thread tab)
 const ThreadView = defineAsyncComponent(() => import("./ThreadView.vue"));
+
+/**
+ * Tab definitions for the trace detail views. The order here is the *default*
+ * order — Flame Graph leads because it is the default landing view. Users can
+ * drag tabs to reorder them (same interaction as the Home page tab bar) and
+ * that order is persisted per-browser under LS_TRACE_TAB_ORDER_KEY.
+ *
+ * `iconSize` is per-tab because the chat glyph reads visually larger than the
+ * others at the same nominal size.
+ */
+const TRACE_TAB_DEFS = [
+  { value: "flame-graph", labelKey: "traces.flameGraph", icon: "flame", iconSize: "sm" },
+  { value: "waterfall", labelKey: "traces.waterfall", icon: "align-left", iconSize: "sm" },
+  { value: "map", labelKey: "traces.traceGraph", icon: "account-tree", iconSize: "sm" },
+  { value: "dag", labelKey: "traces.dag", icon: "git-branch", iconSize: "sm" },
+  { value: "thread", labelKey: "traces.thread", icon: "chat", iconSize: "xs" },
+] as const;
+
+type TraceTabValue = (typeof TRACE_TAB_DEFS)[number]["value"];
+
+/** The view a trace opens on when the user has no persisted preference. */
+const DEFAULT_TRACE_TAB: TraceTabValue = "flame-graph";
+
+const LS_TRACE_TAB_ORDER_KEY = "o2_trace_tab_order";
+const LS_TRACE_ACTIVE_TAB_KEY = "o2_trace_active_tab";
+
+const isKnownTraceTab = (value: string): value is TraceTabValue =>
+  TRACE_TAB_DEFS.some((tab) => tab.value === value);
+
+/**
+ * Reads the saved tab order, dropping any values that are no longer known and
+ * appending tabs added since the order was saved, so a shipped new tab still
+ * shows up for users with a stored order.
+ */
+function loadTraceTabOrder(): TraceTabValue[] {
+  const defaults = TRACE_TAB_DEFS.map((tab) => tab.value);
+  try {
+    const saved = localStorage.getItem(LS_TRACE_TAB_ORDER_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        const ordered = parsed.filter(
+          (value: unknown): value is TraceTabValue =>
+            typeof value === "string" && isKnownTraceTab(value),
+        );
+        // De-dupe defensively — a corrupted entry shouldn't render a tab twice.
+        const unique = [...new Set(ordered)];
+        defaults.forEach((value) => {
+          if (!unique.includes(value)) unique.push(value);
+        });
+        return unique;
+      }
+    }
+  } catch {
+    // Corrupt/unavailable storage → fall through to the default order.
+  }
+  return [...defaults];
+}
+
+function loadTraceActiveTab(): TraceTabValue {
+  try {
+    const saved = localStorage.getItem(LS_TRACE_ACTIVE_TAB_KEY);
+    if (saved && isKnownTraceTab(saved)) return saved;
+  } catch {
+    // Ignore — fall through to the default tab.
+  }
+  return DEFAULT_TRACE_TAB;
+}
 
 export default defineComponent({
   name: "TraceDetails",
@@ -1010,7 +1054,8 @@ export default defineComponent({
 
     const traceTree: any = ref([]);
     const spanMap: any = ref({});
-    const activeTab = ref("waterfall");
+    const activeTab = ref<string>(loadTraceActiveTab());
+    const tabOrder = ref<TraceTabValue[]>(loadTraceTabOrder());
     const sidebarActiveTab = ref("attributes");
 
     const { searchObj, getUrlQueryParams, navigateToCorrelatedLogs } = useTraces();
@@ -1405,23 +1450,83 @@ export default defineComponent({
       return Math.min(...spans.map((span: any) => span.start_time));
     });
 
-    // Tabs configuration
-    const traceTabs = computed(() => {
-      const tabs = [
-        { label: "Waterfall", value: "waterfall" },
-        { label: "Flame Graph", value: "flame-graph" },
-        { label: "Trace Graph", value: "map" },
-      ];
-      // Conditionally add DAG tab for LLM traces
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "DAG", value: "dag" });
+    /** Which tabs this trace can show, independent of ordering. */
+    const isTraceTabVisible = (value: TraceTabValue) => {
+      switch (value) {
+        // DAG and Thread only make sense for traces containing LLM spans.
+        case "dag":
+          return hasLLMSpans.value;
+        // Thread view — chat-style projection of LLM turns and tool calls —
+        // is additionally gated on the VITE_SHOW_LLM_UI env flag.
+        case "thread":
+          return config.showLLMUI !== "false" && hasLLMSpans.value;
+        default:
+          return true;
       }
-      // Thread view — chat-style projection of LLM turns and tool calls.
-      if (hasLLMSpans.value) {
-        tabs.push({ label: "Thread", value: "thread" });
+    };
+
+    /**
+     * The tab bar, in the user's order, filtered to what this trace supports.
+     * `tabOrder` keeps hidden tabs in place so a user's arrangement survives
+     * moving between traces that do and don't have LLM spans.
+     */
+    const traceTabs = computed(() =>
+      tabOrder.value
+        .filter(isTraceTabVisible)
+        .map((value) => TRACE_TAB_DEFS.find((tab) => tab.value === value)!),
+    );
+
+    /**
+     * Applies a drag-reorder reported by OToggleGroup and persists the result.
+     * Indices are resolved against the full order (including hidden tabs) so
+     * the moved tab lands adjacent to its drop target either way.
+     */
+    const onTabReorder = ({
+      from,
+      to,
+      before = true,
+    }: {
+      from: string;
+      to: string;
+      before?: boolean;
+    }) => {
+      if (from === to) return;
+      const order = [...tabOrder.value];
+      const fromIdx = order.indexOf(from as TraceTabValue);
+      if (fromIdx === -1) return;
+
+      const [moved] = order.splice(fromIdx, 1);
+      // Recompute the target index after removal, then insert on the chosen side.
+      let toIdx = order.indexOf(to as TraceTabValue);
+      if (toIdx === -1) return;
+      if (!before) toIdx += 1;
+      order.splice(toIdx, 0, moved);
+
+      tabOrder.value = order;
+      try {
+        localStorage.setItem(LS_TRACE_TAB_ORDER_KEY, JSON.stringify(order));
+      } catch {
+        // Storage unavailable (private mode / quota) — order still applies for
+        // this session, it just won't survive a reload.
       }
-      return tabs;
-    });
+    };
+
+    /**
+     * A persisted tab can be invalid for the trace being opened — e.g. the user
+     * last viewed "thread" on an LLM trace and then opens a plain HTTP trace.
+     * Fall back to the default view rather than rendering an empty body.
+     */
+    watch(
+      traceTabs,
+      (tabs) => {
+        if (!tabs.length) return;
+        if (tabs.some((tab) => tab.value === activeTab.value)) return;
+        activeTab.value = tabs.some((tab) => tab.value === DEFAULT_TRACE_TAB)
+          ? DEFAULT_TRACE_TAB
+          : tabs[0].value;
+      },
+      { immediate: true },
+    );
 
     const showTraceDetails = ref(false);
     const currentIndex = ref(0);
@@ -1502,6 +1607,13 @@ export default defineComponent({
     const updateActiveTab = (value: boolean | AcceptableValue | AcceptableValue[]) => {
       const tab = String(value);
       activeTab.value = tab;
+      // Remember the last view so reopening a trace lands where the user left
+      // off, rather than resetting to the default every time.
+      try {
+        localStorage.setItem(LS_TRACE_ACTIVE_TAB_KEY, tab);
+      } catch {
+        // Storage unavailable — selection still applies for this session.
+      }
       if (tab === "map") {
         setupTooltips();
       }
@@ -1697,9 +1809,9 @@ export default defineComponent({
     // (e.g. moving from LLM span with "preview" to a non-LLM span).
     watch(selectedSpanId, (newSpanId, oldSpanId) => {
       if (newSpanId && spanMap.value[newSpanId]) {
-        const isLLM = isLLMTrace(spanMap.value[newSpanId]);
-        if (!oldSpanId || (sidebarActiveTab.value === "preview" && !isLLM)) {
-          sidebarActiveTab.value = isLLM ? "preview" : "attributes";
+        const canPreview = hasTracePreview(spanMap.value[newSpanId]);
+        if (!oldSpanId || (sidebarActiveTab.value === "preview" && !canPreview)) {
+          sidebarActiveTab.value = canPreview ? "preview" : "attributes";
         }
       }
     });
@@ -2086,6 +2198,13 @@ export default defineComponent({
           searchObj.data.traceDetails.selectedSpanId = "";
           searchObj.data.traceDetails.showSpanDetails = false;
         } else {
+          // A span selected from the URL is set before `spanMap` is populated,
+          // so the selectedSpanId watcher cannot classify it on first pass.
+          // Re-apply the default now that the span exists: evaluator/LLM spans
+          // land directly on Preview, while ordinary spans use Attributes.
+          sidebarActiveTab.value = hasTracePreview(spanMap.value[selectedSpanId.value])
+            ? "preview"
+            : "attributes";
           scrollSpanIntoView(selectedSpanId.value);
         }
       }
@@ -2497,7 +2616,9 @@ export default defineComponent({
       searchObj.data.traceDetails.showSpanDetails = true;
       searchObj.data.traceDetails.selectedSpanId = spanId;
       if (swichToWaterfall && activeTab.value !== "waterfall") {
-        activeTab.value = "waterfall";
+        // Goes through updateActiveTab so the persisted last-viewed tab stays
+        // in sync with what's actually on screen.
+        updateActiveTab("waterfall");
       }
 
       scrollSpanIntoView(spanId);
@@ -2624,6 +2745,8 @@ export default defineComponent({
       // `config.showLLMUI`.
       config,
       activeTab,
+      traceTabs,
+      onTabReorder,
       sidebarActiveTab,
       traceTree,
       collapseMapping,

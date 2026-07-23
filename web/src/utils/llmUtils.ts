@@ -103,6 +103,14 @@ export function isLLMTrace(data: any): boolean {
   return false;
 }
 
+/** Whether Trace Details can render a useful input/output preview for a span.
+ * Remote evaluator spans intentionally do not claim GenAI semantics, but they
+ * still persist their request and response on the evaluator attributes. */
+export function hasTracePreview(data: any): boolean {
+  if (!data) return false;
+  return isLLMTrace(data) || hasValue(data.attributes_prompt) || hasValue(data.attributes_response);
+}
+
 /**
  * Parse LLM usage details from backend data
  * Handles both JSON objects (from backend) and strings (edge cases)

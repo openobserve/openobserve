@@ -110,8 +110,13 @@ export function isJobFilterComplete(group: any): boolean {
 }
 
 export function buildJobFilterConditionPayload(group: V2Group) {
+  return buildOptionalJobConditionPayload(group) ?? { type: "all" };
+}
+
+/** Build a condition payload for optional criteria such as an End Signal. */
+export function buildOptionalJobConditionPayload(group: V2Group) {
   const conditions = cleanFilterGroup(group);
-  if (!conditions.conditions.length) return { type: "all" };
+  if (!conditions.conditions.length) return null;
 
   return {
     version: 2,

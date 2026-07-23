@@ -91,6 +91,23 @@ pub struct AgentOptions {
     /// array. Tabular results shrink to ~60% of their JSON token cost as csv.
     #[serde(default)]
     pub output_format: OutputFormat,
+    /// Query execution mode. `partition` runs the partitioned streaming pipeline
+    /// (per-partition early termination, streaming-aggs cache) and collects
+    /// the result into this single response.
+    #[serde(default)]
+    pub mode: AgentSearchMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentSearchMode {
+    /// Current behavior: single search through the result cache path.
+    #[default]
+    Default,
+    /// Partitioned execution: the SSE-era backend partition loop scans
+    /// partition by partition, stops early once enough rows are collected,
+    /// and aggregation queries accumulate streaming-aggs cache per partition.
+    Partition,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

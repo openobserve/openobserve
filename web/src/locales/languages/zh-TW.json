@@ -2651,6 +2651,7 @@
     "kubernetes": "Kubernetes",
     "windows": "Windows",
     "linux": "Linux",
+    "macos": "macOS",
     "awsconfig": "Amazon Web Services (AWS)",
     "gcpconfig": "Google Cloud Platform (GCP)",
     "azure": "Microsoft Azure",
@@ -8520,7 +8521,7 @@
         "chipSampling": "取樣控制"
       },
       "descriptionPlaceholder": "此作業監控什麼？",
-      "samplingValueHelp": "JSON：rate 為 0-1 之間的數字，count 為正整數。",
+      "samplingValueHelp": "請輸入 0 到 1 之間的取樣率。",
       "samplingValueAllHelp": "當模式為「全部」時不適用 — 每個相符事件都會被評估。",
       "samplingHelp": "在篩選後套用。控制成本 — 只有相符的 span 才會計入比率。",
       "presets": {
@@ -8539,6 +8540,7 @@
         "sampling": "取樣"
       },
       "targetSection": "目標",
+      "filteringSection": "篩選",
       "scorersSection": "評分器與對應",
       "nameLabel": "名稱",
       "namePlaceholder": "Production Faithfulness Monitor",
@@ -8548,7 +8550,7 @@
       "streamTypePlaceholder": "traces",
       "descriptionLabel": "描述",
       "samplingModeLabel": "取樣模式",
-      "samplingValueLabel": "取樣值 JSON",
+      "samplingValueLabel": "取樣率",
       "samplingModes": {
         "rate": "比率",
         "all": "全部",

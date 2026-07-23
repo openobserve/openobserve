@@ -192,6 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-list-delete-accounts-btn"
               variant="outline-destructive"
               size="sm"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
               icon-left="delete"
             >
@@ -641,6 +642,7 @@ export default defineComponent({
     const serviceAccounts = ref([]);
     const selectedAccounts: any = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
 
     onBeforeMount(async () => {
       await getServiceAccountsUsers();
@@ -946,6 +948,7 @@ export default defineComponent({
     };
 
     const bulkDeleteServiceAccounts = async () => {
+      bulkDeleteLoading.value = true;
       const accountEmails = selectedAccounts.value
         .filter((account: any) => !isSystemAccount(account.email))
         .map((account: any) => account.email);
@@ -989,6 +992,8 @@ export default defineComponent({
             variant: "error",
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     };
 
@@ -1118,6 +1123,7 @@ export default defineComponent({
       selectedAccountEmails,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteServiceAccounts,
       redactToken,

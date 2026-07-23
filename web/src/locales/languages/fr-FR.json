@@ -2651,6 +2651,7 @@
     "kubernetes": "Kubernetes",
     "windows": "Fenêtres",
     "linux": "Linux",
+    "macos": "macOS",
     "awsconfig": "Amazon Web Services (AWS)",
     "gcpconfig": "Plateforme Google Cloud (GCP)",
     "azure": "Microsoft Azure",
@@ -8525,7 +8526,7 @@
         "chipSampling": "Contrôle de l'échantillonnage"
       },
       "descriptionPlaceholder": "Que surveille cette tâche ?",
-      "samplingValueHelp": "JSON : rate est un nombre entre 0 et 1, count est un entier positif.",
+      "samplingValueHelp": "Saisissez un taux compris entre 0 et 1.",
       "samplingValueAllHelp": "Non applicable lorsque le mode est Tout — chaque événement correspondant sera évalué.",
       "samplingHelp": "Appliqué après le filtre. Contrôle le coût — seuls les spans correspondants comptent dans le taux.",
       "presets": {
@@ -8544,6 +8545,7 @@
         "sampling": "L'échantillonnage"
       },
       "targetSection": "Cible",
+      "filteringSection": "Filtrage",
       "scorersSection": "Buteurs et cartographie",
       "nameLabel": "Nom",
       "namePlaceholder": "Moniteur de fidélité de la production",
@@ -8553,7 +8555,7 @@
       "streamTypePlaceholder": "traces",
       "descriptionLabel": "Descriptif",
       "samplingModeLabel": "Mode d'échantillonnage",
-      "samplingValueLabel": "Valeur d'échantillonnage JSON",
+      "samplingValueLabel": "Taux d'échantillonnage",
       "samplingModes": {
         "rate": "Tarif",
         "all": "Tous",

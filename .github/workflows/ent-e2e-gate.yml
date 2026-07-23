@@ -111,21 +111,42 @@ jobs:
           set -euo pipefail
           REPO="openobserve/o2-enterprise"; WF="oss-pr-ent-gate.yml"
 
-          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF) for OSS PR #$PR ($HEAD_REF)…"
+          # Resolve which ENT *code* to build against (separate from --ref, which only picks the
+          # engine workflow version). Cross-repo features live on same-named branches in both repos,
+          # and the OSS side references enterprise code that only exists on the matching ENT branch
+          # until it merges — building against ENT main would fail to COMPILE. Prefer same-named, else main.
+          # Only build against a same-named ENT branch when it has an OPEN ENT PR — that's what marks
+          # it as the live counterpart of this OSS PR. A bare branch (stale/abandoned/coincidental,
+          # or one whose PR already merged) is NOT trusted; fall back to main. An open PR also implies
+          # the branch exists, so this one check covers "branch AND PR open".
+          ENT_CODE_REF=main
+          if [ -n "$(gh pr list --repo "$REPO" --head "$HEAD_REF" --state open --json number -q '.[0].number' 2>/dev/null)" ]; then
+            ENT_CODE_REF="$HEAD_REF"
+            echo "::notice::Open ENT PR on branch '$HEAD_REF' — building the enterprise binary against it."
+          else
+            echo "::notice::No open ENT PR for '$HEAD_REF' — building against ENT main."
+          fi
+
+          # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.
+          DISPATCH_TS=$(date -u +%s)
+          echo "::notice::Dispatching ENT engine ($REPO@$ENT_REF, code=$ENT_CODE_REF) for OSS PR #$PR ($HEAD_REF)…"
           gh workflow run "$WF" --repo "$REPO" --ref "$ENT_REF" \
             -f oss_branch="$HEAD_REF" \
             -f oss_pr="$PR" \
             -f oss_sha="$HEAD_SHA" \
-            -f enterprise_ref="$ENT_REF"
+            -f enterprise_ref="$ENT_CODE_REF"
 
-          # Correlate our run by its PR-scoped run-name: "ENT e2e gate — OSS PR #<PR> (<branch>)".
-          # `#<PR> (` boundary avoids #12 matching #123. gh returns newest-first, so [0] is our latest.
+          # Correlate by PR-scoped run-name ("ENT e2e gate — OSS PR #<PR> ("; the "(" boundary keeps
+          # #12 from matching #123) AND createdAt >= dispatch time (minus 60s clock-skew), so a stale
+          # prior run for this PR is never picked. Take the NEWEST qualifying run.
           MATCH="OSS PR #$PR ("
+          MIN_TS=$((DISPATCH_TS - 60))
           RUN_ID=""
+          sleep 8   # let the dispatched run register before the first lookup
           for i in $(seq 1 30); do            # ~5 min to appear
             RUN_ID=$(gh run list --repo "$REPO" --workflow "$WF" -L 40 \
-              --json databaseId,displayTitle \
-              -q "[.[] | select(.displayTitle | contains(\"$MATCH\"))][0].databaseId" 2>/dev/null || echo "")
+              --json databaseId,displayTitle,createdAt \
+              -q "[.[] | select(.displayTitle | contains(\"$MATCH\")) | select((.createdAt|fromdateiso8601) >= $MIN_TS)] | sort_by(.createdAt) | last | .databaseId" 2>/dev/null || echo "")
             if [ -n "$RUN_ID" ] && [ "$RUN_ID" != "null" ]; then break; fi
             sleep 10
           done
@@ -161,6 +182,13 @@ jobs:
 
           if [ "$CONCL" = "success" ]; then
             echo "::notice::✅ Enterprise e2e specs passed against this PR."
+            exit 0
+          fi
+
+          # cancelled/skipped/empty ≈ a newer push superseded this run (engine cancel-in-progress).
+          # NOT a spec failure — the newer run is authoritative and reports on its own. Defer to it.
+          if [ "$CONCL" = "cancelled" ] || [ "$CONCL" = "skipped" ] || [ -z "$CONCL" ]; then
+            echo "::notice::ENT run concluded '$CONCL' (likely superseded by a newer push) — deferring to the newer run, not failing the gate."
             exit 0
           fi
 

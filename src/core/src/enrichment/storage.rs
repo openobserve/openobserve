@@ -35,7 +35,7 @@ use tokio::task::JoinHandle;
 #[derive(Debug, Clone)]
 pub enum Values {
     Json(Arc<Vec<serde_json::Value>>),
-    Vrl(Arc<Vec<transform::vrl::value::Value>>),
+    Vrl(Arc<Vec<vrl::value::Value>>),
     RecordBatch(Vec<RecordBatch>),
 }
 
@@ -90,11 +90,8 @@ impl Values {
                 let pool = rayon::ThreadPoolBuilder::new()
                     .num_threads(config::get_config().limit.cpu_num)
                     .build()?;
-                let json_data = pool.install(|| {
-                    data.par_iter()
-                        .map(crate::service::db::enrichment_table::convert_from_vrl)
-                        .collect()
-                });
+                let json_data =
+                    pool.install(|| data.par_iter().map(transform::convert_from_vrl).collect());
                 Ok(Arc::new(json_data))
             }
             Values::RecordBatch(batches) => {
@@ -121,24 +118,20 @@ impl Values {
     }
 
     /// Convert to VRL format if not already in that format
-    pub fn to_vrl(&self) -> Result<Arc<Vec<transform::vrl::value::Value>>> {
+    pub fn to_vrl(&self) -> Result<Arc<Vec<vrl::value::Value>>> {
         match self {
             Values::Vrl(data) => Ok(Arc::clone(data)),
             Values::Json(data) => {
                 let pool = rayon::ThreadPoolBuilder::new()
                     .num_threads(config::get_config().limit.cpu_num)
                     .build()?;
-                let vrl_data = pool.install(|| {
-                    data.par_iter()
-                        .map(crate::service::db::enrichment_table::convert_to_vrl)
-                        .collect()
-                });
+                let vrl_data =
+                    pool.install(|| data.par_iter().map(transform::convert_to_vrl).collect());
                 Ok(Arc::new(vrl_data))
             }
             Values::RecordBatch(batches) => {
                 // Convert RecordBatch directly to VRL without intermediate JSON
-                let vrl_data =
-                    crate::service::db::enrichment_table::convert_recordbatch_to_vrl(batches)?;
+                let vrl_data = crate::db::enrichment_table::convert_recordbatch_to_vrl(batches)?;
                 Ok(Arc::new(vrl_data))
             }
         }
@@ -149,7 +142,7 @@ impl Values {
         match self {
             Values::RecordBatch(batches) => Ok(batches.clone()),
             Values::Vrl(data) => {
-                let chunks: Vec<&[transform::vrl::value::Value]> =
+                let chunks: Vec<&[vrl::value::Value]> =
                     data.as_ref().chunks(get_batch_size()).collect();
 
                 chunks
@@ -227,7 +220,7 @@ pub mod remote {
             .await
             .map_err(|e| anyhow!("Failed to upload enrichment table to remote: {}", e))?;
 
-        crate::service::db::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
+        crate::db::file_list::set(&account, &remote_key, Some(file_meta), false).await?;
 
         log::debug!("Uploaded enrichment table {table_name} to remote");
         Ok(())
@@ -243,10 +236,8 @@ pub mod remote {
         // Merge the data from db and convert to parquet format
         // Pass None for end_time to fetch all data (not in search context)
         let (data, min_ts, max_ts) =
-            crate::service::db::enrichment_table::get_enrichment_data_from_db(
-                org_id, table_name, None,
-            )
-            .await?;
+            crate::db::enrichment_table::get_enrichment_data_from_db(org_id, table_name, None)
+                .await?;
         if data.is_empty() {
             return Ok(());
         }
@@ -580,7 +571,7 @@ pub mod database {
         created_at: i64,
     ) -> Result<()> {
         // Use existing enrichment table storage
-        crate::service::db::enrichment_table::save_enrichment_data_to_db(
+        crate::db::enrichment_table::save_enrichment_data_to_db(
             org_id, table_name, data, created_at, // append_data = false for now
         )
         .await
@@ -592,7 +583,7 @@ pub mod database {
 
     pub async fn delete(org_id: &str, table_name: &str) -> Result<()> {
         // Use existing enrichment table deletion
-        crate::service::db::enrichment_table::delete_enrichment_data_from_db(org_id, table_name)
+        crate::db::enrichment_table::delete_enrichment_data_from_db(org_id, table_name)
             .await
             .map_err(|e| {
                 anyhow::anyhow!("Failed to delete enrichment table {}: {e}", table_name)
@@ -612,7 +603,7 @@ pub mod database {
 
     pub async fn exists(org_id: &str, table_name: &str) -> Result<bool> {
         // Check if table exists by trying to get its metadata
-        match crate::service::db::enrichment_table::get_meta_table_stats(org_id, table_name).await {
+        match crate::db::enrichment_table::get_meta_table_stats(org_id, table_name).await {
             Some(_) => Ok(true),
             None => Ok(false),
         }
@@ -631,7 +622,7 @@ mod tests {
     use tokio;
 
     use super::*;
-    use crate::service::enrichment::storage::Values;
+    use crate::enrichment::storage::Values;
 
     // current ignore because it need database to get schema
     #[ignore]
@@ -1015,7 +1006,7 @@ mod tests {
 
     #[test]
     fn test_values_vrl_len_nonempty() {
-        use transform::vrl::value::Value as VrlValue;
+        use vrl::value::Value as VrlValue;
         let v = Values::Vrl(Arc::new(vec![VrlValue::Null, VrlValue::Null]));
         assert_eq!(v.len(), 2);
     }
@@ -1082,7 +1073,7 @@ mod tests {
 
     #[test]
     fn test_values_vrl_is_empty_false() {
-        use transform::vrl::value::Value as VrlValue;
+        use vrl::value::Value as VrlValue;
         let v = Values::Vrl(Arc::new(vec![VrlValue::Null]));
         assert!(!v.is_empty());
     }
@@ -1162,7 +1153,7 @@ mod tests {
 
     #[test]
     fn test_values_vrl_clone_and_debug() {
-        use transform::vrl::value::Value as VrlValue;
+        use vrl::value::Value as VrlValue;
         let v = Values::Vrl(Arc::new(vec![VrlValue::Null]));
         let cloned = v.clone();
         assert_eq!(cloned.len(), 1);

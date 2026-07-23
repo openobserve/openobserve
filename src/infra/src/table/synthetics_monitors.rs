@@ -159,6 +159,29 @@ pub async fn count_referencing_location<C: ConnectionTrait>(
         .count() as u64)
 }
 
+/// Synthetics in one org whose `locations` array contains the given location
+/// id. Filtered in Rust for the same cross-DB reason as
+/// `count_referencing_location`; the per-org set is small.
+pub async fn list_referencing_location<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    location_id: &str,
+) -> Result<Vec<Synthetic>, errors::Error> {
+    let _lock = super::get_lock().await;
+    let models = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .all(conn)
+        .await?;
+    let mut out = Vec::new();
+    for m in models {
+        let s = Synthetic::try_from(m)?;
+        if s.locations.iter().any(|l| l == location_id) {
+            out.push(s);
+        }
+    }
+    Ok(out)
+}
+
 pub async fn create<C: TransactionTrait>(
     conn: &C,
     org_id: &str,

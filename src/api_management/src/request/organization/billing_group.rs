@@ -15,13 +15,12 @@
 
 use axum::{Json, extract::Path, response::Response};
 use o2_enterprise::enterprise::cloud::{billing_group, billing_invites, billing_invites::Status};
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
-    common::{meta::http::HttpResponse, utils::auth::UserEmail},
-    extractors::Headers,
-};
+use crate::common::meta::http::HttpResponse;
 
 #[derive(Deserialize, ToSchema)]
 pub struct InviteRequest {
@@ -60,7 +59,7 @@ pub struct InviteResponseItem {
 }
 
 async fn get_org_name(org_id: &str) -> String {
-    let info = crate::service::organization::get_org(org_id).await;
+    let info = openobserve_core::organization::get_org(org_id).await;
     info.map(|v| v.name).unwrap_or("".to_string())
 }
 
@@ -168,7 +167,7 @@ pub async fn invite(
         return HttpResponse::bad_request("billing group is not enabled for this org".to_string());
     }
 
-    let org_info = crate::service::organization::get_org(&req.org_id).await;
+    let org_info = openobserve_core::organization::get_org(&req.org_id).await;
     if org_info.is_none() {
         return HttpResponse::bad_request(format!("org with org_id {} does not exist", req.org_id));
     }

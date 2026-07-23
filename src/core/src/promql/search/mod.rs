@@ -44,15 +44,12 @@ use proto::cluster_rpc;
 use tracing::{Instrument, info_span};
 #[cfg(feature = "enterprise")]
 use {
-    crate::service::search::SEARCH_SERVER,
+    crate::search::SEARCH_SERVER,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
     o2_enterprise::enterprise::search::{TaskStatus, WorkGroup},
 };
 
-use crate::service::{
-    promql::MetricsQueryRequest, search::server_internal_error,
-    self_reporting::report_request_usage_stats,
-};
+use crate::{promql::MetricsQueryRequest, search::server_internal_error};
 
 mod cache;
 pub mod grpc;
@@ -120,7 +117,7 @@ pub async fn search(
     // so that select_nodes with strategy=stream receives a non-empty,
     // deterministic key.  A single PromQL request may cover multiple metric
     // names, so we cannot provide a more specific stream name here.
-    let nodes = crate::service::search::cluster::flight::get_online_querier_nodes(
+    let nodes = crate::search::cluster::flight::get_online_querier_nodes(
         trace_id,
         &req.org_id,
         "metrics/",
@@ -142,7 +139,7 @@ pub async fn search(
 
     // Check work group (OSS uses dist_lock, Enterprise uses WorkGroup::Short)
     #[cfg(not(feature = "enterprise"))]
-    let _lock = crate::service::search::work_group::check_work_group(
+    let _lock = crate::search::work_group::check_work_group(
         trace_id,
         &req.org_id,
         timeout,
@@ -154,7 +151,7 @@ pub async fn search(
 
     // Enterprise: Always use Short workgroup for metrics queries
     #[cfg(feature = "enterprise")]
-    let _lock = crate::service::search::work_group::check_work_group(
+    let _lock = crate::search::work_group::check_work_group(
         trace_id,
         &req.org_id,
         Some(user_email),
@@ -520,7 +517,7 @@ async fn search_in_cluster(
         ..Default::default()
     };
 
-    report_request_usage_stats(
+    usage_reporting::report_request_usage_stats(
         req_stats,
         &req.org_id,
         "", // TODO see if we can add metric name
@@ -704,7 +701,7 @@ async fn merge_exemplars_query(series: &[cluster_rpc::Series], org_id: &str) -> 
 /// This function is called for every PromQL query. Consider caching org settings
 /// with a TTL to reduce database load in high-throughput scenarios.
 async fn get_max_series_limit(org_id: &str) -> usize {
-    match crate::service::db::organization::get_org_setting(org_id).await {
+    match crate::db::organization::get_org_setting(org_id).await {
         Ok(settings) => settings.max_series_per_query.unwrap_or_else(|| {
             let cfg = get_config();
             cfg.limit.metrics_max_series_response

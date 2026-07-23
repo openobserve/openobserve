@@ -19,6 +19,10 @@ use config::meta::{
     pipeline::components::NodeData,
     self_reporting::usage::{TriggerData, TriggerDataStatus, TriggerDataType},
 };
+use db::{
+    self,
+    authz::{remove_ownership, set_ownership},
+};
 use infra::table::workflows::{self, Workflow, WorkflowError, WorkflowRunData, WorkflowRunErrors};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -26,19 +30,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    common::{
-        infra::config::ALERTS,
-        meta::authz::Authz,
-        utils::{
-            auth::{remove_ownership, set_ownership},
-            get_nats_lock,
-        },
-    },
-    service::{
-        db,
-        pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
-        self_reporting::publish_triggers_usage,
-    },
+    common::{infra::config::ALERTS, meta::authz::Authz, utils::get_nats_lock},
+    pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
+    self_reporting::publish_triggers_usage,
 };
 
 pub mod runtime;
@@ -276,7 +270,7 @@ async fn validate_workflow(workflow: &Workflow) -> Result<(), anyhow::Error> {
             ));
         }
         if let NodeData::Destination(ref destination) = node.data {
-            let (dest, _) = crate::service::alerts::destinations::get_with_template(
+            let (dest, _) = crate::alerts::destinations::get_with_template(
                 &workflow.org_id,
                 &destination.destination_id,
             )

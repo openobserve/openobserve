@@ -178,6 +178,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline-destructive"
               size="sm"
               icon-left="delete"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
               {{ t("iam.user.delete") }}
@@ -317,6 +318,7 @@ export default defineComponent({
     };
     const selectedUsers: any = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
     const rows = ref<any[]>([]);
     const tableKey = ref(0);
 
@@ -1040,6 +1042,7 @@ export default defineComponent({
     };
 
     const bulkDeleteUsers = async () => {
+      bulkDeleteLoading.value = true;
       const userEmails = selectedUsers.value.map((user: any) => user.email);
 
       try {
@@ -1080,6 +1083,8 @@ export default defineComponent({
             variant: "error",
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     };
 
@@ -1226,6 +1231,7 @@ export default defineComponent({
       selectedUserIds,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteUsers,
       rows,

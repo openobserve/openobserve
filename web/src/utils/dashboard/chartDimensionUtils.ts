@@ -111,6 +111,45 @@ export const calculateOptimalFontSize = (
 };
 
 /**
+ * Widens the ECharts grid's left inset to the measured pixel width of the
+ * widest formatted y-axis label. ECharts' containLabel under-measures rendered
+ * label width, so wide labels clip at the left edge; we measure with the same
+ * canvas API ECharts renders with and reserve exactly that much, disabling
+ * containLabel so the two reservations don't stack.
+ *
+ * @param options - the ECharts options object (mutated in place).
+ */
+export const applyMeasuredYAxisLeftInset = (options: any): void => {
+  const grid = options?.grid;
+  const yAxis = options?.yAxis;
+
+  // Arrays are gauge/trellis layouts that manage their own left spacing.
+  const isPlainObject = (v: any) =>
+    v && typeof v === "object" && !Array.isArray(v);
+  if (!isPlainObject(grid) || !isPlainObject(yAxis)) return;
+  if (yAxis.type !== "value") return;
+
+  const formatter = yAxis.axisLabel?.formatter;
+  if (typeof formatter !== "function") return;
+
+  let widest = 0;
+  const series = Array.isArray(options?.series) ? options.series : [];
+  for (const s of series) {
+    const data = Array.isArray(s?.data) ? s.data : [];
+    for (const point of data) {
+      const y = Array.isArray(point) ? point[1] : point;
+      const width = calculateWidthText(String(formatter(y)));
+      if (width > widest) widest = width;
+    }
+  }
+
+  if (widest > 0) {
+    options.grid.left = widest;
+    options.grid.containLabel = false;
+  }
+};
+
+/**
  * Calculates a dynamic nameGap for the x-axis based on label rotation.
  * When labels are rotated, we need more space between the labels and the axis name.
  *

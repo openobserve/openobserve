@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="iam-roles-table-section"
           :data="rows"
           :loading="loading"
+          :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           :selected-ids="selectedRoleNames"
           @update:selected-ids="onSelectionChange"
@@ -121,6 +122,7 @@ const onSelectionChange = (ids: string[]) => {
   selectedRoleNames.value = ids;
 };
 const confirmBulkDelete = ref(false);
+const bulkDeleteLoading = ref(false);
 
 const { rolesState } = usePermissions();
 
@@ -272,6 +274,7 @@ const openBulkDeleteDialog = async () => {
 
 const bulkDeleteUserRoles = async () => {
   const roleNames = selectedRoleNames.value;
+  bulkDeleteLoading.value = true;
 
   try {
     const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
@@ -316,6 +319,8 @@ const bulkDeleteUserRoles = async () => {
       });
     }
     confirmBulkDelete.value = false;
+  } finally {
+    bulkDeleteLoading.value = false;
   }
 };
 

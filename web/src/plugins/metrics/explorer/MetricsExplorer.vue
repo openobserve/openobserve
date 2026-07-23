@@ -61,11 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("metrics.explorer.modeVisualize") }}
         </OToggleGroupItem>
         <OToggleGroupItem value="workspace" size="sm" data-test="metrics-explorer-mode-workspace">
-          <!-- `favorite-border` (outline), not the filled `favorite`: a filled
-               heart is the card's ON state and on a tab would read as "already
+          <!-- `star-outline` (outline), not the filled `star`: a filled star is
+               the card's ON state and on a tab would read as "already
                favourited" rather than "your favourites live here". -->
           <template #icon-left>
-            <OIcon name="favorite-border" size="sm" class="shrink-0" />
+            <OIcon name="star-outline" size="sm" class="shrink-0" />
           </template>
           {{ t("metrics.explorer.modeWorkspace") }}
         </OToggleGroupItem>
@@ -449,7 +449,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                collide. -->
             <div
               v-for="row in virtualizer.getVirtualItems()"
-              :key="getVirtualRowKey(row)"
+              :key="row.key as string | number"
               class="absolute top-0 left-0 w-full pb-3"
               :class="isGrid ? 'grid gap-3' : 'flex flex-col gap-3'"
               :style="{
@@ -540,7 +540,7 @@ import { useI18n } from "vue-i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import { isEqual, debounce } from "lodash-es";
 
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -812,8 +812,6 @@ export default defineComponent({
       })),
     );
 
-    const getVirtualRowKey = (row: VirtualItem): string | number => row.key as string | number;
-
     let resizeObserver: ResizeObserver | null = null;
 
     // (Re)attach the width observer to the CURRENT scroll element, disconnecting
@@ -948,7 +946,7 @@ export default defineComponent({
       if (grid.showFavoritesOnly.value) {
         actions.push({
           id: "clear-favorites",
-          icon: "favorite",
+          icon: "star",
           titleKey: "metrics.explorer.emptyActions.clearFavorites",
           descriptionKey: "metrics.explorer.emptyActions.clearFavoritesDesc",
         });
@@ -1667,7 +1665,6 @@ export default defineComponent({
       columns,
       rowsOfCards,
       virtualizer,
-      getVirtualRowKey,
       onDataScope,
       visibleCards,
       gridVisible,

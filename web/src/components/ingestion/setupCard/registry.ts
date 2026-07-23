@@ -38,6 +38,7 @@ import dynamodb from "./content/dynamodb";
 import kubernetes from "./content/kubernetes";
 import linux from "./content/linux";
 import windows from "./content/windows";
+import macos from "./content/macos";
 import gcp from "./content/gcp";
 import otlpTraces from "./content/otlpTraces";
 
@@ -60,6 +61,7 @@ const registry: Record<string, DataSourceCardBuilder> = {
   kubernetes,
   linux,
   windows,
+  macos,
   gcp,
   otlpTraces,
 };

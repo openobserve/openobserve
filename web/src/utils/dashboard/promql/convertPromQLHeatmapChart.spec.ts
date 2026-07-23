@@ -1461,3 +1461,80 @@ describe("bucket labels must be unique — ECharts category axes require it", ()
     expect(new Set(labels).size).toBe(labels.length); // ...all distinct
   });
 });
+
+describe("compact_preview shrinks the heatmap for the metrics explorer cards", () => {
+  const converter = new HeatmapConverter();
+  const store = { state: { timezone: "UTC", theme: "light" } };
+
+  // A small classic histogram: two buckets over one timestamp.
+  const processedData: ProcessedPromQLData[] = [
+    {
+      series: [
+        { name: "a", metric: { le: "0.5" }, values: [], data: { "1000": "3" } },
+        { name: "b", metric: { le: "+Inf" }, values: [], data: { "1000": "7" } },
+      ],
+      timestamps: [[1000, "t1"]],
+      queryIndex: 0,
+    },
+  ];
+
+  const convertWith = (extraConfig: Record<string, any>) =>
+    converter.convert(
+      processedData,
+      {
+        type: "heatmap",
+        config: { heatmap_mode: "prometheus_histogram", ...extraConfig },
+      },
+      store,
+      { legends: [] },
+    ) as any;
+
+  it("leaves the full-size look untouched when the flag is absent", () => {
+    const result = convertWith({});
+    // Default ECharts colour bar — no card sizing applied.
+    expect(result.visualMap.itemWidth).toBeUndefined();
+    expect(result.grid.top).toBeUndefined();
+    expect(result.yAxis.axisLabel.fontSize).toBeUndefined();
+  });
+
+  it("shrinks the colour bar and pins it under the axis", () => {
+    const result = convertWith({ compact_preview: true });
+    expect(result.visualMap).toMatchObject({
+      orient: "horizontal",
+      bottom: 0,
+      itemWidth: 10,
+      itemHeight: 90,
+      textStyle: { fontSize: 9 },
+    });
+    // Room for the bar; no top gap on a short card.
+    expect(result.grid.top).toBe(8);
+    expect(result.grid.bottom).toBe(26);
+  });
+
+  it("thins the bucket labels but always keeps the top +Inf row", () => {
+    const result = convertWith({ compact_preview: true });
+    const axisLabel = result.yAxis.axisLabel;
+    expect(axisLabel.fontSize).toBe(9);
+    // The interval predicate is indexed from the bottom; the TOP row (highest
+    // index = +Inf) must always be labelled.
+    const rowCount = result.yAxis.data.length;
+    expect(axisLabel.interval(rowCount - 1)).toBe(true);
+  });
+
+  it("shrinks the x-axis time labels", () => {
+    const result = convertWith({ compact_preview: true });
+    expect(result.xAxis[0].axisLabel).toMatchObject({
+      fontSize: 9,
+      hideOverlap: true,
+    });
+  });
+
+  it("portals the tooltip regardless of the compact flag (not a card-only concern)", () => {
+    // Same treatment as the other PromQL charts — a heatmap on a dashboard with
+    // overflow-hidden clips its tooltip too, so this is not gated on the card.
+    expect(convertWith({}).tooltip.appendToBody).toBe(true);
+    expect(convertWith({ compact_preview: true }).tooltip.appendToBody).toBe(
+      true,
+    );
+  });
+});

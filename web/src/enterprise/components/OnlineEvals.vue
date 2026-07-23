@@ -237,6 +237,7 @@ the Free Software Foundation, either version 3 of the License, or
             :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
+            :action-loading="jobsBulkDeleting"
             :pending-status-id="pendingJobStatusId"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
@@ -470,6 +471,7 @@ const pendingDeleteTab = ref<ActiveTab | null>(null);
 // Ids for a pending bulk delete (jobs tab). Non-empty => the confirm dialog and
 // performDelete operate on the whole batch instead of a single `pendingDeleteRow`.
 const pendingBulkDeleteIds = ref<string[]>([]);
+const jobsBulkDeleting = ref(false);
 const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
@@ -1228,6 +1230,7 @@ async function performDelete() {
 async function performBulkJobsDelete() {
   const ids = [...pendingBulkDeleteIds.value];
   if (ids.length === 0) return;
+  jobsBulkDeleting.value = true;
   try {
     const results = await Promise.allSettled(
       ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
@@ -1250,6 +1253,7 @@ async function performBulkJobsDelete() {
   } finally {
     pendingBulkDeleteIds.value = [];
     pendingDeleteTab.value = null;
+    jobsBulkDeleting.value = false;
   }
 }
 </script>

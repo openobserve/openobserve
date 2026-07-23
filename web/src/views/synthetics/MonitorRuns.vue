@@ -400,7 +400,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="px-2 py-2">
                       <div
                         v-for="l in locationBreakdown"
-                        :key="l.name"
+                        :key="l.id ?? l.name"
                         class="flex items-center gap-3 py-2.25 border-b border-border-default last:border-b-0"
                       >
                         <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
@@ -617,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #cell-location="{ row }">
                   <span class="inline-flex items-center gap-1 text-sm text-text-body">
                     <OIcon :name="locationIcon((row as VisibleRun).location)" size="sm" />
-                    {{ (row as VisibleRun).location }}
+                    {{ locationLabel((row as VisibleRun).location) }}
                   </span>
                 </template>
                 <template #cell-browser="{ row }">
@@ -929,7 +929,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -965,6 +965,7 @@ import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
 import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
+import { locationDisplayLabel } from "@/utils/synthetics/format";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
@@ -980,6 +981,26 @@ const emit = defineEmits<{
 
 const store = useStore();
 const orgIdentifier = computed(() => (store.state as any).selectedOrganization?.identifier ?? "");
+
+// id -> "Name (region)" — run records carry the raw location id (KSUID for
+// private, "aws-us-east-1" for public); resolve to a human label wherever
+// it's displayed. Grouping/filtering still key off the raw id.
+const locationNames = ref<Record<string, string>>({});
+function locationLabel(id: string): string {
+  return locationNames.value[id] ?? id;
+}
+onMounted(async () => {
+  try {
+    const res = await syntheticsService.getLocations(orgIdentifier.value);
+    const locations: { id: string; name: string; region: string }[] =
+      (res.data as any).locations ?? [];
+    locationNames.value = Object.fromEntries(
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.name, loc.region)]),
+    );
+  } catch (err) {
+    console.error("[synthetics] failed to load locations", err);
+  }
+});
 
 // ── Props ────────────────────────────────────────────────────────────────
 interface Props {
@@ -1185,7 +1206,7 @@ const deviceOptions = computed<SelectOption[]>(() => [
 const locationOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allLocations"), value: "all", icon: "location-on" },
   ...uniqueValues("location").map((v) => ({
-    label: v,
+    label: locationLabel(v),
     value: v,
     icon: locationIcon(v),
   })),
@@ -1491,6 +1512,9 @@ const breakdownDimensions = computed(() =>
 
 interface BreakdownItem {
   name: string;
+  /** Stable key for v-for — the raw id when name is a resolved display label
+   *  (location breakdown), so two locations can't collide on a shared name. */
+  id?: string;
   icon?: string;
   pct: string;
   barPct?: string;
@@ -1547,11 +1571,12 @@ const locationBreakdown = computed<BreakdownItem[]>(() => {
     return "location-on";
   }
 
-  return Array.from(groups.entries()).map(([name, g]) => {
+  return Array.from(groups.entries()).map(([id, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     const entry: BreakdownItem = {
-      name,
-      icon: getIconForRegion(name),
+      name: locationLabel(id),
+      id,
+      icon: getIconForRegion(id),
       pct: pct + "%",
       barColor: "var(--color-status-success-text)",
       textColor: "var(--color-success-700)",

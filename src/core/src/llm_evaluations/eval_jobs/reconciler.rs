@@ -15,9 +15,9 @@
 
 //! Reconciler for Online Eval Jobs.
 //!
-//! Converts a job's declarative state into a hidden evaluation pipeline.
-//! The pipeline is the actual execution surface: it carries the realtime
-//! source stream binding, the LLM evaluation node, and an output sink.
+//! Converts a span-scope job's declarative state into a hidden evaluation
+//! pipeline. Trace/session jobs deliberately do not create hidden pipelines;
+//! the Eval Scheduler owns their target detection.
 //!
 //! This module is intentionally side-effect bounded — it only reads/writes
 //! the underlying pipeline via the `service::pipeline` service and store
@@ -39,9 +39,9 @@ use config::{
         stream::{StreamParams, StreamType},
     },
 };
-use infra::table::online_eval_jobs::{OnlineEvalJob, SamplingMode};
+use infra::table::online_eval_jobs::OnlineEvalJob;
 
-use crate::service::pipeline::store::PipelineError;
+use crate::pipeline::store::PipelineError;
 
 /// Errors raised by the reconciler.
 #[derive(Debug, thiserror::Error)]
@@ -58,6 +58,13 @@ pub enum ReconcileError {
 /// if no pipeline should exist for the current status). Idempotent:
 /// calling repeatedly with the same job state is a no-op.
 pub async fn reconcile(job: &OnlineEvalJob) -> Result<Option<String>, ReconcileError> {
+    if !job.uses_hidden_pipeline() {
+        if let Some(pid) = job.pipeline_id.as_deref() {
+            best_effort_delete(pid).await;
+        }
+        return Ok(None);
+    }
+
     match job.status.as_str() {
         "draft" => {
             // No pipeline should exist in draft. Tear down any prior one.
@@ -92,7 +99,7 @@ pub async fn tear_down(job: &OnlineEvalJob) -> Result<(), ReconcileError> {
 
 /// Delete the pipeline, swallowing NotFound to remain idempotent.
 async fn best_effort_delete(pipeline_id: &str) {
-    match crate::service::pipeline::delete_pipeline(pipeline_id).await {
+    match crate::pipeline::delete_pipeline(pipeline_id).await {
         Ok(()) => {}
         Err(PipelineError::NotFound(_)) => {
             // Already gone — fine.
@@ -120,12 +127,14 @@ async fn ensure_pipeline(
     job: &OnlineEvalJob,
     desired_enabled: bool,
 ) -> Result<String, ReconcileError> {
+    job.validate()
+        .map_err(|error| ReconcileError::Other(error.to_string()))?;
     match job.pipeline_id.as_deref() {
         None => {
             // First-time provisioning.
             let new_id = ider::generate();
             let pipeline = build_pipeline_from_job(job, &new_id, desired_enabled, 1);
-            crate::service::pipeline::save_pipeline(pipeline).await?;
+            crate::pipeline::save_pipeline(pipeline).await?;
             // save_pipeline persists `enabled` as-is, so no separate enable_pipeline call
             // is needed for the create path. If we later want to be defensive against
             // future changes in save_pipeline semantics, we can re-assert enable state
@@ -134,13 +143,13 @@ async fn ensure_pipeline(
         }
         Some(pipeline_id) => {
             // Pipeline should already exist. Fetch and compare.
-            let existing = match crate::service::pipeline::store::get_by_id(pipeline_id).await {
+            let existing = match crate::pipeline::store::get_by_id(pipeline_id).await {
                 Ok(p) => p,
                 Err(PipelineError::NotFound(_)) => {
                     // Drift: job thinks a pipeline exists but it's gone. Recreate
                     // with the same id so the job row stays consistent.
                     let pipeline = build_pipeline_from_job(job, pipeline_id, desired_enabled, 1);
-                    crate::service::pipeline::save_pipeline(pipeline).await?;
+                    crate::pipeline::save_pipeline(pipeline).await?;
                     return Ok(pipeline_id.to_string());
                 }
                 Err(e) => return Err(e.into()),
@@ -150,7 +159,7 @@ async fn ensure_pipeline(
             if !pipeline_matches_job(&existing, job) {
                 let updated =
                     build_pipeline_from_job(job, pipeline_id, desired_enabled, existing.version);
-                crate::service::pipeline::update_pipeline(updated).await?;
+                crate::pipeline::update_pipeline(updated).await?;
             }
 
             // Ensure enable state. update_pipeline preserves whatever `enabled` was
@@ -159,13 +168,8 @@ async fn ensure_pipeline(
             if existing.enabled != desired_enabled || pipeline_matches_job(&existing, job) {
                 // For evaluation pipelines, sampling has no time-of-day semantics
                 // so starts_from_now is always false.
-                crate::service::pipeline::enable_pipeline(
-                    &job.org_id,
-                    pipeline_id,
-                    desired_enabled,
-                    false,
-                )
-                .await?;
+                crate::pipeline::enable_pipeline(&job.org_id, pipeline_id, desired_enabled, false)
+                    .await?;
             }
 
             Ok(pipeline_id.to_string())
@@ -183,8 +187,7 @@ fn build_pipeline_from_job(
     enabled: bool,
     version: i32,
 ) -> Pipeline {
-    let stream_type = parse_stream_type(&job.stream_type);
-    let source_stream = StreamParams::new(&job.org_id, &job.stream, stream_type);
+    let source_stream = StreamParams::new(&job.org_id, &job.stream, StreamType::Traces);
 
     // Input node: the source stream we listen on.
     let input_node = Node::new(
@@ -205,6 +208,8 @@ fn build_pipeline_from_job(
         sampling_rate,
         scorers: job.scorers.clone(),
         job_id: Some(job.id.clone()),
+        job_version: Some(job.version),
+        input_mapping: job.input_mapping.clone(),
     };
     let eval_node = Node::new(
         format!("eval-{pipeline_id}"),
@@ -212,16 +217,6 @@ fn build_pipeline_from_job(
         400.0,
         100.0,
         "default".to_string(),
-    );
-
-    // Output node: fixed sink stream where eval results are written.
-    let output_stream = StreamParams::new(&job.org_id, "_llm_scores", StreamType::Logs);
-    let output_node = Node::new(
-        format!("output-{pipeline_id}"),
-        NodeData::Stream(output_stream),
-        500.0,
-        100.0,
-        "output".to_string(),
     );
 
     let mut nodes = vec![input_node.clone()];
@@ -248,12 +243,7 @@ fn build_pipeline_from_job(
             eval_node.get_node_id(),
         ));
     }
-    edges.push(Edge::new(
-        eval_node.get_node_id(),
-        output_node.get_node_id(),
-    ));
     nodes.push(eval_node);
-    nodes.push(output_node);
 
     Pipeline {
         id: pipeline_id.to_string(),
@@ -284,11 +274,7 @@ pub(crate) fn pipeline_matches_job(pipeline: &Pipeline, job: &OnlineEvalJob) -> 
     }
 
     // Source stream
-    let expected_stream = StreamParams::new(
-        &job.org_id,
-        &job.stream,
-        parse_stream_type(&job.stream_type),
-    );
+    let expected_stream = StreamParams::new(&job.org_id, &job.stream, StreamType::Traces);
     let source_matches = match &pipeline.source {
         PipelineSource::Realtime(sp) => sp == &expected_stream,
         _ => false,
@@ -334,6 +320,9 @@ pub(crate) fn pipeline_matches_job(pipeline: &Pipeline, job: &OnlineEvalJob) -> 
         Some(params) => {
             (params.sampling_rate - expected_rate).abs() < f64::EPSILON
                 && params.scorers == job.scorers
+                && params.job_id.as_deref() == Some(job.id.as_str())
+                && params.job_version == Some(job.version)
+                && params.input_mapping == job.input_mapping
         }
     }
 }
@@ -409,31 +398,23 @@ fn build_filter_condition(job: &OnlineEvalJob) -> Option<ConditionParams> {
         .ok()
 }
 
-/// Parse the job's `stream_type` (a string from the DB) into a `StreamType`,
-/// defaulting to `Logs` for unknown values.
-fn parse_stream_type(s: &str) -> StreamType {
-    match s.to_lowercase().as_str() {
-        "traces" => StreamType::Traces,
-        "logs" => StreamType::Logs,
-        "metrics" => StreamType::Metrics,
-        _ => StreamType::Logs,
-    }
-}
-
 /// Extract the effective sampling rate from the job's sampling config.
-/// Defaults to 1.0 (sample all) for `all`/`count` modes or malformed configs.
+/// Invalid persisted configurations fail closed so they cannot unexpectedly
+/// evaluate every matching target.
 fn extract_sampling_rate(job: &OnlineEvalJob) -> f64 {
-    if job.sampling_mode == SamplingMode::Rate
-        && let Some(rate) = job.sampling_value.get("rate").and_then(|v| v.as_f64())
-    {
-        return rate;
-    }
-    1.0
+    job.sampling_rate().unwrap_or_else(|error| {
+        log::error!(
+            "[EvalJob] invalid sampling config for job {}: {error}; failing closed",
+            job.id
+        );
+        0.0
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use config::meta::pipeline::components::ScorerRef;
+    use infra::table::online_eval_jobs::SamplingMode;
 
     use super::*;
 
@@ -445,6 +426,7 @@ mod tests {
             description: None,
             stream: "spans".to_string(),
             stream_type: "traces".to_string(),
+            target_scope: infra::table::online_eval_jobs::TargetScope::Span,
             filter_condition: serde_json::json!({"type": "all"}),
             scorers: vec![
                 ScorerRef {
@@ -457,6 +439,10 @@ mod tests {
                 },
             ],
             input_mapping: None,
+            span_selectors: Vec::new(),
+            span_selector_bindings: Default::default(),
+            trace_config: None,
+            session_config: None,
             sampling_mode: SamplingMode::Rate,
             sampling_value: serde_json::json!({"rate": 0.25}),
             status: "active".to_string(),
@@ -481,9 +467,9 @@ mod tests {
         assert!(pipeline.description.contains("job-abc"));
         assert_eq!(pipeline.kind, PipelineKind::Evaluation);
 
-        // 4 nodes, 3 edges: input -> system id check -> eval -> output.
-        assert_eq!(pipeline.nodes.len(), 4);
-        assert_eq!(pipeline.edges.len(), 3);
+        // 3 nodes, 2 edges: input -> system id check -> eval task publisher.
+        assert_eq!(pipeline.nodes.len(), 3);
+        assert_eq!(pipeline.edges.len(), 2);
 
         // Source must be Realtime(spans/traces).
         match &pipeline.source {
@@ -523,22 +509,41 @@ mod tests {
             _ => panic!("expected LlmEvaluation middle node"),
         }
 
-        // Output: Stream node to _llm_scores/logs.
-        match pipeline.nodes[3].get_node_data() {
-            NodeData::Stream(sp) => {
-                assert_eq!(sp.stream_name.to_string(), "_llm_scores");
-                assert_eq!(sp.stream_type, StreamType::Logs);
-            }
-            _ => panic!("expected Stream output node"),
-        }
-
-        // Edges wire input -> id check -> eval -> output.
+        // Edges wire input -> id check -> eval task publisher.
         assert_eq!(pipeline.edges[0].source, pipeline.nodes[0].get_node_id());
         assert_eq!(pipeline.edges[0].target, pipeline.nodes[1].get_node_id());
         assert_eq!(pipeline.edges[1].source, pipeline.nodes[1].get_node_id());
         assert_eq!(pipeline.edges[1].target, pipeline.nodes[2].get_node_id());
-        assert_eq!(pipeline.edges[2].source, pipeline.nodes[2].get_node_id());
-        assert_eq!(pipeline.edges[2].target, pipeline.nodes[3].get_node_id());
+    }
+
+    #[test]
+    fn test_draft_span_job_pipeline_validates_when_activated() {
+        let mut job = sample_job();
+        job.status = "draft".to_string();
+
+        assert!(infra::table::online_eval_jobs::is_valid_transition(
+            &job.status,
+            "active"
+        ));
+        job.status = "active".to_string();
+        let mut pipeline = build_pipeline_from_job(&job, "pipe-activate", true, 1);
+
+        assert!(pipeline.validate().is_ok());
+        assert!(matches!(
+            pipeline.nodes.last().map(Node::get_node_data),
+            Some(NodeData::LlmEvaluation(_))
+        ));
+    }
+
+    #[test]
+    fn test_trace_scope_jobs_do_not_use_hidden_pipeline() {
+        let mut job = sample_job();
+        job.target_scope = infra::table::online_eval_jobs::TargetScope::Trace;
+        job.apply_target_scope_defaults();
+
+        assert!(!job.uses_hidden_pipeline());
+        assert!(job.trace_config.is_some());
+        assert!(job.session_config.is_none());
     }
 
     #[test]
@@ -572,8 +577,8 @@ mod tests {
 
         let pipeline = build_pipeline_from_job(&job, "pipe-filter", true, 1);
 
-        assert_eq!(pipeline.nodes.len(), 5);
-        assert_eq!(pipeline.edges.len(), 4);
+        assert_eq!(pipeline.nodes.len(), 4);
+        assert_eq!(pipeline.edges.len(), 3);
         assert!(matches!(
             pipeline.nodes[1].get_node_data(),
             NodeData::Condition(_)
@@ -592,8 +597,6 @@ mod tests {
         assert_eq!(pipeline.edges[1].target, pipeline.nodes[2].get_node_id());
         assert_eq!(pipeline.edges[2].source, pipeline.nodes[2].get_node_id());
         assert_eq!(pipeline.edges[2].target, pipeline.nodes[3].get_node_id());
-        assert_eq!(pipeline.edges[3].source, pipeline.nodes[3].get_node_id());
-        assert_eq!(pipeline.edges[3].target, pipeline.nodes[4].get_node_id());
     }
 
     #[test]
@@ -671,6 +674,26 @@ mod tests {
     }
 
     #[test]
+    fn test_pipeline_matches_job_false_on_input_mapping_or_version_drift() {
+        let job = sample_job();
+        let pipeline = build_pipeline_from_job(&job, "pipe-drift", true, 1);
+
+        let mut mapping_drifted = job.clone();
+        mapping_drifted.input_mapping = Some(std::collections::BTreeMap::from([(
+            "scorer-1".to_string(),
+            std::collections::BTreeMap::from([(
+                "input".to_string(),
+                "{{gen_ai_input_messages}}".to_string(),
+            )]),
+        )]));
+        assert!(!pipeline_matches_job(&pipeline, &mapping_drifted));
+
+        let mut version_drifted = job.clone();
+        version_drifted.version += 1;
+        assert!(!pipeline_matches_job(&pipeline, &version_drifted));
+    }
+
+    #[test]
     fn test_pipeline_matches_job_false_on_filter_drift() {
         let job = sample_job();
         let pipeline = build_pipeline_from_job(&job, "pipe-1", true, 1);
@@ -692,18 +715,15 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_stream_type() {
-        assert_eq!(parse_stream_type("traces"), StreamType::Traces);
-        assert_eq!(parse_stream_type("Traces"), StreamType::Traces);
-        assert_eq!(parse_stream_type("logs"), StreamType::Logs);
-        assert_eq!(parse_stream_type("metrics"), StreamType::Metrics);
-        // Default fallback for unknown values.
-        assert_eq!(parse_stream_type("bogus"), StreamType::Logs);
-        assert_eq!(parse_stream_type(""), StreamType::Logs);
+    fn test_extract_sampling_rate_rate_mode() {
+        let mut job = sample_job();
+        job.sampling_mode = SamplingMode::Rate;
+        job.sampling_value = serde_json::json!(0.1);
+        assert!((extract_sampling_rate(&job) - 0.1).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn test_extract_sampling_rate_rate_mode() {
+    fn test_extract_sampling_rate_supports_legacy_object_value() {
         let mut job = sample_job();
         job.sampling_mode = SamplingMode::Rate;
         job.sampling_value = serde_json::json!({"rate": 0.1});
@@ -711,10 +731,14 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_sampling_rate_count_mode_defaults_to_1() {
+    fn test_extract_sampling_rate_invalid_config_fails_closed() {
         let mut job = sample_job();
         job.sampling_mode = SamplingMode::Count;
-        job.sampling_value = serde_json::json!({"count": 100});
-        assert!((extract_sampling_rate(&job) - 1.0).abs() < f64::EPSILON);
+        job.sampling_value = serde_json::json!(100);
+        assert!((extract_sampling_rate(&job) - 0.0).abs() < f64::EPSILON);
+
+        job.sampling_mode = SamplingMode::Rate;
+        job.sampling_value = serde_json::json!(2.0);
+        assert!((extract_sampling_rate(&job) - 0.0).abs() < f64::EPSILON);
     }
 }

@@ -27,16 +27,16 @@ pub mod cache;
 pub mod cluster_info;
 pub mod compact;
 pub mod dashboards;
-// Compatibility re-export only. Database implementations live in the `db` crate.
-pub use ::db;
+use ::common;
+use ::db;
 pub mod enrichment;
 pub mod enrichment_table;
-pub mod file_downloader;
+pub mod error_suggest;
 pub mod file_list;
-pub mod file_list_dump;
-pub use ::db::folders;
+use ::db::folders;
+use search_service::file_list_dump;
 pub mod functions;
-mod functions_cache;
+pub mod functions_cache;
 pub mod github;
 pub mod grpc;
 pub mod http;
@@ -67,8 +67,8 @@ pub mod providers;
 pub mod ratelimit;
 pub mod runtime_metrics;
 pub mod schema;
-mod schema_watcher;
-pub mod search;
+pub mod schema_watcher;
+use search_service as search;
 #[cfg(feature = "enterprise")]
 pub mod search_jobs;
 pub mod self_reporting;
@@ -88,43 +88,3 @@ pub mod trial_quota;
 pub mod users;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
-
-/// Compatibility namespace for the common crate. Authentication and stream-query helpers remain
-/// available at their historical paths while their service-backed implementations live in the
-/// service layer.
-pub mod common {
-    pub mod meta {
-        pub use ::common::meta::*;
-
-        pub use crate::service::ingestion_types as ingestion;
-
-        /// Lives here rather than in the `common` crate so that `common` does not
-        /// depend on the `search` crate.
-        pub mod search {
-            pub use ::search::{
-                AuditContext, CAPPED_RESULTS_MSG, CacheQueryRequest, CachedQueryResponse,
-                MultiCachedQueryResponse, QueryDelta, ResultCacheSelectionStrategy,
-                SearchResultType, SortStrategy,
-            };
-        }
-    }
-
-    pub mod infra {
-        pub use ::common::infra::{cluster, wal};
-
-        pub mod config {
-            pub use ::common::infra::config::*;
-
-            pub use crate::service::cache::{REALTIME_ALERT_TRIGGERS, STREAM_EXECUTABLE_PIPELINES};
-        }
-
-        #[cfg(feature = "enterprise")]
-        pub use crate::service::ofga;
-    }
-
-    pub mod utils {
-        pub use ::common::utils::*;
-
-        pub use crate::service::{auth, stream_utils as stream};
-    }
-}

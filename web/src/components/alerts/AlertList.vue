@@ -521,6 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="outline-destructive"
                     size="sm"
                     icon-left="delete"
+                    :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
                     >Delete</OButton
                   >
@@ -2411,12 +2412,14 @@ export default defineComponent({
     };
 
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref<boolean>(false);
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteAlerts = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
         message: "Deleting alerts...",
@@ -2501,6 +2504,8 @@ export default defineComponent({
             message: errorMessage,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
@@ -2651,6 +2656,7 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteAlerts,
       confirmBulkDelete,
+      bulkDeleteLoading,
       config,
       isCompactToolbar,
       isAnomalyDetectionEnabled,

@@ -114,6 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline-destructive"
               size="sm"
               icon-left="delete"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
               {{ t("settings.cipherKeysPage.delete") }}
@@ -233,6 +234,7 @@ export default defineComponent({
     }> = ref({ visible: false, data: null });
     const selectedKeys: Ref<any[]> = ref([]);
     const confirmBulkDelete = ref(false);
+    const bulkDeleteLoading = ref(false);
 
     watch(
       () => router.currentRoute.value.query?.action,
@@ -416,6 +418,7 @@ export default defineComponent({
     };
 
     const bulkDeleteCipherKeys = () => {
+      bulkDeleteLoading.value = true;
       const keyNames = selectedKeys.value.map((key: any) => key.name);
 
       CipherKeysService.bulkDelete(store.state.selectedOrganization.identifier, { ids: keyNames })
@@ -458,6 +461,9 @@ export default defineComponent({
                 t("settings.cipherKeysPage.bulkDeleteError"),
             });
           }
+        })
+        .finally(() => {
+          bulkDeleteLoading.value = false;
         });
     };
 
@@ -494,6 +500,7 @@ export default defineComponent({
       selectedKeyIds,
       handleSelectedIdsUpdate,
       confirmBulkDelete,
+      bulkDeleteLoading,
       openBulkDeleteDialog,
       bulkDeleteCipherKeys,
     };

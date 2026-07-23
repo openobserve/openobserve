@@ -28,12 +28,14 @@ enterprise = [
     "openobserve-core/enterprise",
     "openobserve-jobs/enterprise",
     "super_cluster_queue/enterprise",
+    "search_service/enterprise",
 ]
 vectorscan = [
     "openobserve-api/vectorscan",
     "openobserve-core/vectorscan",
     "openobserve-jobs/vectorscan",
     "super_cluster_queue/vectorscan",
+    "search_service/vectorscan",
 ]
 cloud = [
     "openobserve-api/cloud",
@@ -45,6 +47,7 @@ vortex = [
     "openobserve-api/vortex",
     "openobserve-core/vortex",
     "openobserve-jobs/vortex",
+    "search_service/vortex",
 ]
 mimalloc = ["dep:mimalloc"]
 jemalloc = ["dep:tikv-jemallocator"]
@@ -83,10 +86,10 @@ inherits = "release"
 debug = true
 strip = false
 
-# tikv-jemalloc-sys is a link-time dependency: it forces the "profiling"
-# feature on the jemalloc sys crate that jemalloc_pprof requires.
+# tikv-jemalloc-sys is a link-time dependency; prettytable-rs exposes the
+# `prettytable` crate name, which cargo-machete does not associate with it.
 [package.metadata.cargo-machete]
-ignored = ["tikv-jemalloc-sys"]
+ignored = ["prettytable-rs", "tikv-jemalloc-sys"]
 
 [dependencies]
 axum.workspace = true
@@ -221,7 +224,12 @@ flight.workspace = true
 async-stream.workspace = true
 sourcemap.workspace = true
 openobserve-api.workspace = true
+openobserve-api-management.workspace = true
 openobserve-core.workspace = true
+common.workspace = true
+db.workspace = true
+search.workspace = true
+search_service.workspace = true
 super_cluster_queue.workspace = true
 openobserve-jobs.workspace = true
 openobserve-mcp.workspace = true
@@ -232,6 +240,7 @@ base64.workspace = true
 float-cmp.workspace = true
 multer.workspace = true
 rcgen.workspace = true
+transform.workspace = true
 
 [workspace]
 members = [
@@ -246,6 +255,9 @@ members = [
     "src/search",
     "src/cipher",
     "src/db",
+    "src/search_service",
+    "src/usage_reporting",
+    "src/audit",
     "src/promql",
     "src/jobs",
     "src/mcp",
@@ -283,6 +295,9 @@ super_cluster_queue = { path = "src/super_cluster_queue" }
 search = { path = "src/search" }
 openobserve-cipher = { path = "src/cipher" }
 db = { path = "src/db" }
+search_service = { path = "src/search_service" }
+usage_reporting = { path = "src/usage_reporting" }
+audit = { path = "src/audit" }
 promql = { path = "src/promql" }
 openobserve-api = { path = "src/api" }
 openobserve-api-management = { path = "src/api_management" }

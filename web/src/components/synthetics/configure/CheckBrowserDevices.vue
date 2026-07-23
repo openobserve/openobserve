@@ -12,6 +12,7 @@ const props = defineProps<{
   check: BrowserCheck;
   browsers?: string[];
   devices?: SyntheticsDevice[];
+  validationErrors?: Record<string, string>;
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
@@ -120,6 +121,15 @@ function toggle(browserId: string, deviceId: string) {
           />
         </div>
       </div>
+
+      <!-- Validation error -->
+      <p
+        v-if="props.validationErrors?.browserDevices"
+        class="text-xs text-status-error-text"
+        data-test="synthetics-check-browser-devices-error"
+      >
+        {{ props.validationErrors.browserDevices }}
+      </p>
     </div>
   </div>
 </template>

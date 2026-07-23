@@ -17,16 +17,16 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Json, Response},
 };
+use db::license;
 use o2_enterprise::enterprise::license::{
     LICENSE_DB_KEY, License, check_license, get_license, ingestion_limit_exceeded_count,
     ingestion_used, license_expired,
 };
+use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
-    handler::http::extractors::Headers,
-    service::db::license,
+    common::meta::http::HttpResponse as MetaHttpResponse, handler::http::extractors::Headers,
 };
 
 #[derive(Serialize, Deserialize)]
@@ -66,13 +66,9 @@ impl<'de> Deserialize<'de> for SaveLicenseRequest {
 
 async fn check_license_permission(user_id: &str, method: &str) -> Result<(), anyhow::Error> {
     use o2_openfga::meta::mapping::OFGA_MODELS;
+    use openobserve_core::{auth::AuthExtractor, users::get_user};
 
-    use crate::{
-        common::utils::auth::{AuthExtractor, is_root_user},
-        service::users::get_user,
-    };
-
-    if !is_root_user(user_id) {
+    if !db::user::is_root_user(user_id) {
         let user = match get_user(Some("_meta"), user_id).await {
             Some(v) => v,
             None => return Err(anyhow::anyhow!("Unauthorized access to license")),

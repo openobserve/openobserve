@@ -24,6 +24,7 @@ import {
   AGENTS_REPO,
   EC2_IAM_NOTE,
   agentCode,
+  agentUninstall,
   envIcons,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
@@ -93,6 +94,7 @@ export default function linuxCard(subs: CardSubstitutions): RichCardContent {
       fixSnippet: `sudo systemctl status openobserve-agent
 sudo journalctl -u openobserve-agent -n 50 --no-pager`,
       troubleshooting: sharedAgentTroubleshooting("`sudo systemctl status openobserve-agent`"),
+      uninstall: agentUninstall("linux"),
     },
     docUrl: "https://github.com/openobserve/agents",
   };

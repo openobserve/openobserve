@@ -14,14 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #[cfg(feature = "enterprise")]
+use common::utils::jwt;
+#[cfg(feature = "enterprise")]
+use db;
+#[cfg(feature = "enterprise")]
 use o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks};
+use openobserve_core::auth::AuthExtractor;
+#[cfg(feature = "enterprise")]
+use openobserve_core::users;
 
 use super::validator::{AuthError, AuthValidationResult, RequestData};
-use crate::common::utils::auth::AuthExtractor;
-#[cfg(feature = "enterprise")]
-use crate::common::utils::jwt;
-#[cfg(feature = "enterprise")]
-use crate::service::{db, users};
 
 /// Whether a request whose user is NOT found in the target org may still be
 /// authenticated *without* an OpenFGA permission check.
@@ -56,7 +58,7 @@ pub async fn token_validator(
     req_data: &RequestData,
     auth_info: &AuthExtractor,
 ) -> Result<AuthValidationResult, AuthError> {
-    use crate::{common::utils::auth::V2_API_PREFIX, service::authz::check_permissions};
+    use openobserve_core::{auth::V2_API_PREFIX, authz::check_permissions};
 
     let user;
     let keys = get_dex_jwks().await;

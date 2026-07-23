@@ -64,8 +64,11 @@ struct EvaluatorSpanReflection {
     flags: u8,
     events: String,
     links: String,
+    attributes_target_scope: String,
+    attributes_target_id: String,
     attributes_target_span_id: String,
     attributes_target_trace_id: String,
+    attributes_target_session_id: String,
     attributes_target_stream: String,
     attributes_target_stream_type: String,
     attributes_target_agent_name: String,
@@ -74,9 +77,13 @@ struct EvaluatorSpanReflection {
     attributes_scorer_version: String,
     attributes_scorer_type: String,
     attributes_job_id: String,
+    attributes_job_version: String,
     attributes_score_config_id: String,
     attributes_score_config_version: String,
     attributes_eval_run_id: String,
+    attributes_task_id: String,
+    attributes_score_id: String,
+    attributes_evaluation_key: String,
     attributes_provider_id: String,
     attributes_provider_name: String,
     attributes_provider_type: String,
@@ -113,8 +120,11 @@ impl EvaluatorSpanReflection {
             flags: 0,
             events: String::new(),
             links: String::new(),
+            attributes_target_scope: String::new(),
+            attributes_target_id: String::new(),
             attributes_target_span_id: String::new(),
             attributes_target_trace_id: String::new(),
+            attributes_target_session_id: String::new(),
             attributes_target_stream: String::new(),
             attributes_target_stream_type: String::new(),
             attributes_target_agent_name: String::new(),
@@ -123,9 +133,13 @@ impl EvaluatorSpanReflection {
             attributes_scorer_version: String::new(),
             attributes_scorer_type: String::new(),
             attributes_job_id: String::new(),
+            attributes_job_version: String::new(),
             attributes_score_config_id: String::new(),
             attributes_score_config_version: String::new(),
             attributes_eval_run_id: String::new(),
+            attributes_task_id: String::new(),
+            attributes_score_id: String::new(),
+            attributes_evaluation_key: String::new(),
             attributes_provider_id: String::new(),
             attributes_provider_name: String::new(),
             attributes_provider_type: String::new(),
@@ -174,7 +188,7 @@ async fn initialize_evaluator_stream_schema(org_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    match crate::service::db::schema::merge(
+    match crate::db::schema::merge(
         org_id,
         stream_name,
         stream_type,
@@ -239,8 +253,11 @@ mod tests {
         assert!(obj.contains_key("flags"));
         assert!(obj.contains_key("events"));
         assert!(obj.contains_key("links"));
+        assert!(obj.contains_key("attributes_target_scope"));
+        assert!(obj.contains_key("attributes_target_id"));
         assert!(obj.contains_key("attributes_target_span_id"));
         assert!(obj.contains_key("attributes_target_trace_id"));
+        assert!(obj.contains_key("attributes_target_session_id"));
         assert!(obj.contains_key("attributes_target_stream"));
         assert!(obj.contains_key("attributes_target_stream_type"));
         assert!(obj.contains_key("attributes_target_agent_name"));
@@ -249,9 +266,13 @@ mod tests {
         assert!(obj.contains_key("attributes_scorer_version"));
         assert!(obj.contains_key("attributes_scorer_type"));
         assert!(obj.contains_key("attributes_job_id"));
+        assert!(obj.contains_key("attributes_job_version"));
         assert!(obj.contains_key("attributes_score_config_id"));
         assert!(obj.contains_key("attributes_score_config_version"));
         assert!(obj.contains_key("attributes_eval_run_id"));
+        assert!(obj.contains_key("attributes_task_id"));
+        assert!(obj.contains_key("attributes_score_id"));
+        assert!(obj.contains_key("attributes_evaluation_key"));
         assert!(obj.contains_key("attributes_provider_id"));
         assert!(obj.contains_key("attributes_provider_name"));
         assert!(obj.contains_key("attributes_provider_type"));

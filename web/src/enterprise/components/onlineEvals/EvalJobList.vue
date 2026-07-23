@@ -78,6 +78,7 @@
             class="ml-3"
             icon-left="delete"
             data-test="eval-job-bulk-delete-btn"
+            :loading="actionLoading"
             @click="handleBulkDelete"
           >
             {{ t("onlineEvals.job.deleteBulkButton") }} ({{ selectedIds.length }})
@@ -90,6 +91,10 @@
 
         <template #cell-stream="{ row }">
           {{ row.stream }}
+        </template>
+
+        <template #cell-targetScope="{ row }">
+          <OTag type="fieldTag" :value="targetScopeOf(row)">{{ targetScopeLabel(row) }}</OTag>
         </template>
 
         <template #cell-scorers="{ row }">
@@ -160,7 +165,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { EvalJob, EvalJobStatus } from "@/services/online-evals.service";
-import { statusOf, valueOf } from "./utils/evalEntity";
+import { statusOf, targetScopeOf, valueOf } from "./utils/evalEntity";
 import { formatDate } from "@/utils/date";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EvalListShell from "./EvalListShell.vue";
@@ -170,6 +175,8 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
+  /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
+  actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */
   pendingStatusId?: string | null;
 }>();
@@ -263,6 +270,14 @@ const columns = computed(() =>
       meta: { align: "left" },
     },
     {
+      id: "targetScope",
+      header: t("onlineEvals.job.columns.targetScope"),
+      accessorFn: (row: EvalJob) => targetScopeOf(row),
+      sortable: true,
+      size: 120,
+      meta: { align: "left" },
+    },
+    {
       id: "scorers",
       header: t("onlineEvals.job.columns.scorers"),
       accessorFn: (row: EvalJob) => (row.scorers || []).length,
@@ -327,6 +342,10 @@ function scorerCountText(row: EvalJob) {
   const count = (row.scorers || []).length;
   if (count === 1) return t("onlineEvals.job.scorerCount", { count });
   return t("onlineEvals.job.scorersCount", { count });
+}
+
+function targetScopeLabel(row: EvalJob) {
+  return t(`onlineEvals.job.targetScopes.${targetScopeOf(row)}`);
 }
 
 function rowCreated(row: EvalJob) {

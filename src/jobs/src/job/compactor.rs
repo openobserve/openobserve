@@ -22,8 +22,7 @@ use config::{
 use infra::cluster::get_node_by_uuid;
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
-
-use crate::service::compact;
+use openobserve_core::compact;
 const ENRICHMENT_TABLE_MERGE_LOCK_KEY: &str = "/compact/enrichment_table";
 
 pub async fn run() -> Result<(), anyhow::Error> {
@@ -115,7 +114,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
         get_config().compact.sync_to_db_interval,
         {
             log::debug!("[COMPACTOR::JOB] Running sync cached compact offset to db");
-            if let Err(e) = crate::service::db::compact::files::sync_cache_to_db().await {
+            if let Err(e) = db::compact::files::sync_cache_to_db().await {
                 log::error!("[COMPACTOR::JOB] run sync cached compact offset to db error: {e}");
             }
         }
@@ -134,7 +133,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 return;
             }
             log::debug!("[COMPACTOR::JOB] Running sync cached downsampling offset to db");
-            if let Err(e) = crate::service::db::compact::downsampling::sync_cache_to_db().await {
+            if let Err(e) = db::compact::downsampling::sync_cache_to_db().await {
                 log::error!(
                     "[COMPACTOR::JOB] run sync cached downsampling offset to db error: {e}"
                 );
@@ -184,7 +183,7 @@ pub async fn run() -> Result<(), anyhow::Error> {
             };
 
             // reset all metrics
-            let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+            let orgs = db::schema::list_organizations_from_cache().await;
             for org in orgs {
                 for stream_type in ALL_STREAM_TYPES {
                     if metrics::COMPACT_PENDING_JOBS
@@ -261,6 +260,6 @@ async fn run_enrichment_table_merge() -> Result<(), anyhow::Error> {
     if let Err(e) = infra::dist_lock::unlock(&locker).await {
         log::error!("[COMPACTOR::JOB] Failed to release lock for enrichment table merge: {e}");
     }
-    crate::service::enrichment::storage::remote::run_merge_job().await;
+    openobserve_core::enrichment::storage::remote::run_merge_job().await;
     Ok(())
 }

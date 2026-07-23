@@ -30,7 +30,7 @@ pub async fn process_expired_batches() {
 
         #[cfg(feature = "enterprise")]
         {
-            let batches = crate::service::alerts::grouping::get_expired_batches();
+            let batches = openobserve_core::alerts::grouping::get_expired_batches();
             let trace_id = config::ider::generate_trace_id();
             let trace_id = format!("expired_batched_{trace_id}");
 
@@ -41,7 +41,7 @@ pub async fn process_expired_batches() {
                 );
 
                 for batch in batches {
-                    if let Err(e) = crate::service::alerts::grouping::send_grouped_notification(
+                    if let Err(e) = openobserve_core::alerts::grouping::send_grouped_notification(
                         &trace_id, batch,
                     )
                     .await
