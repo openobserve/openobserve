@@ -1,8 +1,8 @@
 {
   "totals": {
-    "rawVarInComponent": 558,
+    "rawVarInComponent": 559,
     "darkMechanism": 2,
-    "unscopedStyle": 1,
+    "unscopedStyle": 2,
     "stylePxUnit": 84
   },
   "files": {
@@ -276,6 +276,10 @@
     },
     "views/Dashboards/ScheduledDashboards.vue": {
       "rawVarInComponent": 5
+    },
+    "views/Dashboards/ViewDashboard.vue": {
+      "unscopedStyle": 1,
+      "rawVarInComponent": 1
     },
     "views/HomeView.vue": {
       "rawVarInComponent": 18

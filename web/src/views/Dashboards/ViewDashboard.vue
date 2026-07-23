@@ -1931,3 +1931,66 @@ export default defineComponent({
   },
 });
 </script>
+
+<style>
+/* keep(complex-state): fullscreen / sticky-header / print-mode toggled state
+   classes (compound .stickyHeader.fullscreenHeader chain + high z-index stacking)
+   plus a @media print block that must reach external ancestors
+   (.o2-app-root, main, .o2-content-scroll, .scroll) — none expressible as
+   component-scoped utilities, so the block stays an unscoped global. */
+.stickyHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1001;
+}
+
+.stickyHeader.fullscreenHeader {
+  top: 0;
+  z-index: 5100 !important;
+}
+
+.fullscreen {
+  width: 100vw !important;
+  height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 5000 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background-color: var(--color-surface-base) !important;
+}
+
+.print-mode-container {
+  /* Grow to the dashboard's natural content height and let the app's outer
+     scroll wrapper (MainLayout's .o2-content-scroll) do the scrolling — the same
+     model the @media print block below relies on. Pinning a viewport height here
+     (100vh or 100%) capped the subtree, and OPageLayout's body (overflow-hidden)
+     then clipped the trailing panels, so tall dashboards could never be scrolled
+     to the bottom. `overflow: visible` keeps the sticky header pinned to the
+     outer scroll wrapper rather than to a dead inner scroll box. */
+  height: auto !important;
+  overflow: visible !important;
+}
+
+@media print {
+  .print-mode-container {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Make every ancestor flex/scroll container release its viewport height
+   * so the absolute → block flow conversion in RenderDashboardCharts.vue's
+   * print CSS can actually grow beyond one page. Without these, the .scroll
+   * / overflow-y wrappers clip the dashboard at viewport-height in print. */
+  .o2-app-root,
+  main,
+  .o2-content-scroll,
+  .scroll {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+}
+
+</style>
