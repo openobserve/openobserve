@@ -16,12 +16,9 @@
 use std::sync::Arc;
 
 use config::utils::time::now_micros;
-
-use crate::service::db::enrichment_table;
+use db::enrichment_table;
 
 pub mod storage;
-
-pub use search::enrichment::StreamTable;
 
 // Global state for caching
 // static METADATA_CACHE: Lazy<Arc<RwLock<HashMap<String, EnrichmentTableMetadata>>>> =
@@ -37,7 +34,7 @@ pub async fn get_enrichment_table(
     org_id: &str,
     table_name: &str,
     apply_primary_region_if_specified: bool,
-) -> Result<Arc<Vec<transform::vrl::value::Value>>, anyhow::Error> {
+) -> Result<Arc<Vec<vrl::value::Value>>, anyhow::Error> {
     let value_type =
         get_enrichment_table_inner(org_id, table_name, apply_primary_region_if_specified).await?;
     value_type.to_vrl()
@@ -66,7 +63,7 @@ pub async fn get_enrichment_table_inner(
         } else {
             db_stats.end_time + 1 // search query end time is not inclusive
         };
-        enrichment_table::get_enrichment_table_data(
+        crate::enrichment_table::runtime::get_enrichment_table_data(
             org_id,
             table_name,
             apply_primary_region_if_specified,
@@ -100,10 +97,9 @@ pub async fn get_enrichment_table_inner(
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use transform::{
-        vector_enrichment::{Case, Condition, Table},
-        vrl::value::Value,
-    };
+    use transform::enrichment::StreamTable;
+    use vector_enrichment::{Case, Condition, Table};
+    use vrl::value::Value;
 
     use super::*;
 
@@ -136,7 +132,7 @@ mod tests {
             }),
         ]
         .into_iter()
-        .map(|v| crate::service::db::enrichment_table::convert_to_vrl(&v))
+        .map(|v| transform::convert_to_vrl(&v))
         .collect()
     }
 

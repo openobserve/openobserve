@@ -23,6 +23,11 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: mockToast,
 }));
 
+// usePatternActions calls useI18n() directly (outside a component), so stub it.
+vi.mock("vue-i18n", () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}));
+
 const mockRouterPush = vi.fn();
 vi.mock("vue-router", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -174,6 +179,29 @@ describe("usePatternActions", () => {
       navigatePatternDetail(true, false);
 
       expect(selectedPattern.value).toBeNull();
+    });
+
+    it("navigates the passed visible list, not the full pattern set", () => {
+      // Simulate a severity filter: the visible list is a 2-item subset in a
+      // different order than the full mockPatternsState list.
+      const visible = [
+        { template: "visible-A", pattern_id: "vA" },
+        { template: "visible-B", pattern_id: "vB" },
+      ];
+      const { openPatternDetails, navigatePatternDetail, selectedPattern, navTotal } =
+        usePatternActions();
+      openPatternDetails(visible[0], 0, visible);
+
+      // Total reflects the visible list, not the full set.
+      expect(navTotal.value).toBe(2);
+
+      navigatePatternDetail(true, false);
+      expect(selectedPattern.value!.index).toBe(1);
+      expect(selectedPattern.value!.pattern.template).toBe("visible-B");
+
+      // Cannot step past the visible list's end.
+      navigatePatternDetail(true, false);
+      expect(selectedPattern.value!.index).toBe(1);
     });
   });
 

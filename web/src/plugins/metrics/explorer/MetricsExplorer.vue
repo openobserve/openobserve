@@ -73,11 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="metrics-explorer-mode-workspace"
         >
-          <!-- `favorite-border` (outline), not the filled `favorite`: a filled
-               heart is the card's ON state and on a tab would read as "already
+          <!-- `star-outline` (outline), not the filled `star`: a filled star is
+               the card's ON state and on a tab would read as "already
                favourited" rather than "your favourites live here". -->
           <template #icon-left>
-            <OIcon name="favorite-border" size="sm" class="shrink-0" />
+            <OIcon name="star-outline" size="sm" class="shrink-0" />
           </template>
           {{ t("metrics.explorer.modeWorkspace") }}
         </OToggleGroupItem>
@@ -998,7 +998,7 @@ export default defineComponent({
       if (grid.showFavoritesOnly.value) {
         actions.push({
           id: "clear-favorites",
-          icon: "favorite",
+          icon: "star",
           titleKey: "metrics.explorer.emptyActions.clearFavorites",
           descriptionKey: "metrics.explorer.emptyActions.clearFavoritesDesc",
         });

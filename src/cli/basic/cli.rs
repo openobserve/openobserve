@@ -17,11 +17,14 @@ use std::path::PathBuf;
 
 use chrono::TimeZone;
 use clap::{Arg, ArgAction, Command};
-use config::utils::file::set_permission;
+use common::{infra::config::USERS, meta};
+use config::{DEFAULT_ORG, utils::file::set_permission};
+use db;
 use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
+use openobserve_core::{compact, file_list, users};
 
 use crate::{
     cli::data::{
@@ -29,9 +32,7 @@ use crate::{
         cli::{Cli as dataCli, args as dataArgs},
         export, import,
     },
-    common::{infra::config::USERS, meta},
     migration,
-    service::{compact, db, file_list, users},
 };
 
 /// Not to be confused with [`clap::arg`] macro, this is a custom macro that
@@ -172,7 +173,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
     if let Some(config_file_path) = app.get_one::<String>("config") {
         let path = PathBuf::from(config_file_path);
         config::config_path_manager::set_config_file_path(path.clone())
-            .and_then(|_| crate::job::config_watcher::reload_config(&path))
+            .and_then(|_| openobserve_jobs::job::config_watcher::reload_config(&path))
             .map_err(|e|
                 anyhow::anyhow!(
                     "set config from file path {config_file_path} failed with {e}, stopping boot up... ",
@@ -237,7 +238,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                         ));
                     }
                     let ret = users::update_user(
-                        meta::organization::DEFAULT_ORG,
+                        DEFAULT_ORG,
                         cfg.auth.root_user_email.as_str(),
                         meta::user::UserUpdateMode::CliUpdate,
                         cfg.auth.root_user_email.as_str(),
@@ -245,7 +246,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                             change_password: true,
                             old_password: None,
                             new_password: Some(cfg.auth.root_user_password.clone()),
-                            role: Some(crate::common::meta::user::UserRoleRequest {
+                            role: Some(common::meta::user::UserRoleRequest {
                                 role: config::meta::user::UserRole::Root.to_string(),
                                 custom: None,
                             }),
@@ -444,13 +445,13 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
             }
         }
         "import" => {
-            crate::service::bootstrap::init().await?;
-            crate::common::infra::cluster::register_and_keep_alive().await?;
+            openobserve_core::bootstrap::init().await?;
+            common::infra::cluster::register_and_keep_alive().await?;
             import::Import::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "export" => {
-            crate::service::bootstrap::init().await?;
-            crate::common::infra::cluster::register_and_keep_alive().await?;
+            openobserve_core::bootstrap::init().await?;
+            common::infra::cluster::register_and_keep_alive().await?;
             export::Export::operator(dataCli::arg_matches(command.clone())).await?;
         }
         "recover-file-list" => {

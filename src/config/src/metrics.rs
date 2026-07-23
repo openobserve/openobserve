@@ -1834,6 +1834,98 @@ pub static LICENSE_USAGE_LAST_REPORTING_SUCCESS: Lazy<IntGauge> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// Queue backend metrics (in-memory queue)
+pub static QUEUE_MEMORY_USED_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "queue_memory_used_bytes",
+            "Current aggregate accounted bytes across all queue topics",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["backend"],
+    )
+    .expect("Metric created")
+});
+
+pub static QUEUE_MEMORY_LIMIT_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "queue_memory_limit_bytes",
+            "Configured aggregate accounted byte limit for the queue backend",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["backend"],
+    )
+    .expect("Metric created")
+});
+
+pub static QUEUE_MESSAGES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "queue_messages",
+            "Current queue message counts by topic and state (pending, in_flight)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["topic", "state"],
+    )
+    .expect("Metric created")
+});
+
+pub static QUEUE_PUBLISH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "queue_publish_total",
+            "Total queue publications by topic and result (accepted, rejected_full, rejected_too_large)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["topic", "result"],
+    )
+    .expect("Metric created")
+});
+
+pub static QUEUE_REDELIVERY_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "queue_redelivery_total",
+            "Total queue message redeliveries by topic and reason (dropped, timeout)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["topic", "reason"],
+    )
+    .expect("Metric created")
+});
+
+pub static QUEUE_MESSAGE_EXPIRED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "queue_message_expired_total",
+            "Total queue messages expired by max_age, by topic and state (pending, in_flight)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["topic", "state"],
+    )
+    .expect("Metric created")
+});
+
+pub static QUEUE_OLDEST_MESSAGE_AGE_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "queue_oldest_message_age_seconds",
+            "Age in seconds of the oldest pending or in-flight queue message",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["topic"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -2305,6 +2397,28 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(LICENSE_USAGE_LAST_REPORTING_SUCCESS.clone()))
+        .expect("Metric registered");
+    // queue backend metrics
+    registry
+        .register(Box::new(QUEUE_MEMORY_USED_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUEUE_MEMORY_LIMIT_BYTES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUEUE_MESSAGES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUEUE_PUBLISH_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUEUE_REDELIVERY_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUEUE_MESSAGE_EXPIRED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(QUEUE_OLDEST_MESSAGE_AGE_SECONDS.clone()))
         .expect("Metric registered");
 }
 

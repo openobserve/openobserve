@@ -17,7 +17,7 @@
  * Shared utilities for rendering log pattern templates with coloured wildcard
  * chips and hover-tooltip value distributions.
  *
- * Mirrors Datadog's "Pattern Inspector" UX: each <*> / <:TYPE> token is a
+ * Pattern-inspector UX: each <*> / <:TYPE> token is a
  * clickable chip that shows the top-N actual values observed at that position
  * across the cluster's example logs, making visually similar patterns
  * immediately distinguishable.
@@ -28,11 +28,20 @@ export interface WildcardValues {
   token: string;
   sample_values: string[];
   is_variable: boolean;
+  /** Backend-computed display mask for this position. */
+  mask?: string | null;
 }
 
 export type TemplateToken =
   | { kind: "text"; value: string }
-  | { kind: "wildcard"; value: string; position: number; sampleValues: string[] };
+  | {
+      kind: "wildcard";
+      value: string;
+      position: number;
+      sampleValues: string[];
+      /** Backend display mask (e.g. "XXX.XXX.XXX.XXX", "[810-3086]") or null. */
+      mask: string | null;
+    };
 
 // Matches <*>, <:IP>, <:IPV4>, <:TIMESTAMP>, <:IDENTIFIERS>, <:NUM>, etc.
 // Must stay in sync with the Rust regex in pattern_extractor.rs:
@@ -83,6 +92,7 @@ export function tokenizeTemplate(
       value: match[0],
       position: wildcardIndex,
       sampleValues: rawValues,
+      mask: (wv as any)?.mask ?? null,
     });
 
     wildcardIndex++;
@@ -204,6 +214,8 @@ export function wildcardLabel(token: string, sampleValues?: any[]): string {
     "<:URL>": "url",
     "<:METHOD>": "method",
     "<:IDENTIFIERS>": "id",
+    "<:IDENTIFIER>": "id",
+    "<:UUID>": "uuid",
   };
   return labelMap[token] ?? token;
 }

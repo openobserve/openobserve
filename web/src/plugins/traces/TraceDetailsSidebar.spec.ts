@@ -112,7 +112,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-
 const mockStore = createStore({
   state: {
     theme: "light",
@@ -204,7 +203,8 @@ const tabStubs = {
   },
   OTab: {
     name: "OTab",
-    template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+    template:
+      '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
     props: ["name", "label", "style"],
   },
   // OTabPanels: provide reactive context via setup()
@@ -394,7 +394,10 @@ describe("TraceDetailsSidebar", async () => {
         // — we set vm state directly.
         viewLogsWrapper.vm.correlationProps = {
           logStreams: [
-            { stream_name: "test-stream", filters: { service_name: "test-svc" } },
+            {
+              stream_name: "test-stream",
+              filters: { service_name: "test-svc" },
+            },
           ],
           timeRange: { startTime: 1000000, endTime: 2000000 },
         };
@@ -590,7 +593,9 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should not show database tab when span has no db_ attributes", () => {
       expect(
-        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+        wrapper
+          .find('[data-test="trace-details-sidebar-tabs-database"]')
+          .exists(),
       ).toBe(false);
     });
 
@@ -609,7 +614,9 @@ describe("TraceDetailsSidebar", async () => {
         span: { ...mockSpan, db_system: "postgresql" },
       });
       expect(
-        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
+        wrapper
+          .find('[data-test="trace-details-sidebar-tabs-database"]')
+          .exists(),
       ).toBe(true);
     });
 
@@ -788,9 +795,7 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should pass span to TraceErrorTab stub", () => {
-      const spanIdEl = wrapper.find(
-        '[data-test="trace-error-tab-span-id"]',
-      );
+      const spanIdEl = wrapper.find('[data-test="trace-error-tab-span-id"]');
       expect(spanIdEl.exists()).toBe(true);
       expect(spanIdEl.text()).toBe(mockSpan.span_id);
     });
@@ -1250,7 +1255,7 @@ describe("TraceDetailsSidebar", async () => {
       });
       expect(testWrapper.exists()).toBe(true);
       // Check that the component has the prop correctly set
-      expect(typeof testWrapper.vm.showLogStreamSelector).toBe('boolean');
+      expect(typeof testWrapper.vm.showLogStreamSelector).toBe("boolean");
       expect(testWrapper.vm.showLogStreamSelector).toBe(true);
       testWrapper.unmount();
     });
@@ -1300,13 +1305,15 @@ describe("TraceDetailsSidebar", async () => {
       });
       // The tooltip content should be computed and available
       expect(testWrapper.vm.viewLogsTooltipContent).toBeDefined();
-      expect(typeof testWrapper.vm.viewLogsTooltipContent).toBe('string');
+      expect(typeof testWrapper.vm.viewLogsTooltipContent).toBe("string");
 
       // The button should be wrapped in spans for tooltip functionality
-      const viewLogsBtn = testWrapper.find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]');
+      const viewLogsBtn = testWrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+      );
       if (viewLogsBtn.exists()) {
         const buttonWrapper = viewLogsBtn.element.parentElement;
-        expect(buttonWrapper?.tagName.toLowerCase()).toBe('span');
+        expect(buttonWrapper?.tagName.toLowerCase()).toBe("span");
       }
       testWrapper.unmount();
     });
@@ -1403,7 +1410,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain the internationalized string
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1419,7 +1426,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain loading text
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1435,7 +1442,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain default text
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1798,7 +1805,7 @@ describe("TraceDetailsSidebar", async () => {
           stubs: {
             ...baseStubs,
             LLMContentRenderer: {
-              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId"><slot /></div>`,
+              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId" :data-content="content"><slot /></div>`,
               props: [
                 "content",
                 "observationType",
@@ -1842,6 +1849,59 @@ describe("TraceDetailsSidebar", async () => {
         '[data-test="llm-content-renderer-output"]',
       );
       expect(outputRenderer.exists()).toBe(true);
+    });
+
+    it("renders a remote evaluator response in Preview without GenAI fields", async () => {
+      const remoteWrapper = mount(TraceDetailsSidebar, {
+        props: {
+          span: {
+            span_id: "remote-evaluator-span",
+            trace_id: "remote-evaluator-trace",
+            attributes_status: "success",
+            attributes_response:
+              '{"code":"OK","value":0.9,"reason":"Supported"}',
+          },
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+          activeTab: "preview",
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: {
+            ...baseStubs,
+            LLMContentRenderer: {
+              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-content="content"><slot /></div>`,
+              props: [
+                "content",
+                "observationType",
+                "contentType",
+                "span",
+                "viewMode",
+                "instanceId",
+              ],
+            },
+            TenstackTable: true,
+            "q-expansion-item": true,
+            CodemirrorEditor: true,
+            CodeQueryEditor: true,
+          },
+        },
+      });
+      await remoteWrapper.vm.$nextTick();
+
+      expect(
+        remoteWrapper
+          .find('[data-test="trace-details-sidebar-tabs-preview"]')
+          .exists(),
+      ).toBe(true);
+      expect(
+        remoteWrapper
+          .find('[data-test="llm-content-renderer-output"]')
+          .attributes("data-content"),
+      ).toBe('{"code":"OK","value":0.9,"reason":"Supported"}');
+
+      remoteWrapper.unmount();
     });
 
     it("should pass instance-id ending with -input to the input LLMContentRenderer", () => {

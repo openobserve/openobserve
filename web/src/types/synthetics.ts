@@ -159,6 +159,11 @@ export type RecorderPortInbound =
   | RecorderPortMessage
   | { type: 'synthetics-response'; response: unknown }
 
+// ---- Bridge transport types (content-script relay, replaces chrome.runtime.*) ----
+
+export type BridgeStatusMessage =
+  | { type: 'bridge-disconnected' }
+
 /**
  * Check types creatable from the UI. Only types both the control plane and the
  * probes run end-to-end today — dns/ping/api exist server-side but have no
@@ -256,6 +261,28 @@ export interface SyntheticsLocation {
   name: string
   region: string
   provider: string
+  /** "public" (o2-operated) | "private" (customer agent) — absent in old payloads. */
+  kind?: 'public' | 'private'
+  enabled?: boolean
+  /** Check types runnable at this location (live agents' capabilities). */
+  types?: string[]
+  status?: 'online' | 'offline' | 'pending'
+  /** Live agents' names, most recently seen first (private rows). */
+  agent_names?: string[]
+  live_agents?: number
+  /** Most recent agent last_seen_at (epoch µs). */
+  last_seen_at?: number
+}
+
+/** Shape returned by GET /api/{org}/synthetics/agent-setup — ingredients the
+ *  setup drawer composes per-platform install commands from. */
+export interface AgentSetup {
+  token?: string
+  org: string
+  o2_url: string
+  script_url: string
+  /** Legacy docker one-liner (drawer fallback when composing is impossible). */
+  install: string
 }
 
 export interface SyntheticsDevice {
@@ -308,4 +335,55 @@ export interface BrowserCheck {
   secrets?: { id?: string; name: string; value: string }[]
   headers?: { id?: string; key: string; value: string }[]
   cookies?: { id?: string; name: string; value: string; domain: string }[]
+}
+
+// ── Private locations (GET /{org}/synthetics/locations + /{id}) ──────────────
+
+/** One row of the locations API — registry fields + computed live stats. */
+export interface SyntheticLocation {
+  id: string
+  name: string
+  region: string
+  provider: string
+  kind: 'public' | 'private'
+  pool: string
+  enabled: boolean
+  types: string[]
+  live_agents: number
+  /** Live agents' names, most recently seen first. */
+  agent_names: string[]
+  agents_total: number
+  status: 'online' | 'offline' | 'pending'
+  version?: string
+  last_seen_at?: number
+  monitors_count: number
+  checks_per_min: number
+}
+
+/** A self-registered agent shown on the location detail page (read-only). */
+export interface SyntheticLocationAgent {
+  id: string
+  name: string
+  version?: string
+  capabilities?: { types?: string[]; icmp?: boolean; max_concurrency?: number }
+  last_seen_at: number
+  created_at: number
+  live: boolean
+}
+
+/** One synthetic assigned to a location, in the detail page's checks table. */
+export interface SyntheticLocationCheck {
+  id: string
+  name: string
+  type: string
+  interval_secs: number
+  enabled: boolean
+  last_check_status: string
+}
+
+/** GET /{org}/synthetics/locations/{id} — flattened location + agents/checks. */
+export interface SyntheticLocationDetail extends SyntheticLocation {
+  agents: SyntheticLocationAgent[]
+  checks: SyntheticLocationCheck[]
+  install?: string
 }

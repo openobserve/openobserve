@@ -28,8 +28,14 @@ use config::{
     cluster::LOCAL_NODE,
     get_config,
     meta::stream::StreamType,
-    utils::{flatten::format_key, json, schema::infer_json_schema_from_map, time::BASE_TIME},
+    utils::{
+        flatten::format_key,
+        json,
+        schema::{format_stream_name, infer_json_schema_from_map},
+        time::BASE_TIME,
+    },
 };
+use db;
 use hashbrown::HashSet;
 use infra::{
     cache::stats,
@@ -41,15 +47,13 @@ use infra::{
 
 use crate::{
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-    service::{
-        db,
-        enrichment::storage::Values,
-        format_stream_name,
-        schema::{check_for_schema, stream_schema_exists}, /* self_reporting::report_request_usage_stats, */
-    },
+    enrichment::storage::Values,
+    schema::{check_for_schema, stream_schema_exists},
 };
 
+pub mod cache;
 pub mod geoip;
+pub mod runtime;
 pub mod url_processor;
 
 // Re-export the initialization function for easy access
@@ -228,17 +232,13 @@ pub async fn save_enrichment_data(
     let schema = Arc::new(schema);
 
     // If data size is less than the merge threshold, we can store it in the database
-    let merge_threshold_mb = crate::service::enrichment::storage::remote::get_merge_threshold_mb()
+    let merge_threshold_mb = crate::enrichment::storage::remote::get_merge_threshold_mb()
         .await
         .unwrap_or(100) as f64;
     if (records_size as f64) < merge_threshold_mb * SIZE_IN_MB {
-        if let Err(e) = crate::service::enrichment::storage::database::store(
-            org_id,
-            &stream_name,
-            &records,
-            timestamp,
-        )
-        .await
+        if let Err(e) =
+            crate::enrichment::storage::database::store(org_id, &stream_name, &records, timestamp)
+                .await
         {
             log::error!("Error writing enrichment table to database: {e}");
             let error_msg = format!("Error writing enrichment table to database: {e}");
@@ -252,20 +252,16 @@ pub async fn save_enrichment_data(
         }
     } else {
         // If data size is greater than the merge threshold, we can store it directly to s3
-        if let Err(e) = crate::service::enrichment::storage::remote::store(
-            org_id,
-            &stream_name,
-            &records,
-            timestamp,
-        )
-        .await
+        if let Err(e) =
+            crate::enrichment::storage::remote::store(org_id, &stream_name, &records, timestamp)
+                .await
         {
             log::error!("Error writing enrichment table to S3: {e}");
         }
     }
 
     // write data to local cache
-    if let Err(e) = crate::service::enrichment::storage::local::store(
+    if let Err(e) = crate::enrichment::storage::local::store(
         org_id,
         &stream_name,
         Values::Json(std::sync::Arc::new(records)),
@@ -321,11 +317,10 @@ pub async fn delete_enrichment_table(
         log::error!("Error deleting stream schema: {e}");
     }
 
-    if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
+    if let Err(e) = crate::enrichment::storage::local::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from local cache: {e}");
     }
-    if let Err(e) = crate::service::enrichment::storage::database::delete(org_id, stream_name).await
-    {
+    if let Err(e) = crate::enrichment::storage::database::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from database: {e}");
     }
 
@@ -437,11 +432,10 @@ pub async fn cleanup_enrichment_table_resources(
 ) {
     log::info!("cleaning up enrichment table  resources {stream_name}");
 
-    if let Err(e) = crate::service::enrichment::storage::local::delete(org_id, stream_name).await {
+    if let Err(e) = crate::enrichment::storage::local::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from local cache: {e}");
     }
-    if let Err(e) = crate::service::enrichment::storage::database::delete(org_id, stream_name).await
-    {
+    if let Err(e) = crate::enrichment::storage::database::delete(org_id, stream_name).await {
         log::error!("Error deleting enrichment table from database: {e}");
     }
 
@@ -466,17 +460,12 @@ pub async fn delete_from_file_list(
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
-    crate::service::compact::retention::delete_from_file_list(
-        org_id,
-        stream_type,
-        stream_name,
-        time_range,
-    )
-    .await
-    .map_err(|e| {
-        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
-        e
-    })?;
+    crate::compact::retention::delete_from_file_list(org_id, stream_type, stream_name, time_range)
+        .await
+        .map_err(|e| {
+            log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
+            e
+        })?;
 
     #[cfg(feature = "enterprise")]
     {

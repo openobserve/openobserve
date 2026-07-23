@@ -28,6 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- usage section new -->
       <div class="flex flex-col gap-4 w-full">
+        <div
+          v-if="showContractCreditMessage"
+          data-test="contract-ai-credits-exhausted"
+          role="status"
+          class="border border-status-warning-text bg-status-warning-bg text-status-warning-text rounded-default px-4 py-3 text-sm"
+        >
+          {{ t("billing.aiContractExhaustedMessage") }}
+        </div>
       <!-- tab-info-section -->
       <!-- this will be unlocked when we get the actionscripts , rum sessions , error tracking from BE -->
         <div v-if="false" class="grid grid-cols-3 gap-4 w-full">
@@ -226,6 +234,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
+import config from "@/aws-exports";
 
   let currentDate = new Date();
 
@@ -268,6 +277,7 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         dataretention: null,
         ai_credits: null
       });
+      const aiUsage = ref<any>(null);
       let chartData: any = ref({});
       // The member-org selector lives in Billing.vue (rendered beside this
       // component) and shares the current selection via this injected reactive.
@@ -276,6 +286,11 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         undefined as any
       );
       const selectedMember = computed(() => usageMember?.selected || "");
+      const showContractCreditMessage = computed(
+        () =>
+          !selectedMember.value &&
+          aiUsage.value?.requires_additional_credits === true,
+      );
 
       // --- Daily chart (appended below the cards when self-usage is on) -----
       // The existing cards (billing API) stay; when reporting is enabled we also
@@ -389,8 +404,19 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
       };
       // ---------------------------------------------------------------------
 
+      const loadAiCreditStatus = async () => {
+        if (config.isCloud !== "true") return;
+        const orgId = store.state.selectedOrganization.identifier;
+        try {
+          aiUsage.value = (await BillingService.get_ai_usage(orgId)).data;
+        } catch {
+          aiUsage.value = null;
+        }
+      };
+
       onMounted(async () => {
         selectUsageDate();
+        await loadAiCreditStatus();
       });
       const usageDate: any = computed(() => {
         return router.currentRoute.value.query.usage_date ?? "30days";
@@ -1121,6 +1147,8 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
         usageData,
         usageCost,
         usageTiles,
+        aiUsage,
+        showContractCreditMessage,
         getUsage,
         router,
         pipelineIcon,
@@ -1142,4 +1170,3 @@ import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
     },
   });
   </script>
-

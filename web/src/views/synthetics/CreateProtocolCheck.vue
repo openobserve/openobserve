@@ -9,6 +9,7 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
 import type {
+  AgentSetup,
   BrowserCheck,
   ProtocolCheck,
   ProtocolCheckType,
@@ -29,6 +30,7 @@ import OButton from '@/lib/core/Button/OButton.vue'
 import OIcon from '@/lib/core/Icon/OIcon.vue'
 import ODialog from '@/lib/overlay/Dialog/ODialog.vue'
 import CheckConfigure from '@/components/synthetics/configure/CheckConfigure.vue'
+import AgentSetupDrawer from '@/components/synthetic-monitoring/AgentSetupDrawer.vue'
 import CreateBrowserTestSkeleton from '@/components/synthetics/CreateBrowserTestSkeleton.vue'
 import CheckHttpConfig from '@/components/synthetics/configure/types/CheckHttpConfig.vue'
 import CheckTcpConfig from '@/components/synthetics/configure/types/CheckTcpConfig.vue'
@@ -105,9 +107,29 @@ async function fetchLocations() {
   try {
     const org = store.state.selectedOrganization.identifier
     const res = await syntheticsService.getLocations(org)
-    locations.value = ((res.data ?? {}).locations ?? []) as SyntheticsLocation[]
+    // Protocol checks run from public locations and private agents alike;
+    // disabled locations are hidden.
+    locations.value = (((res.data ?? {}).locations ?? []) as SyntheticsLocation[]).filter(
+      (l) => l.enabled !== false,
+    )
   } catch {
     locations.value = []
+  }
+}
+
+// ── Private agent setup (drawer opened from the locations card) ──────────
+const showAgentSetup = ref(false)
+const agentSetup = ref<AgentSetup | null>(null)
+
+async function openAgentSetup() {
+  showAgentSetup.value = true
+  if (agentSetup.value) return
+  try {
+    const org = store.state.selectedOrganization.identifier
+    const res = await syntheticsService.getAgentSetup(org)
+    agentSetup.value = (res.data ?? null) as AgentSetup | null
+  } catch {
+    agentSetup.value = null
   }
 }
 
@@ -204,7 +226,7 @@ async function saveCheck() {
       toast({ variant: 'success', message: t('synthetics.newCheck.saved') })
     }
     isDirty.value = false
-    router.push({ name: 'synthetic', query: { folder: check.value.folder } })
+    router.push({ name: 'synthetics', query: { folder: check.value.folder } })
   } catch (err: any) {
     dismiss()
     toast({
@@ -221,7 +243,7 @@ async function saveCheck() {
 <template>
   <OPageLayout
     :title="headerTitle"
-    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetic' }, dataTest: 'synthetics-create-back-btn' }"
+    :back="{ label: t('synthetics.newCheck.back'), to: { name: 'synthetics' }, dataTest: 'synthetics-create-back-btn' }"
     bleed
   >
 
@@ -234,9 +256,11 @@ async function saveCheck() {
           :locations="locations"
           :destinations="destinations"
           :folders="folders"
+          allow-private-locations
           class="w-full!"
           @refresh:destinations="fetchDestinations"
           @update:check="onConfigureUpdate"
+          @setup-agent="openAgentSetup"
         >
           <template #type-config>
             <component
@@ -251,7 +275,7 @@ async function saveCheck() {
       <!-- Sticky footer -->
       <div class="flex items-center px-3 py-2.5 gap-2 border-t border-border-default shrink-0 bg-surface-base">
         <span class="flex-1" aria-hidden="true" />
-        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetic' })">
+        <OButton variant="ghost" size="sm" data-test="synthetics-create-cancel-btn" @click="router.push({ name: 'synthetics' })">
           {{ t('common.cancel') }}
         </OButton>
         <OButton variant="primary" size="sm" :loading="isSaving" data-test="synthetics-create-save-btn" @click="saveCheck">
@@ -259,6 +283,18 @@ async function saveCheck() {
           <template #suffix><OIcon name="save" size="sm" /></template>
         </OButton>
       </div>
+
+      <!-- Private agent setup drawer; locations reload on close so a freshly
+           registered location becomes selectable without leaving the form. -->
+      <AgentSetupDrawer
+        v-model:open="showAgentSetup"
+        :token="agentSetup?.token"
+        :org="agentSetup?.org"
+        :o2-url="agentSetup?.o2_url"
+        :script-url="agentSetup?.script_url"
+        :install="agentSetup?.install"
+        @update:open="(open: boolean) => { if (!open) fetchLocations() }"
+      />
 
       <!-- Unsaved changes dialog -->
       <ODialog

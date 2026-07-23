@@ -16,20 +16,18 @@
 use axum::{extract::Path, http::HeaderMap, response::Response};
 use config::{get_config, meta::stream::StreamType, metrics, utils::json};
 use hashbrown::HashMap;
+use openobserve_api_common::extractors::Headers;
+use openobserve_core::auth::UserEmail;
+use search_service as SearchService;
 use serde::Serialize;
 use tracing::{Instrument, Span};
 
 use crate::{
     common::{
         meta::http::HttpResponse as MetaHttpResponse,
-        utils::{
-            auth::UserEmail,
-            http::{get_or_create_trace_id, get_use_cache_from_request},
-        },
+        utils::http::{get_or_create_trace_id, get_use_cache_from_request},
     },
-    extractors::Headers,
     search::error_utils::map_error_to_http_response,
-    service::search as SearchService,
 };
 
 /// GetTraceDAG
@@ -91,7 +89,7 @@ pub async fn get_trace_dag(
 
     #[cfg(feature = "enterprise")]
     {
-        if let Err(e) = crate::service::search::check_search_allowed(&org_id, Some(&stream_name)) {
+        if let Err(e) = search_service::check_search_allowed(&org_id, Some(&stream_name)) {
             return MetaHttpResponse::too_many_requests(e.to_string());
         }
     }
@@ -117,15 +115,12 @@ pub async fn get_trace_dag(
     {
         use o2_openfga::meta::mapping::OFGA_MODELS;
 
-        use crate::{
-            common::utils::auth::{AuthExtractor, is_root_user},
-            service::users::get_user,
-        };
-        if !is_root_user(user_id) {
+        use crate::service::{auth::AuthExtractor, users::get_user};
+        if !db::user::is_root_user(user_id) {
             let user: config::meta::user::User = get_user(Some(&org_id), user_id).await.unwrap();
             let stream_type_str = StreamType::Traces.as_str();
 
-            if !crate::service::authz::check_permissions(
+            if !openobserve_core::authz::check_permissions(
                 user_id,
                 AuthExtractor {
                     auth: "".to_string(),
@@ -237,6 +232,7 @@ pub async fn get_trace_dag(
         use_cache: get_use_cache_from_request(&query),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     let stream_type = StreamType::Traces;

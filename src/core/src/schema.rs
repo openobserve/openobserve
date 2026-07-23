@@ -42,6 +42,7 @@ use config::{
     },
 };
 use datafusion::arrow::datatypes::{Field, Schema};
+use db;
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
@@ -51,8 +52,8 @@ use serde_json::{Map, Value};
 
 use super::logs::bulk::SCHEMA_CONFORMANCE_FAILED;
 use crate::{
-    common::meta::{authz::Authz, ingestion::StreamSchemaChk, stream::SchemaEvolution},
-    service::db,
+    common::meta::{authz::Authz, stream::SchemaEvolution},
+    ingestion_types::StreamSchemaChk,
 };
 
 pub(crate) fn get_upto_discard_error() -> anyhow::Error {
@@ -333,12 +334,7 @@ pub(crate) async fn handle_diff_schema(
     };
 
     if is_new {
-        crate::common::utils::auth::set_ownership(
-            org_id,
-            stream_type.as_str(),
-            Authz::new(stream_name),
-        )
-        .await;
+        db::authz::set_ownership(org_id, stream_type.as_str(), Authz::new(stream_name)).await;
     }
 
     // check defined_schema_fields

@@ -18,6 +18,7 @@ pub mod search_job_results;
 pub mod search_jobs;
 
 use config::utils::json;
+use db::{sourcemaps::SOURCEMAP_PREFIX, workflows::WORKFLOWS_PREFIX};
 use infra::{
     coordinator::get_coordinator,
     errors::{Error, Result},
@@ -31,13 +32,7 @@ use infra::{
     },
 };
 use o2_enterprise::enterprise::super_cluster::queue::{Message, MessageType};
-use openobserve_core::service::{
-    db::{
-        sourcemaps::SOURCEMAP_PREFIX,
-        workflows::{WORKFLOW_TRIGGER_PREFIX, WORKFLOWS_PREFIX},
-    },
-    workflows::WorkflowTrigger,
-};
+use openobserve_core::workflows::{WorkflowTrigger, runtime::WORKFLOW_TRIGGER_PREFIX};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {

@@ -291,6 +291,7 @@ describe("Custom Component", () => {
         "vector",
         "filebeat",
         "gcpLogs",
+        "loongcollector",
       ];
       
       // Test each log route sets correct tab
@@ -691,7 +692,30 @@ describe("Custom Component", () => {
           }
         },
       });
-      
+
+      expect(testWrapper.vm.tabs).toBe("ingestLogs");
+      testWrapper.unmount();
+    });
+
+    it("should handle loongcollector route", () => {
+      mockRouter.currentRoute.value.name = "loongcollector";
+
+      const testWrapper = mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            'OSplitter': {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            },
+            'OTabs': true,
+            'ORouteTab': true,
+            'router-view': true
+          }
+        },
+      });
+
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });

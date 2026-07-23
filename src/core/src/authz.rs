@@ -15,13 +15,15 @@
 
 #[cfg(feature = "enterprise")]
 use axum::response::Response;
+#[cfg(feature = "enterprise")]
+use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::user::UserRole;
 #[cfg(feature = "enterprise")]
 use config::meta::{stream::StreamType, user::User};
-
-use crate::common::utils::auth::AuthExtractor;
 #[cfg(feature = "enterprise")]
-use crate::common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::is_root_user};
+use db::user::is_root_user;
+
+use crate::auth::AuthExtractor;
 
 #[cfg(feature = "enterprise")]
 #[derive(Clone, Copy)]
@@ -50,9 +52,7 @@ pub async fn check_stream_permissions(
         meta::mapping::{LOGS_INSIGHTS_KEY, LOGS_PATTERN_KEY, OFGA_MODELS},
     };
 
-    let user: User = crate::service::users::get_user(Some(org_id), user_id)
-        .await
-        .unwrap();
+    let user: User = crate::users::get_user(Some(org_id), user_id).await.unwrap();
     let stream_type_str = stream_type.as_str();
     let config = get_config();
     let mut o2_model_type = "";
@@ -104,7 +104,7 @@ pub async fn check_permissions(
     role: UserRole,
     _is_external: bool,
 ) -> bool {
-    use crate::common::infra::config::ORG_USERS;
+    use common::infra::config::ORG_USERS;
 
     if !o2_openfga::config::get_config().enabled {
         return true;
@@ -156,41 +156,11 @@ pub async fn check_permissions(
     true
 }
 
-#[cfg(feature = "enterprise")]
 pub async fn list_objects_for_user(
     org_id: &str,
     user_id: &str,
     permission: &str,
     object_type: &str,
 ) -> anyhow::Result<Option<Vec<String>>> {
-    let openfga_config = o2_openfga::config::get_config();
-    if is_root_user(user_id) || !openfga_config.enabled || !openfga_config.list_only_permitted {
-        return Ok(None);
-    }
-
-    let role = crate::service::users::get_user(Some(org_id), user_id)
-        .await
-        .map(|user| user.role.to_string())
-        .unwrap_or_default();
-    let objects = o2_openfga::authorizer::authz::list_objects(
-        user_id,
-        permission,
-        object_type,
-        org_id,
-        &role,
-    )
-    .await
-    .map_err(|_| anyhow::anyhow!("Unauthorized Access"))?;
-    log::debug!("list_objects_for_user for user {user_id} from {org_id} org returns: {objects:#?}");
-    Ok(Some(objects))
-}
-
-#[cfg(not(feature = "enterprise"))]
-pub async fn list_objects_for_user(
-    _org_id: &str,
-    _user_id: &str,
-    _permission: &str,
-    _object_type: &str,
-) -> anyhow::Result<Option<Vec<String>>> {
-    Ok(None)
+    db::authz::list_objects_for_user(org_id, user_id, permission, object_type).await
 }

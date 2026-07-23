@@ -103,6 +103,18 @@ export function isLLMTrace(data: any): boolean {
   return false;
 }
 
+/** Whether Trace Details can render a useful input/output preview for a span.
+ * Remote evaluator spans intentionally do not claim GenAI semantics, but they
+ * still persist their request and response on the evaluator attributes. */
+export function hasTracePreview(data: any): boolean {
+  if (!data) return false;
+  return (
+    isLLMTrace(data) ||
+    hasValue(data.attributes_prompt) ||
+    hasValue(data.attributes_response)
+  );
+}
+
 /**
  * Parse LLM usage details from backend data
  * Handles both JSON objects (from backend) and strings (edge cases)
@@ -114,8 +126,7 @@ export function parseUsageDetails(value: any): UsageDetails {
 
     const input = Number(data.gen_ai_usage_input_tokens) || 0;
     const output = Number(data.gen_ai_usage_output_tokens) || 0;
-    const total =
-      Number(data.gen_ai_usage_total_tokens) || input + output;
+    const total = Number(data.gen_ai_usage_total_tokens) || input + output;
 
     return {
       input,
@@ -447,7 +458,9 @@ export function getQualityScoreColor(score: number | null): string {
 /**
  * Get color for observation type badge
  */
-export function getObservationTypeColor(type: string | null | undefined): string {
+export function getObservationTypeColor(
+  type: string | null | undefined,
+): string {
   if (!type) return "grey";
 
   const colorMap: Record<string, string> = {
@@ -486,15 +499,10 @@ export function extractLLMData(span: any): LLMData | null {
   const evaluation = parseEvaluationScores(span);
 
   return {
-    provider:
-      span.gen_ai_system ||
-      span.gen_ai_provider_name ||
-      "unknown",
+    provider: span.gen_ai_system || span.gen_ai_provider_name || "unknown",
     observationType: span.gen_ai_operation_name || "span",
     modelName:
-      span.gen_ai_response_model ||
-      span.gen_ai_request_model ||
-      "unknown",
+      span.gen_ai_response_model || span.gen_ai_request_model || "unknown",
     input: span.gen_ai_input_messages,
     output: span.gen_ai_output_messages,
     modelParameters: modelParams,

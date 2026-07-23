@@ -21,11 +21,12 @@ use axum::{
     response::Response,
 };
 use config::{ider, meta::pipeline::Pipeline};
-
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
-use crate::common::utils::auth::check_permissions;
+use openobserve_core::auth::check_permissions;
+
 use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{
         extractors::Headers,
         models::pipelines::{PipelineBulkEnableRequest, PipelineBulkEnableResponse, PipelineList},
@@ -189,7 +190,7 @@ pub async fn list_pipelines(
                 _permitted = list;
             }
             Err(e) => {
-                return crate::common::meta::http::HttpResponse::forbidden(e.to_string());
+                return common::meta::http::HttpResponse::forbidden(e.to_string());
             }
         }
         // Get List of allowed objects ends
@@ -206,7 +207,7 @@ pub async fn list_pipelines(
     };
 
     // Fetch pipeline errors from DB
-    let pipeline_errors = match crate::service::db::pipeline_errors::list_by_org(&org_id).await {
+    let pipeline_errors = match db::pipeline_errors::list_by_org(&org_id).await {
         Ok(errors) => errors
             .into_iter()
             .map(|error| {
@@ -269,7 +270,7 @@ pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -
     let paused_at = if let Some(derived_stream) = meta_pipeline.get_derived_stream() {
         let module_key =
             derived_stream.get_scheduler_module_key(&meta_pipeline.name, &meta_pipeline.id);
-        match crate::service::db::scheduler::get(
+        match db::scheduler::get(
             &meta_pipeline.org,
             config::meta::triggers::TriggerModule::DerivedStream,
             &module_key,
@@ -284,15 +285,14 @@ pub async fn get_pipeline(Path((org_id, pipeline_id)): Path<(String, String)>) -
     };
 
     // Get last error info
-    let last_error =
-        match crate::service::db::pipeline_errors::get_by_pipeline_id(&pipeline_id).await {
-            Ok(Some(error)) => Some(crate::handler::http::models::pipelines::PipelineErrorInfo {
-                last_error_timestamp: error.last_error_timestamp,
-                error_summary: error.error_summary,
-                node_errors: error.node_errors,
-            }),
-            _ => None,
-        };
+    let last_error = match db::pipeline_errors::get_by_pipeline_id(&pipeline_id).await {
+        Ok(Some(error)) => Some(crate::handler::http::models::pipelines::PipelineErrorInfo {
+            last_error_timestamp: error.last_error_timestamp,
+            error_summary: error.error_summary,
+            node_errors: error.node_errors,
+        }),
+        _ => None,
+    };
 
     MetaHttpResponse::json(crate::handler::http::models::pipelines::Pipeline::from(
         meta_pipeline,
@@ -632,8 +632,7 @@ pub async fn enable_pipeline_bulk(
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
-
-    use crate::service::db::pipeline::PipelineError;
+    use openobserve_core::pipeline::store::PipelineError;
 
     fn status(err: PipelineError) -> StatusCode {
         Response::from(err).status()

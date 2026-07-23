@@ -24,11 +24,8 @@ use datafusion::{
     physical_plan::ExecutionPlan,
 };
 use parking_lot::Mutex;
-
-use crate::service::search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
-pub use crate::service::search::datafusion::plan_metrics::{
-    get_cluster_metrics, get_peak_memory_from_ctx,
-};
+use search::datafusion::distributed_plan::remote_scan_exec::RemoteScanExec;
+pub use search::datafusion::plan_metrics::{get_cluster_metrics, get_peak_memory_from_ctx};
 
 pub fn get_scan_stats(plan: &Arc<dyn ExecutionPlan>) -> Option<Arc<Mutex<ScanStats>>> {
     let mut visitor = RemoteScanVisitor::new();

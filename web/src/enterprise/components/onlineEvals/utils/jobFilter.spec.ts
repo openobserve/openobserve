@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildJobFilterConditionPayload,
+  buildOptionalJobConditionPayload,
   cleanFilterGroup,
   createEmptyJobFilterGroup,
   normalizeJobFilterCondition,
@@ -126,7 +127,12 @@ describe("cleanFilterGroup", () => {
         { filterType: "condition", column: "", operator: "=", value: "x" },
         { filterType: "condition", column: "a", operator: "", value: "x" },
         { filterType: "condition", column: "a", operator: "=", value: "" },
-        { filterType: "condition", column: "a", operator: "=", value: undefined },
+        {
+          filterType: "condition",
+          column: "a",
+          operator: "=",
+          value: undefined,
+        },
         { filterType: "condition", column: "a", operator: "=", value: null },
         { filterType: "condition", column: "b", operator: "=", value: "ok" },
       ],
@@ -174,7 +180,10 @@ describe("cleanFilterGroup", () => {
   });
 
   it("tolerates a missing conditions array", () => {
-    const cleaned = cleanFilterGroup({ filterType: "group", logicalOperator: "AND" } as any);
+    const cleaned = cleanFilterGroup({
+      filterType: "group",
+      logicalOperator: "AND",
+    } as any);
     expect(cleaned.conditions).toEqual([]);
   });
 });
@@ -205,7 +214,12 @@ describe("buildJobFilterConditionPayload", () => {
       filterType: "group",
       logicalOperator: "AND",
       conditions: [
-        { filterType: "condition", column: "span_name", operator: "=", value: "chat" },
+        {
+          filterType: "condition",
+          column: "span_name",
+          operator: "=",
+          value: "chat",
+        },
       ],
     } as any);
     expect(payload).toMatchObject({
@@ -220,6 +234,51 @@ describe("buildJobFilterConditionPayload", () => {
             operator: "=",
             value: "chat",
           }),
+        ],
+      },
+    });
+  });
+});
+
+describe("buildOptionalJobConditionPayload", () => {
+  it("returns null when no End Signal condition is configured", () => {
+    expect(
+      buildOptionalJobConditionPayload({
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [],
+      } as any),
+    ).toBeNull();
+  });
+
+  it("emits the canonical V2 envelope for an End Signal", () => {
+    expect(
+      buildOptionalJobConditionPayload({
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "status",
+            operator: "=",
+            value: "complete",
+          },
+        ],
+      } as any),
+    ).toEqual({
+      version: 2,
+      conditions: {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "status",
+            operator: "=",
+            value: "complete",
+            values: [],
+            logicalOperator: "AND",
+          },
         ],
       },
     });

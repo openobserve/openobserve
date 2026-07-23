@@ -53,11 +53,16 @@ use config::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
+use utoipa::ToSchema;
 
 /// Per-org total usage counter. Single AtomicU64 per org — no cross-key locks.
 /// This is the hot-path structure used by `try_deduct`.
 static ORG_USAGE: Lazy<RwLock<HashMap<String, AtomicU64>>> =
     Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Explicit per-organization limits. Missing organizations use the
+/// deployment-wide default.
+static ORG_LIMITS: Lazy<RwLock<HashMap<String, u64>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 /// Bounded channel for deduction records pending DB flush.
 /// Capacity is generous to avoid backpressure on the hot path.
@@ -156,11 +161,13 @@ impl std::fmt::Display for QuotaExhaustedError {
 
 impl std::error::Error for QuotaExhaustedError {}
 
-/// Get the shared pool limit (same for all orgs, from config)
-fn get_pool_limit() -> u64 {
-    o2_enterprise::enterprise::common::config::get_config()
+/// Get the organization's shared pool limit, falling back to deployment config.
+fn get_pool_limit(org_id: &str) -> u64 {
+    let default_limit = o2_enterprise::enterprise::common::config::get_config()
         .cloud
-        .ai_free_credit_pool
+        .ai_free_credit_pool;
+    let org_limit = ORG_LIMITS.read().unwrap().get(org_id).copied();
+    org_limit.unwrap_or(default_limit)
 }
 
 /// Get total usage across all features for an org (single atomic read)
@@ -197,26 +204,72 @@ fn add_to_org_counter(org_id: &str, delta: u64) {
     }
 }
 
-/// HA message broadcast to other nodes after a deduction.
-/// Contains the delta (cost) so receivers can add it to their local counter.
+fn set_cached_limit(org_id: &str, usage_limit: u64) {
+    ORG_LIMITS
+        .write()
+        .unwrap()
+        .insert(org_id.to_string(), usage_limit);
+}
+
+/// HA message broadcast to other nodes after a deduction or limit update.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TrialQuotaHaMsg {
     pub org_id: String,
     pub cost: u64,
+    #[serde(default)]
+    pub usage_limit: Option<u64>,
     pub source_node: Node,
     /// Microsecond timestamp of when the deduction happened.
     /// Used to skip messages older than the DB snapshot loaded at init.
     pub timestamp: i64,
 }
 
-/// Check if the org has an active Stripe subscription (valid subscription_id + customer_id).
-pub async fn org_has_active_subscription(org_id: &str) -> bool {
-    if let Ok(Some(sub)) =
-        o2_enterprise::enterprise::cloud::billings::get_billing_by_org_id(org_id).await
-    {
-        !sub.subscription_type.is_free_sub()
-    } else {
-        false
+/// Persist and publish an explicit lifetime credit limit for an organization.
+/// Credit usage continues to use the existing in-memory counter and batched DB flush.
+pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Error> {
+    let previous_limit = get_pool_limit(org_id);
+    let db_limit = i64::try_from(usage_limit)
+        .map_err(|_| anyhow::anyhow!("AI credit limit exceeds the supported maximum"))?;
+    infra::table::trial_quota_usage::set_usage_limit_for_org(org_id, db_limit).await?;
+    if usage_limit > previous_limit {
+        reset_checkpoint(org_id).await;
+    }
+    set_cached_limit(org_id, usage_limit);
+
+    if !LOCAL_NODE.is_single_node() {
+        if let Err(err) = publish_ha_msg(&TrialQuotaHaMsg {
+            org_id: org_id.to_string(),
+            cost: 0,
+            usage_limit: Some(usage_limit),
+            source_node: LOCAL_NODE.clone(),
+            timestamp: config::utils::time::now_micros(),
+        })
+        .await
+        {
+            log::warn!(
+                "[TRIAL_QUOTA] Failed to broadcast limit update for org={org_id}; periodic reconciliation will apply it: {err}"
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Reconcile explicit limits from the database. This runs on the existing
+/// flush interval so missed or out-of-order HA messages remain short-lived.
+pub async fn refresh_limits_from_db() {
+    match infra::table::trial_quota_usage::load_all_usage_limits().await {
+        Ok(limits) => {
+            let limits = limits
+                .into_iter()
+                .filter_map(|(org_id, limit)| {
+                    u64::try_from(limit).ok().map(|limit| (org_id, limit))
+                })
+                .collect();
+            *ORG_LIMITS.write().unwrap() = limits;
+        }
+        Err(err) => {
+            log::warn!("[TRIAL_QUOTA] Failed to refresh organization limits: {err}");
+        }
     }
 }
 
@@ -232,7 +285,7 @@ pub async fn try_deduct(
     feature: TrialQuotaFeature,
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
     let cost = feature.cost();
-    let pool_limit = get_pool_limit();
+    let pool_limit = get_pool_limit(org_id);
 
     log::info!(
         "[TRIAL_QUOTA] try_deduct called: org={} feature={} cost={} pool_limit={}",
@@ -310,6 +363,7 @@ pub async fn try_deduct(
                 let msg = TrialQuotaHaMsg {
                     org_id: org_id.to_string(),
                     cost,
+                    usage_limit: None,
                     source_node: LOCAL_NODE.clone(),
                     timestamp: config::utils::time::now_micros(),
                 };
@@ -398,8 +452,8 @@ async fn publish_ha_msg(msg: &TrialQuotaHaMsg) -> Result<(), anyhow::Error> {
 }
 
 /// Subscribe to the HA queue and apply remote deltas to local counters.
-/// Each message carries `(org_id, cost, source_node)`. Messages from self
-/// are skipped. The delta is atomically added to the local counter.
+/// Each message carries a usage delta or an explicit limit. Messages from self
+/// are skipped. Usage deltas are atomically added to the local counter.
 ///
 /// Must run on ALL cloud nodes. Skipped in single-node mode.
 pub async fn subscribe_ha_queue() {
@@ -475,14 +529,21 @@ pub async fn subscribe_ha_queue() {
             continue;
         }
 
+        if let Some(usage_limit) = ha_msg.usage_limit {
+            set_cached_limit(&ha_msg.org_id, usage_limit);
+        }
+
         let old = get_org_total_used(&ha_msg.org_id);
-        add_to_org_counter(&ha_msg.org_id, ha_msg.cost);
+        if ha_msg.cost > 0 {
+            add_to_org_counter(&ha_msg.org_id, ha_msg.cost);
+        }
         let new_total = get_org_total_used(&ha_msg.org_id);
 
         log::info!(
-            "[TRIAL_QUOTA] HA sync: org={} delta={} total {}->{}",
+            "[TRIAL_QUOTA] HA sync: org={} delta={} limit={:?} total {}->{}",
             ha_msg.org_id,
             ha_msg.cost,
+            ha_msg.usage_limit,
             old,
             new_total,
         );
@@ -501,7 +562,7 @@ pub async fn subscribe_ha_queue() {
 
 /// Get remaining credits in the org's shared pool
 pub fn get_remaining(org_id: &str) -> u64 {
-    let limit = get_pool_limit();
+    let limit = get_pool_limit(org_id);
     let used = get_org_total_used(org_id);
     limit.saturating_sub(used)
 }
@@ -511,9 +572,9 @@ pub fn get_used(org_id: &str) -> u64 {
     get_org_total_used(org_id)
 }
 
-/// Get the pool limit (same for all orgs)
-pub fn get_limit(_org_id: &str) -> u64 {
-    get_pool_limit()
+/// Get the pool limit for an organization, falling back to the deployment-wide default.
+pub fn get_limit(org_id: &str) -> u64 {
+    get_pool_limit(org_id)
 }
 
 /// Serializable request body for AI usage events.
@@ -613,7 +674,7 @@ fn record_usage_internal(
         ..credit_event.clone()
     };
 
-    crate::service::self_reporting::report_usage(vec![credit_event, feature_event]);
+    usage_reporting::report_usage(vec![credit_event, feature_event]);
 }
 
 /// Record free credit usage (all orgs). Writes `AiFreeCredits` — not billed.
@@ -627,24 +688,25 @@ pub fn record_billable_ai_usage(org_id: &str, ctx: &AiUsageContext, feature: Tri
 }
 
 /// AI usage response for the API
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AiUsageResponse {
     pub mode: String,
     pub credits_used: u64,
     pub credits_limit: u64,
     pub credits_remaining: u64,
+    pub requires_additional_credits: bool,
 }
 
 /// Get AI usage info for an org (for the usage API endpoint).
 /// Reports the single shared pool across all AI features.
-/// Reads from DB for accuracy (not in-memory cache).
+/// Uses the greater of persisted and in-memory usage to include pending flushes.
 ///
 /// Mode is derived from actual state:
 /// - `"free"`: credits remaining in pool
 /// - `"pay_as_you_go"`: credits exhausted + active subscription
 /// - `"exhausted"`: credits exhausted + no subscription
 pub async fn get_usage(org_id: &str) -> AiUsageResponse {
-    let limit = get_pool_limit();
+    let limit = get_pool_limit(org_id);
     let in_memory_used = get_org_total_used(org_id);
 
     // Read from DB for accuracy
@@ -669,15 +731,25 @@ pub async fn get_usage(org_id: &str) -> AiUsageResponse {
         }
     };
 
-    let used = db_used;
+    let used = db_used.max(in_memory_used);
     let remaining = limit.saturating_sub(used);
-
-    let mode = if remaining > 0 {
-        "free"
-    } else if org_has_active_subscription(org_id).await {
-        "pay_as_you_go"
+    let exhaustion_policy = if remaining == 0 {
+        Some(
+            o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                org_id,
+            )
+            .await,
+        )
     } else {
-        "exhausted"
+        None
+    };
+    let requires_additional_credits =
+        exhaustion_policy.is_some_and(|policy| policy.requires_additional_credits());
+
+    let mode = match exhaustion_policy {
+        None => "free",
+        Some(policy) if policy.allows_metered_overage() => "pay_as_you_go",
+        Some(_) => "exhausted",
     };
 
     AiUsageResponse {
@@ -685,12 +757,13 @@ pub async fn get_usage(org_id: &str) -> AiUsageResponse {
         credits_used: used,
         credits_limit: limit,
         credits_remaining: remaining,
+        requires_additional_credits,
     }
 }
 
 /// Get the current usage percentage for an org (0–100, clamped).
 pub fn get_quota_percentage(org_id: &str) -> u8 {
-    let limit = get_pool_limit();
+    let limit = get_pool_limit(org_id);
     if limit == 0 {
         return 100;
     }
@@ -742,69 +815,9 @@ pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
 
 /// Reset checkpoint tracking for an org (e.g., when credits are refilled).
 pub async fn reset_checkpoint(org_id: &str) {
-    if let Err(e) = infra::table::trial_quota_usage::update_notified_checkpoint(org_id, 0).await {
+    if let Err(e) = infra::table::trial_quota_usage::reset_notified_checkpoint(org_id).await {
         log::error!("[AI_QUOTA] Failed to reset checkpoint for org={org_id}: {e}");
     }
-}
-
-/// Build the email message for a given checkpoint and org type (free vs paid).
-pub fn build_quota_email_message(
-    org_id: &str,
-    org_name: &str,
-    checkpoint: u8,
-    is_paid: bool,
-    used: u64,
-    limit: u64,
-) -> (String, String) {
-    let display_name = if org_name.is_empty() {
-        org_id
-    } else {
-        org_name
-    };
-    let subject = format!(
-        "[OpenObserve] AI Credits: {}% used — {display_name}",
-        checkpoint
-    );
-
-    let message = match (checkpoint, is_paid) {
-        (80, false) => format!(
-            "You've used 80% of your free AI credits ({used}/{limit}). Subscribe to a plan for uninterrupted AI access."
-        ),
-        (80, true) => format!(
-            "You've used 80% of your free AI credits ({used}/{limit}). Once exhausted, AI usage will be billed to your subscription."
-        ),
-        (90, false) => format!(
-            "You've used 90% of your free AI credits ({used}/{limit}). Subscribe now to avoid losing access."
-        ),
-        (90, true) => format!(
-            "You've used 90% of your free AI credits ({used}/{limit}). Pay-as-you-go billing will start soon."
-        ),
-        (95, false) => format!(
-            "Only 5% of your free AI credits remain ({used}/{limit}). Subscribe immediately to continue using AI."
-        ),
-        (95, true) => format!(
-            "Only 5% of your free AI credits remain ({used}/{limit}). Pay-as-you-go billing is about to start."
-        ),
-        (100, false) => format!(
-            "Your free AI credits are exhausted ({used}/{limit}). Subscribe to resume AI features."
-        ),
-        (100, true) => format!(
-            "Your free AI credits are exhausted ({used}/{limit}). AI usage is now billed to your subscription via pay-as-you-go."
-        ),
-        _ => format!("You've used {checkpoint}% of your free AI credits ({used}/{limit})."),
-    };
-
-    let body = format!(
-        "<html><body>\
-        <h2>AI Credit Usage Alert</h2>\
-        <p><strong>Organization:</strong> {display_name} ({org_id})</p>\
-        <p>{message}</p>\
-        <p><strong>Credits used:</strong> {used} / {limit}</p>\
-        <p><a href=\"https://cloud.openobserve.ai/billings\">View Billing</a></p>\
-        </body></html>"
-    );
-
-    (subject, body)
 }
 
 /// Initialize quota from DB on node startup.
@@ -817,10 +830,19 @@ pub async fn init_from_db() {
             let max_updated_at = records.iter().map(|r| r.updated_at).max().unwrap_or(0);
             INIT_WATERMARK.store(max_updated_at, Ordering::Relaxed);
 
-            // Sum per-feature counts into per-org totals
+            // Sum per-feature counts into per-org totals and load explicit limits.
             let mut org_totals: HashMap<String, u64> = HashMap::new();
+            let mut org_limits: HashMap<String, u64> = HashMap::new();
             for record in &records {
                 *org_totals.entry(record.org_id.clone()).or_default() += record.usage_count as u64;
+                if let Some(limit) = record.usage_limit
+                    && let Ok(limit) = u64::try_from(limit)
+                {
+                    org_limits
+                        .entry(record.org_id.clone())
+                        .and_modify(|current| *current = (*current).max(limit))
+                        .or_insert(limit);
+                }
             }
 
             // Populate ORG_USAGE with totals
@@ -830,6 +852,7 @@ pub async fn init_from_db() {
                     map.insert(org_id, AtomicU64::new(total));
                 }
             }
+            *ORG_LIMITS.write().unwrap() = org_limits;
 
             log::info!(
                 "[TRIAL_QUOTA] Loaded {} quota records from DB, watermark={}",
@@ -898,71 +921,6 @@ mod tests {
     #[test]
     fn test_pending_checkpoint_100_skip_notified_95() {
         assert_eq!(pending_checkpoint_from(100, 95), Some(100));
-    }
-
-    // --- build_quota_email_message ---
-
-    #[test]
-    fn test_email_subject_contains_percentage_and_org_name() {
-        let (subject, _) = build_quota_email_message("org1", "My Org", 80, false, 80, 100);
-        assert!(subject.contains("80%"), "subject: {subject}");
-        assert!(subject.contains("My Org"), "subject: {subject}");
-    }
-
-    #[test]
-    fn test_email_subject_uses_org_id_when_name_empty() {
-        let (subject, _) = build_quota_email_message("org1", "", 80, false, 80, 100);
-        assert!(subject.contains("org1"), "subject: {subject}");
-    }
-
-    #[test]
-    fn test_email_body_contains_org_and_credits() {
-        let (_, body) = build_quota_email_message("org1", "My Org", 90, true, 90, 100);
-        assert!(body.contains("My Org"), "body missing org name");
-        assert!(body.contains("90"), "body missing used credits");
-        assert!(body.contains("100"), "body missing limit");
-    }
-
-    #[test]
-    fn test_email_80_free_mentions_subscribe() {
-        let (_, body) = build_quota_email_message("o", "o", 80, false, 80, 100);
-        assert!(
-            body.to_lowercase().contains("subscribe"),
-            "free 80% should mention subscribe"
-        );
-    }
-
-    #[test]
-    fn test_email_80_paid_mentions_billing() {
-        let (_, body) = build_quota_email_message("o", "o", 80, true, 80, 100);
-        assert!(
-            body.to_lowercase().contains("billed") || body.to_lowercase().contains("billing"),
-            "paid 80% should mention billing"
-        );
-    }
-
-    #[test]
-    fn test_email_100_free_credits_exhausted() {
-        let (_, body) = build_quota_email_message("o", "o", 100, false, 100, 100);
-        assert!(
-            body.to_lowercase().contains("exhaust"),
-            "100% free should mention exhausted"
-        );
-    }
-
-    #[test]
-    fn test_email_100_paid_pay_as_you_go() {
-        let (_, body) = build_quota_email_message("o", "o", 100, true, 100, 100);
-        assert!(
-            body.to_lowercase().contains("pay-as-you-go") || body.to_lowercase().contains("billed"),
-            "100% paid should mention pay-as-you-go"
-        );
-    }
-
-    #[test]
-    fn test_email_unknown_checkpoint_fallback() {
-        let (_, body) = build_quota_email_message("o", "o", 50, false, 50, 100);
-        assert!(body.contains("50%"), "fallback should include percentage");
     }
 
     #[test]

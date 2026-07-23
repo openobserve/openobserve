@@ -15,6 +15,11 @@
 
 use axum::{extract::Path, response::Response};
 use config::meta::folder::Folder;
+use db::folders::{self, FolderError};
+#[cfg(feature = "enterprise")]
+use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::UserEmail;
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
@@ -22,10 +27,33 @@ use crate::{
         CreateFolderRequestBody, CreateFolderResponseBody, FolderType, GetFolderResponseBody,
         ListFoldersResponseBody, UpdateFolderRequestBody,
     },
-    service::folders,
 };
-#[cfg(feature = "enterprise")]
-use crate::{common::utils::auth::UserEmail, extractors::Headers};
+
+fn folder_error_response(value: FolderError) -> Response {
+    match value {
+        FolderError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        FolderError::TableReportsError(err) => MetaHttpResponse::internal_error(err),
+        FolderError::MissingName => MetaHttpResponse::bad_request("Folder name cannot be empty"),
+        FolderError::UpdateDefaultFolder => {
+            MetaHttpResponse::bad_request("Can't update default folder")
+        }
+        FolderError::DeleteWithDashboards => MetaHttpResponse::bad_request(
+            "Folder contains dashboards, please move/delete dashboards from folder",
+        ),
+        FolderError::DeleteWithAlerts => MetaHttpResponse::bad_request(
+            "Folder contains alerts, please move/delete alerts from folder",
+        ),
+        FolderError::DeleteWithReports => MetaHttpResponse::bad_request(
+            "Folder contains reports, please move/delete reports from folder",
+        ),
+        FolderError::NotFound => MetaHttpResponse::not_found("Folder not found"),
+        FolderError::PermittedFoldersMissingUser => MetaHttpResponse::forbidden(""),
+        FolderError::PermittedFoldersValidator(err) => MetaHttpResponse::forbidden(err),
+        FolderError::FolderNameAlreadyExists => MetaHttpResponse::bad_request(
+            "Folder with this name already exists in this organization",
+        ),
+    }
+}
 
 /// CreateFolder
 #[utoipa::path(
@@ -71,7 +99,7 @@ pub async fn create_folder(
             let body: CreateFolderResponseBody = folder.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => folder_error_response(err),
     }
 }
 
@@ -116,7 +144,7 @@ pub async fn update_folder(
     let folder = body.into();
     match folders::update_folder(&org_id, &folder_id, folder_type.into(), folder).await {
         Ok(_) => MetaHttpResponse::ok("Folder updated"),
-        Err(err) => err.into(),
+        Err(err) => folder_error_response(err),
     }
 }
 
@@ -164,7 +192,7 @@ pub async fn list_folders(
             let body: ListFoldersResponseBody = folders.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => folder_error_response(err),
     }
 }
 
@@ -202,7 +230,7 @@ pub async fn get_folder(
             let body: CreateFolderResponseBody = folder.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => folder_error_response(err),
     }
 }
 
@@ -240,7 +268,7 @@ pub async fn get_folder_by_name(
             let body: CreateFolderResponseBody = folder.into();
             MetaHttpResponse::json(body)
         }
-        Err(err) => err.into(),
+        Err(err) => folder_error_response(err),
     }
 }
 
@@ -276,7 +304,7 @@ pub async fn delete_folder(
 ) -> Response {
     match folders::delete_folder(&org_id, &folder_id, folder_type.into()).await {
         Ok(()) => MetaHttpResponse::ok("Folder deleted"),
-        Err(err) => err.into(),
+        Err(err) => folder_error_response(err),
     }
 }
 
@@ -328,7 +356,7 @@ pub mod deprecated {
                 let body: CreateFolderResponseBody = folder.into();
                 MetaHttpResponse::json(body)
             }
-            Err(err) => err.into(),
+            Err(err) => folder_error_response(err),
         }
     }
 
@@ -374,7 +402,7 @@ pub mod deprecated {
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::update_folder(&org_id, &folder_id, folder_type, folder).await {
             Ok(_) => MetaHttpResponse::ok("Folder updated"),
-            Err(err) => err.into(),
+            Err(err) => folder_error_response(err),
         }
     }
 
@@ -419,7 +447,7 @@ pub mod deprecated {
                 let body: ListFoldersResponseBody = folders.into();
                 MetaHttpResponse::json(body)
             }
-            Err(err) => err.into(),
+            Err(err) => folder_error_response(err),
         }
     }
 
@@ -456,7 +484,7 @@ pub mod deprecated {
                 let body: CreateFolderResponseBody = folder.into();
                 MetaHttpResponse::json(body)
             }
-            Err(err) => err.into(),
+            Err(err) => folder_error_response(err),
         }
     }
 
@@ -495,7 +523,7 @@ pub mod deprecated {
                 let body: CreateFolderResponseBody = folder.into();
                 MetaHttpResponse::json(body)
             }
-            Err(err) => err.into(),
+            Err(err) => folder_error_response(err),
         }
     }
 
@@ -530,15 +558,13 @@ pub mod deprecated {
         let folder_type = config::meta::folder::FolderType::Dashboards;
         match folders::delete_folder(&org_id, &folder_id, folder_type).await {
             Ok(()) => MetaHttpResponse::ok("Folder deleted"),
-            Err(err) => err.into(),
+            Err(err) => folder_error_response(err),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use openobserve_core::service::folders::FolderError;
-
     use super::*;
 
     #[test]
@@ -560,7 +586,7 @@ mod tests {
         ];
 
         for (error, expected_status) in test_cases {
-            let response: Response = error.into();
+            let response = folder_error_response(error);
             assert_eq!(response.status().as_u16(), expected_status);
         }
     }
@@ -568,14 +594,14 @@ mod tests {
     #[test]
     fn test_folder_error_infra_error_is_500() {
         let err = FolderError::InfraError(infra::errors::Error::Message("db down".to_string()));
-        let response: Response = err.into();
+        let response = folder_error_response(err);
         assert_eq!(response.status().as_u16(), 500);
     }
 
     #[test]
     fn test_folder_error_table_reports_error_is_500() {
         let err = FolderError::TableReportsError(infra::table::reports::Error::ReportNotFound);
-        let response: Response = err.into();
+        let response = folder_error_response(err);
         assert_eq!(response.status().as_u16(), 500);
     }
 }

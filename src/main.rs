@@ -26,6 +26,7 @@ use std::{
 };
 
 use arrow_flight::flight_service_server::FlightServiceServer;
+use common::{infra::cluster, meta};
 use config::{
     META_ORG_ID,
     cluster::LOCAL_NODE,
@@ -33,10 +34,10 @@ use config::{
     meta::triggers::{Trigger, TriggerModule, TriggerStatus},
     utils::size::bytes_to_human_readable,
 };
+use db::{self, scheduler::TriggerModule::QueryRecommendations};
 use infra::runtime::{create_grpc_runtime, create_job_runtime};
-use openobserve::{
-    cli::basic::cli,
-    common::{infra::cluster, meta},
+use openobserve::{cli::basic::cli, migration};
+use openobserve_api::{
     handler::{
         grpc::{
             auth::check_auth,
@@ -53,17 +54,12 @@ use openobserve::{
         },
         http::router::*,
     },
-    job, migration, router,
-    service::{
-        bootstrap,
-        cluster_info::ClusterInfoService,
-        db::{self, scheduler::TriggerModule::QueryRecommendations},
-        metadata,
-        node::NodeService,
-        search::SEARCH_SERVER,
-        self_reporting,
-    },
+    router,
 };
+use openobserve_core::{
+    bootstrap, cluster_info::ClusterInfoService, metadata, node::NodeService, self_reporting,
+};
+use openobserve_jobs::job;
 use opentelemetry::{KeyValue, global, trace::TracerProvider};
 use opentelemetry_otlp::{WithExportConfig, WithHttpConfig, WithTonicConfig};
 use opentelemetry_proto::tonic::collector::{
@@ -78,6 +74,7 @@ use proto::cluster_rpc::{
     node_service_server::NodeServiceServer, query_cache_server::QueryCacheServer,
     search_server::SearchServer, streams_server::StreamsServer,
 };
+use search_service::SEARCH_SERVER;
 use tokio::sync::oneshot;
 use tonic::{
     codec::CompressionEncoding,
@@ -271,7 +268,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
             // Register job runtime for metrics collection
             if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                openobserve::service::runtime_metrics::register_runtime("job".to_string(), handle);
+                openobserve_core::runtime_metrics::register_runtime("job".to_string(), handle);
             }
 
             job_init_tx.send(true).ok();
@@ -312,7 +309,7 @@ async fn main() -> Result<(), anyhow::Error> {
         };
 
         // Register gRPC runtime for metrics collection
-        openobserve::service::runtime_metrics::register_runtime(
+        openobserve_core::runtime_metrics::register_runtime(
             "grpc".to_string(),
             rt.handle().clone(),
         );
@@ -336,11 +333,11 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Register main HTTP runtime for metrics collection
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        openobserve::service::runtime_metrics::register_runtime("http".to_string(), handle);
+        openobserve_core::runtime_metrics::register_runtime("http".to_string(), handle);
     }
 
     // Start runtime metrics collector
-    openobserve::service::runtime_metrics::start_metrics_collector().await;
+    openobserve_core::runtime_metrics::start_metrics_collector().await;
 
     // let node online
     let _ = cluster::set_online().await;
@@ -946,13 +943,13 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
         async move {
             if LOCAL_NODE.is_ingester() {
                 // Ingest directly on ingester nodes
-                match openobserve::service::traces::handle_otlp_request(
+                match openobserve_core::traces::handle_otlp_request(
                     META_ORG_ID,
                     request,
                     config::meta::otlp::OtlpRequestType::HttpJson,
                     None,
-                    openobserve::common::meta::ingestion::IngestUser::SystemJob(
-                        openobserve::common::meta::ingestion::SystemJobType::SelfReporting,
+                    openobserve_core::ingestion_types::IngestUser::SystemJob(
+                        openobserve_core::ingestion_types::SystemJobType::SelfReporting,
                     ),
                 )
                 .await
@@ -992,16 +989,15 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                     }
                 };
 
-                let (_addr, channel) =
-                    match openobserve::service::grpc::get_ingester_channel().await {
-                        Ok(v) => v,
-                        Err(e) => {
-                            log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
-                            return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
-                                format!("No ingester available: {e}"),
-                            ));
-                        }
-                    };
+                let (_addr, channel) = match openobserve_core::grpc::get_ingester_channel().await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[SEARCH-INSPECTOR] Failed to get ingester channel: {e}");
+                        return Err(opentelemetry_sdk::error::OTelSdkError::InternalFailure(
+                            format!("No ingester available: {e}"),
+                        ));
+                    }
+                };
 
                 let client = opentelemetry_proto::tonic::collector::trace::v1::trace_service_client::TraceServiceClient::with_interceptor(
                     channel,
@@ -1375,7 +1371,7 @@ pub fn create_action_server_router() -> axum::Router {
         middleware,
         routing::{get, post},
     };
-    use openobserve::handler::http::{request::action_server, router::cors_layer};
+    use openobserve_api::handler::http::{request::action_server, router::cors_layer};
 
     let cfg = get_config();
 
@@ -1393,7 +1389,7 @@ pub fn create_action_server_router() -> axum::Router {
                 .put(action_server::patch_action),
         )
         .layer(middleware::from_fn(
-            openobserve::handler::http::auth::action_server::auth_middleware,
+            openobserve_api_management::auth::action_server::auth_middleware,
         ))
         .layer(cors_layer());
 
@@ -1419,7 +1415,7 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
     {
         log::info!("init super cluster");
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
-        openobserve::super_cluster_queue::init().await?;
+        super_cluster_queue::init().await?;
     }
 
     // Initialize enterprise AI components (agent and evaluation clients).
@@ -1438,7 +1434,7 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 
     o2_enterprise::enterprise::pipeline::pipeline_file_server::PipelineFileServer::run().await?;
     if o2cfg.rate_limit.rate_limit_enabled && o2_openfga::config::get_config().enabled {
-        o2_ratelimit::init(openobserve::handler::http::router::openapi::openapi_info().await)
+        o2_ratelimit::init(openobserve_api::handler::http::router::openapi::openapi_info().await)
             .await?;
     }
 
@@ -1448,9 +1444,9 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
 #[cfg(feature = "enterprise")]
 fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::Error> {
     if o2cfg.rate_limit.rate_limit_enabled {
-        let meta_store: config::meta::meta_store::MetaStore =
-            cfg.common.queue_store.as_str().into();
-        if meta_store != config::meta::meta_store::MetaStore::Nats {
+        let queue_store =
+            config::meta::queue_store::QueueStore::try_from(cfg.common.queue_store.as_str());
+        if queue_store != Ok(config::meta::queue_store::QueueStore::Nats) {
             return Err(anyhow::anyhow!(
                 "ZO_QUEUE_STORE must be nats when ratelimit is enabled"
             ));

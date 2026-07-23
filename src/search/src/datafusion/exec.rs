@@ -287,6 +287,17 @@ impl<'a> DataFusionContextBuilder<'a> {
 }
 
 pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
+    register_builtin_udfs(ctx);
+    let udf_list = get_all_transform(org_id)?;
+    for udf in udf_list {
+        ctx.register_udf(udf.clone());
+    }
+    Ok(())
+}
+
+/// Register the org-independent O2 UDFs/UDAFs (everything except the per-org
+/// VRL transform functions).
+pub fn register_builtin_udfs(ctx: &SessionContext) {
     ctx.register_udf(super::udf::str_match_udf::STR_MATCH_UDF.clone());
     ctx.register_udf(super::udf::str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone());
     ctx.register_udf(super::udf::fuzzy_match_udf::FUZZY_MATCH_UDF.clone());
@@ -314,10 +325,6 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
         super::udaf::summary_percentile::SummaryPercentile::new(),
     ));
     ctx.register_udf(super::udf::cast_to_timestamp_udf::CAST_TO_TIMESTAMP_UDF.clone());
-    let udf_list = get_all_transform(org_id)?;
-    for udf in udf_list {
-        ctx.register_udf(udf.clone());
-    }
 
     #[cfg(feature = "enterprise")]
     {
@@ -331,8 +338,25 @@ pub fn register_udf(ctx: &SessionContext, org_id: &str) -> Result<()> {
             o2_enterprise::enterprise::search::datafusion::udaf::approx_topk_distinct::ApproxTopKDistinct::new(),
         ));
     }
+}
 
-    Ok(())
+/// Names of every function usable in O2 SQL: the DataFusion built-ins plus
+/// the built-in O2 UDFs (per-org VRL functions excluded). Snapshotted once —
+/// the registry is static for the process lifetime. Used for did-you-mean
+/// suggestions on "Invalid function" errors.
+pub fn registered_function_names() -> &'static [String] {
+    static NAMES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    NAMES.get_or_init(|| {
+        let ctx = SessionContext::new();
+        register_builtin_udfs(&ctx);
+        let state = ctx.state();
+        let mut names: Vec<String> = state.scalar_functions().keys().cloned().collect();
+        names.extend(state.aggregate_functions().keys().cloned());
+        names.extend(state.window_functions().keys().cloned());
+        names.sort();
+        names.dedup();
+        names
+    })
 }
 
 pub async fn register_metrics_table(

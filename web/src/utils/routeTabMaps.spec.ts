@@ -323,6 +323,12 @@ describe("resolveTab", () => {
       expect(resolveTab("ingestLogs", "syslogNg", "curl")).toBe("syslogNg");
     });
 
+    it("ingestLogs – loongcollector", () => {
+      expect(resolveTab("ingestLogs", "loongcollector", "curl")).toBe(
+        "loongcollector"
+      );
+    });
+
     it("billings – usage", () => {
       expect(resolveTab("billings", "usage", "usage")).toBe("usage");
     });
@@ -516,8 +522,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.others)).toHaveLength(4);
     });
 
-    it("recommended has 9 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(9);
+    it("recommended has 10 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.recommended)).toHaveLength(10);
     });
 
     it("security has 7 entries", () => {
@@ -532,8 +538,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.ingestMetrics)).toHaveLength(6);
     });
 
-    it("ingestLogs has 8 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(8);
+    it("ingestLogs has 9 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(9);
     });
 
     it("billings has 4 entries", () => {

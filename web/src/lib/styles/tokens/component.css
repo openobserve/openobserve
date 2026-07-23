@@ -124,6 +124,8 @@
   --color-toggle-item-disabled: var(--color-text-disabled);
   --color-toggle-border: var(--color-border-default);
   --color-toggle-focus-ring: var(--color-primary-400);
+  /* Insertion line shown while dragging to reorder (reorderable groups) */
+  --color-toggle-drop-indicator: var(--color-primary-600);
 
   /* Dropdown */
   --color-dropdown-bg: var(--color-surface-overlay);
@@ -886,6 +888,7 @@
   --color-toggle-item-disabled: var(--color-toggle-item-disabled);
   --color-toggle-border: var(--color-toggle-border);
   --color-toggle-focus-ring: var(--color-toggle-focus-ring);
+  --color-toggle-drop-indicator: var(--color-toggle-drop-indicator);
 
   /* Dropdown */
   --color-dropdown-bg: var(--color-dropdown-bg);
@@ -1414,6 +1417,8 @@
   --color-label-chip-url-text:     var(--color-label-chip-url-text);
   --color-label-chip-num-bg:       var(--color-label-chip-num-bg);
   --color-label-chip-num-text:     var(--color-label-chip-num-text);
+  --color-pattern-var-bg:          var(--color-pattern-var-bg);
+  --color-pattern-var-text:        var(--color-pattern-var-text);
   --color-label-chip-float-bg:     var(--color-label-chip-float-bg);
   --color-label-chip-float-text:   var(--color-label-chip-float-text);
   --color-label-chip-hex-bg:       var(--color-label-chip-hex-bg);

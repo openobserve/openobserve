@@ -14,6 +14,7 @@ const { t } = useI18n();
 defineProps<{
   data: any[];
   loading?: boolean;
+  actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
 }>();
@@ -134,6 +135,7 @@ const columns: OTableColumnDef[] = [
         data-test="iam-roles-bulk-delete-btn"
         variant="outline-destructive"
         size="sm"
+        :loading="actionLoading"
         @click="emit('bulk-delete')"
       >
         <template #icon-left>

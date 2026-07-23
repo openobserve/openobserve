@@ -28,7 +28,7 @@ use config::{
 use infra::{client::grpc::make_grpc_search_client, cluster::get_node_by_uuid, errors::ErrorCodes};
 use proto::cluster_rpc::GetLicenseUsageResponse;
 
-use crate::service::search as SearchService;
+use crate::search as SearchService;
 
 pub async fn get_usage(
     sql: String,
@@ -72,6 +72,7 @@ pub async fn get_usage(
         use_cache: default_use_cache(),
         clear_cache: false,
         local_mode: None,
+        agent_options: None,
     };
 
     let trace_id = ider::uuid();

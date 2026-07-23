@@ -66,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }}</span>
                 <OIcon
                   v-if="tab.folderId === FAVORITES_FOLDER_ID"
-                  name="favorite"
+                  name="star"
                   size="sm"
                   class="shrink-0 text-favorite"
                 />

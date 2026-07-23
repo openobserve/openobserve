@@ -226,7 +226,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSpinner size="xs" />
                 {{ t("confirmDialog.loading") }}
               </div>
-              <template v-else-if="sortedSavedViews.length">
+              <div
+                v-else-if="sortedSavedViews.length"
+                class="max-h-72 overflow-y-auto overscroll-contain"
+                data-test="logs-search-bar-saved-views-menu-list"
+              >
                 <ODropdownItem
                   v-for="view in sortedSavedViews"
                   :key="view.view_id"
@@ -237,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       :name="
                         favoriteViews.includes(view.view_id)
-                          ? 'favorite'
+                          ? 'star'
                           : 'saved-search'
                       "
                       size="sm"
@@ -261,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                 </ODropdownItem>
-              </template>
+              </div>
               <ODropdownItem v-else disabled>
                 {{ t("search.savedViewsNotFound") }}
               </ODropdownItem>
@@ -557,7 +561,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-toolbar"
             >
               <OIcon name="menu" size="sm" />
-              <OTooltip style="width: 110px" :content="t('search.moreActions')" />
+              <OTooltip max-width="7rem" :content="t('search.moreActions')" />
             </OButton>
           </template>
 
@@ -1788,8 +1792,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         :name="
                           favoriteViews.includes(row.view_id)
-                            ? 'favorite'
-                            : 'favorite-border'
+                            ? 'star'
+                            : 'star-outline'
                         "
                         size="xs"
                         :class="
@@ -1879,7 +1883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <OIcon name="favorite" size="xs" class="text-favorite" />
+                      <OIcon name="star" size="xs" class="text-favorite" />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"

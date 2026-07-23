@@ -109,6 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="destination-list-delete-destinations-btn"
               variant="outline-destructive"
               size="sm"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
               <template #icon-left>
@@ -394,6 +395,7 @@ export default defineComponent({
       data: null,
     });
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
@@ -692,6 +694,7 @@ export default defineComponent({
     };
 
     const bulkDeleteDestinations = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
         message: "Deleting destinations...",
@@ -759,6 +762,8 @@ export default defineComponent({
             message: errorMessage,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
@@ -823,6 +828,7 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteDestinations,
       confirmBulkDelete,
+      bulkDeleteLoading,
       selectedDestinations,
       getPrebuiltTypeName,
       getCustomDestinationLabel,

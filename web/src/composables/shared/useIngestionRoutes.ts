@@ -16,6 +16,7 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
+import LoongCollector from "@/components/ingestion/logs/LoongCollector.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
@@ -42,6 +43,7 @@ import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.v
 import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
 import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
 import LinuxConfig from "@/components/ingestion/recommended/LinuxConfig.vue";
+import MacOSConfig from "@/components/ingestion/recommended/MacOSConfig.vue";
 import OtelConfig from "@/components/ingestion/recommended/OtelConfig.vue";
 import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue";
 
@@ -223,6 +225,14 @@ const useIngestionRoutes = () => {
                     routeGuard(to, from, next);
                   },
                 },
+                {
+                  path: "loongcollector",
+                  name: "loongcollector",
+                  component: LoongCollector,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
               ],
             },
             {
@@ -339,6 +349,14 @@ const useIngestionRoutes = () => {
               path: "linux",
               name: "ingestFromLinux",
               component: LinuxConfig,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
+              path: "macos",
+              name: "ingestFromMacOS",
+              component: MacOSConfig,
               beforeEnter(to: any, from: any, next: any) {
                 routeGuard(to, from, next);
               },
@@ -808,6 +826,10 @@ const useIngestionRoutes = () => {
           },
           children: [
             {
+              // Named so the router doesn't warn about an unnamed empty-path
+              // child under a named parent. Nothing navigates to this name; it
+              // exists only to land /ai-integrations on the first integration.
+              name: "ai-integrations-default",
               path: "",
               redirect: () => {
                 const first = aiCategories[0].integrations[0];

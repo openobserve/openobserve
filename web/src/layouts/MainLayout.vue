@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex-1 flex min-h-0">
       <ONavbar
         v-if="store.state.printMode !== true"
-        :links-list="linksList"
+        :links-list="navLinks"
         :mini-mode="miniMode"
         :visible="leftDrawerOpen"
         @menu-hover="handleMenuHover"
@@ -251,6 +251,11 @@ export default defineComponent({
     },
     signout() {
       this.closeSocket();
+
+      // AI chat streams outlive their component by design, so navigating away
+      // doesn't kill an answer. Logout has to stop them explicitly — otherwise
+      // they keep streaming and writing chat history after sign-out.
+      window.dispatchEvent(new Event("o2:abort-ai-streams"));
 
       // Clear any open notifications so they don't carry over past logout.
       dismissAll();
@@ -460,6 +465,18 @@ export default defineComponent({
       },
     ]);
 
+    // Reveal the rail only once its item list is settled — true immediately when
+    // config is cached, else set when getConfig() resolves. Avoids config-driven
+    // tiles popping in and shifting the layout.
+    const menuReady = ref(
+      !!(
+        store.state.zoConfig &&
+        Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") &&
+        store.state.zoConfig.version != ""
+      ),
+    );
+    const navLinks = computed(() => (menuReady.value ? linksList.value : []));
+
     const langList = [
       {
         label: "English",
@@ -573,6 +590,7 @@ export default defineComponent({
             .leftNavigationLinks(linksList, t);
           filterMenus();
         }
+        menuReady.value = true;
         await nextTick();
         // if rum enabled then setUser to capture session details.
         if (store.state.zoConfig.rum?.enabled) {
@@ -693,7 +711,7 @@ export default defineComponent({
 
     const updateSyntheticMenu = () => {
       const existingIndex = linksList.value.findIndex(
-        (l: any) => l.name === "synthetic",
+        (l: any) => l.name === "synthetics",
       );
 
       if (!isSyntheticsEnabled.value) {
@@ -718,8 +736,8 @@ export default defineComponent({
       linksList.value.splice(insertAt, 0, {
         title: t("menu.synthetic"),
         icon: "radar",
-        link: "/synthetic",
-        name: "synthetic",
+        link: "/synthetics",
+        name: "synthetics",
       });
     };
 
@@ -1168,12 +1186,17 @@ export default defineComponent({
           await nextTick();
 
           filterMenus();
+          menuReady.value = true;
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
           }
         })
-        .catch((error) => console.log(error));
+        .catch((error) => {
+          console.log(error);
+          // Fail open: reveal the base menu even if /config never resolves.
+          menuReady.value = true;
+        });
     };
 
     if (config.isCloud == "true") {
@@ -1320,6 +1343,18 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Home page has its own inline AI tab (see toggleAIChat's home special-case
+    // above), so the sidebar chat panel is redundant there — close it on
+    // arrival so we don't show both the sidebar and the home AI tab at once.
+    watch(
+      () => router.currentRoute.value.name,
+      (routeName) => {
+        if (routeName === "home" && store.state.isAiChatEnabled) {
+          closeChat();
+        }
+      },
+    );
+
     const showShortcuts = ref(false);
     const openShortcutsList = () => { showShortcuts.value = true; };
 
@@ -1335,6 +1370,7 @@ export default defineComponent({
       langList,
       selectedLanguage,
       linksList,
+      navLinks,
       selectedOrg,
       orgOptions,
       leftDrawerOpen: true,

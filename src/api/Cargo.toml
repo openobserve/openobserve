@@ -11,6 +11,8 @@ path = "src/lib.rs"
 [features]
 default = []
 enterprise = [
+    "dep:openobserve-cipher",
+    "openobserve-cipher/enterprise",
     "dep:o2_dex",
     "dep:o2_enterprise",
     "dep:o2_openfga",
@@ -18,6 +20,7 @@ enterprise = [
     "openobserve-api-management/enterprise",
     "openobserve-api-query/enterprise",
     "openobserve-core/enterprise",
+    "search_service/enterprise",
 ]
 cloud = [
     "enterprise",
@@ -29,11 +32,13 @@ cloud = [
 vectorscan = [
     "openobserve-api-query/vectorscan",
     "openobserve-core/vectorscan",
+    "search_service/vectorscan",
 ]
 vortex = [
     "config/vortex",
     "openobserve-api-query/vortex",
     "openobserve-core/vortex",
+    "search_service/vortex",
 ]
 profiling = [
     "dep:tikv-jemalloc-ctl",
@@ -48,7 +53,13 @@ profiling = [
 ignored = ["tikv-jemalloc-sys"]
 
 [dependencies]
+common.workspace = true
+audit.workspace = true
+db.workspace = true
 openobserve-core.workspace = true
+search.workspace = true
+transform.workspace = true
+search_service.workspace = true
 openobserve-api-management.workspace = true
 openobserve-api-query.workspace = true
 openobserve-api-common.workspace = true
@@ -65,6 +76,7 @@ anyhow.workspace = true
 base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
+openobserve-cipher = { workspace = true, optional = true }
 datafusion.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
@@ -116,8 +128,4 @@ flight.workspace = true
 async-stream.workspace = true
 
 [dev-dependencies]
-expect-test.workspace = true
 base64.workspace = true
-float-cmp.workspace = true
-multer.workspace = true
-rcgen.workspace = true
