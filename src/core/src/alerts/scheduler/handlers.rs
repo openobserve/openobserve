@@ -769,14 +769,13 @@ async fn handle_alert_triggers(
     // Per-term on_term notifications produced by the composite branch, sent on
     // the fire path below so they share the composite's silence window.
     #[cfg(feature = "enterprise")]
-    let mut composite_on_term_sends: Vec<crate::service::alerts::composite::OnTermSend> =
-        Vec::new();
+    let mut composite_on_term_sends: Vec<crate::alerts::composite::OnTermSend> = Vec::new();
 
     let evaluation_took = Instant::now();
     // evaluate alert
     #[cfg(feature = "enterprise")]
     let result = if alert.composite.is_some() {
-        match crate::service::alerts::composite::evaluate_composite_for_scheduler(
+        match crate::alerts::composite::evaluate_composite_for_scheduler(
             &trigger.org,
             &mut alert,
             (Some(start_time), final_end_time),
@@ -938,7 +937,7 @@ async fn handle_alert_triggers(
     #[cfg(feature = "enterprise")]
     if trigger_results.data.is_some() && !composite_on_term_sends.is_empty() {
         for send in &composite_on_term_sends {
-            if let Err(e) = crate::service::alerts::alert::send_to_destinations(
+            if let Err(e) = crate::alerts::alert::send_to_destinations(
                 &alert,
                 &send.destinations,
                 &send.rows,

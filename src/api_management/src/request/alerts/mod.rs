@@ -1502,7 +1502,7 @@ pub async fn preview_composite(
                 }
             }
         };
-        specs.push(crate::service::alerts::composite::PreviewTermSpec {
+        specs.push(openobserve_core::alerts::composite::PreviewTermSpec {
             name: t.name,
             alert_id,
             stream_type: t.stream_type,
@@ -1513,7 +1513,7 @@ pub async fn preview_composite(
         });
     }
 
-    let resolved = match crate::service::alerts::composite::resolve_preview_terms(&org_id, specs)
+    let resolved = match openobserve_core::alerts::composite::resolve_preview_terms(&org_id, specs)
         .await
     {
         Ok(r) => r,
@@ -1526,7 +1526,7 @@ pub async fn preview_composite(
     let start = end - period_minutes * 60 * 1_000_000;
     let trace_id = config::ider::generate_trace_id();
 
-    match crate::service::alerts::composite::preview_composite(
+    match openobserve_core::alerts::composite::preview_composite(
         &org_id,
         resolved,
         req_body.expression,

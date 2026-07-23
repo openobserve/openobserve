@@ -62,7 +62,6 @@ use crate::{
 pub mod decompression;
 pub mod middlewares;
 pub mod openapi;
-pub mod ui;
 
 pub use common::meta::http::ERROR_HEADER;
 
@@ -1329,7 +1328,7 @@ pub fn other_service_routes() -> Router {
 }
 
 /// Create the full application router
-pub fn create_app_router() -> Router {
+pub fn create_app_router(ui_routes: fn() -> Router) -> Router {
     let cfg = get_config();
 
     let mut app = if config::cluster::LOCAL_NODE.is_router() {
@@ -1374,7 +1373,7 @@ pub fn create_app_router() -> Router {
                 "/",
                 get(move || core::future::ready(axum::response::Redirect::permanent(&web_path))),
             )
-            .nest_service("/web", ui::ui_routes());
+            .nest_service("/web", ui_routes());
     }
 
     // Set request body size limit (equivalent to actix-web's PayloadConfig)

@@ -274,38 +274,36 @@ async fn resolve_scheduler_terms(
     for term in &spec.terms {
         let (member_name, query) = match term.alert_id {
             // Reference term (ReRun): re-run the referenced alert's live query.
-            Some(rid) => {
-                match crate::service::db::alerts::alert::get_by_id(client, org_id, rid).await {
-                    Ok(Some((_folder, referenced))) => {
-                        let name = Some(referenced.name.clone());
-                        if !referenced.enabled {
-                            (
-                                name,
-                                Err(format!(
-                                    "referenced alert '{}' is disabled",
-                                    referenced.name
-                                )),
-                            )
-                        } else {
-                            (
-                                name,
-                                Ok(ResolvedQuery {
-                                    stream_type: referenced.stream_type,
-                                    stream_name: referenced.stream_name,
-                                    query_condition: referenced.query_condition,
-                                    operator: referenced.trigger_condition.operator,
-                                    threshold: referenced.trigger_condition.threshold,
-                                }),
-                            )
-                        }
+            Some(rid) => match crate::db::alerts::alert::get_by_id(client, org_id, rid).await {
+                Ok(Some((_folder, referenced))) => {
+                    let name = Some(referenced.name.clone());
+                    if !referenced.enabled {
+                        (
+                            name,
+                            Err(format!(
+                                "referenced alert '{}' is disabled",
+                                referenced.name
+                            )),
+                        )
+                    } else {
+                        (
+                            name,
+                            Ok(ResolvedQuery {
+                                stream_type: referenced.stream_type,
+                                stream_name: referenced.stream_name,
+                                query_condition: referenced.query_condition,
+                                operator: referenced.trigger_condition.operator,
+                                threshold: referenced.trigger_condition.threshold,
+                            }),
+                        )
                     }
-                    Ok(None) => (
-                        None,
-                        Err(format!("referenced alert {rid} not found (deleted?)")),
-                    ),
-                    Err(e) => (None, Err(format!("failed to load referenced alert: {e}"))),
                 }
-            }
+                Ok(None) => (
+                    None,
+                    Err(format!("referenced alert {rid} not found (deleted?)")),
+                ),
+                Err(e) => (None, Err(format!("failed to load referenced alert: {e}"))),
+            },
             // Inline term: use the query stored on the composite.
             None => match &term.query {
                 Some(q) => (
@@ -355,7 +353,7 @@ pub async fn resolve_preview_terms(
     let mut resolved = Vec::with_capacity(specs.len());
     for spec in specs {
         let (member_name, query) = if let Some(aid) = spec.alert_id {
-            match crate::service::db::alerts::alert::get_by_id(client, org_id, aid).await {
+            match crate::db::alerts::alert::get_by_id(client, org_id, aid).await {
                 Ok(Some((_folder, member))) => {
                     let name = Some(member.name.clone());
                     if !member.enabled {

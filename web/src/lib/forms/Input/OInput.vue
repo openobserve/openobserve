@@ -322,6 +322,7 @@ const wrapperClasses = computed(() => [
         @keydown="emit('keydown', $event)"
         @keyup="emit('keyup', $event)"
         @keypress="emit('keypress', $event)"
+        @paste="emit('paste', $event)"
       />
 
       <!-- Text/number/etc input -->
@@ -358,6 +359,7 @@ const wrapperClasses = computed(() => [
         @keydown="emit('keydown', $event)"
         @keyup="emit('keyup', $event)"
         @keypress="emit('keypress', $event)"
+        @paste="emit('paste', $event)"
       />
 
       <!-- Clear button -->
