@@ -10214,6 +10214,8 @@
       "panelEditorQueryInspector": "Open query inspector",
       "metricsRunQuery": "Run PromQL query",
       "metricsRefresh": "Refresh",
+      "metricsAddToDashboard": "Add to dashboard",
+      "metricsCopyUrl": "Copy share link",
       "tracesSearch": "Run query",
       "tracesRefresh": "Refresh",
       "alertsCreate": "Create new alert",
