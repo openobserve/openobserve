@@ -486,6 +486,16 @@ function fireConfetti() {
             <template v-else>{{ content.provider.name.charAt(0) }}</template>
           </span>
           <h1 class="c-h1">{{ content.provider.name }}</h1>
+          <!-- Optional control sitting just after the title, spaced off it
+               (e.g. RUM's Browser / React Native platform switch). Renders only
+               when a host page fills it, so other cards are untouched. -->
+          <div
+            v-if="$slots['hero-actions']"
+            class="ms-2 shrink-0"
+            data-test="ai-hero-actions"
+          >
+            <slot name="hero-actions" />
+          </div>
         </div>
         <p class="c-sub">{{ content.provider.tagline }}</p>
         <div class="pv-meta">
