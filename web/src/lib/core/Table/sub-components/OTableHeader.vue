@@ -287,25 +287,36 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
         "
         @click="cell._sortColumn && handleSort(cell._sortColumn)"
       >
-        {{ cell.label }}
-        <OIcon
-          v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
-          name="arrow-upward"
-          size="sm"
-          class="text-table-sort-icon-active ml-1"
-        />
-        <OIcon
-          v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
-          name="arrow-downward"
-          size="sm"
-          class="text-table-sort-icon-active ml-1"
-        />
-        <OIcon
-          v-else-if="level.isLeaf && cell._sortColumn"
-          name="unfold-more"
-          size="sm"
-          class="opacity-40 ml-1"
-        />
+        <!-- Truncate the label so an unbreakable pivot group value (e.g. a long
+             user_email with no spaces to wrap on) can't overflow its narrow
+             fixed-width colspan and overlap neighbouring headers (QA issue 2239
+             item 9). Sort icon stays pinned via shrink-0. -->
+        <div
+          :class="[
+            'flex items-center gap-1 min-w-0 overflow-hidden',
+            level.isLeaf ? 'justify-start' : 'justify-center',
+          ]"
+        >
+          <span class="truncate" :title="String(cell.label ?? '')">{{ cell.label }}</span>
+          <OIcon
+            v-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'asc'"
+            name="arrow-upward"
+            size="sm"
+            class="shrink-0 text-table-sort-icon-active"
+          />
+          <OIcon
+            v-else-if="level.isLeaf && cell._sortColumn && getSortIcon?.(cell._sortColumn) === 'desc'"
+            name="arrow-downward"
+            size="sm"
+            class="shrink-0 text-table-sort-icon-active"
+          />
+          <OIcon
+            v-else-if="level.isLeaf && cell._sortColumn"
+            name="unfold-more"
+            size="sm"
+            class="shrink-0 opacity-40"
+          />
+        </div>
       </th>
     </tr>
   </thead>
