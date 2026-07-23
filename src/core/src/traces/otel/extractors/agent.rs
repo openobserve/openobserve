@@ -181,6 +181,7 @@ mod tests {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["custom.agent".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         };
 
         assert_eq!(
@@ -241,6 +242,7 @@ mod tests {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["custom.agent_name".to_string()],
             agent_id_fields: vec!["custom.agent_id".to_string()],
+            ..Default::default()
         };
         let identity = extractor.extract(&attrs, &HashMap::new(), &config);
 
