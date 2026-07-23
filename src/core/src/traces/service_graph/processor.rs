@@ -235,7 +235,12 @@ fn build_agent_or_service(has_agent_id: bool, depth: usize, with_trace_agent: bo
 /// into the tool/model queries. One agent per trace is assumed (single-agent
 /// agentic traces); `MAX` gives a deterministic pick if that ever fails to hold.
 #[cfg(feature = "enterprise")]
-fn build_trace_agent_cte(stream_name: &str, has_agent_id: bool, start_time: i64, end_time: i64) -> (String, String) {
+fn build_trace_agent_cte(
+    stream_name: &str,
+    has_agent_id: bool,
+    start_time: i64,
+    end_time: i64,
+) -> (String, String) {
     let id_col = if has_agent_id {
         ", MAX(gen_ai_agent_id) AS gen_ai_agent_id"
     } else {
