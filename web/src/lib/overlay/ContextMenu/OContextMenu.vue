@@ -95,8 +95,8 @@ onBeforeUnmount(() => {
         :hide-when-detached="true"
         :collision-padding="8"
         :class="[
-          // Layout + stacking (must be above the app header/drawer: 2000/3000)
-          'min-w-40 p-1 z-[6000]',
+          // Layout + stacking — z-menu is the shared overlay layer (tokens/base.css)
+          'min-w-40 p-1 z-menu',
           // Surface — a context menu is visually the same object as a dropdown
           // menu, so it deliberately shares the dropdown token set rather than
           // duplicating one that would have to be kept in sync.

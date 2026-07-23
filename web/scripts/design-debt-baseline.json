@@ -2,7 +2,7 @@
   "totals": {
     "rawProjectRamp": 142,
     "rawVarInComponent": 585,
-    "arbZ": 35,
+    "arbZ": 34,
     "darkMechanism": 20,
     "unscopedStyle": 7,
     "stylePxUnit": 90
@@ -381,9 +381,6 @@
     },
     "lib/navigation/Tabs/OTab.vue": {
       "rawProjectRamp": 1
-    },
-    "lib/overlay/Dropdown/ODropdown.vue": {
-      "arbZ": 1
     },
     "lib/overlay/Tooltip/OTooltip.vue": {
       "arbZ": 1
