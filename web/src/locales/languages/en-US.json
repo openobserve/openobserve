@@ -10034,7 +10034,8 @@
       "nameRequired": "Name is required",
       "selectorRequired": "Selector is required for \"{step}\"",
       "urlInvalid": "Enter a valid URL starting with http:// or https://",
-      "urlRequired": "Starting URL is required"
+      "urlRequired": "Starting URL is required",
+      "fixHighlightedFields": "Fix the highlighted fields before saving"
     },
     "privateLocations": {
       "searchPlaceholder": "Search locations...",
