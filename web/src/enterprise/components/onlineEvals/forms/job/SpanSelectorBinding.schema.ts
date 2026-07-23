@@ -34,6 +34,10 @@ export const makeSpanSelectorSchema = (
           message: t("onlineEvals.job.spanSelector.validation.maximumSpans"),
         }),
       filterReady: z.boolean(),
+      // The filter-builder tree is form-owned (rendered in form mode via
+      // name-prefix="filterGroup") so each condition binds to a unique nested
+      // path. Its completeness is surfaced through `filterReady` above.
+      filterGroup: z.any(),
     })
     .superRefine((value, ctx) => {
       if (options.isDuplicateName(value.name, value.id)) {
