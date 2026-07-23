@@ -13,27 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Parses pasted date-range / single date-time text into a shape the DateTime
-// picker can apply. `parseDateRangeString` handles a full range (replacing
-// both the start and end); `parseSingleDateTime` handles a single value
-// (replacing just the side the caller targets, e.g. via cursor position).
-//
-// Accepted range inputs: the `{"start_date","end_date"}` JSON object Copy
-// emits (epoch microseconds, timezone-independent), ISO 8601, the app's own
-// "MMM DD, YYYY HH:mm:ss.SSS Z" display format (JsonPreview, DetailTable,
-// TraceDetailsSidebar, etc. all render this — a user copying a timestamp out
-// of the app's own log/trace views produces exactly this string), the plain
-// absolute range, and a raw epoch timestamp pair. Accepted single-value
-// inputs: the single-value form of any of the above.
-//
-// Timezone handling: this module has no store/timezone dependency by design.
-// Anything that already resolves to an unambiguous instant — the copy-emitted
-// JSON, a raw epoch timestamp, or ISO 8601 WITH an explicit offset/`Z` —
-// is returned as `"timestamp"` (epoch µs), untouched by whatever timezone the
-// picker has selected. Anything with no timezone information of its own — the
-// app's own `YYYY/MM/DD HH:MM:SS` format, or offset-less ISO — is returned as
-// `"absolute"` (date/time strings); the caller (DateTime.vue) resolves those
-// using the picker's *currently selected* timezone, same as manual entry.
+// Parses pasted date-range / single date-time text for the DateTime picker.
+// No store/timezone dependency by design: inputs that already resolve to an
+// unambiguous instant (JSON copy payload, epoch timestamp, offset/`Z` ISO)
+// return `"timestamp"` (epoch µs); inputs with no timezone of their own
+// return `"absolute"` (date/time strings), resolved by the caller using the
+// picker's currently selected timezone.
 
 export interface AbsoluteRangeResult {
   type: "absolute";
@@ -69,14 +54,9 @@ const ABSOLUTE_RANGE_RE =
 const TIMESTAMP_RANGE_RE = /^(\d{10,16})\s*-\s*(\d{10,16})$/;
 const ABSOLUTE_SINGLE_RE = /^(\d{4}\/\d{2}\/\d{2})(?:\s+(\d{2}:\d{2}:\d{2}))?$/;
 const TIMESTAMP_SINGLE_RE = /^(\d{10,16})$/;
-// ISO 8601: YYYY-MM-DD, optionally with a T- or space-separated time
-// (seconds optional), optionally with a `Z` or ±HH:MM/±HHMM offset.
 const ISO_SINGLE_RE =
   /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?(Z|[+-]\d{2}:?\d{2})?$/;
-// The app's own "MMM DD, YYYY HH:mm:ss.SSS Z" display format (see
-// src/utils/date.ts's formatTimestamp / the HUMAN_TZ_FORMAT constants used
-// across the log/trace views): month name, day, year, time, optional
-// milliseconds, optional `Z`/±offset.
+// The app's own log/trace timestamp display format (src/utils/date.ts formatTimestamp).
 const HUMAN_LOG_SINGLE_RE =
   /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),?\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(?:\s+(Z|[+-]\d{2}:?\d{2}))?$/i;
 const MONTH_INDEX: Record<string, string> = {
@@ -96,7 +76,6 @@ export function parseDateRangeString(raw: string): ParsedDateRange | null {
   const humanLog = parseRangeVia(s, parseHumanLogSingle);
   if (humanLog) return humanLog;
 
-  // Timestamps before the human-readable absolute regex.
   const tsMatch = s.match(TIMESTAMP_RANGE_RE);
   if (tsMatch) {
     return {
@@ -156,8 +135,7 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
   const [, year, month, day, hour, minute, second, offset] = m;
 
   if (offset) {
-    // Fully qualified instant — parse natively. Deliberately ignores the
-    // picker's selected timezone: an explicit offset already IS the instant.
+    // Explicit offset already IS the instant — ignores the picker's timezone.
     const normalizedOffset =
       offset === "Z" ? "Z" : offset.replace(/^([+-]\d{2}):?(\d{2})$/, "$1:$2");
     const iso = `${year}-${month}-${day}T${hour ?? "00"}:${minute ?? "00"}:${second ?? "00"}${normalizedOffset}`;
@@ -173,11 +151,6 @@ function parseIsoSingle(raw: string): IsoSingleParsed | null {
   };
 }
 
-// The app's own "MMM DD, YYYY HH:mm:ss.SSS Z" display format. Milliseconds
-// (when present) are kept in the time string / fed straight to Date.parse —
-// the picker's own display is second-granularity, so they're honored for the
-// resulting instant but won't visibly round-trip in the field afterward,
-// exactly like pasting a µs timestamp already behaves.
 function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
   const m = raw.match(HUMAN_LOG_SINGLE_RE);
   if (!m) return null;
@@ -202,11 +175,8 @@ function parseHumanLogSingle(raw: string): IsoSingleParsed | null {
   };
 }
 
-// Splits on a whitespace-padded ` - ` and parses both sides with the given
-// single-value parser. Safe for formats whose date component can itself
-// contain a bare `-` (ISO, the human-log format) where the naive
-// TIMESTAMP/ABSOLUTE regexes' looser `\s*-\s*` would be ambiguous — neither
-// format ever has whitespace around its own internal dashes.
+// Splits on a whitespace-padded ` - ` — safe for ISO/human-log dates, which
+// contain a bare `-` but never whitespace around it.
 function parseRangeVia(
   s: string,
   parseSingle: (part: string) => IsoSingleParsed | null,
@@ -216,9 +186,8 @@ function parseRangeVia(
 
   const start = parseSingle(parts[0]);
   const end = parseSingle(parts[1]);
-  // Both sides must agree on having/not having an offset — mixing would
-  // silently interpret one side in a different frame of reference than the
-  // other, which is exactly the ambiguity this feature exists to avoid.
+  // Both sides must agree on having/not having an offset, else they'd be
+  // interpreted in different frames of reference.
   if (!start || !end || start.hasOffset !== end.hasOffset) return null;
 
   if (start.hasOffset) {
@@ -237,9 +206,7 @@ function parseRangeVia(
   };
 }
 
-// The object Copy puts on the clipboard: `{"start_date":<µs>,"end_date":<µs>}`.
-// Epoch microseconds side-step timezone ambiguity entirely, so this is trusted
-// as-is (no digit-length unit guessing, unlike the raw-timestamp paste path).
+// The `{"start_date":<µs>,"end_date":<µs>}` payload Copy puts on the clipboard.
 function parseJsonRange(s: string): TimestampRangeResult | null {
   if (!s.startsWith("{")) return null;
   try {
@@ -248,13 +215,12 @@ function parseJsonRange(s: string): TimestampRangeResult | null {
       return { type: "timestamp", startMicros: obj.start_date, endMicros: obj.end_date };
     }
   } catch {
-    // Not JSON — fall through to the other formats.
+    // not JSON
   }
   return null;
 }
 
-// Auto-detect epoch unit by digit length and normalize to microseconds.
-// Mirrors the defaultAbsoluteTime handling in DateTime.vue.
+// Auto-detect epoch unit by digit length; mirrors DateTime.vue's defaultAbsoluteTime.
 function toMicros(digits: string): number {
   const n = Number(digits);
   if (digits.length <= 10) return n * 1_000_000; // seconds
