@@ -27,6 +27,12 @@ export interface ButtonGroupProps {
    * Defaults to "md".
    */
   radius?: ButtonGroupRadius;
+  /**
+   * Draw divider lines between sibling buttons. Defaults to true (segmented
+   * look). Set false for a seamless single pill — e.g. a query-builder field
+   * chip where the group itself carries the border and inner buttons are ghost.
+   */
+  divided?: boolean;
 }
 
 export interface ButtonGroupSlots {

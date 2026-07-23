@@ -46,7 +46,10 @@ export type ButtonVariant =
   // Pricing template chip — pill-shaped toggle chip for quick-setup template selection
   | "pricing-chip"
   // Outline with primary color text + border — for "always highlighted" branded badges (e.g. edition indicator)
-  | "outline-primary";
+  | "outline-primary"
+  // Dashed outline "add tile" — transparent bg, dashed muted border + muted icon.
+  // For the small "+" add-affordance buttons in the query builder (add join / filter / condition).
+  | "dashed";
 
 /** Size controls height, padding, font-size, and border-radius */
 export type ButtonSize =

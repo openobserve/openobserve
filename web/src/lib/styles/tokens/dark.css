@@ -268,6 +268,9 @@
     --color-badge-purple-ol-border: var(--color-purple-400);
     --color-badge-purple-ol-text:   var(--color-purple-400);
 
+    /* magenta: match the query editor's dark function colour */
+    --color-badge-magenta-ol-text:  #ff00ff;
+
     /* teal: brighten solid bg and outline for dark mode */
     --color-badge-teal-solid-bg: var(--color-teal-400);
     --color-badge-teal-ol-text: var(--color-teal-300);

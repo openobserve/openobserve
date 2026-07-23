@@ -335,6 +335,10 @@
   --color-badge-purple-ol-border: var(--color-purple-600);
   --color-badge-purple-ol-text:   var(--color-purple-700);
 
+  /* Badge — magenta: matches the SQL query editor's function-name colour
+     (e.g. count) so query-builder chips read like the query below them. */
+  --color-badge-magenta-ol-text:  #c700c7;
+
   /* Badge — teal */
   --color-badge-teal-solid-bg: var(--color-teal-600);
   --color-badge-teal-solid-text: var(--color-white);
@@ -1214,6 +1218,9 @@
   /* Badge — purple */
   --color-badge-purple-ol-border: var(--color-badge-purple-ol-border);
   --color-badge-purple-ol-text:   var(--color-badge-purple-ol-text);
+
+  /* Badge — magenta (query-editor function colour) */
+  --color-badge-magenta-ol-text:  var(--color-badge-magenta-ol-text);
 
   /* Badge — teal */
   --color-badge-teal-solid-bg: var(--color-badge-teal-solid-bg);
