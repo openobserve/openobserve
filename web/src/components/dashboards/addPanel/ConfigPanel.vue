@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon"
         @click="toggleAllSections"
         data-test="dashboard-config-toggle-all-sections-btn"
+        :data-test-all-expanded="String(allSectionsExpanded)"
         :aria-label="
           allSectionsExpanded
             ? t('dashboard.collapseAllSections')

@@ -220,8 +220,13 @@ watch(
       </template>
     </CollapsibleTrigger>
 
-    <!-- Animated content -->
-    <CollapsibleContent class="o-collapsible-content overflow-hidden">
+    <!-- Animated content. data-test lets e2e wait for the open/close height
+         animation to finish before interacting with section content (a repeated
+         component-level hook, like o-dialog-primary-btn). -->
+    <CollapsibleContent
+      class="o-collapsible-content overflow-hidden"
+      data-test="o-collapsible-content"
+    >
       <slot />
     </CollapsibleContent>
   </CollapsibleRoot>

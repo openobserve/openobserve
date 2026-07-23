@@ -10,6 +10,11 @@ export default class DashboardPanelConfigs {
     this.toggleAllSectionsBtn = page.locator(
       '[data-test="dashboard-config-toggle-all-sections-btn"]'
     );
+    // Same button, narrowed to the all-sections-expanded state — used as a
+    // deterministic wait target after clicking expand-all.
+    this.toggleAllSectionsBtnExpanded = page.locator(
+      '[data-test="dashboard-config-toggle-all-sections-btn"][data-test-all-expanded="true"]'
+    );
     this.legend = page.locator(
       '[data-test="dashboard-config-legend-position"]'
     );
@@ -199,12 +204,33 @@ export default class DashboardPanelConfigs {
   /**
    * Config sections start collapsed after the config-panel redesign. Expand them
    * all (via the unfold-all button) so section options — legend, axis, pivot,
-   * table, etc. — render and are interactable. Clicking once from the default
-   * all-collapsed state expands every section.
+   * table, etc. — render and are interactable. Idempotent: skips the click when
+   * every section is already expanded (the button reflects the state via
+   * data-test-all-expanded), and waits for the state flip so section-open
+   * animations have started before callers query section content.
    */
   async expandAllConfigSections() {
     await this.toggleAllSectionsBtn.waitFor({ state: "visible" });
+    const expanded = await this.toggleAllSectionsBtn.getAttribute(
+      "data-test-all-expanded"
+    );
+    if (expanded === "true") return;
     await this.toggleAllSectionsBtn.click();
+    await this.toggleAllSectionsBtnExpanded.waitFor({
+      state: "visible",
+      timeout: 5000,
+    });
+    // Wait for the sections' open (height) animations to finish. Clicking an
+    // OSelect while sections are still animating moves the trigger mid-open,
+    // which dismisses the just-opened dropdown (close-on-scroll/anchor-move) —
+    // the source of flaky option-click timeouts.
+    await this.page
+      .waitForFunction(() =>
+        Array.from(
+          document.querySelectorAll('[data-test="o-collapsible-content"]')
+        ).every((el) => el.getAnimations().length === 0)
+      )
+      .catch(() => {});
   }
   // Select legend position. This is now a segmented toggle (OToggleGroup): the
   // option items are always visible, so click the matching item directly — no
