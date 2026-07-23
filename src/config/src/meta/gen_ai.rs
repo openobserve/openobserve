@@ -72,7 +72,11 @@ impl GenAiAgentMappingConfig {
             &self.env_fields,
             "deployment.environment.name",
         )?;
-        validate_fields("version_fields", &self.version_fields, "gen_ai.agent.version")?;
+        validate_fields(
+            "version_fields",
+            &self.version_fields,
+            "gen_ai.agent.version",
+        )?;
 
         Ok(self)
     }
