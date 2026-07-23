@@ -106,7 +106,7 @@ limitations under the License.
         <!-- Email Preview -->
         <div v-if="type === 'email'" data-test="email-preview" class="email-client max-w-150 mx-auto bg-white border border-[var(--color-brand-msg-divider)] rounded-default overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
           <div class="email-header bg-[var(--color-brand-msg-bg)] p-4 border-b border-[var(--color-brand-msg-border)]">
-            <div data-test="email-subject" class="email-subject font-bold text-base mb-2">
+            <div data-test="email-subject" class="email-subject font-bold text-base mb-2 text-[var(--color-brand-msg-text-strong)]">
               Subject: 🚨 OpenObserve Alert Notification
             </div>
             <div data-test="email-from" class="email-from text-[var(--color-brand-msg-meta)] text-sm mb-1">
@@ -325,17 +325,17 @@ const copyTemplate = () => {
 
 <style scoped>
 /* keep(brand): pixel-accurate Slack/Teams/Email replicas, colors are external brands (D12) */
-/* The global `a { color: var(--color-text-link) }` rule (unlayered) outranks the
-   inline `text-[var(--color-brand-slack-green)]` utility, turning this link the theme link color.
-   This selector's specificity wins it back to PagerDuty green, like main. */
+/* The global unlayered `a` link-color rule outranks the inline brand-green
+   utility on this anchor, retinting it to the theme link color. This selector's
+   higher specificity wins it back to PagerDuty green, matching main. */
 .pagerduty-link a {
   color: var(--color-brand-slack-green);
   text-decoration: none;
 }
 
-/* Same issue as the link above: the global `p { color: var(--color-text-body) }`
-   rule (light text in dark mode) overrides the inline utility, making this
-   message unreadable on the email card's fixed light background. */
+/* Same issue as the link above: the global `p` body-text rule (light text in
+   dark mode) overrides the inline utility, making this message unreadable on the
+   email card's fixed light background. */
 .email-alert-info p {
   color: var(--color-brand-msg-meta);
 }

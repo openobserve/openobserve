@@ -454,7 +454,7 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
         <div
           v-if="data.node_type == 'function' && hasNodeError"
           data-test="pipeline-node-error-badge"
-          class="absolute -top-3 -right-3 w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-[15] shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200 error-badge"
+          class="absolute -top-3 -right-3 w-5 h-5 bg-status-negative border-2 border-white rounded-full flex items-center justify-center cursor-pointer z-15 shadow-[0_0.125rem_0.375rem_color-mix(in_srgb,var(--color-status-negative)_50%,transparent)] transition-all duration-200 error-badge"
           @click.stop="navigateToFunction(data.name)"
         >
           <OIcon name="error" size="sm" />

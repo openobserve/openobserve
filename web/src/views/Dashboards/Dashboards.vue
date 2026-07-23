@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-body text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-4 focus-visible:ring-primary-500/25 focus-visible:ring-inset"
+                class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-full bg-surface-subtle text-text-body text-xs leading-5 transition-colors outline-none hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-4 focus-visible:ring-accent/25 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -378,7 +378,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
             <template #bottom>
               <div
-                class="flex w-full justify-between items-center py-1"
+                class="flex w-full justify-between items-center gap-4 py-1"
               >
                 <div
                   class="text-xs font-normal flex items-center shrink-0"

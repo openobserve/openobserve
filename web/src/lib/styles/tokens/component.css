@@ -14,7 +14,6 @@
   /* Separator */
   --spacing-separator: var(--spacing-px);
   --color-separator: var(--color-border-default);
-  --color-separator-strong: var(--color-border-strong);
 
   /* Form field label (dark overrides in dark.css) */
   --color-input-label-text: var(--color-grey-800);
@@ -57,6 +56,11 @@
   --color-button-ghost-primary-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-primary-active-bg: var(--color-surface-accent-active);
   --color-button-ghost-primary-focus-ring: var(--color-primary-400);
+
+  /* Button — on-dark-primary (primary-colored text on a WHITE button that sits on
+     a dark gradient panel). Fixed at primary-600 in BOTH themes — must NOT flip to
+     the lighter accent (primary-400) or it washes out against the white button. */
+  --color-button-on-dark-primary-text: var(--color-primary-600);
 
   /* Button — ghost-destructive (flat + destructive color text) */
   --color-button-ghost-destructive-text: var(--color-error-600);
@@ -298,6 +302,18 @@
   --color-badge-primary-ol-text: var(--color-primary-700);
   --color-badge-primary-soft-bg: var(--color-primary-100);
   --color-badge-primary-soft-text: var(--color-primary-700);
+
+  /* Count badge — small numeric overlay badge (e.g. OTableColumnToggle hidden-column
+     count). Solid brand dot, fixed primary-600 in both themes + white text. */
+  --color-count-badge-bg: var(--color-primary-600);
+
+  /* Avatar tint stack — decorative placeholder silhouette avatars
+     (CommunitySlackInvite). A 4-step brand gradient, each step fixed in both themes
+     (dark enough behind the white person glyph). Not real members. */
+  --color-avatar-tint-1: var(--color-primary-700);
+  --color-avatar-tint-2: var(--color-primary-600);
+  --color-avatar-tint-3: var(--color-primary-500);
+  --color-avatar-tint-4: var(--color-primary-400);
 
   /* Keyboard-shortcut cheatsheet — soft primary highlight (light tint; reversed in dark) */
   --color-shortcut-highlight-bg: var(--color-primary-100);
@@ -550,6 +566,7 @@
   --color-switch-border-off: var(--color-primary-500);
   --color-switch-thumb-off: var(--color-primary-500);
   --color-switch-thumb-on: var(--color-primary-500);
+  --color-switch-track-on: var(--color-primary-500); /* ON-track fill — solid primary-500, fixed both themes (matches switch-border) */
   --color-switch-disabled-border: var(--color-grey-300);
   --color-switch-disabled-thumb: var(--color-grey-300);
 
@@ -787,7 +804,6 @@
   /* Separator */
   --spacing-separator: var(--spacing-separator);
   --color-separator: var(--color-separator);
-  --color-separator-strong: var(--color-separator-strong);
 
   /* Button — primary */
   --color-button-primary: var(--color-button-primary);
@@ -825,6 +841,9 @@
   --color-button-ghost-primary-hover-bg: var(--color-button-ghost-primary-hover-bg);
   --color-button-ghost-primary-active-bg: var(--color-button-ghost-primary-active-bg);
   --color-button-ghost-primary-focus-ring: var(--color-button-ghost-primary-focus-ring);
+
+  /* Button — on-dark-primary */
+  --color-button-on-dark-primary-text: var(--color-button-on-dark-primary-text);
 
   /* Button — ghost-destructive */
   --color-button-ghost-destructive-text: var(--color-button-ghost-destructive-text);
@@ -998,6 +1017,7 @@
   --color-switch-border-off: var(--color-switch-border-off);
   --color-switch-thumb-off: var(--color-switch-thumb-off);
   --color-switch-thumb-on: var(--color-switch-thumb-on);
+  --color-switch-track-on: var(--color-switch-track-on);
   --color-switch-disabled-border: var(--color-switch-disabled-border);
   --color-switch-disabled-thumb: var(--color-switch-disabled-thumb);
 
@@ -1181,6 +1201,15 @@
   --color-badge-primary-ol-text: var(--color-badge-primary-ol-text);
   --color-badge-primary-soft-bg: var(--color-badge-primary-soft-bg);
   --color-badge-primary-soft-text: var(--color-badge-primary-soft-text);
+
+  /* Count badge */
+  --color-count-badge-bg: var(--color-count-badge-bg);
+
+  /* Avatar tint stack (decorative) */
+  --color-avatar-tint-1: var(--color-avatar-tint-1);
+  --color-avatar-tint-2: var(--color-avatar-tint-2);
+  --color-avatar-tint-3: var(--color-avatar-tint-3);
+  --color-avatar-tint-4: var(--color-avatar-tint-4);
 
   /* Keyboard-shortcut cheatsheet */
   --color-shortcut-highlight-bg: var(--color-shortcut-highlight-bg);

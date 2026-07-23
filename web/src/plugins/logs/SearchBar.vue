@@ -615,7 +615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-dropdown-bg [border:0.063rem_solid_var(--color-card-glass-border)] rounded-default [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-[9999]"
+                class="search-download-submenu absolute right-full top-0 mr-1 min-w-40 bg-dropdown-bg [border:0.063rem_solid_var(--color-card-glass-border)] rounded-default [box-shadow:0_0.5rem_1.5rem_var(--color-hover-shadow)] py-1 px-0 z-9999"
                 data-test="search-download-submenu"
               >
                 <button
@@ -1305,7 +1305,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="absolute! z-[51] top-[0.1875rem] right-1 [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
+        class="absolute! z-51 top-[0.1875rem] right-1 [border:1px_solid_var(--color-card-glass-border)]! rounded-default w-7.5! h-7.5! min-w-7.5! min-h-7.5!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1375,7 +1375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchObj.meta.queryEditorPlaceholderFlag &&
                   !searchObj.meta.nlpMode
                 "
-                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -1425,7 +1425,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!searchObj.data.tempFunctionContent && searchObj.meta.functionEditorPlaceholderFlag && !isVrlEditorDisabled"
-                      class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-[1] select-none"
+                      class="query-editor-placeholder-overlay absolute top-0 left-0 right-0 bottom-0 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] pointer-events-none z-1 select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{ vrlPlaceholder }}</span>
                     </div>
@@ -1515,7 +1515,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <div>
         <div
-          class="text-sm font-semibold leading-tight pr-2 text-text-label"
+          class="text-compact font-medium leading-tight pr-2 text-input-label-text"
         >{{ t("search.fileType") }}</div>
         <OButtonGroup
           data-test="custom-download-file-type-button-group"

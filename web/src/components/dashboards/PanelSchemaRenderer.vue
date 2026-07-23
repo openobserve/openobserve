@@ -51,11 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
-          :data="
-            panelData.chartType == 'table'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
+          :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
           ref="tableRendererRef"
@@ -1625,6 +1621,14 @@ export default defineComponent({
 
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
+        // Once the underlying data is cleared (e.g. required columns removed
+        // after a successful run), convertPanelDataCommon bails on validation
+        // and never refreshes panelData — so guard on noData here to avoid
+        // rendering the stale converted rows behind the "No Data" state.
+        // Mirrors chartRendererData's noData guard for the chart path.
+        if (noData.value === "No Data") {
+          return { rows: [], columns: [] };
+        }
         if (panelSchema.value.queryType === "promql") {
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options

@@ -275,7 +275,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="smart_display"
                     size="sm"
-                    class="text-primary-700"
+                    class="text-accent"
                   />
                   <span class="font-bold text-sm text-text-heading"
                     >{{ t('synthetics.runDetail.sessionReplay') }}</span
