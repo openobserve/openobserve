@@ -230,9 +230,9 @@ export const mockRunDetail = {
 // ── Location fixtures ───────────────────────────────────────────────────────
 
 export const mockLocations: SyntheticsLocation[] = [
-  { id: "us-east-1", name: "US East (N. Virginia)", region: "us-east-1", provider: "aws" },
-  { id: "eu-west-1", name: "EU (Ireland)", region: "eu-west-1", provider: "aws" },
-  { id: "ap-southeast-1", name: "Asia Pacific (Singapore)", region: "ap-southeast-1", provider: "aws" },
+  { id: "us-east-1", label: "US East (N. Virginia)", region: "us-east-1", provider: "aws" },
+  { id: "eu-west-1", label: "EU (Ireland)", region: "eu-west-1", provider: "aws" },
+  { id: "ap-southeast-1", label: "Asia Pacific (Singapore)", region: "ap-southeast-1", provider: "aws" },
 ];
 
 // ── Capabilities / device fixtures ──────────────────────────────────────────

@@ -258,7 +258,8 @@ export interface SyntheticsFolder {
 // Available probe location returned by GET /api/{org}/synthetics/locations
 export interface SyntheticsLocation {
   id: string
-  name: string
+  /** Display label — user/agent-chosen (private) or o2's friendly name (public). */
+  label: string
   region: string
   provider: string
   /** "public" (o2-operated) | "private" (customer agent) — absent in old payloads. */
@@ -353,7 +354,8 @@ export interface BrowserCheck {
 /** One row of the locations API — registry fields + computed live stats. */
 export interface SyntheticLocation {
   id: string
-  name: string
+  /** Display label — user/agent-chosen (private) or o2's friendly name (public). */
+  label: string
   region: string
   provider: string
   kind: 'public' | 'private'
@@ -366,6 +368,8 @@ export interface SyntheticLocation {
   agents_total: number
   status: 'online' | 'offline' | 'pending'
   version?: string
+  /** Name of the most recently seen agent, live or stale. */
+  last_agent_name?: string
   last_seen_at?: number
   monitors_count: number
   checks_per_min: number
