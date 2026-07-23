@@ -58,6 +58,12 @@ const forwardedAttrs = computed(() => {
 const childAnchorRef = ref<HTMLSpanElement | null>(null);
 const parentEl = ref<Element | null>(null);
 const childOpen = ref(false);
+// Lazy-mount guard: the reka tooltip tree (Provider/Root/Portal/Content — ~6
+// components + floating-ui setup) is NOT rendered until the parent is first
+// hovered. This is the whole perf story for long/virtualized tables: a row that
+// is only scrolled past, never hovered, pays nothing for its tooltips. Once a
+// tooltip has been opened we keep it mounted so repeat hovers are instant.
+const childActivated = ref(false);
 let cleanupFn: (() => void) | null = null;
 // Pending open timer for the hover delay (child mode). Wrapper mode gets its
 // delay for free from reka's `delay-duration`; child mode wires its own hover
@@ -106,16 +112,21 @@ onMounted(() => {
     if (parentEl.value) {
       // Open after `props.delay` ms of hover (matching wrapper mode); leaving
       // before then cancels the pending open so a quick pass-over shows nothing.
+      // Mount the reka tree (if not already) and open it. Deferring the mount to
+      // here — the first hover, after the delay — is what keeps un-hovered rows
+      // cheap.
+      const activateAndOpen = () => {
+        childActivated.value = true;
+        childOpen.value = true;
+        childShowTimer = null;
+      };
       const show = () => {
         if (props.disabled) return;
         if (childShowTimer) clearTimeout(childShowTimer);
         if (props.delay > 0) {
-          childShowTimer = setTimeout(() => {
-            childOpen.value = true;
-            childShowTimer = null;
-          }, props.delay);
+          childShowTimer = setTimeout(activateAndOpen, props.delay);
         } else {
-          childOpen.value = true;
+          activateAndOpen();
         }
       };
       const hide = () => {
@@ -227,9 +238,11 @@ const contentClasses = computed(() => [
     </TooltipRoot>
   </TooltipProvider>
 
-  <!-- ── Child mode: no default slot, attaches to parent element as its tooltip -->
+  <!-- ── Child mode: no default slot, attaches to parent element as its tooltip.
+       The reka tree is mounted lazily (v-if) on first hover — see childActivated
+       — so un-hovered rows in a long/virtualized table cost next to nothing. -->
   <template v-else>
-    <TooltipProvider>
+    <TooltipProvider v-if="childActivated">
       <TooltipRoot
         :delay-duration="0"
         :open="disabled ? false : childOpen"

@@ -249,6 +249,12 @@ export interface OTableProps<TData = any> {
   virtualScroll?: boolean;
   /** Fixed row height for virtual scroll calculations (default 48) */
   virtualScrollItemSize?: number;
+  /**
+   * Rows rendered beyond the visible window on each side while virtualizing
+   * (default 100). Lower it (e.g. 10–20) for heavy rows / moderate datasets so
+   * the DOM stays small; the default suits long, light lists that scroll fast.
+   */
+  overscan?: number;
   /** Container max height; falls back to parent height when not set */
   maxHeight?: string | number;
 

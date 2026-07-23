@@ -153,15 +153,16 @@ const display = computed(() => {
 });
 
 /**
- * Hover tooltip — shown for RELATIVE mode only, revealing the full absolute
- * datetime. Absolute/date cells already show the full datetime, so they get no
- * tooltip. Suppressed when it would duplicate the cell text.
+ * Whether to OFFER the hover tooltip — RELATIVE mode only, revealing the full
+ * absolute datetime (absolute/date cells already show it, so they get none).
+ * This decision is deliberately cheap: it does NOT format the absolute string.
+ * The string is built lazily in the #content slot below, which the (lazy)
+ * OTooltip only renders on hover — so a cell that is merely scrolled past in a
+ * long/virtualized table never runs the timezone formatter.
  */
-const tooltip = computed(() => {
-  if (props.mode !== "relative") return null;
-  const text = absolute.value;
-  return text && text !== display.value ? text : null;
-});
+const showAbsoluteTooltip = computed(
+  () => props.mode === "relative" && epochMs.value !== null,
+);
 </script>
 
 <template>
@@ -171,6 +172,8 @@ const tooltip = computed(() => {
   >{{ emptyLabel }}</span>
   <template v-else>
     <span class="tabular-nums whitespace-nowrap">{{ display }}</span>
-    <OTooltip v-if="tooltip" :content="tooltip" />
+    <OTooltip v-if="showAbsoluteTooltip">
+      <template #content>{{ absolute }}</template>
+    </OTooltip>
   </template>
 </template>

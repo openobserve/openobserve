@@ -36,6 +36,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         filter-mode="client"
         :default-columns="false"
         show-index
+        virtual-scroll
+        :overscan="20"
         :show-global-filter="false"
         :enable-column-resize="true"
         :persist-columns="true"
@@ -224,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch, nextTick } from "vue";
+import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -275,7 +277,12 @@ export default defineComponent({
 
     const qTableRef: any = ref(null);
     const loading = ref(false);
-    const allIncidents = ref<Incident[]>([]);
+    // The incident dataset is read-only display data replaced wholesale on every
+    // reload, so hold it in a shallowRef (and freeze each row on load — see
+    // loadIncidents). Vue then never deep-proxies the hundreds of objects, which
+    // keeps the filter computeds and the table's row-model rebuild off the
+    // reactivity hot path — the difference is very visible at a few hundred rows.
+    const allIncidents = shallowRef<Incident[]>([]);
     const searchQuery = ref("");
     // Primary filter groups the lifecycle like other list pages: Active covers
     // both open and acknowledged (still needs attention), Resolved is done.
@@ -487,8 +494,12 @@ export default defineComponent({
           keyword
         );
 
-        allIncidents.value = response.data.incidents;
-        store.dispatch('incidents/setCachedData', response.data.incidents);
+        // Freeze each row so Vue leaves it raw (frozen objects are never made
+        // reactive), both here and once it lands in the Vuex cache below.
+        const items: Incident[] = response.data.incidents || [];
+        for (const it of items) Object.freeze(it);
+        allIncidents.value = items;
+        store.dispatch('incidents/setCachedData', items);
       } catch (error: any) {
         toast({
           variant: "error",
@@ -603,13 +614,22 @@ export default defineComponent({
         .join(", ");
     };
 
+    // The dimensions cell reads a row's sorted dimensions several times per render
+    // (the shown chips, the "+N more" count, and its tooltip). Sorting is pure and
+    // group_values is a stable object per incident, so memoise by object identity
+    // to sort each row's dimensions once instead of on every re-render.
+    const sortedDimCache = new WeakMap<object, [string, string][]>();
     const getSortedDimensions = (
       dimensions: Record<string, string> | undefined,
     ) => {
-      if (!dimensions || Object.keys(dimensions).length === 0) return [];
-      return Object.keys(dimensions)
+      if (!dimensions || typeof dimensions !== "object") return [];
+      const cached = sortedDimCache.get(dimensions);
+      if (cached) return cached;
+      const sorted = Object.keys(dimensions)
         .sort()
-        .map(key => [key, dimensions[key]] as [string, string]);
+        .map((key) => [key, dimensions[key]] as [string, string]);
+      sortedDimCache.set(dimensions, sorted);
+      return sorted;
     };
 
     const getDimensionColorClass = (key: string) => {
