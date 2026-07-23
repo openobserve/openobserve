@@ -28,6 +28,18 @@ describe("agentFilterSql", () => {
     expect(sql).toBe("agent_name = 'support-agent'");
   });
 
+  it("adds agent_version and agent_env clauses when the variant carries them", () => {
+    const sql = buildScoresAgentFilterWhere({
+      ...agentWithId,
+      env: "production",
+      version: "1.3.0",
+    });
+
+    expect(sql).toBe(
+      "agent_id = 'agent-123' AND agent_version = '1.3.0' AND agent_env = 'production'",
+    );
+  });
+
   it("filters _evaluator inline on attributes_target_agent_id", () => {
     const sql = buildEvaluatorAgentFilterWhere(agentWithId);
 
