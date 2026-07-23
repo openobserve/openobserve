@@ -29,10 +29,7 @@ pub use compaction;
 pub mod dashboards;
 use ::common;
 use ::db;
-pub mod enrichment;
-pub mod enrichment_table;
 pub mod error_suggest;
-pub mod file_list;
 use ::db::folders;
 pub mod functions;
 pub mod functions_cache;
@@ -59,7 +56,6 @@ pub mod org_storage_providers;
 pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
-pub mod promql;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]
@@ -68,8 +64,6 @@ pub mod runtime_metrics;
 pub use schema;
 pub mod schema_watcher;
 use search_service as search;
-#[cfg(feature = "enterprise")]
-pub mod search_jobs;
 pub mod self_reporting;
 pub mod service;
 pub mod session;

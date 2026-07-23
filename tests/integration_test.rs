@@ -56,6 +56,7 @@ mod tests {
             json,
         },
     };
+    use enrichment_service::enrichment::storage::{Values, local};
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
     use openobserve::migration;
     use openobserve_api::handler::{
@@ -70,9 +71,7 @@ mod tests {
         destinations::{Destination, DestinationType},
     };
     use openobserve_core::{
-        alerts::scheduler::handlers::handle_triggers,
-        enrichment::storage::{Values, local},
-        ingestion_common::IngestionResponse,
+        alerts::scheduler::handlers::handle_triggers, ingestion_common::IngestionResponse,
     };
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
@@ -3131,7 +3130,7 @@ mod tests {
         payload.push(record2);
 
         // Call save_enrichment_data
-        let result = openobserve_core::enrichment_table::save_enrichment_data(
+        let result = enrichment_service::enrichment_table::save_enrichment_data(
             org_id, table_name, payload, false, // append_data = false
         )
         .await;
@@ -3183,7 +3182,7 @@ mod tests {
 
         // Check get_enrichment_table function, it should return same data
         let data =
-            openobserve_core::enrichment::get_enrichment_table(org_id, table_name, false).await;
+            enrichment_service::enrichment::get_enrichment_table(org_id, table_name, false).await;
         assert!(data.is_ok());
         let data = data.unwrap();
         assert!(data.len() == 2);
@@ -3226,7 +3225,7 @@ mod tests {
 
     async fn e2e_cleanup_enrichment_table(org_id: &str, stream_name: &str) {
         // Clean up the enrichment table and its schema
-        openobserve_core::enrichment_table::delete_enrichment_table(
+        enrichment_service::enrichment_table::delete_enrichment_table(
             org_id,
             stream_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3284,7 +3283,7 @@ mod tests {
         );
         initial_payload.push(record1);
 
-        let result1 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result1 = enrichment_service::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             initial_payload,
@@ -3339,7 +3338,7 @@ mod tests {
         );
         append_payload.push(record2);
 
-        let result2 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result2 = enrichment_service::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             append_payload,
@@ -3409,7 +3408,7 @@ mod tests {
         record1.insert("age".to_string(), json::Value::String("25".to_string()));
         initial_payload.push(record1);
 
-        let result1 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result1 = enrichment_service::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             initial_payload,
@@ -3449,7 +3448,7 @@ mod tests {
         ); // New field
         append_payload.push(record2);
 
-        let result2 = openobserve_core::enrichment_table::save_enrichment_data(
+        let result2 = enrichment_service::enrichment_table::save_enrichment_data(
             org_id,
             table_name,
             append_payload,

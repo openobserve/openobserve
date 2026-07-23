@@ -4092,6 +4092,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "enrichment-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-json",
+ "arrow-schema",
+ "axum",
+ "bytes",
+ "chrono",
+ "common",
+ "compaction",
+ "config",
+ "csv",
+ "datafusion",
+ "db",
+ "enrichment",
+ "futures",
+ "futures-util",
+ "hashbrown 0.16.1",
+ "infra",
+ "log",
+ "maxminddb",
+ "multer",
+ "o2_enterprise",
+ "parquet",
+ "proto",
+ "rayon",
+ "reqwest 0.13.2",
+ "schema",
+ "search_service",
+ "serde",
+ "serde_json",
+ "tokio",
+ "transform",
+ "vrl",
+]
+
+[[package]]
 name = "env_filter"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6775,6 +6814,7 @@ dependencies = [
  "datafusion-functions-json",
  "datafusion-proto",
  "db",
+ "enrichment-service",
  "env_logger",
  "expect-test",
  "faststr",
@@ -6901,6 +6941,7 @@ dependencies = [
  "config",
  "datafusion",
  "db",
+ "enrichment-service",
  "flate2",
  "flight",
  "futures",
@@ -6930,6 +6971,7 @@ dependencies = [
  "opentelemetry-proto",
  "parking_lot 0.12.5",
  "pprof",
+ "promql",
  "prost 0.14.3",
  "proto",
  "rand 0.10.1",
@@ -7090,6 +7132,7 @@ dependencies = [
  "datafusion",
  "db",
  "enrichment",
+ "enrichment-service",
  "flate2",
  "futures",
  "futures-util",
@@ -7172,6 +7215,7 @@ dependencies = [
  "compaction",
  "config",
  "db",
+ "enrichment-service",
  "futures",
  "hashbrown 0.16.1",
  "infra",
@@ -7182,6 +7226,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-core",
  "prometheus",
+ "promql",
  "proto",
  "regex",
  "report_server",
@@ -7981,11 +8026,13 @@ name = "promql"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
+ "arrow",
  "async-recursion",
  "async-trait",
  "chrono",
  "config",
  "datafusion",
+ "db",
  "expect-test",
  "futures",
  "hashbrown 0.16.1",
@@ -7994,11 +8041,20 @@ dependencies = [
  "log",
  "o2_enterprise",
  "promql-parser",
+ "prost 0.14.3",
+ "proto",
  "rayon",
  "regex",
+ "search",
+ "search_service",
+ "serde",
  "strum 0.28.0",
  "tokio",
+ "tonic",
  "tracing",
+ "tracing-opentelemetry",
+ "usage_reporting",
+ "utoipa",
 ]
 
 [[package]]
@@ -10784,6 +10840,7 @@ dependencies = [
  "compaction",
  "config",
  "db",
+ "enrichment-service",
  "infra",
  "log",
  "o2_enterprise",

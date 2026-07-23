@@ -20,8 +20,6 @@ use config::meta::search::SearchEventType;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-pub mod search;
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct MetricsQueryRequest {
     pub query: String,

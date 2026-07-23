@@ -15,7 +15,6 @@
 
 use std::sync::Arc;
 
-use ::promql::utils::{apply_label_selector, apply_matchers};
 use arrow::record_batch::RecordBatch;
 use config::{
     TIMESTAMP_COL_NAME, get_config,
@@ -45,7 +44,10 @@ use search::{
 };
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-use crate::promql::search::grpc::Context;
+use crate::{
+    search::grpc::Context,
+    utils::{apply_label_selector, apply_matchers},
+};
 
 #[tracing::instrument(name = "promql:search:grpc:wal:create_context", skip(trace_id))]
 pub(crate) async fn create_context(

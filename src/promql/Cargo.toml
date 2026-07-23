@@ -7,27 +7,44 @@ publish = false
 
 [features]
 default = []
-enterprise = ["dep:o2_enterprise"]
+enterprise = [
+    "dep:o2_enterprise",
+    "search/enterprise",
+    "search_service/enterprise",
+]
+vectorscan = ["search/vectorscan", "search_service/vectorscan"]
+vortex = ["config/vortex", "search/vortex", "search_service/vortex"]
 
 [dependencies]
 ahash.workspace = true
+arrow.workspace = true
 async-recursion.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 config.workspace = true
 datafusion.workspace = true
+db.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 infra.workspace = true
 itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
+prost.workspace = true
+proto.workspace = true
 promql-parser.workspace = true
 rayon.workspace = true
 regex.workspace = true
+search.workspace = true
+search_service.workspace = true
+serde.workspace = true
 strum.workspace = true
 tokio.workspace = true
+tonic.workspace = true
 tracing.workspace = true
+tracing-opentelemetry.workspace = true
+usage_reporting.workspace = true
+utoipa.workspace = true
 
 [dev-dependencies]
 expect-test.workspace = true

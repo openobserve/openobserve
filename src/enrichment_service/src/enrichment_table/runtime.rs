@@ -134,7 +134,7 @@ pub async fn get_enrichment_table_data(
     log::info!("get enrichment table {org_id}/{name} data req start time: {start_time}");
 
     #[cfg(feature = "enterprise")]
-    crate::search::SEARCH_SERVER
+    search_service::SEARCH_SERVER
         .insert(
             trace_id.clone(),
             TaskStatus::new_leader(
@@ -152,7 +152,7 @@ pub async fn get_enrichment_table_data(
         )
         .await;
 
-    let result = crate::search::cluster::http::search_inner(
+    let result = search_service::cluster::http::search_inner(
         request,
         search_query,
         regions,
@@ -163,7 +163,7 @@ pub async fn get_enrichment_table_data(
     .await;
 
     #[cfg(feature = "enterprise")]
-    let _ = crate::search::SEARCH_SERVER.remove(&trace_id, false).await;
+    let _ = search_service::SEARCH_SERVER.remove(&trace_id, false).await;
 
     match result {
         Ok((batches, ..)) => {

@@ -46,7 +46,7 @@ use search::{
 use search_service::match_source;
 use tracing::Instrument;
 
-use crate::{db, file_list, promql::search::grpc::Context};
+use crate::search::grpc::Context;
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
@@ -266,7 +266,7 @@ async fn get_file_list(
     filters: &[(String, Vec<String>)],
 ) -> Result<Vec<FileKey>> {
     let (time_min, time_max) = time_range;
-    let results = match file_list::query(
+    let results = match search_service::file_list::query(
         trace_id,
         org_id,
         StreamType::Metrics,

@@ -1118,7 +1118,7 @@ pub async fn delete_stream(
     // enrichment table cleanup
 
     if stream_type == StreamType::EnrichmentTables {
-        crate::enrichment_table::cleanup_enrichment_table_resources(
+        enrichment_service::enrichment_table::cleanup_enrichment_table_resources(
             org_id,
             stream_name,
             stream_type,

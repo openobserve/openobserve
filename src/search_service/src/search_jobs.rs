@@ -22,6 +22,7 @@ use config::{
     },
     utils::json,
 };
+use db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*};
 use infra::{
     client::grpc::make_grpc_search_client,
     errors::{Error, ErrorCodes},
@@ -37,10 +38,7 @@ use o2_enterprise::enterprise::{
 };
 use tokio::sync::mpsc;
 
-use crate::{
-    db::search_job::{search_job_partitions::*, search_job_results::*, search_jobs::*},
-    search::grpc_search::{grpc_search, grpc_search_partition},
-};
+use crate::grpc_search::{grpc_search, grpc_search_partition};
 
 // 1. get the oldest job from `search_jobs` table
 // 2. check if the job is previous running (get error then retry, be cancel then retry) (case 1) or

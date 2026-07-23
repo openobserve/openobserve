@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use ::promql;
 use alert::to_float;
 use arrow_schema::{DataType, Schema};
 use async_trait::async_trait;
@@ -38,7 +39,6 @@ use search::utils::is_permissable_function_error;
 use tracing::Instrument;
 use usage_reporting::http_report_metrics;
 
-use super::promql;
 use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;

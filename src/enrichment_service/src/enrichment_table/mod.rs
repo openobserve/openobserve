@@ -23,6 +23,7 @@ use axum::{
 };
 use bytes::Bytes;
 use chrono::Utc;
+use common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
     cluster::LOCAL_NODE,
@@ -44,12 +45,9 @@ use infra::{
         SchemaCache,
     },
 };
+use schema::{check_for_schema, stream_schema_exists};
 
-use crate::{
-    common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
-    enrichment::storage::Values,
-    schema::{check_for_schema, stream_schema_exists},
-};
+use crate::enrichment::storage::Values;
 
 pub mod cache;
 pub mod geoip;
@@ -292,7 +290,7 @@ pub async fn save_enrichment_data(
 
     // notify update
     if !schema.fields().is_empty()
-        && let Err(e) = super::db::enrichment_table::notify_update(org_id, &stream_name).await
+        && let Err(e) = db::enrichment_table::notify_update(org_id, &stream_name).await
     {
         log::error!("Error notifying enrichment table {org_id}/{stream_name} update: {e}");
     }
@@ -460,17 +458,12 @@ pub async fn delete_from_file_list(
     stream_name: &str,
     time_range: (i64, i64),
 ) -> Result<(), anyhow::Error> {
-    crate::compaction::retention::delete_from_file_list(
-        org_id,
-        stream_type,
-        stream_name,
-        time_range,
-    )
-    .await
-    .map_err(|e| {
-        log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
-        e
-    })?;
+    compaction::retention::delete_from_file_list(org_id, stream_type, stream_name, time_range)
+        .await
+        .map_err(|e| {
+            log::error!("[ENRICHMENT_TABLE] delete_from_file_list failed: {e}");
+            e
+        })?;
 
     #[cfg(feature = "enterprise")]
     {

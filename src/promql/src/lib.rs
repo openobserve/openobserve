@@ -40,10 +40,14 @@ mod functions;
 mod label_usage;
 pub mod name_visitor;
 mod rewrite;
+pub mod search;
 mod selector_loader;
 pub mod selector_visitor;
 mod series_labels;
+mod service;
 pub mod utils;
+
+pub use service::MetricsQueryRequest;
 
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m
 pub const MINIMAL_INTERVAL: Duration = Duration::from_secs(1); // 1s

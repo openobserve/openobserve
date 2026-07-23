@@ -24,7 +24,7 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
-use openobserve_core::{compaction, file_list, users};
+use openobserve_core::{compaction, users};
 
 use crate::{
     cli::data::{
@@ -435,7 +435,7 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
         "delete-parquet" => {
             let account = command.remove_one::<String>("account").unwrap_or_default();
             let file = command.get_one::<String>("file").unwrap();
-            match file_list::delete_parquet_file(&account, file, true).await {
+            match infra_file_list::delete_parquet_file(&account, file, true).await {
                 Ok(_) => {
                     println!("delete parquet file {file} successfully");
                 }

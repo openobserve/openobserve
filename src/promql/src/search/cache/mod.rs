@@ -508,10 +508,10 @@ impl MetricsIndexCacheItem {
 
 #[cfg(test)]
 mod tests {
-    use ::promql::adjust_start_end;
     use config::meta::promql::value::{Labels, Sample};
 
     use super::*;
+    use crate::adjust_start_end;
 
     #[test]
     fn test_promql_cache_hash_key_generation() {

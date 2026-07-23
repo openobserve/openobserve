@@ -59,11 +59,10 @@ use std::sync::LazyLock as Lazy;
 
 use anyhow::{Result, anyhow};
 use config::{get_config, meta::enrichment_table::*, utils::json};
+use db;
 use futures::StreamExt;
 use reqwest::Client;
 use tokio::sync::mpsc;
-
-use crate::db;
 
 // ============================================================================
 // MPSC Channel and Event
@@ -327,7 +326,7 @@ async fn process_url_jobs(mut rx: mpsc::UnboundedReceiver<EnrichmentUrlJobEvent>
 /// the status check prevents duplicate processing. Only jobs in Pending or Failed status
 /// will proceed past the initial checks.
 async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
-    use crate::db::enrichment_table::{get_url_jobs_for_table, notify_update, save_url_job};
+    use db::enrichment_table::{get_url_jobs_for_table, notify_update, save_url_job};
 
     // ===== MULTI-URL SUPPORT: Process all pending jobs sequentially =====
     // Fetch all jobs for this table. We process them one by one in the order they appear.
@@ -439,7 +438,7 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                 // Fetch the latest job state to preserve progress updates made during processing.
                 // The process_enrichment_table_url function updates progress after each batch,
                 // so we need the latest state before marking as completed.
-                let mut job = match crate::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                let mut job = match db::enrichment_table::get_url_job_by_id(&job_id).await {
                     Ok(Some(j)) => j,
                     Ok(None) => {
                         log::warn!(
@@ -499,7 +498,7 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
 
                 // Fetch the latest job state to preserve progress updates (last_byte_position,
                 // etc.) made during processing before the failure occurred.
-                let mut job = match crate::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                let mut job = match db::enrichment_table::get_url_job_by_id(&job_id).await {
                     Ok(Some(j)) => j,
                     Ok(None) => {
                         log::warn!(
@@ -1652,8 +1651,7 @@ async fn process_enrichment_table_url(
     use std::collections::HashMap;
 
     use config::meta::stream::StreamType;
-
-    use crate::schema::stream_schema_exists;
+    use schema::stream_schema_exists;
 
     let mut stream_schema_map: HashMap<String, infra::schema::SchemaCache> = HashMap::new();
     stream_schema_exists(
@@ -1757,11 +1755,7 @@ async fn save_enrichment_batch(
             time::BASE_TIME,
         },
     };
-
-    use crate::{
-        db,
-        schema::{check_for_schema, stream_schema_exists},
-    };
+    use schema::{check_for_schema, stream_schema_exists};
 
     let stream_name = format_stream_name(table_name.to_string());
 

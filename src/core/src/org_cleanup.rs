@@ -518,7 +518,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     // so once the rows are gone the objects can no longer be located and would leak.
     // (search_jobs service is enterprise-only; OSS just drops the rows below.)
     #[cfg(feature = "enterprise")]
-    crate::search_jobs::delete_org_result_files(org_id)
+    search_service::search_jobs::delete_org_result_files(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/search_job_results: {e}"))?;
     infra::table::search_job::search_jobs::delete_by_org(org_id)

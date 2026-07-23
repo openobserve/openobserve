@@ -138,7 +138,7 @@ impl Ingest for Ingester {
                         .unwrap_or(true),
                     None => true,
                 };
-                match openobserve_core::enrichment_table::save_enrichment_data(
+                match enrichment_service::enrichment_table::save_enrichment_data(
                     &org_id,
                     &stream_name,
                     json_records,

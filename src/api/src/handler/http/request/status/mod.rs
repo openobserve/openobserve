@@ -608,7 +608,7 @@ pub async fn cache_status() -> impl IntoResponse {
     );
 
     // query cache
-    let (len, cap, mem_size) = openobserve_core::promql::search::get_cache_stats().await;
+    let (len, cap, mem_size) = promql::search::get_cache_stats().await;
     stats.insert(
         "PROMQL_QUERY_CACHE",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),

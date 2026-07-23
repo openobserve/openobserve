@@ -25,6 +25,7 @@ enterprise = [
     "search/enterprise",
     "search_service/enterprise",
     "compaction/enterprise",
+    "enrichment-service/enterprise",
     "usage_reporting/enterprise",
 ]
 cloud = [
@@ -63,6 +64,7 @@ search_service.workspace = true
 ingestion-common.workspace = true
 schema.workspace = true
 compaction.workspace = true
+enrichment-service.workspace = true
 usage_reporting.workspace = true
 axum.workspace = true
 http.workspace = true

@@ -19,6 +19,7 @@ use config::{meta::stream::StreamType, metrics};
 use futures::Stream;
 use infra::errors;
 use opentelemetry::global;
+use promql::search as SearchService;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -26,12 +27,9 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {o2_enterprise::enterprise::search::TaskStatus, search_service::SEARCH_SERVER};
 
-use crate::{
-    handler::grpc::{
-        MetadataMap,
-        cluster_rpc::{MetricsQueryRequest, MetricsQueryResponse, metrics_server::Metrics},
-    },
-    service::promql::search as SearchService,
+use crate::handler::grpc::{
+    MetadataMap,
+    cluster_rpc::{MetricsQueryRequest, MetricsQueryResponse, metrics_server::Metrics},
 };
 
 pub struct MetricsQuerier;
@@ -136,7 +134,7 @@ impl Metrics for MetricsQuerier {
 
         // spawn a task to push streaming responses
         tokio::task::spawn(async move {
-            if let Err(e) = openobserve_core::promql::search::grpc::data(&req, tx).await {
+            if let Err(e) = promql::search::grpc::data(&req, tx).await {
                 log::error!("[gRPC:metrics:data] get data error: req:{req:?}, error:{e:?}")
             }
             #[cfg(feature = "enterprise")]
