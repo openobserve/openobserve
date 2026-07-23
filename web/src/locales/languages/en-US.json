@@ -7726,7 +7726,11 @@
     "agentGraph": {
       "allAgents": "All agents",
       "stream": "Stream",
-      "agent": "Agent"
+      "agent": "Agent",
+      "noAgentsTitle": "No agents found",
+      "noAgentsDescription": "No agents were discovered in this time range. Try widening the time range, or check that your traces include gen_ai agent attributes.",
+      "agentCountSingular": "agent",
+      "agentCountPlural": "agents"
     },
     "kpi": {
       "totalCost": "Total Cost",
