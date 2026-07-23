@@ -75,7 +75,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let mut need_billing_group_migration = false;
     let mut need_workflows_migration = false;
     let mut need_synthetics_migration = false;
-    let mut need_synthetic_folders_backfill = false;
 
     let existing_meta: Option<o2_openfga::meta::mapping::OFGAModel> =
         match db::ofga::get_ofga_model().await {
@@ -261,7 +260,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 let v0_0_35 = version_compare::Version::from("0.0.35").unwrap();
                 let v0_0_36 = version_compare::Version::from("0.0.36").unwrap();
                 let v0_0_37 = version_compare::Version::from("0.0.37").unwrap();
-                let v0_0_38 = version_compare::Version::from("0.0.38").unwrap();
 
                 if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
                     need_pipeline_migration = true;
@@ -343,10 +341,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                 if existing_model_version < v0_0_37 {
                     log::info!("[OFGA:Local] workflows permissions migration needed");
                     need_workflows_migration = true;
-                }
-                if existing_model_version < v0_0_38 {
-                    log::info!("[OFGA:Local] synthetic folders selfParent backfill needed");
-                    need_synthetic_folders_backfill = true;
                 }
             }
 
@@ -525,18 +519,6 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         Err(e) => {
                             log::error!(
                                 "[OFGA:Local] Error migrating anomaly detection to openfga: {e}"
-                            );
-                        }
-                    }
-                }
-                if need_synthetic_folders_backfill {
-                    match migrations::migrate_synthetic_folders().await {
-                        Ok(_) => {
-                            log::info!("[OFGA:Local] Synthetic folders migrated to openfga");
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[OFGA:Local] Error migrating synthetic folders to openfga: {e}"
                             );
                         }
                     }
