@@ -700,8 +700,19 @@ const enrichedMonitors = computed(() => {
   }))
 })
 
+// Monitors filtered by type, search, and location — used for status counts
+// so they reflect the currently visible subset. Status is excluded so selecting
+// "Failed" doesn't zero out all other status counts.
+const filteredStatusMonitors = computed(() =>
+  enrichedMonitors.value.filter(m =>
+    (typeFilter.value === 'all'   || m.type === typeFilter.value) &&
+    (locationFilter.value === 'all' || m.locations.includes(locationFilter.value)) &&
+    (!search.value || m.name.toLowerCase().includes(search.value.toLowerCase()) || m.url.toLowerCase().includes(search.value.toLowerCase()))
+  )
+)
+
 const statusTabs = computed(() => {
-  const ms = enrichedMonitors.value
+  const ms = filteredStatusMonitors.value
   const tabs = [
     { filter: 'all',      label: t('synthetics.filters.allStatuses'),      count: ms.length },
     { filter: 'passed',   label: t('synthetics.filters.passed'),   count: ms.filter(m => m.status === 'passed').length },

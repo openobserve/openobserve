@@ -364,6 +364,20 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
   e.preventDefault()
 }
 
+// When the user switches organizations while editing a check, silently redirect
+// to the synthetics list of the new org — the check ID belongs to the previous
+// org and shouldn't be resolved against the new one.
+watch(
+  () => store.state.selectedOrganization.identifier,
+  (newOrg, oldOrg) => {
+    if (oldOrg && newOrg !== oldOrg && props.editId) {
+      stopActiveExtension()
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+    }
+  },
+)
+
 async function saveCheck() {
   // ── Pre-save validation ───────────────────────────────────────────
   validationErrors.value = {}
@@ -784,20 +798,6 @@ function onClearResults() {
         </template>
       </div>
 
-      <!-- Unsaved changes dialog (route leave) -->
-      <ODialog
-        v-model:open="showUnsavedDialog"
-        size="sm"
-        :title="t('synthetics.newCheck.unsavedTitle')"
-        :primary-button-label="t('synthetics.newCheck.leave')"
-        :secondary-button-label="t('synthetics.newCheck.stay')"
-        data-test="synthetics-create-unsaved-dialog"
-        @click:primary="onConfirmLeave"
-        @click:secondary="showUnsavedDialog = false"
-      >
-        <p class="py-2">{{ t('synthetics.newCheck.unsavedBody') }}</p>
-      </ODialog>
-
       <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
       <ODialog
         v-model:open="showBulkDeleteDialog"
@@ -816,5 +816,20 @@ function onClearResults() {
       </ODialog>
     </div>
   </template>
+
+  <!-- Unsaved changes dialog (route leave) — rendered at top level so it's
+       available in ALL phases (gate, extension-setup, editor), not just editor. -->
+  <ODialog
+    v-model:open="showUnsavedDialog"
+    size="sm"
+    :title="t('synthetics.newCheck.unsavedTitle')"
+    :primary-button-label="t('synthetics.newCheck.leave')"
+    :secondary-button-label="t('synthetics.newCheck.stay')"
+    data-test="synthetics-create-unsaved-dialog"
+    @click:primary="onConfirmLeave"
+    @click:secondary="showUnsavedDialog = false"
+  >
+    <p class="py-2">{{ t('synthetics.newCheck.unsavedBody') }}</p>
+  </ODialog>
   </OPageLayout>
 </template>

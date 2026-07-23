@@ -4,7 +4,7 @@
 // Create/edit view for protocol checks (http/tcp/tls/ssh) — single configure
 // page, no journey step. Mirrors CreateBrowserTest's data fetching and save
 // flow; the per-type request card is slotted into CheckConfigure.
-import { computed, onMounted, ref, type Component } from 'vue'
+import { computed, onMounted, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useStore } from 'vuex'
@@ -209,6 +209,19 @@ function onConfirmLeave() {
     pendingLeavePath = null
   }
 }
+
+// When the user switches organizations while editing a check, silently redirect
+// to the synthetics list of the new org — the check ID belongs to the previous
+// org and shouldn't be resolved against the new one.
+watch(
+  () => store.state.selectedOrganization.identifier,
+  (newOrg, oldOrg) => {
+    if (oldOrg && newOrg !== oldOrg && props.editId) {
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+    }
+  },
+)
 
 async function saveCheck() {
   isSaving.value = true
