@@ -163,6 +163,12 @@ async function loadForEdit(id: string) {
     journeyStepDone.value = true
   } catch (err) {
     console.error('[synthetics] failed to load check for edit', err)
+    if ((err as any)?.response?.status === 404) {
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isLoadingEdit.value = false
+      return
+    }
     loadError.value = true
     toast({
       variant: 'error',
@@ -419,6 +425,13 @@ async function saveCheck() {
     }
   } catch (err: any) {
     dismiss()
+    if (err?.response?.status === 404) {
+      forceLeave = true
+      router.push({ name: 'synthetics' })
+      toast({ variant: 'warning', message: t('synthetics.newCheck.notFoundInOrg') })
+      isSaving.value = false
+      return
+    }
     toast({
       variant: 'error',
       message: err?.response?.data?.message || t('synthetics.newCheck.saveFailed'),
@@ -784,20 +797,6 @@ function onClearResults() {
         </template>
       </div>
 
-      <!-- Unsaved changes dialog (route leave) -->
-      <ODialog
-        v-model:open="showUnsavedDialog"
-        size="sm"
-        :title="t('synthetics.newCheck.unsavedTitle')"
-        :primary-button-label="t('synthetics.newCheck.leave')"
-        :secondary-button-label="t('synthetics.newCheck.stay')"
-        data-test="synthetics-create-unsaved-dialog"
-        @click:primary="onConfirmLeave"
-        @click:secondary="showUnsavedDialog = false"
-      >
-        <p class="py-2">{{ t('synthetics.newCheck.unsavedBody') }}</p>
-      </ODialog>
-
       <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
       <ODialog
         v-model:open="showBulkDeleteDialog"
@@ -816,5 +815,20 @@ function onClearResults() {
       </ODialog>
     </div>
   </template>
+
+  <!-- Unsaved changes dialog (route leave) — rendered at top level so it's
+       available in ALL phases (gate, extension-setup, editor), not just editor. -->
+  <ODialog
+    v-model:open="showUnsavedDialog"
+    size="sm"
+    :title="t('synthetics.newCheck.unsavedTitle')"
+    :primary-button-label="t('synthetics.newCheck.leave')"
+    :secondary-button-label="t('synthetics.newCheck.stay')"
+    data-test="synthetics-create-unsaved-dialog"
+    @click:primary="onConfirmLeave"
+    @click:secondary="showUnsavedDialog = false"
+  >
+    <p class="py-2">{{ t('synthetics.newCheck.unsavedBody') }}</p>
+  </ODialog>
   </OPageLayout>
 </template>
