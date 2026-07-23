@@ -34,6 +34,8 @@ pub struct AgentRecord {
     pub stream_name: String,
     pub agent_id: Option<String>,
     pub agent_name: Option<String>,
+    pub env: Option<String>,
+    pub version: Option<String>,
     pub identity_source: String,
     pub first_seen: i64,
     pub last_seen: i64,
@@ -58,6 +60,8 @@ impl From<AgentRecord> for ActiveModel {
             stream_name: Set(record.stream_name),
             agent_id: Set(record.agent_id),
             agent_name: Set(record.agent_name),
+            env: Set(record.env),
+            agent_version: Set(record.version),
             identity_source: Set(record.identity_source),
             first_seen: Set(record.first_seen),
             last_seen: Set(record.last_seen),
@@ -109,6 +113,11 @@ pub async fn upsert_many(records: Vec<AgentRecord>) -> Result<usize, errors::Err
             active.first_seen = Set(existing.first_seen.min(record.first_seen));
             active.last_seen = Set(existing.last_seen.max(record.last_seen));
             active.updated_at = Set(record.updated_at);
+
+            if record.last_seen >= existing.last_seen {
+                active.env = Set(record.env.clone());
+                active.agent_version = Set(record.version.clone());
+            }
 
             if existing.identity_source == "agent_id"
                 && let Some(agent_name) = record.agent_name
@@ -186,6 +195,31 @@ pub async fn delete_for_stream(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_agent_record_maps_env_and_version_into_active_model() {
+        let record = AgentRecord {
+            agent_key: "k".to_string(),
+            org_id: "org".to_string(),
+            stream_type: "traces".to_string(),
+            stream_name: "s".to_string(),
+            agent_id: Some("id-1".to_string()),
+            agent_name: Some("a".to_string()),
+            env: Some("prod".to_string()),
+            version: Some("1.2.0".to_string()),
+            identity_source: "agent_id".to_string(),
+            first_seen: 1,
+            last_seen: 2,
+            created_at: 3,
+            updated_at: 4,
+        };
+        let active: ActiveModel = record.into();
+        assert_eq!(active.env.into_value(), Some(Some("prod".to_string()).into()));
+        assert_eq!(
+            active.agent_version.into_value(),
+            Some(Some("1.2.0".to_string()).into())
+        );
+    }
 
     #[test]
     fn test_agent_list_filter_default_has_no_scope() {
