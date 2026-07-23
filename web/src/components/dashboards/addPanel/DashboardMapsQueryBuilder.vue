@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center w-full"
+          class="text-xs text-center w-full flex justify-center items-center"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </OButtonGroup>
         <div
-          class="text-xs font-bold text-center w-full"
+          class="text-xs text-center w-full flex justify-center items-center"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
