@@ -18,7 +18,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'sankey'">
     <!-- source container -->
     <div class="pl-3 flex flex-row">
-      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+      <div class="layout-name whitespace-nowrap min-w-20 flex items-center">
+        <span
+          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-badge-indigo-ol-text"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.source") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
@@ -39,8 +43,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-source-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1"
+          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-indigo-ol-border bg-surface-panel"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -58,23 +63,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="cursor-grab !w-4"
             :data-test="`dashboard-source-item-${sourceLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1"
                 :data-test="`dashboard-source-item-${sourceLabel}`"
               >
-                {{ sourceLabel }}
+                <AxisFieldChipLabel :label="sourceLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
@@ -118,12 +124,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="!w-4"
             :data-test="`dashboard-source-item-${sourceLabel}-remove`"
             @click="removeSource()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -142,7 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <!-- target container -->
     <div class="pl-3 flex flex-row">
-      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+      <div class="layout-name whitespace-nowrap min-w-20 flex items-center">
+        <span
+          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-badge-orange-ol-text"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.target") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
@@ -163,8 +174,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-target-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1"
+          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-orange-ol-border bg-surface-panel"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -182,23 +194,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="cursor-grab !w-4"
             :data-test="`dashboard-target-item-${targetLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1"
                 :data-test="`dashboard-target-item-${targetLabel}`"
               >
-                {{ targetLabel }}
+                <AxisFieldChipLabel :label="targetLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
@@ -242,12 +255,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="!w-4"
             :data-test="`dashboard-target-item-${targetLabel}-remove`"
             @click="removeTarget()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -265,7 +279,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
     <!-- value container -->
     <div class="pl-3 flex flex-row">
-      <div class="layout-name whitespace-nowrap min-w-32.5 flex items-center">
+      <div class="layout-name whitespace-nowrap min-w-20 flex items-center">
+        <span
+          class="w-2 h-2 rounded-default mr-1.5 shrink-0 bg-badge-success-ol-text"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.value") }}
         <OIcon name="info-outline" size="sm" class="ml-1" />
           <OTooltip :content="Hint" />
@@ -286,8 +304,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value-layout"
       >
         <OButtonGroup
-          class="axis-field overflow-hidden mr-2 my-1"
+          class="axis-field overflow-hidden mr-2 my-1 border border-border-default border-s-2 border-s-badge-success-ol-border bg-surface-panel"
           radius="sm"
+          :divided="false"
           v-if="
             dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
@@ -305,23 +324,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="cursor-grab !w-4"
             :data-test="`dashboard-value-item-${valueLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1"
                 :data-test="`dashboard-value-item-${valueLabel}`"
               >
-                {{ valueLabel }}
+                <AxisFieldChipLabel :label="valueLabel" />
                 <template #icon-right><OIcon name="arrow-drop-down" size="sm"
                 /></template>
               </OButton>
@@ -365,12 +385,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="!w-4"
             :data-test="`dashboard-value-item-${valueLabel}-remove`"
             @click="removeValue()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
@@ -423,10 +444,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 
 export default defineComponent({
   name: "DashboardSankeyChartBuilder",
   components: {
+    AxisFieldChipLabel,
     OSeparator,
     OButtonGroup,
     OButton,
