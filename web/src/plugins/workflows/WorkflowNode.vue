@@ -62,6 +62,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="requestDeleteNode(id)"
         >
           <OIcon name="delete" size="sm" />
+          <!-- Same OTooltip the test badges below use — the delete button simply
+               never had one. Preferred over the pipeline node's hand-rolled
+               tooltip div: reka-ui/Floating UI handles the Vue Flow node's
+               transformed ancestor, so it can't drift the way a bare `fixed`
+               element does. -->
+          <OTooltip
+            :content="t('workflow.deleteNodeTitle')"
+            side="top"
+            align="center"
+            :side-offset="8"
+          />
         </OButton>
       </div>
 

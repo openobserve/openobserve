@@ -103,7 +103,6 @@ const {
   openStepPicker,
 } = useDragAndDrop();
 const showButtons = ref(false);
-const showDeleteTooltip = ref(false);
 let hideButtonsTimeout: number | null = null;
 
 // last_error is set at runtime but absent from the base pipeline literal type;
@@ -250,13 +249,6 @@ const handleActionButtonsLeave = () => {
 };
 
 // Handle delete tooltip show/hide
-const handleDeleteTooltipEnter = () => {
-  showDeleteTooltip.value = true;
-};
-
-const handleDeleteTooltipLeave = () => {
-  showDeleteTooltip.value = false;
-};
 
 // Navigate to function page to fix the error
 const navigateToFunction = (functionName: string | undefined) => {
@@ -496,18 +488,19 @@ function getIcon(data: NodeData | undefined, ioType: string | undefined) {
             @click.stop="deleteNode(id)"
             class="min-w-5! w-5! h-5! p-0! rounded-default! bg-surface-overlay/95! border! border-(--node-color)! text-(--node-color)! transition-all! duration-200! node-action-btn delete-btn"
             :data-test="`pipeline-node-${io_type}-delete-btn`"
-            @mouseenter="handleDeleteTooltipEnter"
-            @mouseleave="handleDeleteTooltipLeave"
           >
             <OIcon name="delete" size="sm" />
+            <!-- Central OTooltip (same as the workflow node and the rest of the
+                 app). Replaced a hand-rolled `fixed`-positioned tooltip div that
+                 drifted inside the transformed Vue Flow node — reka-ui/Floating
+                 UI handles that correctly. -->
+            <OTooltip
+              :content="t('pipeline.deleteNodeTitle')"
+              side="top"
+              align="center"
+              :side-offset="8"
+            />
           </OButton>
-          <div
-            v-if="showDeleteTooltip"
-            class="fixed bg-status-negative text-white py-1.5 px-2.5 rounded-default text-2xs z-[1000] shadow-[0_0.25rem_0.75rem_color-mix(in_srgb,var(--color-black)_30%,transparent)] pointer-events-none whitespace-nowrap left-3.75"
-          >
-            Delete Node
-            <div class="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[5px] [border-top-color:#dc2626]"></div>
-          </div>
         </div>
       </template>
 
