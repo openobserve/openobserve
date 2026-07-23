@@ -1240,6 +1240,59 @@ describe("LLMContentRenderer", () => {
       expect(messageJson.find('[data-test="code-query-editor"]').exists()).toBe(true);
     });
 
+    it("should fill the available height for a single JSON message", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "assistant", content: '{"score":1,"reasoning":"valid"}' },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.find(".content-wrapper").classes()).toContain("h-full");
+      expect(wrapper.find(".messages-view").classes()).toContain("h-full");
+      expect(wrapper.find(".message-item").classes()).toEqual(
+        expect.arrayContaining(["h-full", "flex", "flex-col"]),
+      );
+      expect(wrapper.find(".message-content-json").classes()).toEqual(
+        expect.arrayContaining(["flex-1", "min-h-0"]),
+      );
+    });
+
+    it("should leave multi-message previews at their natural height", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "system", content: "Follow the instructions" },
+            { role: "user", content: '{"query":"list all traces"}' },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.find(".content-wrapper").classes()).not.toContain(
+        "h-full",
+      );
+      expect(wrapper.find(".messages-view").classes()).not.toContain("h-full");
+      expect(wrapper.find(".message-item").classes()).not.toContain("h-full");
+    });
+
+    it("should wrap long unbroken message content", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "user", content: `stats ${"x".repeat(500)}` },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.find(".message-content").classes()).toContain(
+        "wrap-anywhere",
+      );
+    });
+
     it("should apply role-based background color to message items", () => {
       wrapper = mount(LLMContentRenderer, {
         props: {

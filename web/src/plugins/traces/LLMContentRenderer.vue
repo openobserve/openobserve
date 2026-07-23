@@ -44,25 +44,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-else
       class="content-wrapper"
-      :class="props.viewMode === 'formatted' && !shouldRenderAsMessages && !isPlainText && 'h-full'"
+      :class="shouldFillFormattedContent && 'h-full'"
     >
       <!-- Truncated view -->
       <div
         v-if="!isExpanded && contentStats.shouldTruncate"
-        :class="
-          props.viewMode === 'formatted' && !shouldRenderAsMessages && !isPlainText && 'h-full'
-        "
+        :class="shouldFillFormattedContent && 'h-full'"
       >
         <!-- Formatted mode -->
         <div
           v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'h-full'"
+          :class="shouldFillFormattedContent && 'h-full'"
         >
-          <div v-if="shouldRenderAsMessages" class="messages-view">
+          <div
+            v-if="shouldRenderAsMessages"
+            class="messages-view"
+            :class="shouldFillSingleJsonMessage && 'h-full'"
+          >
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
-              class="message-item mb-2 h-full"
+              class="message-item mb-2"
+              :class="
+                shouldFillSingleJsonMessage && 'h-full flex flex-col mb-0'
+              "
               :style="{
                 border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
@@ -79,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json text-compact bg-code-bg h-full p-2"
+                class="message-content-json p-2 flex-1 min-h-0 text-compact bg-code-bg"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
@@ -94,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body bg-code-bg overflow-x-auto p-2"
+                class="message-content markdown-body min-w-0 max-w-full wrap-anywhere p-2 overflow-x-auto bg-code-bg"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
@@ -146,22 +151,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Full content view -->
-      <div
-        v-else
-        :class="
-          props.viewMode === 'formatted' && !shouldRenderAsMessages && !isPlainText && 'h-full'
-        "
-      >
+      <div v-else :class="shouldFillFormattedContent && 'h-full'">
         <!-- Formatted mode -->
         <div
           v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'h-full'"
+          :class="shouldFillFormattedContent && 'h-full'"
         >
-          <div v-if="shouldRenderAsMessages" class="messages-view">
+          <div
+            v-if="shouldRenderAsMessages"
+            class="messages-view"
+            :class="shouldFillSingleJsonMessage && 'h-full'"
+          >
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
-              class="message-item mb-2 h-full"
+              class="message-item mb-2"
+              :class="
+                shouldFillSingleJsonMessage && 'h-full flex flex-col mb-0'
+              "
               :style="{
                 border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
@@ -178,7 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json text-compact bg-code-bg h-full p-2"
+                class="message-content-json p-2 flex-1 min-h-0 text-compact bg-code-bg"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
@@ -193,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-else
-                class="message-content markdown-body bg-code-bg overflow-x-auto p-2"
+                class="message-content markdown-body min-w-0 max-w-full wrap-anywhere p-2 overflow-x-auto bg-code-bg"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
@@ -648,6 +655,21 @@ const isMessageJson = (content: string): boolean => {
 const stringifyMessageContent = (content: string): string => {
   return JSON.stringify(JSON.parse(content), null, 2);
 };
+
+const shouldFillSingleJsonMessage = computed(() => {
+  return (
+    parsedMessages.value.length === 1 &&
+    isMessageJson(parsedMessages.value[0].content)
+  );
+});
+
+const shouldFillFormattedContent = computed(() => {
+  return (
+    props.viewMode === "formatted" &&
+    ((!shouldRenderAsMessages.value && !isPlainText.value) ||
+      shouldFillSingleJsonMessage.value)
+  );
+});
 
 const renderMarkdown = (content: string): string => {
   const markdownContent = toMarkdown(content);
