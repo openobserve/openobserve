@@ -46,10 +46,10 @@ use o2_enterprise::enterprise::recommendations::service::QueryRecommendationServ
 use proto::cluster_rpc;
 
 #[cfg(feature = "enterprise")]
-use crate::service::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
+use crate::alerts::scheduler::query_optimization_recommendation::QueryOptimizerContext;
 #[cfg(feature = "cloud")]
-use crate::service::organization::is_org_in_free_trial_period;
-use crate::service::{
+use crate::organization::is_org_in_free_trial_period;
+use crate::{
     alerts::{
         alert::{AlertExt, get_alert_start_end_time, get_by_id_db, get_row_column_map},
         derived_streams::DerivedStreamExt,
@@ -70,7 +70,7 @@ pub async fn handle_triggers(
     // scheduled alerts/pipelines/reports would send notifications for an org the user
     // believes is gone. Keep the trigger alive (reschedule ~1h out) so it resumes if
     // the org is resurrected; on hard-delete the scheduler rows are purged by cleanup.
-    if crate::service::db::org_status::is_blocked(&trigger.org) {
+    if crate::db::org_status::is_blocked(&trigger.org) {
         log::debug!(
             "[scheduler] org={} is pending deletion/deleting; skipping {:?} trigger {}",
             trigger.org,
@@ -161,7 +161,7 @@ async fn handle_anomaly_detection_triggers(
         trigger.status = db::scheduler::TriggerStatus::Waiting;
         db::scheduler::update_trigger(trigger.clone(), true, "").await?;
 
-        crate::service::self_reporting::publish_triggers_usage(TriggerData {
+        crate::self_reporting::publish_triggers_usage(TriggerData {
             _timestamp: now_micros(),
             org: trigger.org.clone(),
             module: TriggerDataType::AnomalyDetection,
@@ -221,7 +221,7 @@ async fn handle_anomaly_detection_triggers(
     // Publish trigger run record to the triggers stream (same as alerts).
     let interval_us = parse_detection_interval_to_micros(&config.schedule_interval);
     let next_run = now_micros() + interval_us;
-    crate::service::self_reporting::publish_triggers_usage(TriggerData {
+    crate::self_reporting::publish_triggers_usage(TriggerData {
         _timestamp: run_start_us,
         org: trigger.org.clone(),
         module: TriggerDataType::AnomalyDetection,
@@ -904,23 +904,19 @@ async fn handle_alert_triggers(
                 // Calculate fingerprint for grouping
                 let fingerprint = if let Some(dedup_config) = alert.deduplication.as_ref() {
                     let org_config =
-                        match crate::service::alerts::org_config::get_deduplication_config(
-                            &new_trigger.org,
-                        )
-                        .await
+                        match crate::alerts::org_config::get_deduplication_config(&new_trigger.org)
+                            .await
                         {
                             Ok(Some(config)) => Some(config),
                             _ => None,
                         };
 
                     let semantic_groups =
-                        crate::service::db::system_settings::get_semantic_field_groups(
-                            &new_trigger.org,
-                        )
-                        .await;
+                        crate::db::system_settings::get_semantic_field_groups(&new_trigger.org)
+                            .await;
 
                     if let Some(first_row) = data.first() {
-                        crate::service::alerts::deduplication::calculate_fingerprint(
+                        crate::alerts::deduplication::calculate_fingerprint(
                             &alert,
                             first_row,
                             dedup_config,
@@ -942,7 +938,7 @@ async fn handle_alert_triggers(
                 );
 
                 // Add to batch
-                let batch_ready = crate::service::alerts::grouping::add_to_batch(
+                let batch_ready = crate::alerts::grouping::add_to_batch(
                     fingerprint.clone(),
                     new_trigger.org.clone(),
                     alert.clone(),
@@ -955,9 +951,8 @@ async fn handle_alert_triggers(
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
                     );
-                    if let Some(batch) =
-                        crate::service::alerts::grouping::get_ready_batch(&fingerprint)
-                        && let Err(e) = crate::service::alerts::grouping::send_grouped_notification(
+                    if let Some(batch) = crate::alerts::grouping::get_ready_batch(&fingerprint)
+                        && let Err(e) = crate::alerts::grouping::send_grouped_notification(
                             &scheduler_trace_id,
                             batch,
                         )
@@ -1000,12 +995,7 @@ async fn handle_alert_triggers(
         // Apply deduplication if enabled (enterprise-only feature)
         #[cfg(feature = "enterprise")]
         let data = if let Some(db) = ORM_CLIENT.get() {
-            match crate::service::alerts::deduplication::apply_deduplication(
-                db,
-                &alert,
-                data.clone(),
-            )
-            .await
+            match crate::alerts::deduplication::apply_deduplication(db, &alert, data.clone()).await
             {
                 Ok((deduplicated_data, deduplicated)) => {
                     if deduplicated_data.is_empty() && deduplicated {
@@ -1086,7 +1076,7 @@ async fn handle_alert_triggers(
                 .enabled
             && let Some(first_row) = data.first()
         {
-            match crate::service::alerts::incidents::correlate_alert_to_incident(
+            match crate::alerts::incidents::correlate_alert_to_incident(
                 &alert,
                 first_row,
                 &data,
@@ -1468,7 +1458,7 @@ async fn handle_report_triggers(
                 trigger.org
             );
             report.enabled = false;
-            if let Err(e) = crate::service::dashboards::reports::enable(
+            if let Err(e) = crate::dashboards::reports::enable(
                 &report.org_id,
                 &_report_folder.folder_id,
                 &report.name,
@@ -1742,7 +1732,7 @@ async fn handle_derived_stream_triggers(
     };
     // Try to get pipeline from cache first, fallback to database if not found
     let pipeline = if let Some(cached_pipeline) =
-        crate::service::pipeline::store::get_scheduled_pipeline_from_cache(&pipeline_id).await
+        crate::pipeline::store::get_scheduled_pipeline_from_cache(&pipeline_id).await
     {
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} found in cache"
@@ -1753,10 +1743,10 @@ async fn handle_derived_stream_triggers(
         log::debug!(
             "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} not in cache, fetching from database"
         );
-        match db::pipeline::get_by_id(&pipeline_id).await {
+        match infra::pipeline::get_by_id(&pipeline_id).await {
             Ok(pipeline) => {
                 // Cache the pipeline for future use
-                crate::service::pipeline::store::cache_scheduled_pipeline(&pipeline).await;
+                crate::pipeline::store::cache_scheduled_pipeline(&pipeline).await;
                 log::debug!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Pipeline {pipeline_id} fetched from database and cached"
                 );
@@ -1819,8 +1809,7 @@ async fn handle_derived_stream_triggers(
             );
 
             if let Err(e) =
-                crate::service::pipeline::enable_pipeline(&pipeline.org, &pipeline.id, false, false)
-                    .await
+                crate::pipeline::enable_pipeline(&pipeline.org, &pipeline.id, false, false).await
             {
                 log::error!(
                     "[SCHEDULER trace_id {scheduler_trace_id}] Failed to pause pipeline due to trial expiry: {}/{} : {e}",
@@ -2166,7 +2155,7 @@ async fn handle_derived_stream_triggers(
                 error: Some(err_msg),
                 node_errors: HashMap::new(),
             };
-            crate::service::self_reporting::publish_error(ErrorData {
+            crate::self_reporting::publish_error(ErrorData {
                 _timestamp: Utc::now().timestamp_micros(),
                 stream_params: pipeline.get_source_stream_params(),
                 error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2314,7 +2303,7 @@ async fn handle_derived_stream_triggers(
                         error: Some(err),
                         node_errors: HashMap::new(),
                     };
-                    crate::service::self_reporting::publish_error(ErrorData {
+                    crate::self_reporting::publish_error(ErrorData {
                         _timestamp: Utc::now().timestamp_micros(),
                         stream_params: pipeline.get_source_stream_params(),
                         error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2411,7 +2400,7 @@ async fn handle_derived_stream_triggers(
             error: Some(err_msg),
             node_errors: HashMap::new(),
         };
-        crate::service::self_reporting::publish_error(ErrorData {
+        crate::self_reporting::publish_error(ErrorData {
             _timestamp: Utc::now().timestamp_micros(),
             stream_params: pipeline.get_source_stream_params(),
             error_source: ErrorSource::Pipeline(pipeline_error),
@@ -2658,7 +2647,7 @@ async fn handle_backfill_triggers(
     };
 
     // 3. Fetch the source pipeline configuration
-    let pipeline = match crate::service::pipeline::store::get_by_id(&config.pipeline_id).await {
+    let pipeline = match crate::pipeline::store::get_by_id(&config.pipeline_id).await {
         Ok(pipeline) => pipeline,
         Err(e) => {
             log::error!(
@@ -3715,7 +3704,7 @@ async fn initiate_stream_deletion(
     };
 
     // Create deletion job using existing retention service
-    let (key, _created) = crate::service::db::compact::retention::delete_stream(
+    let (key, _created) = crate::db::compact::retention::delete_stream(
         org_id,
         stream.stream_type,
         &stream.stream_name,
@@ -3732,7 +3721,7 @@ async fn initiate_stream_deletion(
         ended_at: 0,
     };
 
-    let job_id = crate::service::db::compact::compactor_manual_jobs::add_job(job).await?;
+    let job_id = crate::db::compact::compactor_manual_jobs::add_job(job).await?;
     Ok(job_id)
 }
 
@@ -3740,7 +3729,7 @@ async fn initiate_stream_deletion(
 /// We need to only check this local region status. This is because the ingestion will happen only
 /// in this region, so we can start backfilling as soon as the deletion in this region is complete.
 async fn check_deletion_status(job_id: &str) -> Result<String, anyhow::Error> {
-    let job = crate::service::db::compact::compactor_manual_jobs::get_job(job_id).await?;
+    let job = crate::db::compact::compactor_manual_jobs::get_job(job_id).await?;
     let status_str = match job.status {
         infra::table::compactor_manual_jobs::Status::Pending => "pending",
         infra::table::compactor_manual_jobs::Status::Running => "running",

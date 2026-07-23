@@ -29,6 +29,7 @@ use config::{
     meta::stream::StreamType,
     utils::{json, time::now_micros},
 };
+use db;
 use infra::{
     cache,
     schema::{
@@ -39,10 +40,7 @@ use infra::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
 
-use crate::{
-    common::infra::config::ORGANIZATIONS,
-    service::{db, organization::check_and_create_org},
-};
+use crate::{common::infra::config::ORGANIZATIONS, organization::check_and_create_org};
 
 pub async fn watch() -> Result<(), anyhow::Error> {
     #[cfg(feature = "enterprise")]
@@ -51,7 +49,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     let audit_enabled = false;
     let cfg = get_config();
     let key = "/schema/";
-    let cluster_coordinator = db::get_coordinator().await;
+    let cluster_coordinator = infra::db::get_coordinator().await;
     let mut events = cluster_coordinator.watch(key).await?;
     let events = Arc::get_mut(&mut events).unwrap();
     log::info!("[Schema:watch] Start watching stream schema");
@@ -65,7 +63,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
         };
         log::debug!("[Schema:watch] Received event: {ev:?}");
         match ev {
-            db::Event::Put(ev) => {
+            infra::db::Event::Put(ev) => {
                 let key_columns = ev.key.split('/').collect::<Vec<&str>>();
                 let (ev_key, mut ev_start_dt) = if key_columns.len() > 5 {
                     (
@@ -191,7 +189,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     log::error!("Failed to save organization in database: {e}");
                 }
             }
-            db::Event::Delete(ev) => {
+            infra::db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(key).unwrap();
                 let columns = item_key.split('/').collect::<Vec<&str>>();
                 let org_id = columns[0];
@@ -267,7 +265,7 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                     }
                 });
             }
-            db::Event::Empty => {}
+            infra::db::Event::Empty => {}
         }
     }
     Ok(())

@@ -36,21 +36,17 @@ use infra::{
 };
 use itertools::Itertools;
 use promql_parser::label::{MatchOp, Matchers};
+use search::{
+    datafusion::exec::register_metrics_table,
+    file_cache::{cache_files, calc_target_partitions},
+    index::{Condition, IndexCondition},
+    tantivy::tantivy_search,
+    types::QueryParams,
+};
+use search_service::match_source;
 use tracing::Instrument;
 
-use crate::service::{
-    db, file_list,
-    promql::search::grpc::Context,
-    search::{
-        datafusion::exec::register_metrics_table,
-        grpc::{
-            QueryParams,
-            storage::{cache_files, calc_target_partitions, tantivy_search},
-        },
-        index::{Condition, IndexCondition},
-        match_source,
-    },
-};
+use crate::{db, file_list, promql::search::grpc::Context};
 
 #[tracing::instrument(name = "promql:search:grpc:storage:create_context", skip(trace_id))]
 pub(crate) async fn create_context(
@@ -126,7 +122,7 @@ pub(crate) async fn create_context(
     }
 
     // calculate scan size
-    let mut scan_stats = match file_list::calculate_files_size(&files.to_vec()).await {
+    let mut scan_stats = match infra::file_list::calculate_files_size(&files.to_vec()).await {
         Ok(size) => size,
         Err(err) => {
             log::error!("[trace_id {trace_id}] calculate files size error: {err}");

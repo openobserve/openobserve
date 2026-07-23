@@ -28,17 +28,15 @@ use config::{
     meta::stream::{StorageType, StreamSettings, StreamType},
     utils::{json, schema_ext::SchemaExt, time::now_micros},
 };
+use db;
 use infra::schema::get_partition_time_level;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     common::meta::stream::SchemaRecords,
-    service::{
-        db,
-        ingestion::{self, get_thread_id},
-        metadata::{Metadata, MetadataItem},
-        stream,
-    },
+    ingestion::{self, get_thread_id},
+    metadata::{Metadata, MetadataItem},
+    stream,
 };
 
 const STREAM_NAME: &str = "trace_list_index";
@@ -248,12 +246,10 @@ mod tests {
 
     use crate::{
         common::meta::stream::SchemaRecords,
-        service::{
-            ingestion,
-            metadata::{
-                Metadata, MetadataItem,
-                trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
-            },
+        ingestion,
+        metadata::{
+            Metadata, MetadataItem,
+            trace_list_index::{STREAM_NAME, TraceListIndex, TraceListItem},
         },
     };
 

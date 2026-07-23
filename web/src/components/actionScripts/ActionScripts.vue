@@ -160,6 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="action-scripts-bulk-delete-btn"
                     variant="secondary"
                     size="sm"
+                    :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
                     ><OIcon name="delete" size="sm" /><span class="ml-1.5"
                       >Delete</span
@@ -345,6 +346,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
     const selectedActionScripts = ref<any[]>([]);
     const splitterModel = ref(220);
     const indexOptions = ref([]);
@@ -670,6 +672,7 @@ export default defineComponent({
     };
 
     const bulkDeleteActionScripts = async () => {
+      bulkDeleteLoading.value = true;
       try {
         if (selectedActionScripts.value.length === 0) {
           toast({
@@ -724,6 +727,8 @@ export default defineComponent({
           });
         }
         confirmBulkDelete.value = false;
+      } finally {
+        bulkDeleteLoading.value = false;
       }
     };
 
@@ -852,6 +857,7 @@ export default defineComponent({
       handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteActionScripts,
+      bulkDeleteLoading,
       getAlertByName,
     };
   },

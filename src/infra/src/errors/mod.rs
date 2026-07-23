@@ -443,6 +443,9 @@ impl ErrorCodes {
             20008 => Ok(ErrorCodes::SearchSQLExecuteError(message)),
             20009 => Ok(ErrorCodes::SearchCancelQuery(message)),
             20010 => Ok(ErrorCodes::SearchTimeout(message)),
+            20011 => Ok(ErrorCodes::InvalidParams(message)),
+            20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
+            20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -613,20 +616,24 @@ mod tests {
     }
 
     #[test]
-    fn test_error_codes_from_json_codes_above_20010_fall_to_server_internal() {
-        // from_json only handles codes up to 20010; 20011-20013 fall through
-        for (code, inner) in [
-            (20011, "invalid_params"),
-            (20012, "rate_exceeded"),
-            (20013, "histogram_unavail"),
+    fn test_error_codes_from_json_round_trips_20011_to_20013() {
+        for (code, expected) in [
+            (
+                20011,
+                ErrorCodes::InvalidParams("invalid_params".to_string()),
+            ),
+            (
+                20012,
+                ErrorCodes::RatelimitExceeded("rate_exceeded".to_string()),
+            ),
+            (
+                20013,
+                ErrorCodes::SearchHistogramNotAvailable("histogram_unavail".to_string()),
+            ),
         ] {
-            let json = format!(r#"{{"code":{code},"message":"x","inner":"{inner}"}}"#);
-            let result = ErrorCodes::from_json(&json).unwrap();
-            // The fallback wraps the entire input JSON string, not the inner value
-            match result {
-                ErrorCodes::ServerInternalError(_) => {}
-                other => panic!("expected ServerInternalError for code {code}, got {other:?}"),
-            }
+            let result = ErrorCodes::from_json(&expected.to_json()).unwrap();
+            assert_eq!(result.get_code(), code);
+            assert_eq!(result.get_inner_message(), expected.get_inner_message());
         }
     }
 

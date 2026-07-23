@@ -311,6 +311,8 @@ import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";
 import Favorite from "~icons/material-symbols/favorite";
 import FavoriteBorder from "~icons/material-symbols/favorite-outline";
+import Star from "~icons/material-symbols/star";
+import StarOutline from "~icons/material-symbols/star-outline";
 import RadioButtonUnchecked from "~icons/material-symbols/radio-button-unchecked";
 import RadioButtonChecked from "~icons/material-symbols/radio-button-checked";
 import ComputerIcon from "~icons/material-symbols/computer-outline";
@@ -354,6 +356,8 @@ export const iconRegistry = {
   "stars": Stars,
   "favorite": Favorite,
   "favorite-border": FavoriteBorder,
+  "star": Star,
+  "star-outline": StarOutline,
   "backpack": Backpack,
   "block": Block,
   "bolt": Bolt,

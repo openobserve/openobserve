@@ -17,13 +17,10 @@ use config::{
     get_config,
     meta::{cluster::RoleGroup, stream::StreamType},
 };
+use db;
 use hashbrown::HashMap;
 use infra::{cluster::get_cached_online_querier_nodes, schema::STREAM_SCHEMAS_LATEST};
-
-use crate::{
-    common::infra::config::ENRICHMENT_TABLES,
-    service::{db, enrichment::StreamTable},
-};
+use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
 
 pub async fn cache_enrichment_tables() -> Result<(), anyhow::Error> {
     let r = STREAM_SCHEMAS_LATEST.read().await;

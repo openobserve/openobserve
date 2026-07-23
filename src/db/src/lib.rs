@@ -47,7 +47,6 @@ pub mod org_status;
 pub mod org_storage_providers;
 pub mod org_users;
 pub mod organization;
-pub mod pipeline;
 pub mod pipeline_errors;
 #[cfg(feature = "vectorscan")]
 pub mod re_pattern;
@@ -65,7 +64,7 @@ pub mod user;
 #[cfg(feature = "enterprise")]
 pub mod workflows;
 
-pub use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
+use infra_db::{Event, NEED_WATCH, NO_NEED_WATCH, get_coordinator};
 
 #[inline]
 pub async fn get(key: &str) -> Result<Bytes> {

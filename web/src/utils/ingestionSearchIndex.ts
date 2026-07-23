@@ -57,6 +57,12 @@ export const ingestionSearchIndex: SearchableItem[] = [
     parentTab: "recommended",
   },
   {
+    name: "ingestFromMacOS",
+    label: "macOS",
+    keywords: ["macos", "mac", "osx", "darwin", "apple", "unified log"],
+    parentTab: "recommended",
+  },
+  {
     name: "AWSConfig",
     label: "AWS",
     keywords: ["aws", "amazon"],

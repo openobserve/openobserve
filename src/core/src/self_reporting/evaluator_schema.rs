@@ -188,7 +188,7 @@ async fn initialize_evaluator_stream_schema(org_id: &str) -> Result<()> {
         return Ok(());
     }
 
-    match crate::service::db::schema::merge(
+    match crate::db::schema::merge(
         org_id,
         stream_name,
         stream_type,

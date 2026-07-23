@@ -16,15 +16,13 @@ use axum::{extract::Path, response::Response};
 #[cfg(feature = "enterprise")]
 use {
     crate::{
-        common::utils::{
-            auth::{UserEmail, check_permissions},
-            http::get_or_create_trace_id,
-        },
+        common::utils::http::get_or_create_trace_id,
         handler::http::{extractors::Headers, models::action::TestActionRequest},
     },
     axum::Json,
     itertools::Itertools,
     o2_enterprise::enterprise::actions::{action_manager::trigger_action, meta::TriggerSource},
+    openobserve_core::auth::{UserEmail, check_permissions},
     tracing::{Level, span},
 };
 
@@ -72,7 +70,7 @@ pub async fn test_action(
     )
     .await
     {
-        return crate::common::meta::http::HttpResponse::forbidden("Unauthorized Access");
+        return common::meta::http::HttpResponse::forbidden("Unauthorized Access");
     }
 
     let trace_id = get_or_create_trace_id(
@@ -88,8 +86,8 @@ pub async fn test_action(
     )
     .await
     {
-        Ok(action) => crate::common::meta::http::HttpResponse::json(action),
-        Err(e) => crate::common::meta::http::HttpResponse::bad_request(e),
+        Ok(action) => common::meta::http::HttpResponse::json(action),
+        Err(e) => common::meta::http::HttpResponse::bad_request(e),
     }
 }
 

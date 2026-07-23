@@ -18,9 +18,8 @@ use config::{
     meta::stream::{ALL_STREAM_TYPES, StreamType},
     utils::json,
 };
+use db;
 use infra::schema::unwrap_stream_settings;
-
-use crate::service::db;
 
 /// Reset the `index_updated_at` field in stream settings.
 ///

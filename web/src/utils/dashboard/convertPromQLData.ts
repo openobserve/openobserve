@@ -41,6 +41,7 @@ import { convertPromQLChartData } from "./promql/convertPromQLChartData";
 import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
 import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
+import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 
 let moment: any;
 let momentInitialized = false;
@@ -586,7 +587,9 @@ export const convertPromQLData = async (
   // can auto-range with its natural padding (avoids bar clipping at
   // the y-axis edge where gap-filled data can extend beyond the query
   // start).
-  if (loading && metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
+  const pinXAxis =
+    loading || panelSchema?.config?.pin_x_axis_to_range === true;
+  if (pinXAxis && metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
     const queryStartMs = metadata.queries[0].startTime / 1000; // µs to ms
     const queryEndMs = metadata.queries[0].endTime / 1000;
 
@@ -1274,6 +1277,8 @@ export const convertPromQLData = async (
 
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
+  // Reserve measured left space so wide y-axis labels don't clip.
+  applyMeasuredYAxisLeftInset(options);
   return {
     options,
     extras: {

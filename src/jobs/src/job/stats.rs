@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::{cluster::LOCAL_NODE, deverbatim, get_config, spawn_pausable_job};
+use db;
+use openobserve_core::compact::stats::update_stats_from_file_list;
 use tokio::time;
-
-use crate::service::{compact::stats::update_stats_from_file_list, db};
 
 pub async fn run() -> Result<(), anyhow::Error> {
     tokio::task::spawn(update_node_memory_usage());

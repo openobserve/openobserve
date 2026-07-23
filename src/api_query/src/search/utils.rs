@@ -20,10 +20,9 @@ use config::{
 };
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
-use search_service::sql::Sql;
-
 #[cfg(feature = "enterprise")]
-pub use crate::service::authz::{StreamPermissionResourceType, check_stream_permissions};
+pub use openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions};
+use search::sql::Sql;
 
 // ============================================================================
 // Query Validation Helpers
@@ -41,6 +40,33 @@ pub fn get_bool_from_request(query: &HashMap<String, String>, param_name: &str) 
 
 /// Validates query fields against stream schema and User-Defined Schema (UDS)
 /// Returns Ok(()) if validation passes, or error if fields are invalid
+/// Replace the engine-reported valid-fields list in a `SearchFieldNotFound`
+/// error with the streams' real schema fields. The engine only sees the
+/// pruned scan schema, so its list is misleading; the real list lets the HTTP
+/// layer build useful did-you-mean suggestions.
+pub async fn enrich_field_error(
+    err: Error,
+    org_id: &str,
+    stream_type: StreamType,
+    stream_names: &[String],
+) -> Error {
+    let Error::ErrorCode(ErrorCodes::SearchFieldNotFound(inner)) = &err else {
+        return err;
+    };
+    let mut fields: Vec<String> = Vec::new();
+    for stream in stream_names {
+        if let Ok(schema) = infra::schema::get(org_id, stream, stream_type).await {
+            fields.extend(schema.fields().iter().map(|f| f.name().to_owned()));
+        }
+    }
+    fields.sort();
+    fields.dedup();
+    match crate::service::error_suggest::rebuild_field_not_found(inner, &fields) {
+        Some(new_inner) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(new_inner)),
+        None => err,
+    }
+}
+
 pub async fn validate_query_fields(
     org_id: &str,
     stream_name: &str,
@@ -90,15 +116,27 @@ pub async fn validate_query_fields(
         }
 
         if schema.field_with_name(&field).is_err() {
+            // Same textual shape as the DataFusion FieldNotFound mapping so the
+            // HTTP layer can extract candidates for did-you-mean suggestions.
+            let valid = schema
+                .fields()
+                .iter()
+                .map(|f| f.name().to_owned())
+                .collect::<Vec<_>>()
+                .join(", ");
             return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
-                "{}. Field not found in stream schema.",
-                field
+                "No field named {field}. Valid fields are {valid}.",
             ))));
         }
 
         if !uds_fields.is_empty() && !uds_fields.contains(&field) {
+            let valid = uds_fields
+                .iter()
+                .map(|f| f.to_owned())
+                .collect::<Vec<_>>()
+                .join(", ");
             return Err(Error::ErrorCode(ErrorCodes::SearchFieldNotFound(format!(
-                "{field}. Field exists but not in User-Defined Schema (UDS)",
+                "No field named {field}. Field exists in the stream but not in its User-Defined Schema (UDS). Valid fields are {valid}.",
             ))));
         }
     }
