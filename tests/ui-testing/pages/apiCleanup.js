@@ -1034,7 +1034,8 @@ class APICleanup {
     }
 
     /**
-     * Fetch all log streams
+     * Fetch all streams of the given type
+     * @param {string} [streamType='logs'] - Stream type to list (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<Array>} Array of stream objects
      */
     async fetchStreams(streamType = 'logs') {
@@ -1063,6 +1064,7 @@ class APICleanup {
     /**
      * Delete a single stream
      * @param {string} streamName - The stream name
+     * @param {string} [streamType='logs'] - Stream type to delete (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<Object>} Deletion result
      */
     async deleteStream(streamName, streamType = 'logs') {
@@ -1094,6 +1096,7 @@ class APICleanup {
      * 1. GET stream settings - checks if schema exists
      * 2. If schema gone, PUT settings to check if deletion marker is still active
      * @param {string} streamName - The stream name to check
+     * @param {string} [streamType='logs'] - Stream type to check (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<boolean>} True if stream still exists or is being deleted
      */
     async isStreamStillDeleting(streamName, streamType = 'logs') {
@@ -1160,6 +1163,7 @@ class APICleanup {
      * @param {string} streamName - The stream name to wait for
      * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
      * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 3000 = 3 seconds)
+     * @param {string} [streamType='logs'] - Stream type to poll (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<boolean>} True if deletion completed, false if timed out
      */
     async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000, streamType = 'logs') {
@@ -1371,6 +1375,7 @@ class APICleanup {
      * @param {Object} options - Optional configuration
      * @param {boolean} options.waitForDeletion - Whether to wait for deletions to complete (default: true)
      * @param {number} options.maxWaitPerStreamMs - Max wait time per stream in ms (default: 120000)
+     * @param {string} [options.streamType='logs'] - Stream type to sweep (e.g. 'logs', 'traces', 'metrics')
      */
     async cleanupStreams(patterns = [], protectedStreams = [], options = {}) {
         const { waitForDeletion = true, maxWaitPerStreamMs = 120000, streamType = 'logs' } = options;
