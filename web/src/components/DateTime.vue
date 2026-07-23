@@ -48,26 +48,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
       <div id="date-time-menu" class="date-time-dialog w-81.25 z-10001 max-h-(--reka-popper-available-height,600px) overflow-y-auto" @keydown.capture="onPickerKeydown">
-        <div v-if="!disableRelative" class="flex justify-evenly py-2">
-          <OButton
-            data-test="date-time-relative-tab"
-            class="w-38.5"
-            :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
-            size="sm"
-            @click="setDateType('relative')"
-          >
-            {{ t("common.relative") }}
-          </OButton>
-          <OSeparator vertical class="my-2" />
-          <OButton
-            data-test="date-time-absolute-tab"
-            class="w-38.5"
-            :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
-            size="sm"
-            @click="setDateType('absolute')"
-          >
-            {{ t("common.absolute") }}
-          </OButton>
+        <div class="flex items-center gap-1 py-2 px-3">
+          <div v-if="!disableRelative" class="flex flex-1 gap-1">
+            <OButton
+              data-test="date-time-relative-tab"
+              class="flex-1"
+              :variant="selectedType === 'relative' ? 'primary' : 'ghost-primary'"
+              size="sm"
+              @click="setDateType('relative')"
+            >
+              {{ t("common.relative") }}
+            </OButton>
+            <OButton
+              data-test="date-time-absolute-tab"
+              class="flex-1"
+              :variant="selectedType === 'absolute' ? 'primary' : 'ghost-primary'"
+              size="sm"
+              @click="setDateType('absolute')"
+            >
+              {{ t("common.absolute") }}
+            </OButton>
+          </div>
+          <div v-else class="flex-1" />
+          <OTooltip :content="t('common.copyRange')">
+            <OButton
+              data-test="date-time-copy-btn"
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="content-copy"
+              :aria-label="t('common.copyRange')"
+              @click="copyRange"
+            />
+          </OTooltip>
+          <OTooltip :content="t('common.pasteRange')">
+            <OButton
+              data-test="date-time-paste-btn"
+              variant="ghost"
+              size="icon-xs-sq"
+              icon-left="content-paste"
+              :aria-label="t('common.pasteRange')"
+              @click="pasteRange"
+            />
+          </OTooltip>
         </div>
         <OSeparator />
         <div class="overflow-y-visible">
@@ -241,30 +263,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="my-2 mx-[0.4rem]"
           />
         </div>
-        <div class="flex items-center gap-1 py-2 px-3 border-t border-border-default">
-          <OTooltip :content="t('common.copyRange')">
-            <OButton
-              data-test="date-time-copy-btn"
-              variant="ghost"
-              size="icon-xs-sq"
-              icon-left="content-copy"
-              :aria-label="t('common.copyRange')"
-              @click="copyRange"
-            />
-          </OTooltip>
-          <OTooltip :content="t('common.pasteRange')">
-            <OButton
-              data-test="date-time-paste-btn"
-              variant="ghost"
-              size="icon-xs-sq"
-              icon-left="content-paste"
-              :aria-label="t('common.pasteRange')"
-              @click="pasteRange"
-            />
-          </OTooltip>
+        <div
+          v-if="!autoApply"
+          class="flex items-center py-2 px-3 border-t border-border-default"
+        >
           <div class="flex-1" />
           <OButton
-            v-if="!autoApply"
             data-test="date-time-apply-btn"
             variant="primary"
             size="xs"
