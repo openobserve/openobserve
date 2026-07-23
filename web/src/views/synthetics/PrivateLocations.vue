@@ -85,7 +85,9 @@
 
       <!-- Last seen -->
       <template #cell-lastSeen="{ row }">
-        <span v-if="(row as any).last_seen_at">{{ formatTimeAgoUs((row as any).last_seen_at) }}</span>
+        <span v-if="(row as any).last_seen_at">{{
+          formatTimeAgoUs((row as any).last_seen_at)
+        }}</span>
         <span v-else class="text-text-muted">—</span>
       </template>
 
@@ -107,7 +109,9 @@
             :disabled="(row as any).monitors_count > 0"
             :title="
               (row as any).monitors_count > 0
-                ? t('synthetics.privateLocations.deleteBlocked', { count: (row as any).monitors_count })
+                ? t('synthetics.privateLocations.deleteBlocked', {
+                    count: (row as any).monitors_count,
+                  })
                 : t('synthetics.table.delete')
             "
             :data-test="`synthetics-private-locations-delete-btn-${(row as any).id}`"
@@ -260,5 +264,4 @@ const columns = computed<OTableColumnDef[]>(() => [
 const openDetail = (row: SyntheticLocation) => {
   router.push({ name: "synthetic-private-location", params: { id: row.id } });
 };
-
 </script>

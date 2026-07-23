@@ -39,10 +39,7 @@ export const makeJobFormSchema = (t: (_key: string) => string) =>
       idleWindowSecs: z.coerce
         .number()
         .int()
-        .min(
-          MIN_COMPLETION_IDLE_WINDOW_SECS,
-          t("onlineEvals.job.validation.idleWindowMinimum"),
-        )
+        .min(MIN_COMPLETION_IDLE_WINDOW_SECS, t("onlineEvals.job.validation.idleWindowMinimum"))
         .default(TRACE_COMPLETION_WINDOW_DEFAULTS.idleWindowSecs),
       maxAgeSecs: z.coerce
         .number()

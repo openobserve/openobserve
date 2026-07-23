@@ -46,10 +46,7 @@ export function buildJobInputMappingPayload(
     const cleanMapping = Object.fromEntries(
       Object.entries(inputMappings[scorerId] || {})
         .map(([key, value]) => [key.trim(), value.trim()])
-        .filter(
-          ([key, value]) =>
-            key && value && !isSystemProvidedVariable(targetScope, key),
-        ),
+        .filter(([key, value]) => key && value && !isSystemProvidedVariable(targetScope, key)),
     );
 
     if (Object.keys(cleanMapping).length) payload[scorerId] = cleanMapping;
@@ -58,17 +55,9 @@ export function buildJobInputMappingPayload(
   return Object.keys(payload).length ? payload : null;
 }
 
-export function normalizeJobInputMappings(
-  value: any,
-  selectedScorerIds: string[],
-) {
+export function normalizeJobInputMappings(value: any, selectedScorerIds: string[]) {
   const parsedValue = parseMaybeJson(value);
-  if (
-    !parsedValue ||
-    typeof parsedValue !== "object" ||
-    Array.isArray(parsedValue)
-  )
-    return {};
+  if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) return {};
 
   const entries = Object.entries(parsedValue);
   const hasPerScorerShape = entries.some(
@@ -76,9 +65,7 @@ export function normalizeJobInputMappings(
       mapping &&
       typeof mapping === "object" &&
       !Array.isArray(mapping) &&
-      Object.values(mapping).every(
-        (fieldValue) => typeof fieldValue === "string",
-      ),
+      Object.values(mapping).every((fieldValue) => typeof fieldValue === "string"),
   );
 
   if (hasPerScorerShape) {
@@ -112,8 +99,7 @@ export function syncJobInputMappings(
 
     if (scorer) {
       scorerTemplateVariables(scorer).forEach((variable) => {
-        if (mapping[variable] === undefined)
-          mapping[variable] = defaultJobMappingValue(variable);
+        if (mapping[variable] === undefined) mapping[variable] = defaultJobMappingValue(variable);
       });
     }
 

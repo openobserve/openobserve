@@ -1533,8 +1533,6 @@ describe("compact_preview shrinks the heatmap for the metrics explorer cards", (
     // Same treatment as the other PromQL charts — a heatmap on a dashboard with
     // overflow-hidden clips its tooltip too, so this is not gated on the card.
     expect(convertWith({}).tooltip.appendToBody).toBe(true);
-    expect(convertWith({ compact_preview: true }).tooltip.appendToBody).toBe(
-      true,
-    );
+    expect(convertWith({ compact_preview: true }).tooltip.appendToBody).toBe(true);
   });
 });

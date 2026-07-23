@@ -193,10 +193,7 @@ describe("OToggleGroup", () => {
     });
 
     it("uses the vertical midpoint when orientation is vertical", async () => {
-      const wrapper = mountGroup(
-        { reorderable: true, orientation: "vertical" },
-        ITEMS,
-      );
+      const wrapper = mountGroup({ reorderable: true, orientation: "vertical" }, ITEMS);
       // Item spans y 0..20. x is deliberately past the horizontal midpoint to
       // prove the vertical axis is the one being consulted.
       await dragOnto(wrapper, "a", "c", { clientX: 90, clientY: 2 });

@@ -6,59 +6,73 @@
     :back="{ label: t('synthetics.privateLocations.detail.back'), to: { name: 'synthetic' } }"
     bleed
   >
-      <template #title-trail>
-        <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
-          {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
-        </OBadge>
-      </template>
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="content-copy"
-          :disabled="!detail"
-          data-test="synthetics-private-location-detail-setup-btn"
-          @click="openSetup"
-        >
-          {{ t("synthetics.privateLocations.copySetupCmd") }}
-        </OButton>
-        <OButton
-          variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="loading"
-          :title="t('common.refresh')"
-          data-test="synthetics-private-location-detail-refresh-btn"
-          @click="load"
-        />
-      </template>
+    <template #title-trail>
+      <OBadge v-if="detail" :variant="statusVariant(detail.status)" :dot="true" size="sm">
+        {{ t(`synthetics.privateLocations.status.${detail.status}`) }}
+      </OBadge>
+    </template>
+    <template #actions>
+      <OButton
+        variant="outline"
+        size="sm"
+        icon-left="content-copy"
+        :disabled="!detail"
+        data-test="synthetics-private-location-detail-setup-btn"
+        @click="openSetup"
+      >
+        {{ t("synthetics.privateLocations.copySetupCmd") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        icon-left="refresh"
+        :loading="loading"
+        :title="t('common.refresh')"
+        data-test="synthetics-private-location-detail-refresh-btn"
+        @click="load"
+      />
+    </template>
 
     <div class="flex-1 min-h-0 overflow-y-auto">
       <div v-if="detail" class="flex flex-col gap-6 p-6">
         <!-- Summary strip -->
-        <div class="flex flex-wrap items-center gap-6 rounded-default border border-border-default bg-surface-subtle px-4 py-3 text-sm">
+        <div
+          class="flex flex-wrap items-center gap-6 rounded-default border border-border-default bg-surface-subtle px-4 py-3 text-sm"
+        >
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.agents") }}</span>
+            <span class="text-xs text-text-muted">{{
+              t("synthetics.privateLocations.table.agents")
+            }}</span>
             <span class="font-medium">{{ detail.live_agents }}/{{ detail.agents_total }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.checks") }}</span>
+            <span class="text-xs text-text-muted">{{
+              t("synthetics.privateLocations.table.checks")
+            }}</span>
             <span class="font-medium">{{ detail.monitors_count }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.checksPerMin") }}</span>
+            <span class="text-xs text-text-muted">{{
+              t("synthetics.privateLocations.table.checksPerMin")
+            }}</span>
             <span class="font-medium">~{{ detail.checks_per_min }}</span>
           </div>
           <div v-if="detail.version" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.detail.version") }}</span>
+            <span class="text-xs text-text-muted">{{
+              t("synthetics.privateLocations.detail.version")
+            }}</span>
             <span class="font-medium">v{{ detail.version }}</span>
           </div>
           <div class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.detail.pool") }}</span>
+            <span class="text-xs text-text-muted">{{
+              t("synthetics.privateLocations.detail.pool")
+            }}</span>
             <span class="font-mono text-xs">{{ detail.pool }}</span>
           </div>
           <div v-if="detail.last_seen_at" class="flex flex-col">
-            <span class="text-xs text-text-muted">{{ t("synthetics.privateLocations.table.lastSeen") }}</span>
+            <span class="text-xs text-text-muted">{{
+              t("synthetics.privateLocations.table.lastSeen")
+            }}</span>
             <span class="font-medium">{{ formatTimeAgoUs(detail.last_seen_at) }}</span>
           </div>
         </div>
@@ -215,10 +229,7 @@ const statusVariant = (status: string) =>
 async function load() {
   loading.value = true;
   try {
-    const res = await syntheticsService.getLocation(
-      orgIdentifier.value,
-      String(route.params.id),
-    );
+    const res = await syntheticsService.getLocation(orgIdentifier.value, String(route.params.id));
     detail.value = res.data as SyntheticLocationDetail;
   } catch (err) {
     detail.value = null;

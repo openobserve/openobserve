@@ -90,10 +90,7 @@
           data-test="span-selector-field-mode"
         />
 
-        <div
-          v-if="formValues.fieldMode === 'default'"
-          class="flex flex-col gap-1.5"
-        >
+        <div v-if="formValues.fieldMode === 'default'" class="flex flex-col gap-1.5">
           <span class="text-xs text-input-help-text leading-none">
             {{ t("onlineEvals.job.spanSelector.defaultSchemaHelp") }}
           </span>
@@ -168,10 +165,7 @@ import {
   normalizeJobFilterCondition,
 } from "../../utils/jobFilter";
 import JobFilterBuilder from "./JobFilterBuilder.vue";
-import {
-  makeSpanSelectorSchema,
-  type SpanSelectorForm,
-} from "./SpanSelectorBinding.schema";
+import { makeSpanSelectorSchema, type SpanSelectorForm } from "./SpanSelectorBinding.schema";
 
 const DEFAULT_FIELDS = [
   "name",
@@ -226,8 +220,7 @@ const spanSelectorSchema = makeSpanSelectorSchema(t, {
   isDuplicateName: (name, id) =>
     props.selectors.some(
       (selector) =>
-        selector.id !== id &&
-        selector.name.trim().toLowerCase() === name.trim().toLowerCase(),
+        selector.id !== id && selector.name.trim().toLowerCase() === name.trim().toLowerCase(),
     ),
 });
 
@@ -243,9 +236,7 @@ const form = useOForm<SpanSelectorForm>({
   schema: spanSelectorSchema,
   onSubmit: saveSelector,
 });
-const formValues = form.useStore(
-  (state: any) => state.values as SpanSelectorForm,
-);
+const formValues = form.useStore((state: any) => state.values as SpanSelectorForm);
 
 const boundSelector = computed(() =>
   props.selectors.find((selector) => selector.id === props.binding),
@@ -304,9 +295,7 @@ function saveSelector(value: SpanSelectorForm) {
     fields: value.fieldMode === "custom" ? [...value.fields] : [],
     maximumSpans: Number(value.maximumSpans),
   };
-  const existingIndex = props.selectors.findIndex(
-    (item) => item.id === selector.id,
-  );
+  const existingIndex = props.selectors.findIndex((item) => item.id === selector.id);
   const selectors = [...props.selectors];
   if (existingIndex >= 0) selectors.splice(existingIndex, 1, selector);
   else selectors.push(selector);

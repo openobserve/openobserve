@@ -160,9 +160,7 @@ describe("SetupCardRenderer — uninstall section", () => {
 
   it("omits the accordion when a card provides no uninstall path", () => {
     wrapper = mountCard();
-    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(false);
   });
 
   it("still renders the section wrapper when uninstall is the only extra", () => {
@@ -176,9 +174,7 @@ describe("SetupCardRenderer — uninstall section", () => {
         },
       },
     });
-    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="ai-uninstall-accordion"]').exists()).toBe(true);
   });
 });
 

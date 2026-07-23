@@ -10,9 +10,7 @@
         <h4 class="m-0 text-compact font-semibold text-text-heading">
           {{ t("onlineEvals.quality.runs.title") }}
         </h4>
-        <p
-          class="m-0 mt-0.5 max-w-[48rem] text-2xs leading-relaxed text-text-secondary"
-        >
+        <p class="m-0 mt-0.5 max-w-[48rem] text-2xs leading-relaxed text-text-secondary">
           {{ t("onlineEvals.quality.runs.hint") }}
         </p>
       </div>
@@ -96,20 +94,14 @@
         <div class="flex flex-col items-start gap-0.5 leading-tight">
           <span
             class="font-semibold [font-variant-numeric:tabular-nums]"
-            :class="
-              row.isUnhealthy ? 'text-status-error-text' : 'text-text-heading'
-            "
+            :class="row.isUnhealthy ? 'text-status-error-text' : 'text-text-heading'"
           >
             {{ row.resultDisplay }}
           </span>
           <span
             v-if="row.health !== 'unclassified'"
             class="text-3xs"
-            :class="
-              row.isUnhealthy
-                ? 'text-status-error-text'
-                : 'text-status-success-text'
-            "
+            :class="row.isUnhealthy ? 'text-status-error-text' : 'text-status-success-text'"
           >
             {{ t(`onlineEvals.quality.runs.health.${row.health}`) }}
           </span>
@@ -127,9 +119,7 @@
 
       <template #cell-targetId="{ row }">
         <div class="flex min-w-0 flex-col items-start gap-0.5 leading-tight">
-          <span
-            class="text-3xs font-medium uppercase tracking-wide text-text-tertiary"
-          >
+          <span class="text-3xs font-medium uppercase tracking-wide text-text-tertiary">
             {{ scopeLabel(row.targetScope) }}
           </span>
           <span
@@ -143,10 +133,7 @@
 
       <template #cell-agentName="{ row }">
         <div class="flex min-w-0 flex-col items-start gap-0.5 leading-tight">
-          <span
-            class="max-w-full truncate text-2xs text-text-heading"
-            :title="agentLabel(row)"
-          >
+          <span class="max-w-full truncate text-2xs text-text-heading" :title="agentLabel(row)">
             {{ agentLabel(row) }}
           </span>
           <span
@@ -198,9 +185,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n();
 
-const hasThreshold = computed(
-  () => thresholdForConfig(props.config).unhealthyExpr != null,
-);
+const hasThreshold = computed(() => thresholdForConfig(props.config).unhealthyExpr != null);
 
 const filterOptions = computed(() => [
   {
@@ -302,9 +287,7 @@ function reasoningFor(row: QualityRunRow): string {
 }
 
 function agentLabel(row: QualityRunRow): string {
-  return (
-    row.agentName || row.agentId || t("onlineEvals.quality.runs.unknownAgent")
-  );
+  return row.agentName || row.agentId || t("onlineEvals.quality.runs.unknownAgent");
 }
 
 function scopeLabel(scope: QualityRunRow["targetScope"]): string {

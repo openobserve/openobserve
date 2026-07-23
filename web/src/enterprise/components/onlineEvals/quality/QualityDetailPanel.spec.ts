@@ -59,22 +59,12 @@ describe("QualityDetailPanel", () => {
   it("shows all scope counts and emits a diagnostic scope change", async () => {
     const wrapper = mountPanel();
 
-    expect(wrapper.find('[data-test="quality-detail-scope-all"]').text()).toBe(
-      "All1.3k",
-    );
-    expect(wrapper.find('[data-test="quality-detail-scope-span"]').text()).toBe(
-      "Span1.2k",
-    );
-    expect(
-      wrapper.find('[data-test="quality-detail-scope-trace"]').text(),
-    ).toBe("Trace50");
-    expect(
-      wrapper.find('[data-test="quality-detail-scope-session"]').text(),
-    ).toBe("Session5");
+    expect(wrapper.find('[data-test="quality-detail-scope-all"]').text()).toBe("All1.3k");
+    expect(wrapper.find('[data-test="quality-detail-scope-span"]').text()).toBe("Span1.2k");
+    expect(wrapper.find('[data-test="quality-detail-scope-trace"]').text()).toBe("Trace50");
+    expect(wrapper.find('[data-test="quality-detail-scope-session"]').text()).toBe("Session5");
 
-    await wrapper
-      .find('[data-test="quality-detail-scope-trace"]')
-      .trigger("click");
+    await wrapper.find('[data-test="quality-detail-scope-trace"]').trigger("click");
 
     expect(wrapper.emitted("update:scope")).toEqual([["trace"]]);
   });
@@ -83,15 +73,11 @@ describe("QualityDetailPanel", () => {
     const wrapper = mountPanel("session");
 
     expect(
-      wrapper
-        .find('[data-test="quality-detail-scope-session"]')
-        .attributes("aria-pressed"),
+      wrapper.find('[data-test="quality-detail-scope-session"]').attributes("aria-pressed"),
     ).toBe("true");
-    expect(
-      wrapper
-        .find('[data-test="quality-detail-scope-all"]')
-        .attributes("aria-pressed"),
-    ).toBe("false");
+    expect(wrapper.find('[data-test="quality-detail-scope-all"]').attributes("aria-pressed")).toBe(
+      "false",
+    );
     expect(wrapper.find("o-empty-state-stub").attributes("title")).toBe(
       "No Session scores in this window",
     );
@@ -105,16 +91,12 @@ describe("QualityDetailPanel", () => {
       dataType: "boolean",
       hasScores: true,
       booleanTrend: [point],
-      booleanTrendSeries: [
-        { id: "__default__", label: "True rate", points: [point] },
-      ],
+      booleanTrendSeries: [{ id: "__default__", label: "True rate", points: [point] }],
     });
 
     expect(wrapper.text()).toContain("True rate over time");
     expect(
-      wrapper
-        .findComponent({ name: "QualityBooleanTrendChart" })
-        .props("legendPassRate"),
+      wrapper.findComponent({ name: "QualityBooleanTrendChart" }).props("legendPassRate"),
     ).toBe("True rate");
 
     await wrapper.setProps({
@@ -127,9 +109,7 @@ describe("QualityDetailPanel", () => {
 
     expect(wrapper.text()).toContain("Healthy rate over time");
     expect(
-      wrapper
-        .findComponent({ name: "QualityBooleanTrendChart" })
-        .props("legendPassRate"),
+      wrapper.findComponent({ name: "QualityBooleanTrendChart" }).props("legendPassRate"),
     ).toBe("Healthy rate");
   });
 });

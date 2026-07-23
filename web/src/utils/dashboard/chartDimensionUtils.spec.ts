@@ -231,7 +231,14 @@ describe("chartDimensionUtils", () => {
       const options = {
         grid: { left: 10, containLabel: true },
         yAxis: { type: "value", axisLabel: { formatter } },
-        series: [{ data: [[0, 1], [1, 60000]] }],
+        series: [
+          {
+            data: [
+              [0, 1],
+              [1, 60000],
+            ],
+          },
+        ],
       };
 
       applyMeasuredYAxisLeftInset(options);

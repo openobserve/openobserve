@@ -96,9 +96,7 @@ export type AgentOs = "linux" | "mac" | "windows";
  * The command takes no arguments, so unlike the install step there is no token to
  * substitute or mask.
  */
-export function agentUninstall(
-  os: AgentOs,
-): NonNullable<RichCardExtras["uninstall"]> {
+export function agentUninstall(os: AgentOs): NonNullable<RichCardExtras["uninstall"]> {
   return {
     label: "Uninstall the Agent",
     description: UNINSTALL_DESC[os],

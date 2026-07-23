@@ -544,11 +544,9 @@ describe("MetricCard (ported to @/lib)", () => {
         }),
       });
 
-      expect(
-        wrapper
-          .findComponent({ name: "MetricCardChart" })
-          .props("allowAlertCreation"),
-      ).toBe(true);
+      expect(wrapper.findComponent({ name: "MetricCardChart" }).props("allowAlertCreation")).toBe(
+        true,
+      );
     });
   });
 });

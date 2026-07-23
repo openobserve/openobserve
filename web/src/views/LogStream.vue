@@ -654,20 +654,14 @@ export default defineComponent({
     };
 
     // Prune deleted streams locally; re-fetch is racy (list is async-cached).
-    const removeStreamsFromTable = (
-      items: { name: string; stream_type: string }[],
-    ) => {
+    const removeStreamsFromTable = (items: { name: string; stream_type: string }[]) => {
       if (!items.length) return;
 
-      const removedKeys = new Set(
-        items.map((s) => `${s.name}-${s.stream_type}`),
-      );
+      const removedKeys = new Set(items.map((s) => `${s.name}-${s.stream_type}`));
 
       // Prune the table first so the UI updates even if cache eviction fails.
       const before = logStream.value.length;
-      logStream.value = logStream.value.filter(
-        (s: any) => !removedKeys.has(s._rowKey),
-      );
+      logStream.value = logStream.value.filter((s: any) => !removedKeys.has(s._rowKey));
       duplicateStreamList.value = duplicateStreamList.value.filter(
         (s: any) => !removedKeys.has(s._rowKey),
       );
@@ -698,9 +692,7 @@ export default defineComponent({
               message: "Stream deleted successfully.",
               variant: "success",
             });
-            removeStreamsFromTable([
-              { name: deleteStreamName, stream_type: deleteStreamType },
-            ]);
+            removeStreamsFromTable([{ name: deleteStreamName, stream_type: deleteStreamType }]);
           }
         })
         .catch((err: any) => {

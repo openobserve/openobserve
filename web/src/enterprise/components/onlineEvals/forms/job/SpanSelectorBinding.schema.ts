@@ -61,9 +61,7 @@ export const makeSpanSelectorSchema = (
       }
 
       const fieldCount =
-        value.fieldMode === "default"
-          ? options.defaultFieldCount
-          : value.fields.length;
+        value.fieldMode === "default" ? options.defaultFieldCount : value.fields.length;
       if (
         value.maximumSpans * fieldCount * SPAN_SELECTOR_CHARS_PER_FIELD >
         SPAN_SELECTOR_BUDGET_CHARS
@@ -76,6 +74,4 @@ export const makeSpanSelectorSchema = (
       }
     });
 
-export type SpanSelectorForm = z.infer<
-  ReturnType<typeof makeSpanSelectorSchema>
->;
+export type SpanSelectorForm = z.infer<ReturnType<typeof makeSpanSelectorSchema>>;

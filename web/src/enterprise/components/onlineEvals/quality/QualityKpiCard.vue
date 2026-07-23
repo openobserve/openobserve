@@ -64,9 +64,7 @@
       >
         <template v-if="delta != null">
           <span class="kpi-trend-arrow">{{ trendArrow }}</span>
-          <span>
-            {{ deltaText }} {{ t("onlineEvals.quality.kpis.vsPrev") }}
-          </span>
+          <span> {{ deltaText }} {{ t("onlineEvals.quality.kpis.vsPrev") }} </span>
         </template>
         <template v-else>
           <span class="kpi-trend-arrow">–</span>
@@ -110,11 +108,7 @@ const ICONS: Record<KpiCard["id"], string> = {
 const cardIcon = computed(() => ICONS[props.kpi.id]);
 
 const trendSentiment = computed<"good" | "bad" | "neutral">(() => {
-  if (
-    props.delta == null ||
-    props.kpi.healthyDirection === "neutral" ||
-    props.delta === 0
-  ) {
+  if (props.delta == null || props.kpi.healthyDirection === "neutral" || props.delta === 0) {
     return "neutral";
   }
   const movedUp = props.delta > 0;

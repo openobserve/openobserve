@@ -27,11 +27,7 @@ export function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
 }
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
@@ -86,10 +82,7 @@ export function thresholdForConfig(config: ScoreConfig): ThresholdSql {
  *
  * Keeping the client-side run table on this helper prevents it from drifting
  * away from the SQL aggregates that drive the overview and detail KPIs. */
-export function isScoreUnhealthy(
-  config: ScoreConfig,
-  score: ScoreValue,
-): boolean | null {
+export function isScoreUnhealthy(config: ScoreConfig, score: ScoreValue): boolean | null {
   if (score == null) return null;
 
   const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
@@ -100,20 +93,16 @@ export function isScoreUnhealthy(
     if (ht.value === undefined || ht.value === null || !ht.direction) {
       return null;
     }
-    const numericScore =
-      typeof score === "number" ? score : Number(String(score));
+    const numericScore = typeof score === "number" ? score : Number(String(score));
     const threshold = Number(ht.value);
     if (!Number.isFinite(numericScore) || !Number.isFinite(threshold)) {
       return null;
     }
-    return ht.direction === "gte"
-      ? numericScore < threshold
-      : numericScore > threshold;
+    return ht.direction === "gte" ? numericScore < threshold : numericScore > threshold;
   }
 
   if (type === "categorical") {
-    const healthy: string[] =
-      ht.healthy_categories || ht.healthyCategories || [];
+    const healthy: string[] = ht.healthy_categories || ht.healthyCategories || [];
     if (!Array.isArray(healthy) || healthy.length === 0) return null;
     return !healthy.map(String).includes(String(score));
   }

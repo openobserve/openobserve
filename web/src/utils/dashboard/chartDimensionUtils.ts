@@ -124,8 +124,7 @@ export const applyMeasuredYAxisLeftInset = (options: any): void => {
   const yAxis = options?.yAxis;
 
   // Arrays are gauge/trellis layouts that manage their own left spacing.
-  const isPlainObject = (v: any) =>
-    v && typeof v === "object" && !Array.isArray(v);
+  const isPlainObject = (v: any) => v && typeof v === "object" && !Array.isArray(v);
   if (!isPlainObject(grid) || !isPlainObject(yAxis)) return;
   if (yAxis.type !== "value") return;
 

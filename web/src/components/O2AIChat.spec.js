@@ -24,7 +24,7 @@ vi.mock("vue-router", () => ({
   }),
   // The component watches route.fullPath to hand a live stream off to the
   // sidebar instance on navigation, so this mock must expose fullPath.
-  useRoute: () => ({ fullPath: '/', path: '/', name: 'home', query: {}, params: {} }),
+  useRoute: () => ({ fullPath: "/", path: "/", name: "home", query: {}, params: {} }),
 }));
 
 // Mock image util and UUID generator

@@ -181,7 +181,8 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    draftLocation.value = props.locationName || (props.locationId ? "" : generateDefaultLocationName());
+    draftLocation.value =
+      props.locationName || (props.locationId ? "" : generateDefaultLocationName());
     draftAgentName.value = "";
   },
 );
@@ -205,9 +206,7 @@ const composedCommand = computed(() => {
   }
   if (draftAgentName.value) lines.push(`  --agent-name="${draftAgentName.value}"`);
   // Join continuation lines; the last line carries no trailing backslash.
-  return lines
-    .map((l, i) => (i === lines.length - 1 ? l.replace(/ \\$/, "") : l))
-    .join("\n");
+  return lines.map((l, i) => (i === lines.length - 1 ? l.replace(/ \\$/, "") : l)).join("\n");
 });
 
 async function copyCommand() {

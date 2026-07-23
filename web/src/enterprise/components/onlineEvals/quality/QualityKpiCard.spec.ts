@@ -36,15 +36,9 @@ describe("QualityKpiCard", () => {
     });
 
     expect(wrapper.text()).toContain("Score Results");
-    expect(wrapper.find('[data-test="quality-kpi-scope-span"]').text()).toBe(
-      "Span1.2k",
-    );
-    expect(wrapper.find('[data-test="quality-kpi-scope-trace"]').text()).toBe(
-      "Trace50",
-    );
-    expect(wrapper.find('[data-test="quality-kpi-scope-session"]').text()).toBe(
-      "Session5",
-    );
+    expect(wrapper.find('[data-test="quality-kpi-scope-span"]').text()).toBe("Span1.2k");
+    expect(wrapper.find('[data-test="quality-kpi-scope-trace"]').text()).toBe("Trace50");
+    expect(wrapper.find('[data-test="quality-kpi-scope-session"]').text()).toBe("Session5");
   });
 
   it("uses operational scorer copy without a scope breakdown", () => {
@@ -58,8 +52,6 @@ describe("QualityKpiCard", () => {
     });
 
     expect(wrapper.text()).toContain("Scorer Success");
-    expect(
-      wrapper.find('[data-test="quality-kpi-scope-breakdown"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('[data-test="quality-kpi-scope-breakdown"]').exists()).toBe(false);
   });
 });
