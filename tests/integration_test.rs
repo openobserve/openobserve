@@ -58,6 +58,7 @@ mod tests {
     };
     use enrichment_data::enrichment::storage::{Values, local};
     use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
+    use ingestion_common::IngestionResponse;
     use openobserve::migration;
     use openobserve_api::handler::{
         grpc::{auth::check_auth, flight::FlightServiceImpl},
@@ -70,9 +71,7 @@ mod tests {
         alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
         destinations::{Destination, DestinationType},
     };
-    use openobserve_core::{
-        alerts::scheduler::handlers::handle_triggers, ingestion_common::IngestionResponse,
-    };
+    use openobserve_core::alerts::scheduler::handlers::handle_triggers;
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
     use search_service::SEARCH_SERVER;
@@ -3140,7 +3139,7 @@ mod tests {
         assert!(response.status().is_success());
 
         // Verify schema was created in database
-        let schema_exists = openobserve_core::schema::stream_schema_exists(
+        let schema_exists = schema::stream_schema_exists(
             org_id,
             table_name,
             config::meta::stream::StreamType::EnrichmentTables,
@@ -3348,7 +3347,7 @@ mod tests {
         assert!(result2.is_ok());
 
         // Verify schema still exists and is valid
-        let schema_exists = openobserve_core::schema::stream_schema_exists(
+        let schema_exists = schema::stream_schema_exists(
             org_id,
             table_name,
             config::meta::stream::StreamType::EnrichmentTables,

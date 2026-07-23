@@ -24,9 +24,10 @@ use config::axum::middlewares::{
 };
 #[cfg(feature = "cloud")]
 use config::meta::stream::StreamType;
+use ingestion_common::IngestUser;
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::ingestion::check_ingestion_allowed;
-use openobserve_core::{auth::UserEmail, ingestion_common::IngestUser};
 
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,

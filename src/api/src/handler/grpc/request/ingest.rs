@@ -20,15 +20,13 @@ use config::{
 };
 use http::StatusCode;
 use infra::errors::{Error, Result};
+use ingestion_common::{IngestUser, SystemJobType};
 use proto::cluster_rpc::{
     IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
 };
 use tonic::{Request, Response, Status};
 
-use crate::service::{
-    ingestion::create_log_ingestion_req,
-    ingestion_common::{IngestUser, SystemJobType},
-};
+use crate::service::ingestion::create_log_ingestion_req;
 
 #[derive(Default)]
 pub struct Ingester;

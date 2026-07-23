@@ -26,15 +26,13 @@ use config::{
     axum::middlewares::{get_process_time, insert_process_time_header},
     meta::otlp::OtlpRequestType,
 };
+use ingestion_common::{
+    GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest,
+    KinesisFHIngestionResponse, KinesisFHRequest,
+};
+use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::ingestion::check_ingestion_allowed;
-use openobserve_core::{
-    auth::UserEmail,
-    ingestion_common::{
-        GCPIngestionRequest, HecResponse, HecStatus, IngestUser, IngestionRequest,
-        KinesisFHIngestionResponse, KinesisFHRequest,
-    },
-};
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use prost::Message;
 

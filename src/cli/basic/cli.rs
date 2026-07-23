@@ -24,7 +24,7 @@ use infra::{
     db::{ORM_CLIENT, connect_to_orm},
     file_list as infra_file_list, table,
 };
-use openobserve_core::{compaction, users};
+use openobserve_core::users;
 
 use crate::{
     cli::data::{
