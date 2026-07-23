@@ -568,8 +568,7 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        // check again to avoid race condition: if another task rotated while we waited for the
-        // write lock, both the wal and the memtable are fresh and no rotation is needed.
+        // check again to avoid race condition
         if !self
             .should_rotate(wal.size(), entry_bytes_size, entry_batch_size)
             .await
@@ -669,14 +668,11 @@ impl Writer {
         memtable.read(org_id, stream_name, time_range, partition_filters)
     }
 
-    /// Check if a rotation is needed, either because the wal file is over its threshold / too old
-    /// or because the memtable is over its threshold.
+    /// Check if the wal file or memtable is over its threshold, or the wal file is too old.
     ///
-    /// `rotate()` calls this twice - once before taking the wal write lock and once after - and
-    /// both calls must consider the same set of thresholds. Checking only the wal threshold on the
-    /// second call would silently drop every memtable-triggered rotation, making
-    /// `max_file_size_in_memory` a no-op. The wal size is passed in because the caller already
-    /// holds the wal lock on the second call.
+    /// `rotate()` calls this twice - before and after taking the wal write lock - and both
+    /// calls must check the same thresholds, otherwise memtable-triggered rotations would
+    /// be dropped by the re-check.
     async fn should_rotate(
         &self,
         wal_size: (usize, usize),
