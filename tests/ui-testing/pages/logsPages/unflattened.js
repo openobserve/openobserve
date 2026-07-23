@@ -276,9 +276,18 @@ class UnflattenedPage {
      * drawer OPEN on the matching row so the caller can continue interacting
      * with the `_o2_id` element.  Returns -1 if no row in the range contains
      * `_o2_id`.
+     *
+     * Pass `deadlineAt` (an absolute `Date.now()` value) to cap how long the
+     * sweep may run.  Each row costs a drawer open plus a probe, so a 15-row
+     * sweep on a slow runner could otherwise outlive the whole test timeout and
+     * get the test killed mid-action instead of returning -1.
      */
-    async findRowWithO2Id(maxRows = 5) {
+    async findRowWithO2Id(maxRows = 5, { deadlineAt = null } = {}) {
         for (let rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+            if (deadlineAt && Date.now() >= deadlineAt) {
+                console.warn(`findRowWithO2Id: time budget reached after scanning ${rowIndex} row(s)`);
+                break;
+            }
             const expandBtn = this.page.locator(
                 `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
             );
