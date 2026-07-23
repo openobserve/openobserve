@@ -43,7 +43,6 @@ use config::{
         time::now_micros,
     },
 };
-use db;
 use hashbrown::HashSet;
 use infra::schema::{
     STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,

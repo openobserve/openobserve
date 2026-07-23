@@ -23,7 +23,6 @@ use config::{
         stream::{ALL_STREAM_TYPES, PartitionTimeLevel, StreamType},
     },
 };
-use db;
 use infra::{
     cluster::get_node_from_consistent_hash,
     file_list as infra_file_list,
