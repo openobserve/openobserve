@@ -1324,4 +1324,81 @@ describe("OTable", () => {
       );
     });
   });
+
+  // ── Per-column value filter (#2239.4) ────────────────────────
+  describe("per-column value filter", () => {
+    function filterableColumns(): OTableColumnDef<TestRow>[] {
+      return makeColumns().map((c) =>
+        c.id === "status" ? { ...c, filterable: true } : c,
+      );
+    }
+
+    it("filters rows to the selected values through the column API", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(10), // 5 Active, 5 Inactive
+          columns: filterableColumns(),
+          enableColumnFilter: true,
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      const table = (wrapper.vm as any).table;
+
+      expect(table.getColumn("status").getCanFilter()).toBe(true);
+      expect(table.getColumn("email").getCanFilter()).toBe(false);
+      expect(table.getFilteredRowModel().rows.length).toBe(10);
+
+      table.getColumn("status").setFilterValue(["Active"]);
+      await nextTick();
+      const rows = table.getFilteredRowModel().rows;
+      expect(rows.length).toBe(5);
+      expect(rows.every((r: any) => r.original.status === "Active")).toBe(true);
+
+      // Multi-select is a union of the chosen values.
+      table.getColumn("status").setFilterValue(["Active", "Inactive"]);
+      await nextTick();
+      expect(table.getFilteredRowModel().rows.length).toBe(10);
+
+      // Clearing restores every row.
+      table.getColumn("status").setFilterValue(undefined);
+      await nextTick();
+      expect(table.getFilteredRowModel().rows.length).toBe(10);
+    });
+
+    it("shows the filter button only on filterable columns when enabled", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(4),
+          columns: filterableColumns(),
+          enableColumnFilter: true,
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      expect(
+        wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="o2-table-column-filter-btn-email"]').exists(),
+      ).toBe(false);
+    });
+
+    it("renders no filter buttons when enableColumnFilter is off", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(4),
+          columns: filterableColumns(),
+          pagination: "none",
+          sorting: "none",
+        },
+      });
+      await nextTick();
+      expect(
+        wrapper.find('[data-test="o2-table-column-filter-btn-status"]').exists(),
+      ).toBe(false);
+    });
+  });
 });

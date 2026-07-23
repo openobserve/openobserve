@@ -283,6 +283,9 @@ export interface OTableProps<TData = any> {
   enableColumnResize?: boolean;
   enableColumnReorder?: boolean;
   enableColumnPin?: boolean;
+  /** Show the Excel-style per-column value-filter dropdown on `filterable`
+   *  columns (client-side). Off by default so existing tables are unaffected. */
+  enableColumnFilter?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
   /**

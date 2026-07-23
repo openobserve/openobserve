@@ -1070,6 +1070,7 @@ defineExpose({
           :enable-row-reorder="props.enableRowReorder"
           :enable-column-reorder="props.enableColumnReorder"
           :enable-column-resize="props.enableColumnResize"
+          :enable-column-filter="props.enableColumnFilter"
           :is-resizing="columnMgmt.isResizing.value"
           :sorting-enabled="sorting.isEnabled.value"
           :sort-by="sorting.activeSortBy.value ?? undefined"

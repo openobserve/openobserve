@@ -2361,8 +2361,8 @@ export default defineComponent({
    legacy logs table used (`.logs-table td { font-family: var(--font-mono) }`).
    OTable renders body cells (td) via OTableBodyCell, so the rule must reach them
    through :deep(). Scoped to the DATA cells (`o2-table-cell-*`) so the expanded
-   row (JsonPreview) keeps its own typography. Fixes #2239: "On Logs font style
-   is changed". */
+   row (JsonPreview) keeps its own typography. Fixes o2-enterprise issue 2239:
+   "On Logs font style is changed". */
 .logs-results-otable :deep(td[data-test^="o2-table-cell-"]) {
   font-family: var(--font-mono);
 }

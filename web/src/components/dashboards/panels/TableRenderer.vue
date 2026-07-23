@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :row-height="22"
       :default-columns="false"
       :show-global-filter="false"
+      :enable-column-filter="enableFiltering"
       :enable-column-reorder="false"
       :enable-cell-copy="true"
       data-test="dashboard-panel-table"
@@ -141,6 +142,9 @@ export default defineComponent({
         id: col.field ?? col.name,
         header: col.header ?? col.label ?? col.name ?? col.field,
         accessorKey: col.field ?? col.name,
+        // Enable the per-column value-filter dropdown when the panel opts in
+        // (config.table_filtering). Row-field / total columns aren't filterable.
+        filterable: props.enableFiltering && !col._isRowField && !col._isTotalColumn,
         meta: {
           ...(col.meta ?? {}),
           _col: col,
