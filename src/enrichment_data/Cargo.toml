@@ -24,7 +24,6 @@ common.workspace = true
 compaction.workspace = true
 config.workspace = true
 csv.workspace = true
-datafusion.workspace = true
 db.workspace = true
 futures.workspace = true
 futures-util.workspace = true
