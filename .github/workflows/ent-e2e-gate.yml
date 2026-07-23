@@ -1,10 +1,10 @@
-name: ENT e2e gate
+name: Playwright E2E Crosscheck
 
 # Pre-merge GUARD (runs in openobserve) that stops an OSS PR from silently breaking the
 # enterprise-only e2e specs. web/tests live in OSS; the ENT e2e *triggers* live in o2-enterprise,
 # so today an OSS frontend/test change only surfaces as an ENT breakage in some later ENT PR.
 #
-# This job IS the required status check. Make `ent-e2e-gate` a required check on main in OSS
+# This job IS the required status check. Make `Playwright E2E Crosscheck` a required check on main in OSS
 # branch protection to actually block merges (one-time admin toggle).
 #
 # Behaviour (A+A+C design):
@@ -24,8 +24,8 @@ name: ENT e2e gate
 #
 # Secrets/vars:
 #   secrets.ORG_ADMIN_TOKEN — PAT: o2-enterprise Actions R/W (dispatch+poll) + openobserve PRs R/W (comment as human).
-#   vars.ENT_GATE_REF       — o2-enterprise ref that carries oss-pr-ent-gate.yml (default 'main').
-#                             Set to 'ci/ent-e2e-gate' while this feature is still on a branch.
+#   vars.ENT_GATE_REF       — o2-enterprise ref that carries oss-pr-ent-gate.yml (default 'main';
+#                             only override to test the engine itself from a branch).
 #   vars.ENT_E2E_GATE_DISABLED — 'true' kill switch: gate passes without dispatching.
 
 on:
@@ -35,7 +35,7 @@ on:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  group: ent-e2e-gate-${{ github.event.pull_request.number }}
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -43,8 +43,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  ent-e2e-gate:
-    name: ent-e2e-gate
+  playwright-e2e-crosscheck:
+    name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
     # but a cold Rust cache can push the ENT build+run toward its own timeouts — don't false-fail
@@ -70,7 +70,7 @@ jobs:
           # forked-PR runs, so the ENT engine can't check it out. Pass with a notice; a maintainer
           # re-runs from an internal branch if enterprise validation is needed.
           if [ "$IS_FORK" = "true" ]; then
-            echo "::notice::Fork PR — ENT e2e gate can't run (no PAT / branch not in main repo). Passing."
+            echo "::notice::Fork PR — Playwright E2E Crosscheck can't run (no PAT / branch not in main repo). Passing."
             echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
           fi
 
@@ -96,7 +96,7 @@ jobs:
 
       - name: Pass — no enterprise-relevant changes (or opted out / disabled)
         if: steps.triage.outputs.mode == 'pass' || steps.triage.outputs.mode == 'skip'
-        run: echo "✅ ENT e2e gate not required for this PR."
+        run: echo "✅ Playwright E2E Crosscheck not required for this PR."
 
       - name: Block — enterprise-relevant change without the e2e label
         if: steps.triage.outputs.mode == 'need-label'
@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           REPO="openobserve/o2-enterprise"; WF="oss-pr-ent-gate.yml"
-          MARKER="<!-- ent-e2e-gate -->"
+          MARKER="<!-- playwright-e2e-crosscheck -->"
 
           # Upsert ONE sticky gate comment per PR (located by the hidden marker) so status updates in
           # place — pass AND fail — instead of spamming a fresh comment each run.
@@ -136,7 +136,7 @@ jobs:
           # build against that branch. Neither → build against main.
           SISTER_PR=$(gh pr list --repo "$REPO" --head "$HEAD_REF" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
           if [ -n "$SISTER_PR" ] && [ "$SISTER_PR" != "null" ]; then
-          sticky "### ⏭️ ENT e2e gate — handled by the sister ENT PR
+          sticky "### ⏭️ Playwright E2E Crosscheck — handled by the sister ENT PR
 
           $MARKER
           This OSS PR has a matching enterprise PR on branch \`$HEAD_REF\`: **openobserve/o2-enterprise#$SISTER_PR**. The enterprise-only e2e specs run there, so this gate defers to that PR's checks and does not build here."
@@ -163,7 +163,7 @@ jobs:
             -f oss_sha="$HEAD_SHA" \
             -f enterprise_ref="$ENT_CODE_REF"
 
-          # Correlate by PR-scoped run-name ("ENT e2e gate — OSS PR #<PR> ("; the "(" boundary keeps
+          # Correlate by PR-scoped run-name ("Playwright E2E Crosscheck — OSS PR #<PR> ("; the "(" boundary keeps
           # #12 from matching #123) AND createdAt >= dispatch time (minus 60s clock-skew), so a stale
           # prior run for this PR is never picked. Take the NEWEST qualifying run.
           MATCH="OSS PR #$PR ("
@@ -178,7 +178,7 @@ jobs:
             sleep 10
           done
           if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
-          sticky "### 🚫 ENT e2e gate — could not start
+          sticky "### 🚫 Playwright E2E Crosscheck — could not start
 
           $MARKER
           Dispatching the enterprise e2e engine failed or the run never appeared (check \`ORG_ADMIN_TOKEN\` / \`ENT_GATE_REF=$ENT_REF\`). The gate stays red until it runs — re-push or re-label to retry.
@@ -191,7 +191,7 @@ jobs:
           RUN_URL="https://github.com/$REPO/actions/runs/$RUN_ID"
           echo "::notice::Tracking ENT run: $RUN_URL"
 
-          sticky "### 🔄 ENT e2e gate — running
+          sticky "### 🔄 Playwright E2E Crosscheck — running
 
           $MARKER
           Building the enterprise binary and running the enterprise-only e2e specs against this PR.
@@ -209,7 +209,7 @@ jobs:
           done
 
           if [ "$STATUS" != "completed" ]; then
-          sticky "### ⏳ ENT e2e gate — timed out
+          sticky "### ⏳ Playwright E2E Crosscheck — timed out
 
           $MARKER
           The [enterprise e2e run]($RUN_URL) didn't finish within the poll window. The gate stays red — re-push to retry.
@@ -219,7 +219,7 @@ jobs:
           fi
 
           if [ "$CONCL" = "success" ]; then
-          sticky "### ✅ ENT e2e gate — passed
+          sticky "### ✅ Playwright E2E Crosscheck — passed
 
           $MARKER
           The enterprise-only e2e specs passed against this PR. $SISTER_NOTE
@@ -247,7 +247,7 @@ jobs:
               SPEC_LIST=$(sed '/^[[:space:]]*$/d; s/^/- `/; s/$/`/' /tmp/fs/failed-specs.txt)
             fi
             [ -n "$SPEC_LIST" ] || SPEC_LIST="_(couldn't read the failed-spec list — open the run for details)_"
-          sticky "### 🚫 ENT e2e gate — Needs Review
+          sticky "### 🚫 Playwright E2E Crosscheck — Needs Review
 
           $MARKER
           The **enterprise-only** e2e spec(s) below failed against this PR. They run only against the enterprise binary, so this breakage wouldn't show up in OSS CI:
@@ -258,14 +258,14 @@ jobs:
 
           Fix and re-push, or add \`skip-ent-e2e\` if this is a known-safe change."
           elif [ "$BUILD_CONCL" = "failure" ]; then
-          sticky "### 🚫 ENT e2e gate — enterprise build failed
+          sticky "### 🚫 Playwright E2E Crosscheck — enterprise build failed
 
           $MARKER
           The enterprise binary didn't compile against this PR, so the specs never ran. This usually means the OSS code references enterprise code not present on the ref it was built against.
 
           $SISTER_NOTE · [ENT run]($RUN_URL)"
           else
-          sticky "### 🚫 ENT e2e gate — failed
+          sticky "### 🚫 Playwright E2E Crosscheck — failed
 
           $MARKER
           The [enterprise e2e run]($RUN_URL) failed (conclusion: \`$CONCL\`).
