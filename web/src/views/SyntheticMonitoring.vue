@@ -5,9 +5,11 @@
     :subtitle="t('synthetics.pageSubtitle')"
     icon="radar"
     bleed
+    tabs-below
   >
       <template #actions>
         <OButton
+          v-if="activeSection === 'checks'"
           size="sm"
           variant="primary"
           data-test="synthetic-monitoring-new-check-btn"
@@ -15,11 +17,37 @@
         >
           {{ t('synthetics.newCheck.button') }}
         </OButton>
+        <OButton
+          v-else
+          size="sm"
+          variant="primary"
+          data-test="synthetic-monitoring-setup-agent-btn"
+          @click="openSetupDrawer()"
+        >
+          {{ t('synthetics.privateLocations.setupAgent') }}
+        </OButton>
+      </template>
+
+      <template #header-tabs>
+        <OTabs
+          :model-value="activeSection"
+          align="left"
+          @change="activeSection = ($event as 'checks' | 'private')"
+        >
+          <OTab name="checks">
+            <OIcon name="radar" size="sm" />
+            <span>{{ t('synthetics.tabs.checks') }}</span>
+          </OTab>
+          <OTab name="private">
+            <OIcon name="location-on" size="sm" />
+            <span>{{ t('synthetics.tabs.private') }}</span>
+          </OTab>
+        </OTabs>
       </template>
     <!-- CONTENT AREA: sidebar + main -->
     <div class="flex flex-1 overflow-hidden">
-      <!-- LEFT SIDEBAR: folder navigation -->
-      <div class="w-rail shrink-0 overflow-y-auto">
+      <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
+      <div v-if="activeSection === 'checks'" class="w-rail shrink-0 overflow-y-auto">
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
@@ -27,8 +55,18 @@
         />
       </div>
 
+      <!-- ── PRIVATE LOCATIONS TAB ── -->
+      <PrivateLocations
+        v-if="activeSection === 'private'"
+        :locations="privateLocations"
+        :loading="locationsLoading"
+        @refresh="loadPrivateLocations"
+        @copy-setup="openSetupDrawer"
+        @delete="confirmDeleteLocation"
+      />
+
       <!-- RIGHT MAIN: filter bar + table -->
-      <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+      <div v-if="activeSection === 'checks'" class="flex-1 flex flex-col overflow-hidden min-w-0">
 
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
@@ -39,6 +77,7 @@
           :empty-message="emptyMessage"
           :selected-ids="selectedMonitorIds"
           :show-folder-column="searchAcrossFolders"
+          :location-names="locationNames"
           data-test="synthetic-monitoring-monitors-table"
           :toggle-loading-map="toggleLoadingMap"
           :trigger-loading-map="triggerLoadingMap"
@@ -65,7 +104,7 @@
               <!-- Type tabs -->
               <OToggleGroup
                 :model-value="activeTab"
-                @update:model-value="(v) => { activeTab = v as string; typeFilter = v === 'all' ? 'all' : (v as string).toUpperCase() }"
+                @update:model-value="onTabChange"
               >
                 <OToggleGroupItem v-for="tab in typeTabs" :key="tab.key" :value="tab.key" size="sm" :icon-left="tab.icon">
                   {{ tab.label }}
@@ -171,6 +210,35 @@
       </p>
     </ODialog>
 
+    <!-- Agent setup drawer -->
+    <AgentSetupDrawer
+      v-model:open="showSetupDrawer"
+      :install="setupInstall"
+      :location-name="setupLocationName"
+      :location-id="setupLocationId"
+      :token="setupData?.token"
+      :org="setupData?.org"
+      :o2-url="setupData?.o2_url"
+      :script-url="setupData?.script_url"
+    />
+
+    <!-- Delete location confirmation -->
+    <ODialog
+      v-model:open="showDeleteLocation"
+      size="sm"
+      :title="t('synthetics.privateLocations.deleteTitle')"
+      :primary-button-label="t('synthetics.table.delete')"
+      :secondary-button-label="t('common.cancel')"
+      primary-button-variant="destructive"
+      data-test="synthetic-monitoring-delete-location-dialog"
+      @click:primary="deleteLocation"
+      @click:secondary="showDeleteLocation = false"
+    >
+      <p class="py-2">
+        {{ t('synthetics.privateLocations.deleteBody', { name: locationToDelete?.label ?? '' }) }}
+      </p>
+    </ODialog>
+
     <!-- Move checks dialog -->
     <MoveAcrossFolders
       type="synthetics"
@@ -216,19 +284,24 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import MonitorTable from "@/components/synthetic-monitoring/MonitorTable.vue";
+import PrivateLocations from "@/views/synthetics/PrivateLocations.vue";
+import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CheckTypePicker from "@/components/synthetics/CheckTypePicker.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import MoveAcrossFolders from "@/components/common/sidebar/MoveAcrossFolders.vue";
 import { mapResponseToBrowserCheck, buildCreateBrowserTestPayload } from '@/utils/synthetics/buildPayload'
-import { SYNTHETIC_CHECK_TYPES, type SyntheticCheckType } from '@/types/synthetics'
+import { SYNTHETIC_CHECK_TYPES, type AgentSetup, type SyntheticCheckType, type SyntheticLocation } from '@/types/synthetics'
 import { CHECK_TYPE_CARDS } from '@/constants/synthetics'
 import { useI18n } from 'vue-i18n'
 import syntheticsService from '@/services/synthetics'
+import { locationDisplayLabel } from '@/utils/synthetics/format'
 import { getFoldersListByType } from '@/utils/commons'
 import { toast } from '@/lib/feedback/Toast/useToast'
 
@@ -330,6 +403,20 @@ const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? ''
 )
 
+/** Resolves once orgIdentifier is populated — on browser back-navigation the
+ *  store may not be hydrated synchronously yet. */
+function waitForOrgIdentifier(): Promise<void> {
+  if (orgIdentifier.value) return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const stop = watch(orgIdentifier, (val) => {
+      if (val) {
+        stop()
+        resolve()
+      }
+    })
+  })
+}
+
 async function loadMonitors(folderId?: string) {
   if (!orgIdentifier.value) return
   loading.value = true
@@ -351,37 +438,38 @@ async function initPage() {
   }
 
   // Wait for the organisation identifier to be resolved before making API
-  // calls.  On browser back-navigation the store may not be ready
-  // synchronously, and loadMonitors silently returns when orgIdentifier is
-  // empty — the table skeleton stays forever because loading is never
-  // cleared.
-  if (!orgIdentifier.value) {
-    await new Promise<void>((resolve) => {
-      const stop = watch(orgIdentifier, (val) => {
-        if (val) {
-          stop()
-          resolve()
-        }
-      })
-    })
-  }
+  // calls — loadMonitors silently returns when orgIdentifier is empty, and
+  // the table skeleton would stay forever because loading is never cleared.
+  await waitForOrgIdentifier()
 
   await loadMonitors(activeFolderId.value)
 
   // Load locations after monitors — not critical for initial render.
   loadLocations()
-
-  const editId = route.query.edit
-  if (typeof editId === 'string' && editId) {
-    const monitor = monitors.value.find((m) => String(m.id) === editId)
-    if (monitor) openEdit(monitor)
-  }
 }
 
 onMounted(() => {
   initPage()
 })
 
+// Defaults to 'checks', but honors ?section=private so links back from the
+// private-location detail page (its own back button, deep links) land on
+// the tab the user actually came from instead of always resetting to Checks.
+const activeSection   = ref<'checks' | 'private'>(route.query.section === 'private' ? 'private' : 'checks');
+// Private Locations data is never fetched on initial render (only on manual
+// refresh or after a delete) — load it the first time the tab is actually
+// opened, so switching to it isn't silently empty.
+let privateLocationsLoaded = false;
+watch(activeSection, async (val) => {
+  if (val === 'private' && !privateLocationsLoaded) {
+    privateLocationsLoaded = true;
+    // On browser back-navigation the org identifier may not be hydrated yet
+    // at this point — wait for it, otherwise the fetch fires against an
+    // empty org and the tab is stuck showing 0 rows forever.
+    await waitForOrgIdentifier();
+    loadPrivateLocations();
+  }
+}, { immediate: true });
 const activeTab      = ref("all");
 const monitorTableMode = computed(() => activeTab.value === 'browser' ? 'browser' : 'all');
 const statusFilter   = ref("all");
@@ -499,17 +587,95 @@ const typeTabs = computed(() => [
   })),
 ]);
 
+const onTabChange = (v: unknown) => {
+  const tab = v as string;
+  activeTab.value = tab;
+  typeFilter.value = tab === 'all' ? 'all' : tab.toUpperCase();
+};
+
+// ── Private locations tab ──────────────────────────────────────────────
+const privateLocations   = ref<SyntheticLocation[]>([]);
+const locationsLoading   = ref(false);
+const showSetupDrawer    = ref(false);
+const setupInstall       = ref<string | null>(null);
+const setupLocationName  = ref<string | null>(null);
+const setupLocationId    = ref<string | null>(null);
+const setupData          = ref<AgentSetup | null>(null);
+const showDeleteLocation = ref(false);
+const locationToDelete   = ref<SyntheticLocation | null>(null);
+
+async function loadPrivateLocations() {
+  locationsLoading.value = true;
+  try {
+    const res = await syntheticsService.getLocations(orgIdentifier.value);
+    const all: SyntheticLocation[] = (res.data as any).locations ?? [];
+    privateLocations.value = all.filter((l) => l.kind === 'private');
+  } catch (err) {
+    console.error('[synthetics] failed to load private locations', err);
+  } finally {
+    locationsLoading.value = false;
+  }
+}
+
+/** Opens the setup drawer. Without a row: the org-level composer (agent
+ *  declares its location via AGENT_LOCATION — the row auto-appears on first
+ *  register). With a row: pinned to that location via --location-id. */
+async function openSetupDrawer(row?: SyntheticLocation) {
+  setupInstall.value = null;
+  setupLocationName.value = row?.label ?? null;
+  setupLocationId.value = row?.id ?? null;
+  showSetupDrawer.value = true;
+  try {
+    const res = await syntheticsService.getAgentSetup(orgIdentifier.value);
+    setupData.value = (res.data ?? null) as AgentSetup | null;
+    setupInstall.value = (res.data as any)?.install ?? null;
+  } catch (err) {
+    console.error('[synthetics] failed to load agent setup', err);
+  }
+}
+
+const confirmDeleteLocation = (row: SyntheticLocation) => {
+  locationToDelete.value = row;
+  showDeleteLocation.value = true;
+};
+
+async function deleteLocation() {
+  if (!locationToDelete.value) return;
+  try {
+    await syntheticsService.deleteLocation(orgIdentifier.value, locationToDelete.value.id);
+    toast({ variant: 'success', message: t('synthetics.privateLocations.toast.deleted') });
+    await loadPrivateLocations();
+  } catch (err: any) {
+    toast({
+      variant: 'error',
+      message:
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        t('synthetics.privateLocations.toast.deleteFailed'),
+    });
+  } finally {
+    showDeleteLocation.value = false;
+    locationToDelete.value = null;
+  }
+}
+
 const locationOpts = ref<{ label: string; value: string }[]>([{ label: t('synthetics.filters.allLocations'), value: 'all' }]);
+// id -> "Name (region)" — checks store locations as ids (KSUID for private,
+// "aws-us-east-1" for public); the table/tooltip need the human label.
+const locationNames = ref<Record<string, string>>({});
 
 async function loadLocations() {
   try {
     const res = await syntheticsService.getLocations(orgIdentifier.value);
-    const locations: { id: string; name: string; region: string; provider: string }[] =
+    const locations: { id: string; label: string; region: string; provider: string }[] =
       (res.data as any).locations ?? [];
     locationOpts.value = [
       { label: t('synthetics.filters.allLocations'), value: 'all' },
-      ...locations.map((loc) => ({ label: `${loc.name} (${loc.region})`, value: loc.name })),
+      ...locations.map((loc) => ({ label: locationDisplayLabel(loc.label, loc.region), value: loc.id })),
     ];
+    locationNames.value = Object.fromEntries(
+      locations.map((loc) => [loc.id, locationDisplayLabel(loc.label, loc.region)]),
+    );
   } catch (err) {
     console.error('[synthetics] failed to load locations', err);
   }
@@ -661,7 +827,7 @@ const onEmptyAction = (actionId: string) => {
 }
 
 const openCreate = (type: SyntheticCheckType = 'browser') =>
-  router.push({ name: 'synthetic-new', query: { folder: activeFolderId.value, type } })
+  router.push({ name: 'synthetics-add', query: { folder: activeFolderId.value, type } })
 
 const onTypeSelected = (type: SyntheticCheckType) => {
   showTypePicker.value = false
@@ -670,8 +836,9 @@ const onTypeSelected = (type: SyntheticCheckType) => {
 
 const openEdit = (m: any) => {
   router.push({
-    name: 'synthetic-new',
-    query: { edit: String(m.id), folder: activeFolderId.value },
+    name: 'synthetics-edit',
+    params: { id: String(m.id) },
+    query: { folder: activeFolderId.value },
   })
 }
 

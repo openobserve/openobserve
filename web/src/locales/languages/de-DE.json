@@ -2651,6 +2651,7 @@
     "kubernetes": "Kubernetes",
     "windows": "Windows",
     "linux": "Linux",
+    "macos": "macOS",
     "awsconfig": "Amazon Web Services (AWS)",
     "gcpconfig": "Google Cloud-Plattform (GCP)",
     "azure": "Microsoft Azure",

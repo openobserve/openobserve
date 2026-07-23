@@ -32,6 +32,8 @@ use flight::common::{MetricsInfo, PreCustomMessage};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::pin_mut;
 use prost::Message;
+use search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
+use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -41,21 +43,14 @@ use {
     search_service::SEARCH_SERVER,
 };
 
-use crate::{
-    handler::grpc::{
-        MetadataMap,
-        flight::{
-            stream::FlightEncoderStreamBuilder,
-            visitor::{
-                get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
-                get_scan_stats,
-            },
+use crate::handler::grpc::{
+    MetadataMap,
+    flight::{
+        stream::FlightEncoderStreamBuilder,
+        visitor::{
+            get_cluster_metrics, get_partial_err, get_peak_memory, get_peak_memory_from_ctx,
+            get_scan_stats,
         },
-    },
-    service::search::{
-        grpc::flight as grpcFlight,
-        inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
-        work_group::DeferredLock,
     },
 };
 
@@ -363,9 +358,9 @@ async fn get_ctx_and_physical_plan(
 
 fn clear_session_data(trace_id: &str) {
     // clear session data
-    search_service::datafusion::storage::file_list::clear(trace_id);
+    search::datafusion::storage::file_list::clear(trace_id);
     // release wal lock files
-    crate::common::infra::wal::release_request(trace_id);
+    common::infra::wal::release_request(trace_id);
     log::info!("Cleared session for trace_id: {trace_id}");
 }
 

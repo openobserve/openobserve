@@ -502,6 +502,56 @@ describe("usePanelDataLoader", () => {
       expect(loader.data.value).toEqual([]);
     });
 
+    it("renders injected PromQL data instead of firing a query", async () => {
+      const panelSchema = ref({
+        id: "test-panel",
+        queryType: "promql",
+        queries: [{ query: "up" }],
+      });
+      const selectedTimeObj = ref({
+        start_time: new Date(Date.now() - 3600000),
+        end_time: new Date(),
+      });
+      const variablesData = ref({ values: [] });
+      const chartPanelRef = ref({ offsetWidth: 1000 });
+
+      const injected = ref({
+        data: [{ result: [{ values: [[1, "1"]] }] }],
+        metadata: { queries: [{ startTime: 1000, endTime: 2000 }] },
+        resultMetaData: [],
+      });
+
+      const loader = usePanelDataLoader(
+        panelSchema,
+        selectedTimeObj,
+        variablesData,
+        chartPanelRef,
+        ref(false), // forceLoad
+        ref("dashboards"), // searchType
+        ref("d"), // dashboardId
+        ref("f"), // folderId
+        ref(null), // reportId
+        ref(null), // runId
+        ref(null), // tabId
+        ref(null), // tabName
+        ref(null), // searchResponse
+        ref(false), // is_ui_histogram
+        ref(null), // dashboardName
+        ref(null), // folderName
+        ref(false), // shouldRefreshWithoutCache
+        ref(undefined), // regionClusterParams
+        ref(true), // allowAnnotationsAPI
+        injected, // injectedPromqlData
+      );
+
+      await loader.loadData();
+
+      // The already-fetched results are rendered directly; no executor runs.
+      expect(loader.loading.value).toBe(false);
+      expect(loader.data.value).toEqual(injected.value.data);
+      expect(loader.metadata.value).toEqual(injected.value.metadata);
+    });
+
     it("should handle invalid timestamps", () => {
       const panelSchema = ref({
         id: "test-panel",

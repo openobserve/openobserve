@@ -329,6 +329,12 @@ test.describe("Traces Regression Bugs — Batch 1", () => {
       await firstResult.click();
       await page.waitForTimeout(2000);
 
+      // The span tree and span blocks read below live in the waterfall view.
+      // Since #13347 the trace detail opens on the flame graph by default (and
+      // the last active tab is persisted per-browser), so select waterfall
+      // explicitly before asserting the tree is visible.
+      await pm.tracesPage.openTraceDetailsTab('waterfall');
+
       await pm.tracesPage.expectTraceDetailsVisible();
       testLogger.info('Trace details visible');
 

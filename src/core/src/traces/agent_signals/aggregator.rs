@@ -53,7 +53,7 @@ pub async fn write_agent_signals(
         ingestion_type: Some(cluster_rpc::IngestionType::Json as i32),
         metadata: None,
     };
-    crate::service::ingestion::ingestion_service::ingest(req)
+    crate::ingestion::ingestion_service::ingest(req)
         .await
         .map(|_| ())
         .map_err(|e| anyhow::anyhow!("{e}"))

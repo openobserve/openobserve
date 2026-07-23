@@ -18,20 +18,17 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+#[cfg(feature = "vectorscan")]
+use db::authz::{remove_ownership, set_ownership};
 use infra::table::re_pattern::PatternEntry;
+use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[cfg(feature = "vectorscan")]
+use crate::{common::meta::authz::Authz, handler::http::request::BulkDeleteResponse};
 use crate::{
-    common::{
-        meta::authz::Authz,
-        utils::auth::{remove_ownership, set_ownership},
-    },
-    handler::http::request::BulkDeleteResponse,
-};
-use crate::{
-    common::{meta::http::HttpResponse as MetaHttpResponse, utils::auth::UserEmail},
+    common::meta::http::HttpResponse as MetaHttpResponse,
     handler::http::{extractors::Headers, request::BulkDeleteRequest},
 };
 
@@ -107,7 +104,7 @@ struct PatternTestResponse {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 struct BuiltInPatternsResponse {
-    patterns: Vec<crate::service::github::adapters::BuiltInPatternResponse>,
+    patterns: Vec<openobserve_core::github::adapters::BuiltInPatternResponse>,
     last_updated: i64,
     source_url: String,
 }
@@ -165,7 +162,7 @@ pub async fn save(
             return MetaHttpResponse::bad_request(e);
         }
 
-        match crate::service::db::re_pattern::add(PatternEntry::new(
+        match db::re_pattern::add(PatternEntry::new(
             &org_id,
             &req.name,
             &req.description,
@@ -335,7 +332,7 @@ pub async fn delete(Path((org_id, id)): Path<(String, String)>) -> Response {
                 "Cannot delete pattern, associated with {pattern_streams:?}{extra}",
             ));
         }
-        match crate::service::db::re_pattern::remove(&id).await {
+        match db::re_pattern::remove(&id).await {
             Ok(_) => {
                 remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
                 MetaHttpResponse::ok("Pattern removed successfully")
@@ -384,8 +381,7 @@ pub async fn delete_bulk(
     #[cfg(feature = "vectorscan")]
     {
         use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
-
-        use crate::common::utils::auth::check_permissions;
+        use openobserve_core::auth::check_permissions;
 
         let user_id = user_email.user_id;
         let mgr = match get_pattern_manager().await {
@@ -442,7 +438,7 @@ pub async fn delete_bulk(
         }
 
         for id in req.ids {
-            match crate::service::db::re_pattern::remove(&id).await {
+            match db::re_pattern::remove(&id).await {
                 Ok(_) => {
                     remove_ownership(&org_id, "re_patterns", Authz::new(&id)).await;
                     successful.push(id);
@@ -529,7 +525,7 @@ pub async fn update(
 
         // we can be fairly certain that in db we have proper json
 
-        match crate::service::db::re_pattern::update(&id, &req.pattern).await {
+        match db::re_pattern::update(&id, &req.pattern).await {
             Ok(_) => MetaHttpResponse::ok("Pattern updated successfully"),
             Err(e) => MetaHttpResponse::bad_request(e),
         }
@@ -629,7 +625,7 @@ pub async fn get_built_in_patterns(
     Path(_org_id): Path<String>,
     Query(query): Query<BuiltInPatternsQuery>,
 ) -> Response {
-    use crate::service::github::{GitHubDataService, adapters::PyWhatAdapter};
+    use openobserve_core::github::{GitHubDataService, adapters::PyWhatAdapter};
 
     // Create GitHub service
     let github_service = GitHubDataService::new();

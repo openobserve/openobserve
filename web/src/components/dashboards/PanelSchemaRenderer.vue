@@ -464,6 +464,19 @@ export default defineComponent({
       required: false,
       default: undefined,
     },
+    /**
+     * Pre-fetched PromQL results to render instead of the panel running its own
+     * query. `{ data, metadata?, resultMetaData? }`, where `data` is one entry
+     * per query (the shape the PromQL executor writes to `state.data`). Used by
+     * the metrics explorer, which owns the fetch lifecycle via its preview
+     * queue but still wants to render through this component. Undefined for
+     * normal dashboard panels, which fetch their own data.
+     */
+    injectedPromqlData: {
+      type: Object,
+      required: false,
+      default: undefined,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -666,6 +679,7 @@ export default defineComponent({
       is_ui_histogram,
       shouldRefreshWithoutCache,
       regionClusterParams,
+      injectedPromqlData,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -700,6 +714,7 @@ export default defineComponent({
       shouldRefreshWithoutCache,
       regionClusterParams,
       allowAnnotationsAPI,
+      injectedPromqlData,
     );
 
     const {

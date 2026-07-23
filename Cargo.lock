@@ -349,9 +349,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.102"
+version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "ar_archive_writer"
@@ -2279,7 +2279,6 @@ dependencies = [
  "chrono",
  "config",
  "dashmap",
- "expect-test",
  "hashbrown 0.16.1",
  "http 1.4.0",
  "http-body-util",
@@ -2293,7 +2292,6 @@ dependencies = [
  "opentelemetry",
  "parking_lot 0.12.5",
  "prost 0.14.3",
- "regex",
  "reqwest 0.13.2",
  "segment",
  "serde",
@@ -2721,9 +2719,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-epoch"
-version = "0.9.18"
+version = "0.9.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+checksum = "2d6914041f254d6e9176c01941b21115dcfb7089e55135a35411081bd106ef3f"
 dependencies = [
  "crossbeam-utils",
 ]
@@ -3645,6 +3643,7 @@ dependencies = [
  "tonic",
  "tracing",
  "transform",
+ "vrl",
 ]
 
 [[package]]
@@ -4342,7 +4341,7 @@ checksum = "da0e4dd2a88388a1f4ccc7c9ce104604dab68d9f408dc34cd45823d5a9069095"
 dependencies = [
  "futures-core",
  "futures-sink",
- "spin 0.9.8",
+ "spin 0.9.9",
 ]
 
 [[package]]
@@ -5642,7 +5641,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 dependencies = [
- "spin 0.9.8",
+ "spin 0.9.9",
 ]
 
 [[package]]
@@ -6167,7 +6166,7 @@ dependencies = [
  "httparse",
  "memchr",
  "mime",
- "spin 0.9.8",
+ "spin 0.9.9",
  "version_check",
 ]
 
@@ -6725,6 +6724,7 @@ dependencies = [
  "chromiumoxide",
  "chrono",
  "clap",
+ "common",
  "config",
  "console-subscriber",
  "cron",
@@ -6733,6 +6733,7 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
+ "db",
  "env_logger",
  "expect-test",
  "faststr",
@@ -6763,6 +6764,7 @@ dependencies = [
  "multer",
  "object_store",
  "openobserve-api",
+ "openobserve-api-management",
  "openobserve-core",
  "openobserve-jobs",
  "openobserve-mcp",
@@ -6791,6 +6793,7 @@ dependencies = [
  "rustls",
  "rustls-native-certs",
  "sea-orm",
+ "search",
  "search_service",
  "segment",
  "serde",
@@ -6824,6 +6827,7 @@ dependencies = [
  "tracing-appender",
  "tracing-opentelemetry",
  "tracing-subscriber",
+ "transform",
  "uaparser",
  "url",
  "utoipa",
@@ -6846,17 +6850,18 @@ dependencies = [
  "arrow-flight",
  "arrow-schema",
  "async-stream",
+ "audit",
  "axum",
  "axum-extra",
  "base64 0.22.1",
  "bytes",
  "chrono",
+ "common",
  "config",
  "datafusion",
- "expect-test",
+ "db",
  "flate2",
  "flight",
- "float-cmp",
  "futures",
  "futures-util",
  "hashbrown 0.16.1",
@@ -6870,7 +6875,6 @@ dependencies = [
  "log",
  "mime",
  "mime_guess",
- "multer",
  "o2_dex",
  "o2_enterprise",
  "o2_openfga",
@@ -6888,10 +6892,10 @@ dependencies = [
  "prost 0.14.3",
  "proto",
  "rand 0.10.1",
- "rcgen",
  "regex",
  "reqwest 0.13.2",
  "rust-embed-for-web",
+ "search",
  "search_service",
  "serde",
  "serde_json",
@@ -6907,6 +6911,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-opentelemetry",
+ "transform",
  "url",
  "utoipa",
  "utoipa-swagger-ui",
@@ -6931,12 +6936,15 @@ name = "openobserve-api-management"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "audit",
  "axum",
  "axum-extra",
  "base64 0.22.1",
  "chrono",
+ "common",
  "config",
  "cron",
+ "db",
  "hashbrown 0.16.1",
  "http 1.4.0",
  "infra",
@@ -6950,16 +6958,18 @@ dependencies = [
  "regex",
  "reqwest 0.13.2",
  "sea-orm",
+ "search",
+ "search_service",
  "serde",
  "serde_json",
  "svix-ksuid",
  "time",
  "tokio",
- "tower",
  "tracing",
  "transform",
  "url",
  "utoipa",
+ "vrl",
 ]
 
 [[package]]
@@ -6967,10 +6977,14 @@ name = "openobserve-api-query"
 version = "0.1.0"
 dependencies = [
  "arrow-schema",
+ "audit",
  "axum",
  "bytes",
  "chrono",
+ "common",
  "config",
+ "db",
+ "enrichment",
  "futures",
  "hashbrown 0.16.1",
  "http 1.4.0",
@@ -6980,8 +6994,10 @@ dependencies = [
  "o2_openfga",
  "openobserve-api-common",
  "openobserve-core",
+ "promql",
  "promql-parser",
  "proto",
+ "search",
  "search_service",
  "serde",
  "serde_json",
@@ -6990,6 +7006,7 @@ dependencies = [
  "tower",
  "tracing",
  "transform",
+ "usage_reporting",
  "utoipa",
 ]
 
@@ -7013,7 +7030,6 @@ dependencies = [
  "arrow",
  "arrow-json",
  "arrow-schema",
- "async-recursion",
  "async-trait",
  "audit",
  "aws-config",
@@ -7030,16 +7046,12 @@ dependencies = [
  "csv",
  "dashmap",
  "datafusion",
- "datafusion-functions-json",
- "datafusion-proto",
  "db",
- "expect-test",
+ "enrichment",
  "flate2",
- "flight",
  "futures",
  "futures-util",
  "hashbrown 0.16.1",
- "hashlink 0.11.0",
  "http 1.4.0",
  "http-body-util",
  "infra",
@@ -7079,7 +7091,6 @@ dependencies = [
  "serde_json",
  "snap",
  "sourcemap",
- "sqlparser",
  "svix-ksuid",
  "tantivy",
  "tantivy_utils",
@@ -7096,6 +7107,7 @@ dependencies = [
  "utoipa",
  "version-compare",
  "vortex",
+ "vrl",
  "wal",
  "webpki-roots 1.0.6",
  "x509-parser",
@@ -7109,9 +7121,12 @@ dependencies = [
  "anyhow",
  "arrow",
  "arrow-schema",
+ "audit",
  "bytes",
  "chrono",
+ "common",
  "config",
+ "db",
  "futures",
  "hashbrown 0.16.1",
  "infra",
@@ -7126,6 +7141,7 @@ dependencies = [
  "regex",
  "report_server",
  "reqwest 0.13.2",
+ "search",
  "search_service",
  "serde_json",
  "tokio",
@@ -8118,7 +8134,6 @@ dependencies = [
  "cargo_metadata",
  "datafusion-proto",
  "prost 0.14.3",
- "prost-build",
  "prost-wkt-types",
  "serde",
  "serde_json",
@@ -9711,6 +9726,7 @@ dependencies = [
  "datafusion",
  "datafusion-functions-json",
  "datafusion-proto",
+ "enrichment",
  "flight",
  "futures",
  "futures-util",
@@ -9748,6 +9764,7 @@ dependencies = [
  "utoipa",
  "vortex",
  "vortex-datafusion",
+ "vrl",
 ]
 
 [[package]]
@@ -9766,9 +9783,8 @@ dependencies = [
  "datafusion-functions-json",
  "datafusion-proto",
  "db",
- "expect-test",
+ "enrichment",
  "flight",
- "float-cmp",
  "futures",
  "hashbrown 0.16.1",
  "infra",
@@ -10286,9 +10302,9 @@ dependencies = [
 
 [[package]]
 name = "spin"
-version = "0.9.8"
+version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+checksum = "3763264f6b73151db08c50ff20d7d8a0b8796e021cdea7ceedad07b80155fa0e"
 dependencies = [
  "lock_api",
 ]
@@ -10701,7 +10717,9 @@ dependencies = [
  "arrow",
  "async-recursion",
  "bytes",
+ "common",
  "config",
+ "db",
  "infra",
  "log",
  "o2_enterprise",

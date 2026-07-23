@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :subtitle="folderName"
     :back="{
       label: t('synthetics.results.monitors'),
-      to: { name: 'synthetic' },
+      to: { name: 'synthetics' },
     }"
     bleed
   >
@@ -336,7 +336,7 @@ function onJumpToWindow(startTime: number, endTime: number) {
 }
 
 function editMonitor() {
-  router.push({ name: "synthetic-new", query: { edit: monitorId.value } });
+  router.push({ name: "synthetics-edit", params: { id: monitorId.value } });
 }
 
 function openRunDetail(runId: string, executionId: string) {

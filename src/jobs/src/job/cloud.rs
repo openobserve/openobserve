@@ -67,7 +67,7 @@ pub fn start() {
 pub fn start_trial_quota_jobs() {
     tokio::spawn(async move { run_trial_quota_flush().await });
     tokio::spawn(async move {
-        crate::service::trial_quota::subscribe_ha_queue().await;
+        openobserve_core::trial_quota::subscribe_ha_queue().await;
     });
 }
 
@@ -160,8 +160,8 @@ async fn run_trial_quota_flush() {
     interval.tick().await; // skip first immediate tick
     loop {
         interval.tick().await;
-        crate::service::trial_quota::flush_to_db().await;
-        crate::service::trial_quota::refresh_limits_from_db().await;
+        openobserve_core::trial_quota::flush_to_db().await;
+        openobserve_core::trial_quota::refresh_limits_from_db().await;
     }
 }
 
@@ -177,9 +177,9 @@ async fn run_ai_quota_check() {
 }
 
 async fn check_all_orgs_ai_quota() {
-    use crate::service::trial_quota;
+    use openobserve_core::trial_quota;
 
-    let orgs = crate::service::db::schema::list_organizations_from_cache().await;
+    let orgs = db::schema::list_organizations_from_cache().await;
 
     // Pre-fetch all notified checkpoints in a single GROUP-BY query to avoid
     // one DB round-trip per org (N+1).
@@ -240,7 +240,8 @@ async fn check_all_orgs_ai_quota() {
             recipients: vec![admin.email.clone()],
         };
 
-        match crate::service::alerts::alert::send_email_notification(&subject, &email, body).await {
+        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        {
             Ok(_) => {
                 log::info!(
                     "[AI_QUOTA] Sent {}% checkpoint email to {} for org={org_id}",
@@ -465,7 +466,8 @@ async fn check_external_contract_expiry() {
             recipients: vec![admin.email.clone()],
         };
 
-        match crate::service::alerts::alert::send_email_notification(&subject, &email, body).await {
+        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        {
             Ok(_) => {
                 log::info!(
                     "[EXT_CONTRACT] Sent {stage:?} expiry warning to {} for org={org_id}",

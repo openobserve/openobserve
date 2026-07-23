@@ -127,9 +127,18 @@ export function buildWireFromStep(step: BrowserStep): WireStep | null {
       return step.value !== undefined && step.value !== ''
         ? { ...base, text: step.value }
         : base
+    case 'hover':
+      return base
+    case 'scroll':
+      return { ...base, value: step.value }
+    case 'wait':
+      return { ...base, value: step.value }
+    case 'screenshot':
+      return base
     default:
-      // hover / scroll / wait / screenshot — not supported by the player.
-      return null
+      // Should never reach here — StepAction is a closed union.
+      console.warn(`[synthetics] unknown action "${step.action}", defaulting to click`)
+      return { ...base, action: 'click' }
   }
 }
 

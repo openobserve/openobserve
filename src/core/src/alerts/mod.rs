@@ -34,14 +34,12 @@ use config::{
         json::{Map, Value},
     },
 };
+use search::utils::is_permissable_function_error;
 use tracing::Instrument;
+use usage_reporting::http_report_metrics;
 
 use super::promql;
-use crate::service::{
-    search::{self as SearchService, utils::is_permissable_function_error},
-    self_reporting::http_report_metrics,
-    setup_tracing_with_trace_id,
-};
+use crate::{search as SearchService, service::setup_tracing_with_trace_id};
 
 pub mod alert;
 pub mod backfill;
@@ -184,8 +182,8 @@ impl QueryConditionExt for QueryCondition {
                     start,
                     end,
                     step: std::cmp::max(
-                        promql::micros(promql::MINIMAL_INTERVAL),
-                        (end - start) / promql::MAX_DATA_POINTS,
+                        ::promql::micros(::promql::MINIMAL_INTERVAL),
+                        (end - start) / ::promql::MAX_DATA_POINTS,
                     ),
                     query_exemplars: false,
                     use_cache: None,
@@ -1585,7 +1583,7 @@ mod tests {
     async fn test_condition_group_evaluate_complex() {
         use config::utils::json::json;
 
-        use crate::service::alerts::ConditionGroupExt;
+        use crate::alerts::ConditionGroupExt;
 
         // Test the condition: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test'
         // AND kubernetes_host = 'test2') With proper Group logic structure
@@ -1684,7 +1682,7 @@ mod tests {
     async fn test_condition_group_evaluate_with_nested_group() {
         use config::utils::json::json;
 
-        use crate::service::alerts::ConditionGroupExt;
+        use crate::alerts::ConditionGroupExt;
 
         // Test evaluation with nested group: kubernetes_docker_id = 'test' OR
         // (kubernetes_container_image = 'test' AND kubernetes_host = 'test2') Structure:
@@ -1752,7 +1750,7 @@ mod tests {
     async fn test_condition_group_to_sql_complex_with_nested_group() {
         use arrow_schema::{DataType, Field, Schema};
 
-        use crate::service::alerts::ConditionGroupExt;
+        use crate::alerts::ConditionGroupExt;
 
         let schema = Schema::new(vec![
             Field::new("kubernetes_docker_id", DataType::Utf8, false),
@@ -1803,7 +1801,7 @@ mod tests {
     async fn test_condition_group_evaluate_operator_precedence() {
         use config::utils::json::json;
 
-        use crate::service::alerts::ConditionGroupExt;
+        use crate::alerts::ConditionGroupExt;
 
         // Test operator precedence: A OR (B) AND C should evaluate as A OR ((B) AND C)
         // Structure: kubernetes_docker_id = 'test' OR (kubernetes_container_image = 'test') AND
@@ -1896,7 +1894,7 @@ mod tests {
     async fn test_deeply_nested_groups_with_precedence() {
         use config::utils::json::json;
 
-        use crate::service::alerts::ConditionGroupExt;
+        use crate::alerts::ConditionGroupExt;
 
         // Complex nested structure: A OR (B AND C OR (D AND E)) AND F
         // This tests: nested groups + operator precedence at multiple levels

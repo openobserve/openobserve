@@ -286,9 +286,15 @@ onMounted(async () => {
 
   try {
     const res = (await getStreams("traces", false, false)) as {
-      list?: { name: string }[];
+      list?: { name: string; settings?: { is_llm_stream?: boolean } }[];
     };
-    availableStreams.value = (res?.list ?? []).map((s) => s.name);
+    // Only LLM trace streams belong here — Agent Behaviour has no signals for a
+    // plain service/HTTP trace stream. `is_llm_stream` is the backend-maintained
+    // flag (auto-detected at ingest from gen_ai_* columns). Exclude only streams
+    // explicitly flagged non-LLM, matching LLM Insights / Sessions / Agent Graph.
+    availableStreams.value = (res?.list ?? [])
+      .filter((s) => s.settings?.is_llm_stream !== false)
+      .map((s) => s.name);
     if (availableStreams.value.length && !activeStream.value) {
       activeStream.value = availableStreams.value[0];
     }

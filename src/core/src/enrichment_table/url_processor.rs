@@ -63,7 +63,7 @@ use futures::StreamExt;
 use reqwest::Client;
 use tokio::sync::mpsc;
 
-use crate::service::db;
+use crate::db;
 
 // ============================================================================
 // MPSC Channel and Event
@@ -193,7 +193,7 @@ static URL_JOB_SENDER: Lazy<mpsc::UnboundedSender<EnrichmentUrlJobEvent>> = Lazy
 /// ```rust,ignore
 /// // In ingester initialization code:
 /// if LOCAL_NODE.is_ingester() {
-///     crate::service::enrichment_table::url_processor::init_url_processor();
+///     crate::enrichment_table::url_processor::init_url_processor();
 /// }
 /// ```
 pub fn init_url_processor() {
@@ -327,9 +327,7 @@ async fn process_url_jobs(mut rx: mpsc::UnboundedReceiver<EnrichmentUrlJobEvent>
 /// the status check prevents duplicate processing. Only jobs in Pending or Failed status
 /// will proceed past the initial checks.
 async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
-    use crate::service::db::enrichment_table::{
-        get_url_jobs_for_table, notify_update, save_url_job,
-    };
+    use crate::db::enrichment_table::{get_url_jobs_for_table, notify_update, save_url_job};
 
     // ===== MULTI-URL SUPPORT: Process all pending jobs sequentially =====
     // Fetch all jobs for this table. We process them one by one in the order they appear.
@@ -441,9 +439,7 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                 // Fetch the latest job state to preserve progress updates made during processing.
                 // The process_enrichment_table_url function updates progress after each batch,
                 // so we need the latest state before marking as completed.
-                let mut job = match crate::service::db::enrichment_table::get_url_job_by_id(&job_id)
-                    .await
-                {
+                let mut job = match crate::db::enrichment_table::get_url_job_by_id(&job_id).await {
                     Ok(Some(j)) => j,
                     Ok(None) => {
                         log::warn!(
@@ -483,7 +479,7 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
                 //
                 // Note: We don't fail the job if notification fails. The data is already
                 // saved; worst case, nodes will pick up changes on next periodic sync.
-                let stream_name = crate::service::format_stream_name(table_name.to_string());
+                let stream_name = config::utils::schema::format_stream_name(table_name.to_string());
                 if let Err(e) = notify_update(org_id, &stream_name).await {
                     log::error!("[ENRICHMENT::URL] Failed to notify update: {}", e);
                 }
@@ -503,27 +499,26 @@ async fn process_single_url_job(org_id: &str, table_name: &str) -> Result<()> {
 
                 // Fetch the latest job state to preserve progress updates (last_byte_position,
                 // etc.) made during processing before the failure occurred.
-                let mut job =
-                    match crate::service::db::enrichment_table::get_url_job_by_id(&job_id).await {
-                        Ok(Some(j)) => j,
-                        Ok(None) => {
-                            log::warn!(
-                                "[ENRICHMENT::URL] Job {} for {}/{} not found after failure",
-                                job_id,
-                                org_id,
-                                table_name
-                            );
-                            continue;
-                        }
-                        Err(e) => {
-                            log::error!(
-                                "[ENRICHMENT::URL] Failed to fetch job {} after failure: {}",
-                                job_id,
-                                e
-                            );
-                            continue;
-                        }
-                    };
+                let mut job = match crate::db::enrichment_table::get_url_job_by_id(&job_id).await {
+                    Ok(Some(j)) => j,
+                    Ok(None) => {
+                        log::warn!(
+                            "[ENRICHMENT::URL] Job {} for {}/{} not found after failure",
+                            job_id,
+                            org_id,
+                            table_name
+                        );
+                        continue;
+                    }
+                    Err(e) => {
+                        log::error!(
+                            "[ENRICHMENT::URL] Failed to fetch job {} after failure: {}",
+                            job_id,
+                            e
+                        );
+                        continue;
+                    }
+                };
 
                 let cfg = get_config();
                 job.retry_count += 1;
@@ -768,9 +763,8 @@ pub async fn check_range_support_for_url(
     let cfg = get_config();
     let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
-    let client =
-        crate::common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
-            .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
+    let client = common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
+        .map_err(|e| anyhow!("Failed to create HTTP client: {}", e))?;
 
     check_range_support(&client, url, org_id, table_name).await
 }
@@ -960,7 +954,7 @@ impl UrlCsvProcessor {
         let timeout = std::time::Duration::from_secs(cfg.enrichment_table.url_fetch_timeout_secs);
 
         let client =
-            crate::common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
+            common::utils::ssrf_guard::build_safe_client(Client::builder().timeout(timeout))
                 .expect("Failed to create HTTP client");
 
         Self {
@@ -993,8 +987,7 @@ impl UrlCsvProcessor {
         // SSRF protection: resolve and validate the URL (literal-IP, hostname,
         // and every resolved A/AAAA record) before issuing any request.
         if let Err(e) =
-            crate::common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&self.url)
-                .await
+            common::utils::ssrf_guard::SsrfGuard::validate_url_with_config_async(&self.url).await
         {
             return Err(anyhow!("URL blocked by SSRF guard: {}", e));
         }
@@ -1645,7 +1638,7 @@ async fn process_enrichment_table_url(
 
     // Now that all batches are processed, update meta stats and notify
     // We need to get the schema from the stream_schema_map since we can't pass it from callback
-    let stream_name = crate::service::format_stream_name(table_name.to_string());
+    let stream_name = config::utils::schema::format_stream_name(table_name.to_string());
     // Use the timestamp from the last batch instead of generating a new one
     let timestamp = last_batch_timestamp.load(std::sync::atomic::Ordering::Relaxed);
 
@@ -1660,7 +1653,7 @@ async fn process_enrichment_table_url(
 
     use config::meta::stream::StreamType;
 
-    use crate::service::schema::stream_schema_exists;
+    use crate::schema::stream_schema_exists;
 
     let mut stream_schema_map: HashMap<String, infra::schema::SchemaCache> = HashMap::new();
     stream_schema_exists(
@@ -1758,11 +1751,15 @@ async fn save_enrichment_batch(
         SIZE_IN_MB, TIMESTAMP_COL_NAME,
         cluster::LOCAL_NODE,
         meta::stream::StreamType,
-        utils::{json, schema::infer_json_schema_from_map, time::BASE_TIME},
+        utils::{
+            json,
+            schema::{format_stream_name, infer_json_schema_from_map},
+            time::BASE_TIME,
+        },
     };
 
-    use crate::service::{
-        db, format_stream_name,
+    use crate::{
+        db,
         schema::{check_for_schema, stream_schema_exists},
     };
 
@@ -1896,28 +1893,18 @@ async fn save_enrichment_batch(
     // Store data based on size threshold
     // If data size is less than the merge threshold, store in database
     // Otherwise, store directly to remote storage
-    let merge_threshold_mb = crate::service::enrichment::storage::remote::get_merge_threshold_mb()
+    let merge_threshold_mb = crate::enrichment::storage::remote::get_merge_threshold_mb()
         .await
         .unwrap_or(100) as f64;
 
     if (records_size as f64) < merge_threshold_mb * SIZE_IN_MB {
-        crate::service::enrichment::storage::database::store(
-            org_id,
-            &stream_name,
-            &records,
-            timestamp,
-        )
-        .await
-        .map_err(|e| anyhow!("Error writing enrichment table to database: {}", e))?;
+        crate::enrichment::storage::database::store(org_id, &stream_name, &records, timestamp)
+            .await
+            .map_err(|e| anyhow!("Error writing enrichment table to database: {}", e))?;
     } else {
-        crate::service::enrichment::storage::remote::store(
-            org_id,
-            &stream_name,
-            &records,
-            timestamp,
-        )
-        .await
-        .map_err(|e| anyhow!("Error writing enrichment table to remote storage: {}", e))?;
+        crate::enrichment::storage::remote::store(org_id, &stream_name, &records, timestamp)
+            .await
+            .map_err(|e| anyhow!("Error writing enrichment table to remote storage: {}", e))?;
     }
 
     // Note: We skip local storage here - it will be done once at the end for efficiency

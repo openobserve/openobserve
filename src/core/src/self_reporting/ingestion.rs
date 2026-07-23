@@ -34,10 +34,7 @@ use hashbrown::{HashMap, hash_map::Entry};
 use proto::cluster_rpc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
-use crate::{
-    common::meta::ingestion::{self, IngestUser, SystemJobType},
-    service,
-};
+use crate::ingestion_types::{self as ingestion, IngestUser, SystemJobType};
 
 pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
     if curr_usages.is_empty() {
@@ -57,7 +54,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                     .as_ref()
                     .map(|ctx| (&ctx.dashboard_id, &ctx.dashboard_name))
                 && let Ok((folder, dashboard)) =
-                    service::dashboards::get_folder_and_dashboard(&usage_data.org_id, dashboard_id)
+                    crate::dashboards::get_folder_and_dashboard(&usage_data.org_id, dashboard_id)
                         .await
                 && let Some(ctx) = usage_data.search_event_context.as_mut()
             {
@@ -242,9 +239,7 @@ pub(super) async fn ingest_usages(mut curr_usages: Vec<UsageData>) {
                 // do not skip self-reporting even if super org reporting fails
 
                 // Check if org has usage stream enabled
-                match crate::service::db::organization::get_org_setting_usage_stream_enabled(&org)
-                    .await
-                {
+                match crate::db::organization::get_org_setting_usage_stream_enabled(&org).await {
                     Ok(true) => {}
                     Ok(false) => continue, // self-report not enabled, so skip
                     Err(e) => {
@@ -287,7 +282,7 @@ pub(super) async fn ingest_reporting_data(
         );
         let bytes = bytes::Bytes::from(json::to_string(&reporting_data_json).unwrap());
         let req = ingestion::IngestionRequest::Usage(bytes);
-        match service::logs::ingest::ingest(
+        match crate::logs::ingest::ingest(
             0,
             &org_id,
             &stream_name,
@@ -330,7 +325,7 @@ pub(super) async fn ingest_reporting_data(
             metadata: None,
         };
 
-        match service::ingestion::ingestion_service::ingest(req).await {
+        match crate::ingestion::ingestion_service::ingest(req).await {
             Ok(resp) if resp.status_code == 200 => {
                 log::debug!(
                     "[SELF-REPORTING] ReportingData successfully ingested to stream {org_id}/{stream_name}"

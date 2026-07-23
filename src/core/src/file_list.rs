@@ -18,11 +18,9 @@ use config::{
     utils::file::get_file_meta as util_get_file_meta,
 };
 use infra::{errors::Result, file_list as infra_file_list, storage};
-pub use infra_file_list::calculate_files_size;
 use rayon::slice::ParallelSliceMut;
-pub use search_service::file_list::{query_by_ids, query_ids};
 
-use crate::service::file_list_dump;
+use crate::file_list_dump;
 
 #[tracing::instrument(
     name = "service::file_list::query",
@@ -138,6 +136,7 @@ mod tests {
         search::ScanStats,
         stream::{FileKey, FileMeta},
     };
+    use infra::file_list::calculate_files_size;
 
     use super::*;
 

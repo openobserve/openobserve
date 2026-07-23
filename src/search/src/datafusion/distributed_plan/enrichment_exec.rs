@@ -39,8 +39,7 @@ use datafusion::{
 use futures::TryStreamExt;
 use parquet::arrow::{ProjectionMask, arrow_reader::ParquetRecordBatchReaderBuilder};
 use rayon::prelude::*;
-
-use crate::enrichment::ENRICHMENT_TABLES;
+use transform::enrichment::ENRICHMENT_TABLES;
 
 #[derive(Debug, Clone)]
 pub struct EnrichmentExec {
@@ -286,7 +285,7 @@ async fn fetch_from_memory_cache(
 
         pool.install(|| {
             let vrl_to_record_batch_timer = metrics.vrl_to_record_batch_time.timer();
-            let chunks: Vec<&[transform::vrl::value::Value]> =
+            let chunks: Vec<&[vrl::value::Value]> =
                 enrichment_data.as_ref().chunks(get_batch_size()).collect();
 
             let result = chunks
@@ -303,7 +302,7 @@ async fn fetch_from_memory_cache(
         })
     } else {
         let vrl_to_record_batch_timer = metrics.vrl_to_record_batch_time.timer();
-        let chunks: Vec<&[transform::vrl::value::Value]> =
+        let chunks: Vec<&[vrl::value::Value]> =
             enrichment_data.as_ref().chunks(get_batch_size()).collect();
 
         let result = chunks

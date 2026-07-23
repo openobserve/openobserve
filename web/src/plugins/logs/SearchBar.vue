@@ -241,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       :name="
                         favoriteViews.includes(view.view_id)
-                          ? 'favorite'
+                          ? 'star'
                           : 'saved-search'
                       "
                       size="sm"
@@ -1792,8 +1792,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OIcon
                         :name="
                           favoriteViews.includes(row.view_id)
-                            ? 'favorite'
-                            : 'favorite-border'
+                            ? 'star'
+                            : 'star-outline'
                         "
                         size="xs"
                         :class="
@@ -1883,7 +1883,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :data-test="`logs-search-bar-favorite-${row.view_id}-saved-view-btn`"
                       @click.stop="handleFavoriteSavedView(row, true)"
                     >
-                      <OIcon name="favorite" size="xs" class="text-favorite" />
+                      <OIcon name="star" size="xs" class="text-favorite" />
                     </OButton>
                     <OButton
                       :title="t('common.edit')"

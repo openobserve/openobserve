@@ -13,16 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-mod cache;
-mod watch;
+pub mod cache;
+pub mod watch;
 
-pub use cache::cache;
 use infra::{
     coordinator::get_coordinator,
     errors::{self, DbError},
     table::cipher::{CipherEntry, EntryKind},
 };
-pub use watch::watch;
 
 pub const CIPHER_KEY_PREFIX: &str = "/cipher_keys/";
 

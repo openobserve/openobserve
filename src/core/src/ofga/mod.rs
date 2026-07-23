@@ -17,7 +17,11 @@ mod migrations;
 
 use std::cmp::Ordering;
 
-use config::meta::{folder::DEFAULT_FOLDER, user::UserRole};
+use config::{
+    DEFAULT_ORG,
+    meta::{folder::DEFAULT_FOLDER, user::UserRole},
+};
+use db;
 use hashbrown::HashSet;
 use infra::dist_lock;
 #[cfg(feature = "cloud")]
@@ -37,13 +41,7 @@ use o2_openfga::{
     },
 };
 
-use crate::{
-    common::{
-        infra::config::{ORG_USERS, ORGANIZATIONS, USERS},
-        meta::organization::DEFAULT_ORG,
-    },
-    service::db,
-};
+use crate::common::infra::config::{ORG_USERS, ORGANIZATIONS, USERS};
 
 pub async fn init() -> Result<(), anyhow::Error> {
     use o2_openfga::get_all_init_tuples;
@@ -411,7 +409,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     }
                     if need_pipeline_migration {
                         get_ownership_all_org_tuple(org_name, "pipelines", &mut tuples);
-                        match db::pipeline::list_by_org(org_name).await {
+                        match infra::pipeline::list_by_org(org_name).await {
                             Ok(pipelines) => {
                                 for pipeline in pipelines {
                                     add_tuple_for_pipeline(org_name, &pipeline.id, &mut tuples);
